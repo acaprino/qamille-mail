@@ -3,6 +3,8 @@ name: ci
 on:
   pull_request:
     branches: [develop]
+  # By hand on a branch (Actions, Run workflow): the same checks without a pull request.
+  workflow_dispatch:
 
 permissions:
   contents: read

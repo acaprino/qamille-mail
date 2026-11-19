@@ -599,8 +599,12 @@ pub struct ComputeState {
     pub usage: Option<Arc<dyn UsageSink>>,
     /// The mode `/health` declares (`remote` in `serve`).
     pub mode: &'static str,
-    /// The assistant's gateway (`POST /v1/chat/completions`), when a provider is configured.
-    llm: Option<Arc<crate::llm::LlmGateway>>,
+    /// The assistant's gateway (`POST /v1/chat/completions`), swapped at run time from `/admin`.
+    llm: crate::llm::LlmHolder,
+    /// The body limit and the time limit (seconds) of the assistant's route; `None`: no route.
+    llm_route: Option<(usize, u64)>,
+    /// The assistant's settings from `/admin` (`/admin/api/llm`); `None`: not on this server.
+    llm_admin: Option<Arc<crate::llm::LlmAdmin>>,
     model_gate: Arc<Gate>,
     parser_gate: Arc<Gate>,
     speech_gate: Arc<Gate>,
@@ -623,7 +627,9 @@ impl ComputeState {
             auth,
             usage: None,
             mode,
-            llm: None,
+            llm: crate::llm::LlmHolder::default(),
+            llm_route: None,
+            llm_admin: None,
             model_gate: Arc::new(Gate::new(queue)),
             parser_gate: Arc::new(Gate::new(queue)),
             speech_gate: Arc::new(Gate::with_permits(speech::default_parallelism(), speech::SPEECH_QUEUE)),
@@ -657,13 +663,24 @@ impl ComputeState {
 
     /// With the assistant's gateway: `POST /v1/chat/completions` and its models in `/v1/models`.
     pub fn with_llm(mut self, gateway: Arc<crate::llm::LlmGateway>) -> Self {
-        self.llm = Some(gateway);
+        self.llm_route = Some((gateway.config().max_request_bytes, gateway.config().timeout_secs));
+        self.llm = crate::llm::LlmHolder::default();
+        self.llm.replace(Some(gateway));
         self
     }
 
-    /// The assistant's gateway, if a provider is configured.
-    pub fn llm_gateway(&self) -> Option<&Arc<crate::llm::LlmGateway>> {
-        self.llm.as_ref()
+    /// With the assistant that `/admin` can change at run time: the route is always there (`404`
+    /// while no provider is set), its limits from the configuration the server started with.
+    pub fn with_llm_admin(mut self, holder: crate::llm::LlmHolder, route: (usize, u64), admin: Arc<crate::llm::LlmAdmin>) -> Self {
+        self.llm = holder;
+        self.llm_route = Some(route);
+        self.llm_admin = Some(admin);
+        self
+    }
+
+    /// The assistant's gateway in use, if a provider is set.
+    pub fn llm_gateway(&self) -> Option<Arc<crate::llm::LlmGateway>> {
+        self.llm.get()
     }
 
     /// With per-user counters.
@@ -714,7 +731,7 @@ impl ComputeState {
 
 /// The compute routes and their layers, without a fallback.
 fn routes(state: ComputeState) -> Router<ComputeState> {
-    let llm_routes = state.llm.as_ref().map(|gateway| chat::routes(&state, gateway));
+    let llm_routes = state.llm_route.map(|(body_limit, timeout_secs)| chat::routes(&state, body_limit, timeout_secs));
     let json_limit = DefaultBodyLimit::max(MAX_JSON_BYTES);
     let upload_limit = DefaultBodyLimit::max(MAX_UPLOAD_BODY);
     let timeout = |limit: Duration| -> TimeoutLayer { TimeoutLayer::with_status_code(StatusCode::REQUEST_TIMEOUT, limit) };
@@ -978,7 +995,7 @@ async fn health(State(state): State<ComputeState>, request: Request) -> Response
 }
 
 async fn list_models(State(state): State<ComputeState>) -> Result<Response, ComputeError> {
-    let assistant = state.llm.as_ref().map(|gateway| gateway.models()).unwrap_or_default();
+    let assistant = state.llm.get().map(|gateway| gateway.models()).unwrap_or_default();
     let models = blocking(move || Ok(state.all_models())).await?;
     let mut data: Vec<_> = models
         .iter()
@@ -1164,7 +1181,45 @@ pub fn admin_routes(state: ComputeState) -> Router<crate::http::AppState> {
         .route("/admin/api/models", get(admin_models))
         .route("/admin/api/models/{id}/install", post(admin_install))
         .route("/admin/api/models/{id}", axum::routing::delete(admin_remove))
+        .route("/admin/api/llm", get(admin_llm).put(admin_llm_save).delete(admin_llm_reset))
         .layer(axum::Extension(state))
+}
+
+fn llm_admin(state: &ComputeState) -> Result<Arc<crate::llm::LlmAdmin>, crate::error::ServerError> {
+    state.llm_admin.clone().ok_or_else(crate::error::ServerError::not_found)
+}
+
+/// `GET /admin/api/llm`: the assistant's settings, where they come from and what runs now; of the
+/// provider's key only where it comes from and its last four characters.
+async fn admin_llm(_admin: crate::http::AdminAuth, axum::Extension(state): axum::Extension<ComputeState>) -> Result<Response, crate::error::ServerError> {
+    let admin = llm_admin(&state)?;
+    let view = tokio::task::spawn_blocking(move || admin.view()).await.map_err(crate::error::ServerError::internal)?;
+    Ok(Json(view).into_response())
+}
+
+/// `PUT /admin/api/llm`: saves the settings in the data folder and applies them at once (a local
+/// model this server did not start with: at the next start, `restart_required`).
+async fn admin_llm_save(
+    _admin: crate::http::AdminAuth,
+    axum::Extension(state): axum::Extension<ComputeState>,
+    crate::http::JsonBody(input): crate::http::JsonBody<crate::llm::LlmSettingsInput>,
+) -> Result<Response, crate::error::ServerError> {
+    let admin = llm_admin(&state)?;
+    let view = tokio::task::spawn_blocking(move || admin.update(input))
+        .await
+        .map_err(crate::error::ServerError::internal)?
+        .map_err(|error| crate::error::ServerError::InvalidRequest(error.to_string()))?;
+    Ok(Json(view).into_response())
+}
+
+/// `DELETE /admin/api/llm`: drops the saved settings; the configuration (file and environment) applies again.
+async fn admin_llm_reset(_admin: crate::http::AdminAuth, axum::Extension(state): axum::Extension<ComputeState>) -> Result<Response, crate::error::ServerError> {
+    let admin = llm_admin(&state)?;
+    let view = tokio::task::spawn_blocking(move || admin.reset())
+        .await
+        .map_err(crate::error::ServerError::internal)?
+        .map_err(|error| crate::error::ServerError::InvalidRequest(error.to_string()))?;
+    Ok(Json(view).into_response())
 }
 
 fn admin_error(error: ComputeError) -> crate::error::ServerError {

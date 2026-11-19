@@ -41,7 +41,7 @@ Un adattatore per l'API di Anthropic è un passo successivo (non obiettivo): l'a
 | `llm_max_tokens_per_day_per_user` | `0` (nessun tetto) | Token in entrata più in uscita al giorno per utente; oltre: `429 rate_limited` con `retry_after_s` fino a mezzanotte UTC. Raccomandato con un provider a pagamento (scelta mia). |
 | `llm_label` | dal nome dell'host | Il nome mostrato nel consenso: «OpenAI» per `api.openai.com`, altrimenti l'host. |
 | `llm_external` | dedotto | `false` se l'host è loopback, un indirizzo privato o un nome senza punti (un servizio del compose); altrimenti `true`. Si può forzare. |
-| `QAMILLE_LLM_API_KEY` | nessuno | Solo nell'ambiente, mai nel file né verso le app (INV-32). |
+| `QAMILLE_LLM_API_KEY` | nessuno | Nell'ambiente, mai nel file di configurazione né verso le app; il pannello `/admin` può impostarne un'altra (INV-32). |
 | `llm_builtin_slots` | `1` | Con `builtin`: richieste servite insieme dal motore, da 1 a 4 (scelta mia: 1, perché il contesto si divide tra gli slot e la memoria cresce con loro). |
 | `llm_builtin_context` | `8192` | Con `builtin`: lunghezza del contesto in token (più lungo, più memoria). |
 | `llm_builtin_idle_secs` | `600` | Con `builtin`: dopo questi secondi senza richieste il modello si scarica dalla memoria. |
@@ -179,7 +179,7 @@ Candidati valutati con questi criteri: le famiglie Gemma 4 (Apache-2.0), Qwen3 (
 
 ## Invarianti
 
-- **INV-32.** La chiave del provider LLM sta solo nell'ambiente del server e non va mai alle app.
+- **INV-32.** La chiave del provider LLM sta nell'ambiente del server o, scelta dal pannello `/admin` (dal 2026-11-19, richiesta del proprietario), in `llm-settings.json` nella cartella dei dati (permessi 0600); non va mai alle app, nei log né nelle risposte dell'API amministrativa, che ne dicono solo la provenienza e le ultime quattro lettere.
 - **INV-33.** Il server non conserva né scrive nei log il contenuto delle richieste e delle risposte LLM.
 - **INV-34.** Prima del consenso l'app dice se il server inoltra le richieste all'assistente a un servizio esterno, e a quale. Il server non inoltra una richiesta il cui consenso non coincide con il provider attuale.
 - **INV-39.** Ogni modello e ogni motore scaricato è fissato a una revisione o versione e verificato con SHA-256 prima dell'uso; mai «l'ultima versione».

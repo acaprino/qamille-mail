@@ -38,7 +38,7 @@ curl -X POST -H "Authorization: Bearer $QAMILLE_ADMIN_KEY" http://127.0.0.1:8788
 
 ### Assistente (gateway LLM)
 
-Con `llm_provider = "openai-compatible"` `serve` monta anche `POST /v1/chat/completions`: il server inoltra la conversazione a un modello compatibile con OpenAI che scegli tu, **interno** (Ollama, vLLM, llama.cpp già in funzione) o **remoto** (OpenAI). Le chiavi `llm_*` sono nella tabella di «Configurazione»; la chiave del provider sta **solo** nella variabile `QAMILLE_LLM_API_KEY`, mai nel file di configurazione, mai verso le app, mai nei log. `llm_provider = "builtin"` (un modello che gira dentro il server) arriva con una versione successiva.
+Con `llm_provider = "openai-compatible"` `serve` monta anche `POST /v1/chat/completions`: il server inoltra la conversazione a un modello compatibile con OpenAI che scegli tu, **interno** (Ollama, vLLM, llama.cpp già in funzione) o **remoto** (OpenAI). Le chiavi `llm_*` sono nella tabella di «Configurazione»; la chiave del provider sta nella variabile `QAMILLE_LLM_API_KEY` (mai nel file di configurazione, mai verso le app, mai nei log) oppure si sceglie dal pannello `/admin`, sezione «Assistente» (sotto). `llm_provider = "builtin"` (un modello che gira dentro il server) arriva con una versione successiva.
 
 - **Accesso:** la chiave di un dispositivo attivo, come per il calcolo, il diritto d'uso dell'edizione (nell'enterprise `402 subscription_required` senza abbonamento), il tetto giornaliero e un cancello suo per le richieste in volo per utente; un corpo oltre `llm_max_request_bytes` riceve `413`.
 - **Consenso:** `GET /v1/info` dichiara in `llm` il modello, i modelli ammessi, `external`, `label` e `context_tokens`. L'app mostra prima del collegamento, per esempio, «le richieste all'assistente vengono inoltrate a OpenAI, un servizio esterno a questo server» e manda `X-Qamille-Llm-Consent: <external>;<label>`. Se non coincide con il provider attuale il server risponde `409 llm_consent_required` **senza inoltrare nulla**.
@@ -57,6 +57,8 @@ docker compose exec ollama ollama pull qwen2.5:14b   # una volta, prima del prim
 ```
 
 Esempio con OpenAI: `QAMILLE_LLM_PROVIDER=openai-compatible`, `QAMILLE_LLM_BASE_URL=https://api.openai.com/v1`, `QAMILLE_LLM_MODEL=gpt-4.1-mini`, `QAMILLE_LLM_MAX_TOKENS_PER_DAY_PER_USER=200000` e la chiave in `QAMILLE_LLM_API_KEY`.
+
+**Dal pannello `/admin`, sezione «Assistente».** Si sceglie chi risponde (nessuno, un'API compatibile OpenAI con indirizzo, chiave, modello predefinito, altri modelli ammessi e token al giorno per utente, oppure un modello locale scaricato dalla sezione «Modelli») e il server lo applica subito, senza riavvio: le richieste già partite finiscono con il provider di prima. Le impostazioni si salvano in `llm-settings.json` nella cartella dei dati (permessi 0600: può contenere la chiave) e all'avvio valgono sopra il file di configurazione e l'ambiente; «Torna alla configurazione del server» le cancella. La chiave non torna mai indietro: il pannello ne mostra solo la provenienza (pannello o configurazione) e le ultime quattro lettere; lasciando il campo vuoto resta quella che c'è. Un modello locale diverso da quello con cui il server è partito si applica al riavvio successivo (il pannello lo dice). API: `GET`, `PUT` e `DELETE` su `/admin/api/llm`, dietro la chiave amministratore come le altre rotte `/admin/api`.
 
 Per fermare il server: Ctrl+C o `SIGTERM`.
 

@@ -1,9 +1,10 @@
 // «Create account» in the Professional build (access wave 3, spec A9): email → a code by mail →
 // code, password twice, optional username, device name. The server answers the same way whether
 // the email is free or already has an account; «Send the code again» after 60 s.
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import Button from '../../ds/primitives/Button';
 import Field from '../../ds/primitives/Field';
+import DeviceName from './DeviceName';
 import { call, errorText } from '../../lib/api';
 import { tr } from '../../lib/i18n';
 import type { LegalInfo } from '../../lib/server-connect';
@@ -15,11 +16,18 @@ export type SignUpStepProps = {
   defaultDeviceName: string;
   /** The server's documents (`GET /v1/info`), when it asks for them. */
   legal?: LegalInfo | null;
+  /** The host titles the step already (the sign-in card). */
+  titled?: boolean;
+  /** «Continue with Google», offered until the code is sent. */
+  google?: ReactNode;
+  /** The Terms box shared with «Continue with Google»: one box for both ways in, above them. */
+  terms?: boolean;
+  onTermsChange?: (checked: boolean) => void;
   onDone: () => void;
   onBack: () => void;
 };
 
-export default function SignUpStep({ url, defaultDeviceName, legal, onDone, onBack }: SignUpStepProps) {
+export default function SignUpStep({ url, defaultDeviceName, legal, titled = false, google, terms: sharedTerms, onTermsChange, onDone, onBack }: SignUpStepProps) {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const [wait, setWait] = useState(0);
@@ -28,7 +36,9 @@ export default function SignUpStep({ url, defaultDeviceName, legal, onDone, onBa
   const [repeat, setRepeat] = useState('');
   const [username, setUsername] = useState('');
   const [deviceName, setDeviceName] = useState(defaultDeviceName);
-  const [terms, setTerms] = useState(false);
+  const [ownTerms, setOwnTerms] = useState(false);
+  const terms = sharedTerms ?? ownTerms;
+  const setTerms = onTermsChange ?? setOwnTerms;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -56,14 +66,16 @@ export default function SignUpStep({ url, defaultDeviceName, legal, onDone, onBa
 
   return (
     <section className="server-signup" aria-label={tr('Crea account', 'Create account')}>
-      <h3>{tr('Crea account', 'Create account')}</h3>
+      {!titled && <h3>{tr('Crea account', 'Create account')}</h3>}
+      {google && !sent && needsTermsBox(legal) && <TermsBox legal={legal!} checked={terms} onChange={setTerms} onError={setError} />}
+      {!sent && google}
       <Field>
         {tr('Email', 'Email')}
         <input type="email" value={email} autoComplete="email" disabled={sent} onChange={(e) => setEmail(e.currentTarget.value)} />
       </Field>
-      {needsTermsBox(legal) && <TermsBox legal={legal!} checked={terms} onChange={setTerms} onError={setError} />}
+      {!google && needsTermsBox(legal) && <TermsBox legal={legal!} checked={terms} onChange={setTerms} onError={setError} />}
       {!sent ? (
-        <div className="button-row">
+        <div className="button-row step-actions">
           <Button variant="primary" disabled={busy || !email.includes('@') || termsBlock(legal, terms)} onClick={() => void send()}>
             {tr('Mandami il codice', 'Send me the code')}
           </Button>
@@ -103,11 +115,8 @@ export default function SignUpStep({ url, defaultDeviceName, legal, onDone, onBa
             {tr('Username (facoltativo)', 'Username (optional)')}
             <input value={username} autoComplete="username" onChange={(e) => setUsername(e.currentTarget.value)} />
           </Field>
-          <Field>
-            {tr('Nome di questo dispositivo', 'Name of this device')}
-            <input value={deviceName} onChange={(e) => setDeviceName(e.currentTarget.value)} />
-          </Field>
-          <div className="button-row">
+          <DeviceName value={deviceName} onChange={setDeviceName} />
+          <div className="button-row step-actions">
             <Button variant="primary" type="submit" disabled={busy || !code.trim() || password.length < 10 || termsBlock(legal, terms)}>
               {tr('Crea account ed entra', 'Create account and sign in')}
             </Button>

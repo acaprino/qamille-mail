@@ -293,6 +293,7 @@ export default function Settings({
   useImperativeHandle(ref, () => ({ showSection, discard, save }));
 
   const section = form.section;
+  const hasGmail = workspace.accounts.some((account) => account.kind === 'Gmail');
   return (
     <>
       <section className="settings-page">
@@ -481,12 +482,18 @@ export default function Settings({
                   </div>
                 ))}
                 <MailboxSync accounts={workspace.accounts} changed={changed} notify={notify} />
-                <h3>{tr('Accedi con Google', 'Sign in with Google')}</h3>
+                {/* With a Gmail mailbox already here, Google is for adding another one, not for signing in again. */}
+                <h3>{hasGmail ? tr('Aggiungi un account Google', 'Add a Google account') : tr('Accedi con Google', 'Sign in with Google')}</h3>
                 <p className="muted">
-                  {tr(
-                    'Scegli il tuo account o inserisci email e password nella pagina di Google che si apre nel browser.',
-                    'Choose your account or enter your email and password on Google’s page in your browser.',
-                  )}
+                  {hasGmail
+                    ? tr(
+                        'Collega un altro indirizzo Gmail o Google Workspace: la pagina di Google si apre nel browser.',
+                        'Connect another Gmail or Google Workspace address: Google’s page opens in your browser.',
+                      )
+                    : tr(
+                        'Scegli il tuo account o inserisci email e password nella pagina di Google che si apre nel browser.',
+                        'Choose your account or enter your email and password on Google’s page in your browser.',
+                      )}
                 </p>
                 {/* Google's own look for its sign-in button: neutral, with its «G». */}
                 <Button
@@ -497,9 +504,11 @@ export default function Settings({
                   <GoogleMark />
                   {form.googlePending
                     ? tr('Mostra avanzamento accesso', 'Show sign-in progress')
-                    : tr('Accedi con Google', 'Sign in with Google')}
+                    : hasGmail
+                      ? tr('Aggiungi un account Google', 'Add a Google account')
+                      : tr('Accedi con Google', 'Sign in with Google')}
                 </Button>
-                <div className="google-setup-help">
+                <div className="google-setup-help" hidden={hasGmail}>
                   <p>
                     {tr(
                       'Prima configurazione di Qamille?',

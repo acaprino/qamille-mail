@@ -8,6 +8,9 @@ import Button from '../../ds/primitives/Button';
 import Field from '../../ds/primitives/Field';
 import GoogleMark from '../../ds/primitives/GoogleMark';
 import { call, errorText } from '../../lib/api';
+import { connectGoogle } from '../../lib/google-sign-in';
+import type { Account } from '../../lib/types';
+import DeviceName from './DeviceName';
 import ResetPasswordStep from './ResetPasswordStep';
 import SignUpStep from './SignUpStep';
 import { consentText } from '../../lib/assistant-server';
@@ -28,6 +31,7 @@ import {
   start,
   typeUrl,
   type ConnectForm,
+  type AccountInfo,
   type ConnectOutcome,
   type Probe,
   type ServerInfo,
@@ -44,6 +48,10 @@ export type ServerConnectProps = {
   signUp?: boolean;
   /** «Sign in again» (A8, EX-15): the session's address, the form opens on «Sign in». */
   reconnect?: string | null;
+  /** The host already titles the form (the sign-in card): the «Sign in» and «Create account» steps show no
+   *  heading of their own, and the host hears which of the two is open. */
+  titled?: boolean;
+  onCreatingChange?: (creating: boolean) => void;
   onDone: () => void;
   onCancel: () => void;
 };
@@ -69,7 +77,7 @@ function probeText(probe: Probe | null): string {
   }
 }
 
-export default function ServerConnect({ preset = null, consented, defaultDeviceName, changeServer = false, signUp = false, reconnect = null, onDone, onCancel }: ServerConnectProps) {
+export default function ServerConnect({ preset = null, consented, defaultDeviceName, changeServer = false, signUp = false, reconnect = null, titled = false, onCreatingChange, onDone, onCancel }: ServerConnectProps) {
   const [form, setForm] = useState<ConnectForm>(() => start({ preset, consented, reconnect }));
   const [deviceName, setDeviceName] = useState(defaultDeviceName);
   const [newPassword, setNewPassword] = useState('');
@@ -79,6 +87,7 @@ export default function ServerConnect({ preset = null, consented, defaultDeviceN
   const [caPem, setCaPem] = useState('');
   // «Create account» and «Forgot password?» replace the sign-in step while open.
   const [side, setSide] = useState<'signup' | 'reset' | null>(signUp && preset ? 'signup' : null);
+  useEffect(() => onCreatingChange?.(side === 'signup'), [side]);
   const [presetInfo, setPresetInfo] = useState<ServerInfo | null>(null);
   // «Continue with Google» (spec «Vendita Professional», V3): the browser signs in on the server.
   const [browserWaiting, setBrowserWaiting] = useState(false);
@@ -86,6 +95,8 @@ export default function ServerConnect({ preset = null, consented, defaultDeviceN
   const [terms, setTerms] = useState(false);
   // The device list came from a browser sign-in: «Disable» uses its code, not a password.
   const [browserLimit, setBrowserLimit] = useState(false);
+  // After «Continue with Google», the address whose mail Google is asked for (see connectMailboxOf).
+  const [mailboxOf, setMailboxOf] = useState<string | null>(null);
   // A fixed address (Professional, or «Sign in again») is asked what it offers by itself.
   const fixedUrl = preset ?? reconnect;
   useEffect(() => {
@@ -155,12 +166,33 @@ export default function ServerConnect({ preset = null, consented, defaultDeviceN
       const args = { url: form.url, identifier: form.identifier, password: form.password, deviceName };
       outcome(await call<ConnectOutcome>(changeServer ? 'server_change_server' : 'server_connect', args));
     });
+  // Signing in with Google also brings that Google account's mail into the app (owner, 2026-11-19), as mail
+  // apps do: the mailboxes already kept on the server arrive first; when that address is not among them, Google
+  // is asked for mail access on the same account (its page opens on it). The sign-in stands whatever happens
+  // here: a refused or failed mail access leaves «Sign in with Google» in Settings to try again.
+  async function connectMailboxOf() {
+    try {
+      await call('sync_now').catch(() => {});
+      const account = await call<AccountInfo>('server_account_info');
+      const email = account.email?.trim();
+      if (!email) return;
+      const { accounts } = await call<{ accounts: Account[] }>('workspace_snapshot');
+      if (accounts.some((one) => one.kind !== 'Sample' && one.email.toLowerCase() === email.toLowerCase())) return;
+      if (live.current) setMailboxOf(email);
+      await connectGoogle(email);
+    } catch {
+      // Nothing to undo: the account is signed in, the mailbox can be connected from Settings.
+    } finally {
+      if (live.current) setMailboxOf(null);
+    }
+  }
   const signInWithBrowser = (provider: string) =>
     run(async () => {
       setBrowserWaiting(true);
       try {
         const result = await call<ConnectOutcome>('server_connect_browser', { url: form.url, provider, deviceName, changeServer, acceptedTerms: signUpWithGoogle ? acceptedTerms(info?.legal, terms) : null });
         setBrowserLimit(result.kind === 'device_limit');
+        if (provider === 'google' && result.kind === 'connected') await connectMailboxOf();
         outcome(result);
       } finally {
         if (live.current) setBrowserWaiting(false);
@@ -173,6 +205,45 @@ export default function ServerConnect({ preset = null, consented, defaultDeviceN
   useFocusAfterStep(section, `${form.step}:${side}:${browserWaiting}`);
   const assistantConsent = consentText(info?.llm);
   const mailboxConsent = consentLine(info);
+  // Google first, then «or» and the email form: the order of every sign-in page people know.
+  const googleBlock = (withTerms: boolean) =>
+    google && (
+    <div className="server-browser-sign-in">
+      {withTerms && signUpWithGoogle && !browserWaiting && <TermsBox legal={info!.legal!} checked={terms} onChange={setTerms} onError={setError} />}
+      {browserWaiting ? (
+        <p role="status" className="field-help">
+          {mailboxOf
+            ? tr(
+                `Ora Google chiede di consentire a Qamille la posta di ${mailboxOf}: conferma nel browser, poi torna qui.`,
+                `Google now asks to let Qamille use the mail of ${mailboxOf}: confirm in the browser, then come back here.`,
+              )
+            : tr(
+                "Completa l'accesso nella finestra del browser che si è aperta, poi torna qui.",
+                'Finish signing in in the browser window that opened, then come back here.',
+              )}{' '}
+          <Button
+            variant="text"
+            type="button"
+            onClick={() => void (mailboxOf ? call('cancel_google_sign_in') : call('server_cancel_browser_sign_in'))}
+          >
+            {mailboxOf ? tr('Salta', 'Skip') : tr('Annulla', 'Cancel')}
+          </Button>
+        </p>
+      ) : (
+        <Button
+          variant="secondary"
+          type="button"
+          className="google-button"
+          disabled={busy || (signUpWithGoogle && termsBlock(info?.legal, terms))}
+          onClick={() => void signInWithBrowser('google')}
+        >
+          <GoogleMark />
+          {preset && info?.google_signup ? tr('Continua con Google', 'Continue with Google') : tr('Accedi con Google', 'Sign in with Google')}
+        </Button>
+      )}
+      <p className="or-divider">{tr('oppure', 'or')}</p>
+    </div>
+    );
 
   return (
     <section ref={section} className="server-connect" aria-label={tr('Collegamento al server', 'Server connection')}>
@@ -263,7 +334,7 @@ export default function ServerConnect({ preset = null, consented, defaultDeviceN
           </p>
           {assistantConsent && <p>{tr(assistantConsent.it, assistantConsent.en)}</p>}
           {mailboxConsent && <p>{tr(mailboxConsent.it, mailboxConsent.en)}</p>}
-          <div className="button-row">
+          <div className="button-row step-actions">
             <Button
               variant="primary"
               disabled={busy}
@@ -283,7 +354,17 @@ export default function ServerConnect({ preset = null, consented, defaultDeviceN
         </>
       )}
       {form.step === 'sign_in' && side === 'signup' && (
-        <SignUpStep url={form.url} defaultDeviceName={defaultDeviceName} legal={info?.legal} onDone={onDone} onBack={() => setSide(null)} />
+        <SignUpStep
+          url={form.url}
+          defaultDeviceName={defaultDeviceName}
+          legal={info?.legal}
+          titled={titled}
+          google={googleBlock(false)}
+          terms={terms}
+          onTermsChange={setTerms}
+          onDone={onDone}
+          onBack={() => setSide(null)}
+        />
       )}
       {form.step === 'sign_in' && side === 'reset' && (
         <ResetPasswordStep
@@ -302,44 +383,25 @@ export default function ServerConnect({ preset = null, consented, defaultDeviceN
             void signIn();
           }}
         >
-          <h3>{tr('Accedi', 'Sign in')}</h3>
-          {google && (
-            <div className="server-browser-sign-in">
-              {signUpWithGoogle && !browserWaiting && <TermsBox legal={info!.legal!} checked={terms} onChange={setTerms} onError={setError} />}
-              {browserWaiting ? (
-                <p role="status" className="field-help">
-                  {tr(
-                    "Completa l'accesso nella finestra del browser che si è aperta, poi torna qui.",
-                    'Finish signing in in the browser window that opened, then come back here.',
-                  )}{' '}
-                  <Button variant="text" type="button" onClick={() => void call('server_cancel_browser_sign_in')}>
-                    {tr('Annulla', 'Cancel')}
-                  </Button>
-                </p>
-              ) : (
-                <Button variant="secondary" type="button" disabled={busy || (signUpWithGoogle && termsBlock(info?.legal, terms))} onClick={() => void signInWithBrowser('google')}>
-                  <GoogleMark />
-                  {preset && info?.google_signup
-                    ? tr('Continua con Google', 'Continue with Google')
-                    : tr('Accedi con Google', 'Sign in with Google')}
-                </Button>
-              )}
-              <p className="field-help">{tr('oppure con username e password', 'or with username and password')}</p>
-            </div>
-          )}
+          {!titled && <h3>{tr('Accedi', 'Sign in')}</h3>}
+          {googleBlock(true)}
           <Field>
             {tr('Username o email', 'Username or email')}
             <input value={form.identifier} autoComplete="username" onChange={(e) => setForm({ ...form, identifier: e.currentTarget.value })} />
           </Field>
-          <Field>
-            {tr('Password', 'Password')}
-            <input type="password" value={form.password} autoComplete="current-password" onChange={(e) => setForm({ ...form, password: e.currentTarget.value })} />
-          </Field>
-          <Field>
-            {tr('Nome di questo dispositivo', 'Name of this device')}
-            <input value={deviceName} onChange={(e) => setDeviceName(e.currentTarget.value)} />
-          </Field>
-          <div className="button-row">
+          <div className="field-with-link">
+            <Field>
+              {tr('Password', 'Password')}
+              <input type="password" value={form.password} autoComplete="current-password" onChange={(e) => setForm({ ...form, password: e.currentTarget.value })} />
+            </Field>
+            {info?.password_reset && (
+              <Button variant="text" type="button" className="field-link" onClick={() => setSide('reset')}>
+                {tr('Password dimenticata?', 'Forgot password?')}
+              </Button>
+            )}
+          </div>
+          <DeviceName value={deviceName} onChange={setDeviceName} />
+          <div className="button-row step-actions">
             <Button variant="primary" type="submit" disabled={busy || !form.identifier.trim() || !form.password}>
               {tr('Accedi', 'Sign in')}
             </Button>
@@ -347,19 +409,15 @@ export default function ServerConnect({ preset = null, consented, defaultDeviceN
               {tr('Annulla', 'Cancel')}
             </Button>
           </div>
-          <div className="button-row">
-            {/* Sign-up only in the Professional build (INV-17), when the server offers it. */}
-            {preset && info?.signup && (
+          {/* Sign-up only in the Professional build (INV-17), when the server offers it. */}
+          {preset && info?.signup && (
+            <p className="sign-in-switch">
+              {tr('Non hai un account?', 'No account yet?')}{' '}
               <Button variant="text" type="button" onClick={() => setSide('signup')}>
                 {tr('Crea account', 'Create account')}
               </Button>
-            )}
-            {info?.password_reset && (
-              <Button variant="text" type="button" onClick={() => setSide('reset')}>
-                {tr('Password dimenticata?', 'Forgot password?')}
-              </Button>
-            )}
-          </div>
+            </p>
+          )}
         </form>
       )}
       {form.step === 'new_password' && (
@@ -428,6 +486,7 @@ export default function ServerConnect({ preset = null, consented, defaultDeviceN
                         // The browser sign-in's code disables the device and finishes the sign-in.
                         const result = await call<ConnectOutcome>('server_browser_disable_device', { deviceId: device.id });
                         setBrowserLimit(result.kind === 'device_limit');
+                        if (result.kind === 'connected') await connectMailboxOf();
                         outcome(result);
                         return;
                       }

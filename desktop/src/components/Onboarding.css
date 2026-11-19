@@ -48,9 +48,49 @@
   width: 100%;
   height: 40px;
 }
-/* The consent and the form read as text: aligned left inside the card. */
+/* The consent and the form read as text, aligned left; every action spans the card, so nothing sits off to
+   one side under the centred title. */
 .onboarding-card .server-connect {
   width: 100%;
-  margin-top: 0;
+  margin-top: 4px;
   text-align: left;
+}
+.onboarding-card .server-connect h3 {
+  margin: 0 0 10px;
+  font-size: var(--text-md);
+}
+.onboarding-card .server-connect p:not([class]) {
+  margin: 0 0 10px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+.onboarding-card .server-browser-sign-in {
+  justify-items: stretch;
+  margin-bottom: 18px;
+}
+.onboarding-card .google-button,
+.onboarding-card .step-actions > .primary,
+.onboarding-card .step-actions > .secondary {
+  width: 100%;
+  height: 40px;
+}
+.onboarding-card .step-actions {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+.onboarding-card .step-actions > .text-button {
+  justify-self: center;
+  min-height: 32px;
+  color: var(--text-secondary);
+}
+.onboarding-card .server-connect .field input {
+  height: 40px;
+}
+.onboarding-card .sign-in-switch {
+  margin-top: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-soft);
+  text-align: center;
 }

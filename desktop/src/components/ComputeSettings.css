@@ -60,8 +60,72 @@ button.danger {
 }
 .server-browser-sign-in {
   display: grid;
-  gap: 4px;
+  gap: 14px;
   justify-items: start;
+  margin-bottom: 14px;
+}
+/* «or» between Google and the password form: a rule on each side of the word. */
+.or-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+.or-divider::before,
+.or-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+/* «Forgot password?» on the line of the Password label, at its right end. */
+.field-with-link {
+  position: relative;
+}
+.field-with-link > .field-link {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 0 2px;
+  color: var(--accent-text);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: inherit;
+}
+.device-name-line,
+.sign-in-switch {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+.device-name-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.device-name-line > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.device-name-line strong {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.device-name-line .text-button,
+.sign-in-switch .text-button {
+  padding: 0 2px;
+  color: var(--accent-text);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.sign-in-switch {
+  margin: 16px 0 0;
 }
 .compute-subscription {
   display: grid;

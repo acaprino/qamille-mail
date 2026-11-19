@@ -366,7 +366,8 @@ async fn plain_http_from_outside_is_refused_on_password_routes() {
         assert_error_shape(&r.body, "tls_required");
     }
     assert_eq!(ts.accounts().argon2_verifications(), before);
-    // Le rotte con la sola chiave non richiedono https.
+    // Anche le rotte con la sola chiave del dispositivo: la chiave vale come una password
+    // (`DeviceAuth`, come il calcolo e la sincronizzazione).
     let r = request(
         &ts.public,
         "GET",
@@ -376,7 +377,8 @@ async fn plain_http_from_outside_is_refused_on_password_routes() {
         &[("authorization", &auth)],
     )
     .await;
-    assert_eq!(r.status, 200);
+    assert_eq!(r.status, 400);
+    assert_error_shape(&r.body, "tls_required");
 }
 
 #[tokio::test]
@@ -496,12 +498,24 @@ async fn whoami_fixes_the_device_auth_contract() {
     let ts = TestServer::standard();
     let a = user_with_device(&ts, "mario", PASSWORD).await;
     let auth = bearer(&a.device_key);
+    // In chiaro da fuori la chiave non passa (`tls_required`); dal loopback sì.
     let r = request(
         &ts.public,
         "GET",
         "/test/whoami",
         None,
         remote([203, 0, 113, 3]),
+        &[("authorization", &auth)],
+    )
+    .await;
+    assert_eq!(r.status, 400);
+    assert_error_shape(&r.body, "tls_required");
+    let r = request(
+        &ts.public,
+        "GET",
+        "/test/whoami",
+        None,
+        loopback(),
         &[("authorization", &auth)],
     )
     .await;
@@ -654,7 +668,7 @@ async fn sign_out_this_device() {
         "DELETE",
         "/v1/devices/self",
         None,
-        remote([203, 0, 113, 4]),
+        loopback(),
         &[("authorization", &auth)],
     )
     .await;

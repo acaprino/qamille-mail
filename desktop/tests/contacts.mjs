@@ -38,7 +38,7 @@ try {
 
   await step('A person in two books is one row that shows both origins', async () => {
     const ada = row('Ada Lovelace');
-    await expect(ada).toContainText('Locale');
+    await expect(ada).toContainText('Local');
     await expect(ada).toContainText('Google · alex@studio-example.com');
     await expect(page.getByRole('list', { name: 'Contacts' }).getByRole('button', { name: /Ada L\./ })).toHaveCount(0);
   });
@@ -64,7 +64,7 @@ try {
     await expect(dialog.getByRole('alert')).toContainText('Choose an address book');
     await expect(dialog).toBeVisible();
     await dialog.getByRole('combobox', { name: 'Address book', exact: true }).click();
-    await page.getByRole('option', { name: 'Locale' }).click();
+    await page.getByRole('option', { name: 'Local' }).click();
     await dialog.getByRole('button', { name: 'Save' }).click();
     await expect(dialog).toHaveCount(0);
     await expect(row('Carla Neri')).toHaveCount(1);
@@ -87,7 +87,7 @@ try {
     await page.getByRole('button', { name: 'Add to contacts' }).click();
     const dialog = page.getByRole('dialog', { name: 'New contact' });
     await expect(dialog.getByLabel('Name', { exact: true })).toHaveValue('Maria Rossi');
-    await expect(dialog.getByRole('combobox', { name: 'Address book', exact: true })).toContainText('Locale');
+    await expect(dialog.getByRole('combobox', { name: 'Address book', exact: true })).toContainText('Local');
     await dialog.getByRole('button', { name: 'Cancel' }).click();
   });
 
@@ -123,10 +123,10 @@ try {
     await expect(dialog.getByRole('checkbox', { checked: true })).toHaveCount(1);
     await dialog.locator('[data-scope="checkbox"][data-part="root"][data-state="checked"]').click();
     await expect(confirm).toBeDisabled();
-    await tick(dialog, 'Locale').click();
-    await expect(dialog.getByRole('checkbox', { name: 'Locale' })).toBeChecked();
+    await tick(dialog, 'Local').click();
+    await expect(dialog.getByRole('checkbox', { name: 'Local' })).toBeChecked();
     const preview = dialog.getByRole('list', { name: 'What will happen' });
-    await expect(preview).toContainText('Locale');
+    await expect(preview).toContainText('Local');
     await expect(preview).toContainText('will be removed');
     await expect(confirm).toContainText('delete');
     await confirm.click();
@@ -150,7 +150,7 @@ try {
     await row('Bea Verdi').click();
     await page.getByRole('button', { name: 'Delete…' }).click();
     const dialog = page.getByRole('dialog', { name: 'Delete contact' });
-    await tick(dialog, 'Locale').click();
+    await tick(dialog, 'Local').click();
     await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
     await expect(row('Bea Verdi')).toHaveCount(0);
     await row('Sofia').click();
@@ -192,9 +192,9 @@ try {
     await page.getByRole('navigation', { name: 'Settings sections' }).getByRole('button', { name: 'Contacts' }).click();
     await expect(page.getByRole('heading', { level: 2, name: 'Contacts' })).toBeVisible();
     const order = page.getByRole('list', { name: 'Order of address books' });
-    await expect(order.getByRole('listitem').first()).toContainText('Locale');
-    await order.getByRole('button', { name: /^Move down: Locale/ }).click();
-    await expect(order.getByRole('listitem').first()).not.toContainText('Locale');
+    await expect(order.getByRole('listitem').first()).toContainText('Local');
+    await order.getByRole('button', { name: /^Move down: Local/ }).click();
+    await expect(order.getByRole('listitem').first()).not.toContainText('Local');
     await page.getByLabel('Address names never treated as one person (comma-separated)').fill('ciao, info');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible();

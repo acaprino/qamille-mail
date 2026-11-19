@@ -2825,18 +2825,18 @@
 .contact-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
 .contact-list li + li { border-top: 1px solid var(--border-soft); }
 .contact-list:empty { display: none; }
-/* Two lines, like the mail rows: the name with its address books, then the address. One line held all three
-   and cut each of them. */
-.contact-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 46px; padding: 6px 12px; text-align: left; background: var(--surface); }
-.contact-row .account-avatar { flex: none; width: 28px; height: 28px; font-size: var(--text-2xs); }
+/* One --control-height row (Compatto): the name, what the name does not already say, the address books at
+   the end. The name keeps its room first; the address gives way, then the last book's name. */
+.contact-row { display: flex; align-items: center; gap: 10px; width: 100%; height: var(--control-height); padding: 0 12px; text-align: left; background: var(--surface); }
+.contact-row .account-avatar { flex: none; width: 22px; height: 22px; font-size: var(--text-2xs); }
 .contact-row:hover { background: var(--hover); }
 .contact-row.active { background: var(--selection); }
-.contact-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; font-size: var(--text-sm); }
-.contact-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.contact-main { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; font-size: var(--text-sm); }
+.contact-head { display: contents; }
 .contact-main strong, .contact-main small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.contact-main strong { flex: 0 1 auto; font-weight: 600; }
-.contact-main small { font-size: var(--text-xs); }
-.contact-origins { display: flex; flex-wrap: nowrap; gap: 4px; margin-left: auto; flex: 0 1 auto; min-width: 0; max-width: 55%; overflow: hidden; }
+.contact-main strong { order: 0; flex: 0 1 auto; max-width: 55%; font-weight: 600; }
+.contact-main small { order: 1; flex: 1 1 0; font-size: var(--text-xs); }
+.contact-origins { order: 2; display: flex; flex-wrap: nowrap; gap: 4px; margin-left: auto; flex: 0 1 auto; min-width: 0; max-width: 45%; overflow: hidden; }
 .contact-origins .origin-chip { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 /* Only the last book's name gives way: a short one before it stays whole. */
 .contact-origins .origin-chip:not(:last-child) { flex-shrink: 0; }

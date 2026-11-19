@@ -200,7 +200,7 @@ export default function MergeDialog({
         <ul className="merge-preview" aria-label={tr('Cosa succederà', 'What will happen')}>
           {s.actions.map((action, index) => (
             <li key={index} className={action.action === 'Delete' ? 'merge-delete' : undefined}>
-              {action.label}: {describe(action)}
+              {bookLabel(action.label)}: {describe(action)}
             </li>
           ))}
         </ul>

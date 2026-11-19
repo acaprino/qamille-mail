@@ -15,7 +15,7 @@ use qamille_server::db::{CORE_MIGRATIONS, SCHEMA_V1, SCHEMA_V4};
 use qamille_server::Db;
 use rusqlite::Connection;
 use serde_json::json;
-use support::{TestServer, bearer, remote, request_raw, test_config, user_with_device};
+use support::{TestServer, bearer, loopback, request_raw, test_config, user_with_device};
 
 fn llm(prompt: u64, completion: u64) -> ComputeUsage {
     ComputeUsage { llm_prompt_tokens: prompt, llm_completion_tokens: completion, ..ComputeUsage::default() }
@@ -225,7 +225,7 @@ fn with_sinks(sinks: &[Arc<Recorder>]) -> TestServer {
 
 async fn embed(ts: &TestServer, key: &str, text: &str) {
     let body = serde_json::to_vec(&json!({"model": MODEL_ID, "input": [text], "dimensions": DIM})).unwrap();
-    let ok = request_raw(&ts.public, "POST", "/v1/embeddings", Some(body), remote([10, 0, 0, 9]), &[("authorization", &bearer(key))]).await;
+    let ok = request_raw(&ts.public, "POST", "/v1/embeddings", Some(body), loopback(), &[("authorization", &bearer(key))]).await;
     assert_eq!(ok.status, 200, "{}", ok.text);
 }
 

@@ -14,7 +14,7 @@ use qamille_server::ext::{
 use qamille_server::{Server, ServerError, StartError};
 use serde_json::{Value, json};
 use support::{
-    ADMIN_KEY, TempDir, TestResponse, bearer, ip, loopback, remote, request, request_raw,
+    ADMIN_KEY, TempDir, TestResponse, bearer, ip, loopback, request, request_raw,
     test_config,
 };
 
@@ -109,7 +109,8 @@ async fn post_embeddings(router: &Router, key: &str) -> TestResponse {
         "POST",
         "/v1/embeddings",
         Some(body),
-        remote([10, 0, 0, 9]),
+        // The compute routes want a secure connection (a device key counts as a password): loopback.
+        loopback(),
         &[("authorization", &bearer(key))],
     )
     .await

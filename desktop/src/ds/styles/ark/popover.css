@@ -28,6 +28,11 @@
 [data-scope='popover'][data-part='content'] button:hover {
   background: var(--hover);
 }
+/* In a menu where items carry icons, an item without one keeps the icon's place: every label starts on
+   one edge (15px icon + the 8px gap). */
+[data-scope='popover'][data-part='content']:has(button > svg) button:not(:has(> svg)) {
+  padding-left: calc(9px + 15px + 8px);
+}
 @keyframes popover-in {
   from {
     opacity: 0;

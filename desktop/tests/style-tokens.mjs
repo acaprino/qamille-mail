@@ -21,6 +21,12 @@ const ALLOWED = [
     why: 'calendar identity palette, one color per calendar',
   })),
   { file: 'components/Calendar', text: 'calc(var(--radius-md) - 2px', why: 'inner radius derived from a token' },
+  // Google's «G» on the «Sign in with Google» buttons: Google's branding fixes its four colours.
+  ...['#EA4335', '#4285F4', '#FBBC05', '#34A853'].map((text) => ({
+    file: 'ds/primitives/GoogleMark',
+    text,
+    why: 'Google sign-in mark, colours fixed by Google branding',
+  })),
 ];
 
 const RULES = [

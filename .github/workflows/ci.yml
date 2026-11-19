@@ -71,5 +71,15 @@ jobs:
       - run: npm run artcraft:sync
       - run: npm run check
       - run: npm run test:ds
-      # Browser tests of the preview that guard the editions (Edge is on the Windows runner).
+      # Browser tests of the preview that guard the editions (Edge is on the Windows runner); the sign-in screens
+      # they pass through are kept as an artifact, to be looked at.
       - run: npm run test:browser -- onboarding-professional
+        env:
+          QAMILLE_SHOTS_DIR: ${{ runner.temp }}/screens
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screens
+          path: ${{ runner.temp }}/screens
+          if-no-files-found: ignore
+          retention-days: 7

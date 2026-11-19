@@ -363,7 +363,7 @@ export default function SearchBar({
           aria-label={t('Guida alla ricerca', 'Search guide')}
           title={t('Aiutami a trovarla', 'Help me find it')}
         >
-          ?
+          <Icon name="info" size={15} />
         </button>
         {!!query.trim() && (
           <Select
@@ -696,7 +696,7 @@ export default function SearchBar({
                     aria-label={`${t('Rimuovi', 'Remove')} ${chip.text}`}
                     onClick={() => onquery(removeSearchChip(query, index))}
                   >
-                    ×
+                    <Icon name="close" size={13} />
                   </button>
                 </Tooltip>
               </span>

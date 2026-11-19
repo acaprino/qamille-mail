@@ -39,6 +39,12 @@ export function setLanguageLocale(value: string): void {
   syncDocumentLanguage();
 }
 
+/** The name of an address book: the backend writes it in Italian («Locale», «Posta · a@b», «Google · altri · a@b»). */
+export function bookLabel(label: string): string {
+  if (isItalian()) return label;
+  if (label === 'Locale') return 'Local';
+  return label.replace(/^Google · altri · /, 'Google · other · ').replace(/^Posta · /, 'Mail · ');
+}
 export function isItalian(): boolean {
   return language.choice === 'auto'
     ? language.locale.toLowerCase().startsWith('it')

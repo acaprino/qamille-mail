@@ -1,12 +1,14 @@
-/* MeetingNotice: the card of a detail state. Every rule stays under its root class. */
+/* MeetingNotice: the card of a detail state. Every rule stays under its root class. Centred in the pane like
+   the pane's other notes (.pane-note, .live): a centred column with its content on the left read as off-centre. */
 .meeting-notice {
   display: grid;
   gap: 14px;
-  justify-items: start;
+  justify-items: center;
   align-self: center;
   max-width: 420px;
   margin: auto;
   padding: 28px;
+  text-align: center;
 
   & h3 {
     margin: 0;
@@ -28,6 +30,7 @@
     display: flex;
     gap: 10px;
     align-items: flex-start;
+    text-align: left;
     padding: 10px 12px;
     font-size: var(--text-sm);
     line-height: 1.45;
@@ -49,6 +52,7 @@
   & .state-actions {
     display: flex;
     flex-wrap: wrap;
+    justify-content: center;
     gap: 8px;
   }
 }

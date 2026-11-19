@@ -5,7 +5,7 @@ import Icon from '../ds/primitives/Icon';
 import Tabs, { type TabItem } from '../ds/primitives/Tabs';
 import { desktop, errorText } from '../lib/api';
 import type { ComposerHandle, ComposerState } from '../lib/composer';
-import { folderLabel, tr } from '../lib/i18n';
+import { tr } from '../lib/i18n';
 import { useReactive } from '../lib/store';
 import { tick } from '../lib/tick';
 import type { Draft, UndoAction, Workspace } from '../lib/types';
@@ -203,9 +203,10 @@ export default function ComposerDock(props: ComposerDockProps) {
       </AnimatePresence>
 
       <footer className="composer-dock" aria-label={tr('Bozze aperte', 'Open drafts')}>
+        {/* The drafts open here, not all the saved ones the sidebar counts: the two numbers say different things. */}
         <span className="dock-label">
           <Icon name="edit" size={15} />
-          <span>{folderLabel('Drafts')}</span>
+          <span>{tr('Bozze aperte', 'Open drafts')}</span>
           <strong>{drafts.length}</strong>
         </span>
         <div className="composer-tabs">
@@ -223,7 +224,7 @@ export default function ComposerDock(props: ComposerDockProps) {
               return (
                 <>
                   <Icon name={activeId === draft?.id ? 'edit' : 'mail'} size={14} />
-                  <span>{item.label}</span>
+                  <span title={item.label}>{item.label}</span>
                   {state?.dirty && (
                     <span className="draft-dirty" aria-label={saveStatusLabel(state.status)}></span>
                   )}

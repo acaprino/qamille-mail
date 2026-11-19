@@ -74,6 +74,11 @@ button,
 a {
   cursor: default;
 }
+/* A link of the interface (a setup guide) in the app's accent, not the browser's blue and purple. */
+a:any-link {
+  color: var(--accent-text);
+  text-underline-offset: 3px;
+}
 /* Icons, avatars and links of the interface do not drag a browser ghost out of the window
    (rule 22). Attachments and messages are dragged by the app's own handlers. */
 img,
@@ -187,6 +192,14 @@ kbd {
 .primary:hover:where(:not(:disabled)) {
   background: var(--accent-hover);
 }
+/* The primary action when it destroys (Delete, Revoke): the danger colour, so it is not read as the safe one. */
+.primary.danger {
+  background: var(--danger);
+  color: var(--surface);
+}
+.primary.danger:hover:where(:not(:disabled)) {
+  background: color-mix(in srgb, var(--danger) 86%, var(--text));
+}
 .secondary {
   border: 1px solid var(--border);
   background: var(--surface);
@@ -236,12 +249,65 @@ kbd {
   font-weight: 400;
   font-size: var(--text-sm);
 }
+/* A progress bar: a visible track filled in the accent. The bare element drew no track, so at 0% it was a
+   blank gap. A page that must signal a limit sets --progress-fill. */
+progress {
+  appearance: none;
+  height: 6px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--border);
+  overflow: hidden;
+}
+progress::-webkit-progress-bar {
+  background: var(--border);
+  border-radius: var(--radius-full);
+}
+progress::-webkit-progress-value {
+  background: var(--progress-fill, var(--accent));
+  border-radius: var(--radius-full);
+}
+/* A disclosure row (details): the app's chevron in place of the browser's triangle, turned down when open
+   (the mask reads only the alpha of the drawing). */
+summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+}
+summary::-webkit-details-marker {
+  display: none;
+}
+summary::before {
+  content: '';
+  flex: none;
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 5 7 7-7 7'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 5 7 7-7 7'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  transition: transform var(--motion-panel) var(--ease-out);
+}
+details[open] > summary::before {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  summary::before {
+    transition: none;
+  }
+}
 .field-help {
   font-size: var(--text-2xs);
   color: var(--muted);
   line-height: 1.65;
   margin-top: -7px;
   margin-bottom: 14px;
+}
+/* Under a heading it describes the section: the pull toward a field above would lay it over the heading. */
+:is(h2, h3, h4) + .field-help {
+  margin-top: 4px;
 }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .visually-hidden {

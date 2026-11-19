@@ -12,11 +12,14 @@ export type TooltipProps = {
   text: string;
   shortcut?: string;
   children: ReactElement;
+  /** The trigger's id when another Ark part shares the button (Popover): both must find the same element. */
+  triggerId?: string;
 };
 
-export default function Tooltip({ text, shortcut, children }: TooltipProps) {
+export default function Tooltip({ text, shortcut, children, triggerId }: TooltipProps) {
   return (
     <ArkTooltip.Root
+      ids={triggerId ? { trigger: triggerId } : undefined}
       lazyMount
       unmountOnExit
       openDelay={400}

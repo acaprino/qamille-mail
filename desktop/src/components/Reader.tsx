@@ -509,12 +509,17 @@ export default function Reader({
           <div className="empty-art">
             <Icon name="mail" size={36} />
           </div>
-          <h2>{tr('Un po’ più di concentrazione.', 'A little more focus.')}</h2>
-          <p>{tr('Seleziona un messaggio per leggerlo qui.', 'Select a message to read it here.')}</p>
-          <span>
-            <kbd>↑</kbd>
-            <kbd>↓</kbd> {tr('Spostati tra i messaggi', 'Move between messages')}
-          </span>
+          {/* An empty list has its own note beside: no message to select, no keys to move between them. */}
+          {total > 0 && (
+            <>
+              <h2>{tr('Un po’ più di concentrazione.', 'A little more focus.')}</h2>
+              <p>{tr('Seleziona un messaggio per leggerlo qui.', 'Select a message to read it here.')}</p>
+              <span>
+                <kbd>↑</kbd>
+                <kbd>↓</kbd> {tr('Spostati tra i messaggi', 'Move between messages')}
+              </span>
+            </>
+          )}
         </div>
       )}
     </section>

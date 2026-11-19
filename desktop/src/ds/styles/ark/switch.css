@@ -11,6 +11,11 @@
   opacity: 0.5;
   cursor: default;
 }
+/* The thumb's two stops are measured from the track's edge: no button padding (the browser's own 6px moved
+   the thumb to the middle when off and past the track's end when on). */
+.switch-row button[role='switch'] {
+  padding: 0;
+}
 .switch-row button[role='switch']:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;

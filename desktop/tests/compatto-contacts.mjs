@@ -85,8 +85,8 @@ try {
     await dialog.getByRole('button', { name: 'Save' }).click();
     await expect(dialog.getByRole('alert')).toContainText('Choose an address book');
     await book.click();
-    await page.getByRole('option', { name: 'Locale' }).click();
-    await expect(book).toContainText('Locale');
+    await page.getByRole('option', { name: 'Local' }).click();
+    await expect(book).toContainText('Local');
     await dialog.getByRole('button', { name: 'Cancel' }).click();
     await expect(dialog).toHaveCount(0);
   });
@@ -109,9 +109,9 @@ try {
     assert.ok((await books.locator('[data-scope="checkbox"][data-part="control"]').count()) >= 2);
     await dialog.getByRole('button', { name: 'Only in one' }).click();
     await expect(dialog.getByRole('checkbox', { checked: true })).toHaveCount(1);
-    const locale = dialog.getByRole('checkbox', { name: 'Locale' });
+    const locale = dialog.getByRole('checkbox', { name: 'Local' });
     const before = await locale.isChecked();
-    await books.getByText('Locale').click();
+    await books.getByText('Local').click();
     await expect(locale).toBeChecked({ checked: !before });
     await dialog.getByRole('button', { name: 'Cancel' }).click();
     await expect(dialog).toHaveCount(0);
@@ -125,7 +125,7 @@ try {
     await expect(dialog).toHaveAttribute('data-size', 'sm');
     assert.equal(await dialog.evaluate((node) => node.offsetWidth), 420);
     await expect(dialog.locator('[data-scope="checkbox"][data-part="control"]')).toHaveCount(1);
-    await dialog.getByText('Locale').click();
+    await dialog.getByText('Local').click();
     await expect(dialog.getByRole('button', { name: 'Delete', exact: true })).toBeEnabled();
     await dialog.getByRole('button', { name: 'Cancel' }).click();
   });

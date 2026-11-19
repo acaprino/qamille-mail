@@ -1,8 +1,8 @@
 .meetings-column {
   display: flex;
   flex-direction: column;
-  width: 352px;
-  min-width: 300px;
+  width: var(--list-w, 360px);
+  min-width: 250px;
   flex-shrink: 0;
   min-height: 0;
   background: var(--surface);

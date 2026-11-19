@@ -705,14 +705,17 @@ export default function Composer(props: ComposerProps) {
             <Icon name="send" size={16} />
             {s.sending ? tr('Invio…', 'Sending…') : tr('Invia', 'Send')}
           </Button>
+          {/* Beside Send, the two tools look alike and weigh less than it; scheduling says when it is on. */}
           <Button
-            variant="secondary"
+            variant="icon"
+            className={cn(s.schedule && 'active')}
             tip={tr('Programma invio', 'Schedule send')}
             aria-label={tr('Programma invio', 'Schedule send')}
+            aria-pressed={s.schedule}
             disabled={locked}
             onClick={() => (s.schedule = !s.schedule)}
           >
-            <Icon name="clock" size={17} />
+            <Icon name="clock" size={18} />
           </Button>
           <Button
             variant="icon"
@@ -721,7 +724,7 @@ export default function Composer(props: ComposerProps) {
             disabled={locked}
             onClick={() => void attach()}
           >
-            <Icon name="clip" />
+            <Icon name="clip" size={18} />
           </Button>
         </div>
         <span className="signature-caption" aria-hidden="true">

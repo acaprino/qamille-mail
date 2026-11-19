@@ -103,7 +103,7 @@ button.danger {
   accent-color: var(--accent);
 }
 .compute-usage li[data-exhausted='true'] progress {
-  accent-color: var(--danger);
+  --progress-fill: var(--danger);
 }
 .compute-plans {
   display: grid;

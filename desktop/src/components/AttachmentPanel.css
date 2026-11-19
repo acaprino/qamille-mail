@@ -20,6 +20,6 @@
     transform: rotate(180deg);
   }
   & .attachment-panel-scroll {
-    padding: 18px 22px 28px;
+    padding: 18px var(--panel-pad-x, 20px) 28px;
   }
 }

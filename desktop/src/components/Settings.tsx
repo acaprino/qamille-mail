@@ -3,6 +3,7 @@ import Button from '../ds/primitives/Button';
 import Checkbox from '../ds/primitives/Checkbox';
 import Field from '../ds/primitives/Field';
 import Icon from '../ds/primitives/Icon';
+import GoogleMark from '../ds/primitives/GoogleMark';
 import Select from '../ds/primitives/Select';
 import Switch from '../ds/primitives/Switch';
 import { call, errorText } from '../lib/api';
@@ -487,12 +488,13 @@ export default function Settings({
                     'Choose your account or enter your email and password on Google’s page in your browser.',
                   )}
                 </p>
+                {/* Google's own look for its sign-in button: neutral, with its «G». */}
                 <Button
-                  variant="primary"
+                  variant="secondary"
                   disabled={form.busy}
                   onClick={() => void signInWithGoogle()}
                 >
-                  <Icon name="link" size={17} />
+                  <GoogleMark />
                   {form.googlePending
                     ? tr('Mostra avanzamento accesso', 'Show sign-in progress')
                     : tr('Accedi con Google', 'Sign in with Google')}
@@ -714,13 +716,19 @@ export default function Settings({
                     <button
                       key={s.id}
                       className={signature.id === s.id ? 'chosen' : undefined}
+                      aria-pressed={signature.id === s.id}
                       onClick={() => (form.signature = copy(s))}
                     >
                       {s.name}
                       <Icon name="chevron" size={16} />
                     </button>
                   ))}
-                  <button onClick={() => (form.signature = emptySignature())}>
+                  {/* A new signature being written is the chosen one, as a saved one is when open. */}
+                  <button
+                    className={workspace.signatures.some((x) => x.id === signature.id) ? undefined : 'chosen'}
+                    aria-pressed={!workspace.signatures.some((x) => x.id === signature.id)}
+                    onClick={() => (form.signature = emptySignature())}
+                  >
                     <Icon name="plus" size={16} />
                     {tr('Nuova firma', 'New signature')}
                   </button>
@@ -781,7 +789,7 @@ export default function Settings({
               />
             ) : (
               <>
-                <h2>{tr('Accesso degli assistenti', 'Assistant access')}</h2>
+                <h2>{tr('Accesso agenti', 'Agent access')}</h2>
                 <p className="muted">
                   {tr(
                     'Decidi cosa possono fare gli assistenti esterni tramite la connessione MCP.',

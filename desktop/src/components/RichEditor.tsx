@@ -83,16 +83,18 @@ export default function RichEditor({ html, onchange, disabled = false }: RichEdi
       <div className="format-toolbar" role="toolbar" aria-label={tr('Formattazione del testo', 'Text formatting')}>
         {tool(tr('Grassetto', 'Bold'), <Icon name="bold" size={15} />, () => run()?.toggleBold().run(), { pressed: active('bold') })}
         {tool(tr('Corsivo', 'Italic'), <Icon name="italic" size={15} />, () => run()?.toggleItalic().run(), { pressed: active('italic') })}
-        {tool(tr('Sottolineato', 'Underline'), <u>U</u>, () => run()?.toggleUnderline().run(), { pressed: active('underline') })}
+        {tool(tr('Sottolineato', 'Underline'), <Icon name="underline" size={15} />, () => run()?.toggleUnderline().run(), { pressed: active('underline') })}
         <span className="toolbar-divider"></span>
         {tool(tr('Elenco puntato', 'Bullet list'), <Icon name="list" size={17} />, () => run()?.toggleBulletList().run(), {
           pressed: active('bulletList'),
         })}
-        {tool(tr('Elenco numerato', 'Numbered list'), '1.', () => run()?.toggleOrderedList().run(), { pressed: active('orderedList') })}
-        {tool(tr('Citazione', 'Quote'), '“', () => run()?.toggleBlockquote().run(), { pressed: active('blockquote') })}
+        {tool(tr('Elenco numerato', 'Numbered list'), <Icon name="list-ordered" size={17} />, () => run()?.toggleOrderedList().run(), {
+          pressed: active('orderedList'),
+        })}
+        {tool(tr('Citazione', 'Quote'), <Icon name="quote" size={17} />, () => run()?.toggleBlockquote().run(), { pressed: active('blockquote') })}
         <span className="toolbar-divider"></span>
-        {tool(tr('Annulla', 'Undo'), '↶', () => run()?.undo().run(), { can: editor?.can().undo() ?? false })}
-        {tool(tr('Ripeti', 'Redo'), '↷', () => run()?.redo().run(), { can: editor?.can().redo() ?? false })}
+        {tool(tr('Annulla', 'Undo'), <Icon name="undo" size={16} />, () => run()?.undo().run(), { can: editor?.can().undo() ?? false })}
+        {tool(tr('Ripeti', 'Redo'), <Icon name="redo" size={16} />, () => run()?.redo().run(), { can: editor?.can().redo() ?? false })}
       </div>
       <div ref={element}></div>
     </div>

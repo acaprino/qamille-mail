@@ -13,7 +13,7 @@
 //   prepare    commands run before the build on a fresh checkout (dependencies the build does not install)
 //   build      the build (default: build-release.bat --no-install --ci), which fills release/
 //   runner     the GitHub runner (default: windows-latest)
-//   assets     zip (default: release/ zipped, plus its .exe and release/installer/) or files (release/'s files)
+//   assets     zip (default: release/ zipped, release/installer/ left out, as the release's only file) or files (release/'s files)
 // Usage:
 //   node .github/scripts/release.mjs current                   the current version
 //   node .github/scripts/release.mjs next <patch|minor|major>  the version after it

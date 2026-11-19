@@ -1,6 +1,6 @@
 [package]
 name = "qamille-compute"
-version = "1.1.2"
+version = "1.1.3"
 edition = "2024"
 description = "Calcolo di Qamille: EmbeddingGemma 2 su ONNX Runtime, spezzatura, lettori di documenti, trascrizione con whisper.cpp, installazione dei modelli"
 publish = false

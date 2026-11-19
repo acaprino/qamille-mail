@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-include-spam-trash"
+description = "Enables the set_include_spam_trash command without any pre-configured scope."
+commands.allow = ["set_include_spam_trash"]
+
+[[permission]]
+identifier = "deny-set-include-spam-trash"
+description = "Denies the set_include_spam_trash command without any pre-configured scope."
+commands.deny = ["set_include_spam_trash"]

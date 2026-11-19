@@ -1,0 +1,11 @@
+target/
+data/
+tests/
+.env
+.env.*
+*.db
+*.db-wal
+*.db-shm
+compose.yaml
+Caddyfile
+README.md

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-index-mail"
+description = "Enables the index_mail command without any pre-configured scope."
+commands.allow = ["index_mail"]
+
+[[permission]]
+identifier = "deny-index-mail"
+description = "Denies the index_mail command without any pre-configured scope."
+commands.deny = ["index_mail"]

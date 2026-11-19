@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-contacts-prefill"
+description = "Enables the contacts_prefill command without any pre-configured scope."
+commands.allow = ["contacts_prefill"]
+
+[[permission]]
+identifier = "deny-contacts-prefill"
+description = "Denies the contacts_prefill command without any pre-configured scope."
+commands.deny = ["contacts_prefill"]

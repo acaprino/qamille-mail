@@ -1,0 +1,15 @@
+.composer-panel {
+  & .draft-recovery {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    font-size: var(--text-xs);
+  }
+  & .draft-recovery p {
+    margin: 0 0 8px;
+    overflow-wrap: anywhere;
+  }
+  & .draft-recovery button {
+    margin: 0 6px 4px 0;
+  }
+}

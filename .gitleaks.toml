@@ -1,0 +1,8 @@
+title = "Qamille"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Fake credentials used by the tests (fixed strings, never real)"
+paths = ['''^server/tests/''', '''^app/tests/''']

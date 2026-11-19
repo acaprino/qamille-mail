@@ -1,0 +1,62 @@
+[package]
+name = "qamille-server"
+version = "1.0.0"
+edition = "2024"
+description = "Server di Qamille: utenti, dispositivi, accesso con password e calcolo"
+publish = false
+
+[lib]
+name = "qamille_server"
+path = "src/lib.rs"
+
+[[bin]]
+name = "qamille-server"
+path = "src/main.rs"
+
+[dependencies]
+# Senza la feature `tracing` di axum: i suoi eventi di rifiuto possono riportare
+# frammenti del corpo della richiesta (e quindi una password).
+axum = { version = "0.8", default-features = false, features = ["http1", "json", "matched-path", "multipart", "query", "tokio", "tower-log"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["timeout", "limit"] }
+rusqlite = { version = "0.40", features = ["bundled"] }
+argon2 = { version = "0.5", features = ["std"] }
+sha2 = "0.10"
+hex = "0.4"
+subtle = "2"
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["raw_value"] }
+chacha20poly1305 = "0.10"
+zeroize = "1"
+toml = "0.8"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+# Inferenza (ONNX Runtime, tokenizer, lettori di documenti): solo qui, mai nell'app (INV-1).
+qamille-compute = { path = "../compute" }
+# Inoltro delle richieste LLM al provider (stesso client del calcolo).
+ureq = { version = "3", features = ["platform-verifier"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+zip = { version = "3", default-features = false, features = ["deflate"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync", "test-util", "io-util"] }
+
+[profile.dev]
+debug = false
+
+# argon2id con 19 MiB è molto lento senza ottimizzazioni: i test ne fanno molti.
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3

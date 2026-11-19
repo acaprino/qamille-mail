@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-server-browser-disable-device"
+description = "Enables the server_browser_disable_device command without any pre-configured scope."
+commands.allow = ["server_browser_disable_device"]
+
+[[permission]]
+identifier = "deny-server-browser-disable-device"
+description = "Denies the server_browser_disable_device command without any pre-configured scope."
+commands.deny = ["server_browser_disable_device"]

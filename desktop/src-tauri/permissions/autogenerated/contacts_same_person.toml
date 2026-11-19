@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-contacts-same-person"
+description = "Enables the contacts_same_person command without any pre-configured scope."
+commands.allow = ["contacts_same_person"]
+
+[[permission]]
+identifier = "deny-contacts-same-person"
+description = "Denies the contacts_same_person command without any pre-configured scope."
+commands.deny = ["contacts_same_person"]

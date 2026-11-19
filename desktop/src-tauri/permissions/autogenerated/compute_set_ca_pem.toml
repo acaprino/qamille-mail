@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-compute-set-ca-pem"
+description = "Enables the compute_set_ca_pem command without any pre-configured scope."
+commands.allow = ["compute_set_ca_pem"]
+
+[[permission]]
+identifier = "deny-compute-set-ca-pem"
+description = "Denies the compute_set_ca_pem command without any pre-configured scope."
+commands.deny = ["compute_set_ca_pem"]

@@ -1,0 +1,82 @@
+/* The frame of a preview card, not part of the visual system: the harness page uses it to lay its cases
+   out, and the export appends it to bundle.css so that the cards lay out the same way. */
+.ds-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 16px;
+  box-sizing: border-box;
+  background: var(--surface);
+  color: var(--text);
+}
+.ds-page {
+  background: var(--surface);
+  color: var(--text);
+}
+.ds-case {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: fit-content;
+  margin: 0;
+}
+.ds-field {
+  width: 240px;
+}
+/* The controls that fill their container (a Select, a tab list, the recipients) stretch to the case. */
+.ds-field,
+.ds-wide,
+.ds-recipients {
+  align-items: stretch;
+}
+.ds-wide {
+  width: 360px;
+}
+.ds-recipients {
+  width: 420px;
+}
+.ds-caption {
+  font-size: var(--text-2xs);
+  color: var(--muted);
+}
+.ds-stage {
+  position: relative;
+  width: 1408px;
+  height: 320px;
+  background: var(--ground);
+  overflow: hidden;
+}
+.ds-body {
+  margin: 0;
+  padding: 16px;
+}
+.ds-modal-text {
+  margin: 0 0 16px;
+}
+.ds-anchor {
+  position: relative;
+  align-items: flex-end;
+  width: 240px;
+  height: 190px;
+}
+.ds-icons {
+  width: 720px;
+  gap: 12px 8px;
+  font-family: var(--font-text);
+}
+.ds-icon-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 92px;
+  margin: 0;
+}
+[data-theme='dark'] .dc-mail {
+  filter: invert(1) hue-rotate(180deg);
+}
+[data-theme='dark'] .dc-mail img {
+  filter: invert(1) hue-rotate(180deg);
+}

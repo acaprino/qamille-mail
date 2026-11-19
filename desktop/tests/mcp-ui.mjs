@@ -1,0 +1,36 @@
+import { chromium, expect } from '@playwright/test';
+import assert from 'node:assert/strict';
+const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 1000 } });
+const page = await context.newPage();
+const errors = [];
+page.on('pageerror', error => errors.push(error.message));
+try {
+  await page.goto(process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:5187');
+  await page.getByRole('button', { name: /^New message/ }).click();
+  await page.getByRole('button', { name: 'Bcc', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Bcc', exact: true }).fill('private@example.test');
+  await page.getByRole('textbox', { name: 'Subject', exact: true }).fill('MCP Bcc persistence');
+  await page.getByRole('textbox', { name: 'Message body' }).fill('Synthetic preview only.');
+  await page.getByRole('button', { name: 'Save and close draft' }).click();
+  await page.getByRole('button', { name: /^Drafts\s*\d*$/ }).click();
+  await page.getByRole('button', { name: /MCP Bcc persistence/ }).first().click();
+  await expect(page.getByRole('button', { name: 'Remove private@example.test', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Save and close draft' }).click();
+  console.log('PASS Bcc remains intact when a draft is saved and reopened');
+  await page.getByRole('button', { name: 'Calendar', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Calendar', exact: true })).toBeVisible();
+  const calendarRail = page.getByRole('complementary', { name: 'Calendars' });
+  await expect(calendarRail.getByRole('heading', { name: 'On this computer', exact: true })).toBeVisible();
+  await expect(calendarRail.getByRole('checkbox', { name: 'Qamille', exact: true })).toBeChecked();
+  await page.getByRole('button', { name: 'New event', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  console.log('PASS Local calendar and event editor load in synthetic preview');
+  await page.getByRole('button', { name: /Alex Personal workspace/ }).click();
+  await page.getByRole('button', { name: 'Agent access', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'MCP connection', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save assistant permissions' })).toBeDisabled();
+  assert.deepEqual(errors, []);
+  console.log('PASS MCP settings load; browser preview cannot grant real permissions');
+} finally { await browser.close(); }

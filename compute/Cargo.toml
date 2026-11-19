@@ -1,0 +1,29 @@
+[package]
+name = "qamille-compute"
+version = "1.0.0"
+edition = "2024"
+description = "Calcolo di Qamille: EmbeddingGemma 2 su ONNX Runtime, spezzatura, lettori di documenti, trascrizione con whisper.cpp, installazione dei modelli"
+publish = false
+
+[lib]
+name = "qamille_compute"
+path = "src/lib.rs"
+
+[dependencies]
+ort = { version = "=2.0.0-rc.15", default-features = false, features = ["std", "download-binaries", "tls-native", "api-31"] }
+tokenizers = { version = "0.22", default-features = false, features = ["fancy-regex"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "tiff"] }
+pdf-extract = "0.12"
+zip = { version = "3", default-features = false, features = ["deflate"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+ureq = { version = "3", features = ["platform-verifier"] }
+ring = "=0.17.14"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_SystemInformation"] }
+
+# This PC has little paging space: without debug data the compiler needs far less memory.
+[profile.dev]
+debug = false

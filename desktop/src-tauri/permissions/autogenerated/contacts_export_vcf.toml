@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-contacts-export-vcf"
+description = "Enables the contacts_export_vcf command without any pre-configured scope."
+commands.allow = ["contacts_export_vcf"]
+
+[[permission]]
+identifier = "deny-contacts-export-vcf"
+description = "Denies the contacts_export_vcf command without any pre-configured scope."
+commands.deny = ["contacts_export_vcf"]

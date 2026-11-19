@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-sync-revoke-mailbox"
+description = "Enables the sync_revoke_mailbox command without any pre-configured scope."
+commands.allow = ["sync_revoke_mailbox"]
+
+[[permission]]
+identifier = "deny-sync-revoke-mailbox"
+description = "Denies the sync_revoke_mailbox command without any pre-configured scope."
+commands.deny = ["sync_revoke_mailbox"]

@@ -1,0 +1,41 @@
+/* Popover (ADR-0008, ADR-0011), on Ark UI Popover: a menu or filter anchored to its button, in a Portal
+   on --z-popover. The buttons inside are the menu items. */
+[data-scope='popover'][data-part='positioner'] {
+  z-index: var(--z-popover);
+}
+[data-scope='popover'][data-part='content'] {
+  z-index: var(--z-popover);
+  min-width: 180px;
+  padding: 5px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  outline: none;
+  animation: popover-in var(--motion-panel) var(--ease-out);
+}
+[data-scope='popover'][data-part='content'] button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 9px;
+  text-align: left;
+  white-space: nowrap;
+  border-radius: var(--radius-sm);
+}
+[data-scope='popover'][data-part='content'] button:hover {
+  background: var(--hover);
+}
+@keyframes popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-scope='popover'][data-part='content'] {
+    animation: none;
+  }
+}

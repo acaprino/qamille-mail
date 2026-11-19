@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-suggest-reply"
+description = "Enables the suggest_reply command without any pre-configured scope."
+commands.allow = ["suggest_reply"]
+
+[[permission]]
+identifier = "deny-suggest-reply"
+description = "Denies the suggest_reply command without any pre-configured scope."
+commands.deny = ["suggest_reply"]

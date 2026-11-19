@@ -1,0 +1,23 @@
+/* Two columns that fill the workspace, not a page with margins like Settings or Calendar. */
+.meetings-page {
+  display: flex;
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+
+  & .detail-pane {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    background: var(--surface);
+  }
+  /* A container: it takes the focus by script only (an action took its button away), and shows no ring. */
+  & .detail-pane:focus {
+    outline: none;
+  }
+}

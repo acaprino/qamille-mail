@@ -1,0 +1,61 @@
+[package]
+name = "qamille"
+version = "1.0.0"
+edition = "2024"
+
+[features]
+default = ["native-ui"]
+native-ui = ["dep:eframe"]
+# The fake compute gateway and the gateway override, for the integration tests only.
+test-support = []
+
+[[bin]]
+name = "qamille"
+path = "src/main.rs"
+required-features = ["native-ui"]
+
+[dependencies]
+chrono = { version = "0.4", features = ["serde", "clock"] }
+chrono-tz = "0.10"
+iana-time-zone = "0.1"
+sys-locale = "0.3"
+unicode-normalization = "0.1"
+dirs = "6"
+eframe = { version = "0.33", optional = true, default-features = false, features = ["default_fonts", "glow", "persistence"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "tiff"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml_edit = "0.25"
+imap = "2.4"
+imap-proto = "0.10"
+rfd = "0.15"
+native-tls = "0.2"
+lettre = { version = "0.11", default-features = false, features = ["smtp-transport", "native-tls", "builder"] }
+mail-parser = "0.11"
+ureq = { version = "3", features = ["json", "platform-verifier"] }
+cpal = "0.16"
+hound = "3.5"
+symphonia = { version = "0.5", features = ["aac", "isomp4", "mp3", "flac", "wav", "pcm"] }
+zip = { version = "3", default-features = false, features = ["deflate"] }
+open = "5"
+ring = "=0.17.14"
+sha2 = "0.10"
+getrandom = "0.3"
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_System_SystemInformation"] }
+
+[profile.release]
+opt-level = 2
+
+# This PC has little paging space: without debug data the compiler needs far less memory.
+[profile.dev]
+debug = false
+
+[dev-dependencies]
+# Integration tests see the test-only helpers (`fake_compute`, `compute_factory::set_override`).
+qamille = { path = ".", default-features = false, features = ["test-support"] }

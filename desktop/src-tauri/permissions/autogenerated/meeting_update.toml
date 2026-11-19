@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-meeting-update"
+description = "Enables the meeting_update command without any pre-configured scope."
+commands.allow = ["meeting_update"]
+
+[[permission]]
+identifier = "deny-meeting-update"
+description = "Denies the meeting_update command without any pre-configured scope."
+commands.deny = ["meeting_update"]

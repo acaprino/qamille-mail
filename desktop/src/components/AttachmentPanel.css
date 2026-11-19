@@ -1,0 +1,25 @@
+.attachment-panel {
+  & .panel-back {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    max-width: 40%;
+    color: var(--accent);
+  }
+  & .panel-crumb {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  & .panel-separator {
+    color: var(--muted);
+  }
+  & .panel-back .chevron-left {
+    display: inline-flex;
+    transform: rotate(180deg);
+  }
+  & .attachment-panel-scroll {
+    padding: 18px 22px 28px;
+  }
+}

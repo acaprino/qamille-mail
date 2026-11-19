@@ -1,0 +1,69 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            server
+            compute
+      - name: Server tests
+        run: cargo test --manifest-path server/Cargo.toml --jobs 2 --locked
+      - name: Compute tests
+        run: cargo test --manifest-path compute/Cargo.toml --jobs 2 --locked
+      - name: Local compose is valid
+        env:
+          QAMILLE_ADMIN_KEY: ci-only-fake-key-0123456789-abcdefghij
+        run: docker compose -f server/compose.local.yaml config -q
+
+  scripts:
+    # The release and public-export scripts and the backup of the hosted server: node tests, with bash and openssl.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node --test ".github/scripts/*.test.mjs"
+
+  app:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app
+      - name: App tests
+        run: cargo test --manifest-path app/Cargo.toml --no-default-features --features test-support --jobs 2 --locked
+
+  desktop:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npm run test:ds

@@ -1,0 +1,50 @@
+<!-- @dsCard height=288 -->
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Qamille</title>
+<style>
+  html, body { margin: 0; height: 100%; background: var(--surface); }
+  .cover { position: relative; width: 960px; height: 288px; overflow: hidden; background: var(--surface); }
+  .cover svg { position: absolute; left: 480px; top: 0; }
+  .accent { fill: var(--accent); }
+  .bolt { fill: var(--on-accent); }
+  .badge { fill: var(--badge); }
+  .ink { fill: var(--text); }
+  .amber { fill: var(--label-4); }
+  .green { fill: var(--label-3); }
+  .cut { fill: var(--surface); }
+  .tile { rx: var(--radius-lg); }
+  .row { rx: var(--radius-sm); }
+  .words { position: absolute; left: 40px; bottom: 36px; width: 420px; }
+  .name { margin: 0; font-family: var(--font-title); font-size: 80px; font-weight: 600; line-height: .95; letter-spacing: -2px; color: var(--text); }
+  .tagline { margin: 12px 0 0; font-family: var(--font-text); font-size: 14px; line-height: 1.5; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="cover">
+  <!--
+    blocks: accent 216x288 (bleeds top, right, bottom), badge 200x96, text 104x176, label-4 80x64, label-3 80x96
+    arrangement: one tall slab with satellites, in the proportions of the app's panes: narrow columns, then one wide
+    pattern: literal motif, the bolt of the logo, because the name and the logo tile are what people know Qamille by; plus mail rows cut from badge
+    steps and radii: 16px gaps, radius-lg on the satellites, radius-sm on the rows
+  -->
+  <svg width="480" height="288" viewBox="0 0 480 288" aria-hidden="true">
+    <rect class="accent" x="264" y="0" width="216" height="288"/>
+    <path class="bolt" transform="translate(290 30) scale(7.6)" d="M12 1 2 14h8l-1 10 10-14h-8l1-9Z"/>
+    <rect class="badge tile" x="48" y="0" width="200" height="96"/>
+    <rect class="cut row" x="64" y="16" width="168" height="16"/>
+    <rect class="cut row" x="64" y="40" width="120" height="16"/>
+    <rect class="cut row" x="64" y="64" width="144" height="16"/>
+    <rect class="ink tile" x="48" y="112" width="104" height="176"/>
+    <rect class="amber tile" x="168" y="112" width="80" height="64"/>
+    <rect class="green tile" x="168" y="192" width="80" height="96"/>
+  </svg>
+  <div class="words">
+    <h1 class="name">Qamille</h1>
+    <p class="tagline">Posta, calendario, rubrica e meeting in un’unica app desktop.</p>
+  </div>
+</div>
+</body>
+</html>

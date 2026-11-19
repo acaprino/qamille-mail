@@ -1,0 +1,21 @@
+/* MeetingMenu: the rename and delete dialogs (drawn in a portal, so scoped by the dialog's own class). */
+.meeting-menu-dialog {
+  & .menu-form {
+    display: grid;
+    gap: 14px;
+  }
+  & .menu-form .field {
+    margin-bottom: 0;
+  }
+  /* A text field is as high as the buttons beside it (the design system's field is a little taller). */
+  & .menu-form .field input {
+    height: var(--control-height);
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  & .menu-text {
+    margin: 0 0 16px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+  }
+}

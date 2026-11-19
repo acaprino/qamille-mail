@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-compute-status"
+description = "Enables the compute_status command without any pre-configured scope."
+commands.allow = ["compute_status"]
+
+[[permission]]
+identifier = "deny-compute-status"
+description = "Denies the compute_status command without any pre-configured scope."
+commands.deny = ["compute_status"]

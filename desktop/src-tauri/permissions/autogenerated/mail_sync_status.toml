@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-mail-sync-status"
+description = "Enables the mail_sync_status command without any pre-configured scope."
+commands.allow = ["mail_sync_status"]
+
+[[permission]]
+identifier = "deny-mail-sync-status"
+description = "Denies the mail_sync_status command without any pre-configured scope."
+commands.deny = ["mail_sync_status"]

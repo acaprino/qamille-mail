@@ -1,0 +1,47 @@
+[package]
+name = "qamille-desktop"
+version = "1.0.0"
+edition = "2024"
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+qamille = { path = "../../app", default-features = false }
+tauri = { version = "2", features = [] }
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# common-controls-v6: task dialogs, whose buttons say what they do (recovery.rs); the manifest Tauri embeds already asks for Common Controls 6.
+rfd = { version = "0.15", features = ["common-controls-v6"] }
+open = "5"
+
+# Same versions Tauri's WebView2 runtime uses, for the settings it does not
+# expose (src/native_feel.rs).
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.39"
+windows-core = "0.62"
+# The version already in Cargo.lock (tao, wry and webview2-com use it), for the
+# title bar, session end and system menu calls of src/window_shell.rs.
+windows = { version = "=0.62.2", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Registry",
+    "Win32_System_Shutdown",
+    "Win32_System_Threading",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[profile.dev]
+debug = false
+
+[profile.release]
+opt-level = 2
+strip = true

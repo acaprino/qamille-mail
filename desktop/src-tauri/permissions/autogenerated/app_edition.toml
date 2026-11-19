@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-app-edition"
+description = "Enables the app_edition command without any pre-configured scope."
+commands.allow = ["app_edition"]
+
+[[permission]]
+identifier = "deny-app-edition"
+description = "Denies the app_edition command without any pre-configured scope."
+commands.deny = ["app_edition"]

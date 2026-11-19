@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-start-mcp-worker"
+description = "Enables the start_mcp_worker command without any pre-configured scope."
+commands.allow = ["start_mcp_worker"]
+
+[[permission]]
+identifier = "deny-start-mcp-worker"
+description = "Denies the start_mcp_worker command without any pre-configured scope."
+commands.deny = ["start_mcp_worker"]

@@ -1,0 +1,29 @@
+.attached-message {
+  & .attached-subject {
+    font-size: var(--text-xl);
+    font-weight: 650;
+    line-height: 1.3;
+    margin: 0 0 14px;
+    overflow-wrap: anywhere;
+  }
+  & .attached-sender {
+    margin-bottom: 18px;
+  }
+  & .attached-status {
+    color: var(--muted);
+    padding: 24px 0;
+  }
+  & .attached-alert {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    color: var(--danger);
+    padding: 16px 0;
+  }
+  & .attached-alert-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+}

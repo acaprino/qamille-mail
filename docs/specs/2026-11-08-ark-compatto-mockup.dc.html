@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Direzione B: Compatto</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#4F46E5}a:hover{color:#3730A3}
+.i{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.dk:hover{background:#22262E}
+.hv:hover{background:rgba(17,24,39,0.06)}
+.rw:hover{background:#F4F5F8}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 900px; background: #FFFFFF; font-family: 'IBM Plex Sans', system-ui, sans-serif; color: #111827; font-size: 13.5px; line-height: 1.4">
+
+<aside aria-label="Barra laterale" style="flex: 1 1 224px; height: 900px; box-sizing: border-box; background: #16181D; color: #E6E8EC; padding: 12px 10px; display: flex; flex-direction: column; gap: 14px; overflow: auto">
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 2px 6px">
+    <div style="display: flex; align-items: center; gap: 9px; font-weight: 600; font-size: 15px">
+      <span style="width: 24px; height: 24px; border-radius: 6px; background: {{accent}}; color: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="11" height="14" viewBox="0 0 21 25" aria-hidden="true"><path d="M12 1 2 14h8l-1 10 10-14h-8l1-9Z" fill="currentColor"></path></svg></span>
+      <span>Qamille</span>
+    </div>
+    <button class="dk" aria-label="Comprimi la barra laterale" style="width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent; color: #A3AAB7; display: flex; align-items: center; justify-content: center"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M9 4v16"></path></svg></button>
+  </div>
+
+  <button style="display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border: 0; border-radius: 6px; background: {{accent}}; color: #FFFFFF; font: inherit; font-weight: 600">
+    <svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path><path d="m13.5 6.5 4 4"></path></svg>
+    <span style="flex: 1; text-align: left">Nuovo messaggio</span>
+    <kbd style="font: inherit; font-size: 11.5px; padding: 0 6px; border-radius: 4px; background: rgba(255,255,255,0.2)">N</kbd>
+  </button>
+
+  <div style="display: flex; flex-direction: column; gap: 1px">
+    <div style="font-size: 11.5px; font-weight: 600; color: #A3AAB7; padding: 4px 8px; letter-spacing: 0.04em; text-transform: uppercase">Account</div>
+    <button aria-pressed="true" style="display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: #2A2E38; color: #FFFFFF; font: inherit; font-weight: 500; text-align: left">
+      <span style="width: 18px; height: 18px; border-radius: 5px; background: #3A3F4B; color: {{accentLight}}; display: flex; align-items: center; justify-content: center"><svg class="i" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13h5l1.5 3h5L16 13h5"></path><path d="M5.5 5h13L21 13v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6z"></path></svg></span>
+      <span>Tutti gli account</span>
+    </button>
+    <button class="dk" aria-pressed="false" title="tu@esempio.it" style="display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: #D3D7DE; font: inherit; text-align: left">
+      <span style="width: 18px; height: 18px; border-radius: 5px; background: #3B5BDB; color: #FFFFFF; font-size: 10.5px; font-weight: 700; display: flex; align-items: center; justify-content: center">P</span>
+      <span>Personale</span>
+    </button>
+    <button class="dk" aria-pressed="false" title="tu@studio-esempio.it" style="display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: #D3D7DE; font: inherit; text-align: left">
+      <span style="width: 18px; height: 18px; border-radius: 5px; background: #0F766E; color: #FFFFFF; font-size: 10.5px; font-weight: 700; display: flex; align-items: center; justify-content: center">L</span>
+      <span>Lavoro</span>
+    </button>
+  </div>
+
+  <nav aria-label="Cartelle della posta" style="display: flex; flex-direction: column; gap: 1px">
+    <button aria-current="page" style="display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: #2A2E38; color: #FFFFFF; font: inherit; font-weight: 500; text-align: left">
+      <svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="color: {{accentLight}}"><path d="M3 13h5l1.5 3h5L16 13h5"></path><path d="M5.5 5h13L21 13v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6z"></path></svg>
+      <span style="flex: 1">Posta in arrivo</span>
+      <span style="font-size: 11.5px; font-weight: 600; color: #FFFFFF; background: {{accent}}; padding: 0 7px; border-radius: 999px">12</span>
+    </button>
+    <button class="dk" style="display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: #D3D7DE; font: inherit; text-align: left">
+      <svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="3"></rect><path d="m8 12 3 3 5-6"></path></svg>
+      <span style="flex: 1">Da fare</span>
+      <span style="font-size: 11.5px; font-weight: 600; color: #D3D7DE; background: #2A2E38; padding: 0 7px; border-radius: 999px">3</span>
+    </button>
+    <button class="dk" style="display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: #D3D7DE; font: inherit; text-align: left">
+      <svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg>
+      <span style="flex: 1">Posticipati</span>
+    </button>
+    <button class="dk" style="display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: #D3D7DE; font: inherit; text-align: left">
+      <svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path><path d="m13.5 6.5 4 4"></path></svg>
+      <span style="flex: 1">Bozze</span>
+      <span style="font-size: 11.5px; font-weight: 600; color: #D3D7DE; background: #2A2E38; padding: 0 7px; border-radius: 999px">2</span>
+    </button>
+    <button class="dk" style="display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: #D3D7DE; font: inherit; text-align: left">
+      <svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3 10 14"></path><path d="M21 3 14.5 21l-4.5-7-7-4.5z"></path></svg>
+      <span style="flex: 1">Inviati</span>
+    </button>
+    <button class="dk" style="display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: #D3D7DE; font: inherit; text-align: left">
+      <svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="4.5" rx="1"></rect><path d="M5 8.5V19a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8.5"></path><path d="M10 12.5h4"></path></svg>
+      <span style="flex: 1">Archivio</span>
+    </button>
+    <button class="dk" style="display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: #D3D7DE; font: inherit; text-align: left">
+      <svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"></path><path d="M9 7V4.5h6V7"></path><path d="M6 7l1 13h10l1-13"></path></svg>
+      <span style="flex: 1">Cestino</span>
+    </button>
+  </nav>
+
+  <nav aria-label="Strumenti" style="display: flex; flex-direction: column; gap: 1px; margin-top: auto; padding-top: 10px; border-top: 1px solid #2A2E38">
+    <button class="dk" style="display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: #D3D7DE; font: inherit; text-align: left">
+      <svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2"></rect><path d="M3.5 10h17M8 3v4M16 3v4"></path></svg>
+      <span>Calendario</span>
+    </button>
+    <button class="dk" style="display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: #D3D7DE; font: inherit; text-align: left">
+      <svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.5"></circle><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"></path><path d="M16 5.2a3.5 3.5 0 0 1 0 6.6M18.5 14.8c1.7.8 2.7 2.5 3 5.2"></path></svg>
+      <span>Contatti</span>
+    </button>
+    <button class="dk" style="display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: #D3D7DE; font: inherit; text-align: left">
+      <svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"></path></svg>
+      <span>Riunioni</span>
+    </button>
+    <button class="dk" style="display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: #D3D7DE; font: inherit; text-align: left">
+      <svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 5.4L19 10l-5.2 1.6L12 17l-1.8-5.4L5 10l5.2-1.6z"></path></svg>
+      <span>Assistente</span>
+    </button>
+  </nav>
+</aside>
+
+<section aria-label="Elenco messaggi" style="flex: 1 1 440px; height: 900px; box-sizing: border-box; border-right: 1px solid #E3E6EA; display: flex; flex-direction: column; min-width: 0">
+  <div style="padding: 12px 14px 0; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid #E3E6EA">
+    <div style="display: flex; align-items: center; gap: 8px">
+      <h2 style="margin: 0; font-size: 15px; font-weight: 600">Posta in arrivo</h2>
+      <span style="font-size: 12px; color: #4B5563">12 da leggere su 48</span>
+      <button class="hv" aria-label="Segna tutto come letto" style="margin-left: auto; width: 30px; height: 30px; border: 0; border-radius: 6px; background: transparent; color: #374151; display: flex; align-items: center; justify-content: center"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 12 4 4 8-9"></path><path d="m11 15 1.5 1.5L21 7"></path></svg></button>
+      <button class="hv" aria-label="Filtri" style="width: 30px; height: 30px; border: 0; border-radius: 6px; background: transparent; color: #374151; display: flex; align-items: center; justify-content: center"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"></path></svg></button>
+    </div>
+    <label style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border: 1px solid #DDE1E7; border-radius: 6px; background: #FFFFFF; color: #4B5563">
+      <svg class="i" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m20 20-4.2-4.2"></path></svg>
+      <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap">Cerca nella posta</span>
+      <input type="search" placeholder="Cerca mittente, oggetto, testo" style="flex: 1; min-width: 0; border: 0; background: transparent; font: inherit; color: #111827; outline: none" />
+      <kbd style="font: inherit; font-size: 11.5px; color: #4B5563; border: 1px solid #DDE1E7; border-radius: 4px; padding: 0 5px">/</kbd>
+    </label>
+    <div role="group" aria-label="Mostra" style="display: flex; gap: 18px">
+      <button aria-pressed="true" style="height: 34px; padding: 0 2px; border: 0; border-bottom: 2px solid {{accent}}; background: transparent; color: #111827; font: inherit; font-weight: 600">Tutte <span style="color: #4B5563; font-weight: 500">48</span></button>
+      <button aria-pressed="false" style="height: 34px; padding: 0 2px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #4B5563; font: inherit; font-weight: 500">Da leggere <span>12</span></button>
+      <button aria-pressed="false" style="height: 34px; padding: 0 2px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #4B5563; font: inherit; font-weight: 500">Con allegati <span>6</span></button>
+    </div>
+  </div>
+
+  <div style="flex: 1; overflow: auto">
+    <sc-for list="{{items}}" as="t" hint-placeholder-count="10">
+      <sc-if value="{{t.isGroup}}" hint-placeholder-val="{{ false }}">
+        <div style="padding: 5px 14px; font-size: 11.5px; font-weight: 600; color: #4B5563; background: #F6F7F9; border-bottom: 1px solid #EEF0F3; letter-spacing: 0.04em; text-transform: uppercase">{{t.label}}</div>
+      </sc-if>
+      <sc-if value="{{t.isThread}}" hint-placeholder-val="{{ true }}">
+        <button class="rw" style="display: flex; align-items: flex-start; gap: 8px; width: 100%; box-sizing: border-box; padding: 9px 14px 9px 8px; border: 0; border-bottom: 1px solid #EEF0F3; background: {{t.bg}}; font: inherit; color: inherit; text-align: left">
+          <span style="flex: none; width: 6px; height: 20px; display: flex; align-items: center">
+            <sc-if value="{{t.unread}}" hint-placeholder-val="{{ false }}"><span style="width: 6px; height: 6px; border-radius: 50%; background: {{accent}}"></span></sc-if>
+          </span>
+          <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+            <span style="display: flex; align-items: center; gap: 6px; min-width: 0">
+              <span style="font-weight: {{t.weight}}; color: #111827; white-space: nowrap">{{t.sender}}</span>
+              <span style="font-size: 12px; color: #4B5563; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0">{{t.to}}</span>
+              <span style="margin-left: auto; flex: none; display: flex; align-items: center; gap: 6px">
+                <sc-if value="{{t.attach}}" hint-placeholder-val="{{ false }}"><svg class="i" width="14" height="14" viewBox="0 0 24 24" role="img" aria-label="Con allegato" style="color: #4B5563"><path d="M20 11.5 12 19.5a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.2a1.7 1.7 0 0 1-2.4-2.4L15 7"></path></svg></sc-if>
+                <sc-if value="{{t.hasCount}}" hint-placeholder-val="{{ false }}"><span style="display: flex; align-items: center; font-size: 11.5px; font-weight: 600; color: #374151; border: 1px solid #DDE1E7; border-radius: 4px; padding: 0 3px 0 5px">{{t.count}}<svg class="i" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="{{t.chevron}}"></path></svg></span></sc-if>
+                <span style="font-size: 12px; color: {{t.timeColor}}; font-weight: {{t.timeWeight}}">{{t.time}}</span>
+              </span>
+            </span>
+            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #4B5563"><span style="font-weight: {{t.subjWeight}}; color: #1F2937">{{t.subject}}</span> — {{t.snippet}}</span>
+          </span>
+        </button>
+      </sc-if>
+      <sc-if value="{{t.isReply}}" hint-placeholder-val="{{ false }}">
+        <button class="rw" style="display: flex; align-items: flex-start; gap: 8px; width: 100%; box-sizing: border-box; padding: 6px 14px 6px 8px; border: 0; border-bottom: 1px solid #EEF0F3; background: {{t.bg}}; font: inherit; color: inherit; text-align: left">
+          <span style="flex: none; width: 6px"></span>
+          <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px">
+            <span style="display: flex; align-items: center; gap: 6px; min-width: 0">
+              <span style="font-weight: 600; font-size: 13px; color: #111827; white-space: nowrap">{{t.sender}}</span>
+              <span style="font-size: 12px; color: #4B5563; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0">{{t.to}}</span>
+              <span style="margin-left: auto; flex: none; font-size: 12px; color: #4B5563">{{t.time}}</span>
+            </span>
+            <span style="font-size: 12.5px; color: #4B5563; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{t.snippet}}</span>
+          </span>
+        </button>
+      </sc-if>
+    </sc-for>
+  </div>
+</section>
+
+<main aria-label="Lettura" style="flex: 999 1 560px; min-width: 0; height: 900px; box-sizing: border-box; display: flex; flex-direction: column">
+  <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 2px; min-height: 52px; padding: 8px 16px; box-sizing: border-box; border-bottom: 1px solid #E3E6EA">
+    <button class="hv" style="display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: #1F2937; font: inherit; font-weight: 500"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7 4 12l5 5"></path><path d="M4 12h10a6 6 0 0 1 6 6v1"></path></svg>Rispondi</button>
+    <button class="hv" style="display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: #1F2937; font: inherit; font-weight: 500"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 7 6 12l5 5"></path><path d="M7 7 2 12l5 5"></path><path d="M6 12h8a6 6 0 0 1 6 6v1"></path></svg>Rispondi a tutti</button>
+    <button class="hv" style="display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: #1F2937; font: inherit; font-weight: 500"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 7 5 5-5 5"></path><path d="M20 12H10a6 6 0 0 0-6 6v1"></path></svg>Inoltra</button>
+    <span aria-hidden="true" style="width: 1px; height: 20px; background: #E3E6EA; margin: 0 6px"></span>
+    <button class="hv" aria-label="Archivia" title="Archivia (E)" style="width: 32px; height: 32px; border: 0; border-radius: 6px; background: transparent; color: #1F2937; display: flex; align-items: center; justify-content: center"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="4.5" rx="1"></rect><path d="M5 8.5V19a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8.5"></path><path d="M10 12.5h4"></path></svg></button>
+    <button class="hv" aria-label="Elimina" title="Elimina (#)" style="width: 32px; height: 32px; border: 0; border-radius: 6px; background: transparent; color: #1F2937; display: flex; align-items: center; justify-content: center"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"></path><path d="M9 7V4.5h6V7"></path><path d="M6 7l1 13h10l1-13"></path></svg></button>
+    <button class="hv" aria-label="Posticipa" title="Posticipa (H)" style="width: 32px; height: 32px; border: 0; border-radius: 6px; background: transparent; color: #1F2937; display: flex; align-items: center; justify-content: center"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg></button>
+    <button class="hv" aria-label="Da fare" title="Da fare (T)" style="width: 32px; height: 32px; border: 0; border-radius: 6px; background: transparent; color: #1F2937; display: flex; align-items: center; justify-content: center"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="3"></rect><path d="m8 12 3 3 5-6"></path></svg></button>
+    <span style="margin-left: auto; font-size: 12px; color: #4B5563; padding-right: 4px">1 di 12</span>
+    <button class="hv" aria-label="Messaggio precedente" style="width: 32px; height: 32px; border: 0; border-radius: 6px; background: transparent; color: #1F2937; display: flex; align-items: center; justify-content: center"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="m18 15-6-6-6 6"></path></svg></button>
+    <button class="hv" aria-label="Messaggio successivo" style="width: 32px; height: 32px; border: 0; border-radius: 6px; background: transparent; color: #1F2937; display: flex; align-items: center; justify-content: center"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+  </div>
+
+  <div style="flex: 1; overflow: auto; padding: 20px 28px">
+    <article style="max-width: 760px; display: flex; flex-direction: column; gap: 16px">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+        <h1 style="margin: 0; font-size: 20px; line-height: 1.3; font-weight: 600">Preventivo sito nuovo, versione 2</h1>
+        <span style="font-size: 11.5px; font-weight: 600; color: #0F5F58; background: #DDF3F0; border-radius: 4px; padding: 1px 6px">Lavoro</span>
+      </div>
+
+      <dl style="margin: 0; display: grid; grid-template-columns: 52px minmax(0, 1fr); row-gap: 4px; column-gap: 8px; font-size: 13px; padding: 10px 12px; background: #F6F7F9; border: 1px solid #EEF0F3; border-radius: 6px">
+        <dt style="color: #4B5563">Da</dt><dd style="margin: 0"><strong style="font-weight: 600">Giulia Ferri</strong> <span style="color: #4B5563">giulia.ferri@studioferri.it</span></dd>
+        <dt style="color: #4B5563">A</dt><dd style="margin: 0">te, Marco Bassi e altri 2</dd>
+        <dt style="color: #4B5563">Data</dt><dd style="margin: 0">oggi, 10:42</dd>
+      </dl>
+
+      <div style="font-size: 14px; line-height: 1.6; color: #1F2937; display: flex; flex-direction: column; gap: 10px">
+        <p style="margin: 0">Ciao,</p>
+        <p style="margin: 0">ti ho allegato la versione rivista del preventivo, con le modifiche che avevamo concordato martedì. Cambiano solo due voci:</p>
+        <ul style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 3px">
+          <li>la voce 3, sviluppo del catalogo, passa da 40 a 32 ore;</li>
+          <li>la voce 5, formazione, diventa facoltativa.</li>
+        </ul>
+        <p style="margin: 0">Se ti va bene, giovedì preparo il contratto.</p>
+        <p style="margin: 0">A presto,<br>Giulia</p>
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 8px">
+        <button class="hv" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border: 1px solid #DDE1E7; border-radius: 6px; background: #FFFFFF; color: #1F2937; font: inherit; font-size: 13px">
+          <svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="color: #B42318"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5"></path></svg>
+          <span style="font-weight: 500">Preventivo_v2.pdf</span><span style="color: #4B5563">248 KB</span>
+        </button>
+      </div>
+    </article>
+  </div>
+</main>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#4F46E5","options":["#4F46E5","#2B5FD0","#0F766E","#1F2937"]},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const accent = this.props.accent ?? '#4F46E5';
+    const mix = (hex, amount) => {
+      const n = parseInt(hex.replace('#', ''), 16);
+      const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => Math.round(c + (255 - c) * amount));
+      return '#' + ch.map((c) => c.toString(16).padStart(2, '0')).join('');
+    };
+    const accentSoft = mix(accent, 0.9);
+    const accentLight = mix(accent, 0.5);
+    const raw = [
+      { isGroup: true, label: 'Oggi' },
+      { isThread: true, selected: true, open: true, sender: 'Giulia Ferri', to: 'a te, Marco Bassi +2', subject: 'Preventivo sito nuovo, versione 2', snippet: 'Ti ho allegato la versione rivista con le modifiche di martedì. Cambiano solo le voci 3 e 5.', time: '10:42', attach: true, count: '3' },
+      { isReply: true, inSelected: true, sender: 'Marco Bassi', to: 'a Giulia Ferri +2', snippet: 'Per me va bene. Aggiungerei la manutenzione annuale come voce separata.', time: '10:05' },
+      { isReply: true, inSelected: true, sender: 'Tu', to: 'a Giulia Ferri', snippet: 'Grazie, la guardo oggi pomeriggio e ti rispondo entro sera.', time: '09:51' },
+      { isThread: true, unread: true, sender: 'Luca Moretti', to: 'a te', subject: 'Riunione di lunedì: ordine del giorno', snippet: 'Ecco i punti: budget del primo trimestre, nuovo fornitore, date delle ferie.', time: '09:12' },
+      { isThread: true, sender: 'Avvisi conto', to: 'a te', subject: 'Estratto conto di ottobre disponibile', snippet: 'Il documento è nell’area riservata. Non rispondere a questo messaggio.', time: '08:30' },
+      { isGroup: true, label: 'Ieri' },
+      { isThread: true, sender: 'Studio Rinaldi', to: 'a te', subject: 'Fattura n. 214', snippet: 'In allegato la fattura per la consulenza di ottobre. Pagamento a 30 giorni.', time: '18:20', attach: true },
+      { isThread: true, unread: true, sender: 'Elena Conti', to: 'a te, Sara Conti', subject: 'Foto della cena di sabato', snippet: 'Ne ho fatte tantissime, ti mando le migliori. Le altre sono nella cartella condivisa.', time: '16:05', count: '5' },
+      { isThread: true, sender: 'Appunti di Design', to: 'a te', subject: 'Numero 48: griglie che respirano', snippet: 'Questa settimana: spaziature, ritmo verticale e tre esempi da studiare.', time: '11:40' },
+      { isThread: true, unread: true, sender: 'SpediPiù', to: 'a te', subject: 'Il tuo pacco arriva domani', snippet: 'Consegna prevista tra le 9 e le 13. Puoi cambiare la data dal link nel messaggio.', time: '09:02' },
+      { isThread: true, sender: 'Marco Bassi', to: 'a te', subject: 'Accesso al server di prova', snippet: 'Ti ho creato l’utente, la password arriva con un messaggio a parte.', time: '08:47' },
+      { isThread: true, sender: 'Sara Conti', to: 'a te, Elena Conti', subject: 'Regalo per la mamma', snippet: 'Che ne dite di dividerci la spesa? Ho visto una cosa carina in centro.', time: '07:55', count: '4' }
+    ];
+    const items = raw.map((t) => ({
+      isGroup: !!t.isGroup, isThread: !!t.isThread, isReply: !!t.isReply,
+      label: t.label || '', sender: t.sender || '', to: t.to || '', subject: t.subject || '',
+      snippet: t.snippet || '', time: t.time || '',
+      unread: !!t.unread, attach: !!t.attach, hasCount: !!t.count, count: t.count || '',
+      chevron: t.open ? 'm18 15-6-6-6 6' : 'm6 9 6 6 6-6',
+      bg: t.selected ? accentSoft : (t.inSelected ? '#F7F8FE' : '#FFFFFF'),
+      weight: t.unread ? '700' : '500',
+      subjWeight: t.unread ? '600' : '500',
+      timeColor: t.unread ? accent : '#4B5563',
+      timeWeight: t.unread ? '600' : '400'
+    }));
+    return { accent, accentSoft, accentLight, items };
+  }
+}
+</script>
+</body>
+</html>

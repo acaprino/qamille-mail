@@ -1,0 +1,5195 @@
+[
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Attach a managed/registered file snapshot to a draft.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "expected_revision": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "handle": {
+          "type": "string"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "handle",
+        "expected_revision"
+      ],
+      "type": "object"
+    },
+    "name": "attach_to_draft",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Qamille calendar: authorize calendar. Google requires explicit calendar consent; local uses the desktop calendar. Mutations require revision/idempotency as declared.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "description": "Required for Google calendars",
+          "type": [
+            "string",
+            "integer"
+          ]
+        }
+      },
+      "required": [
+        "account_id"
+      ],
+      "type": "object"
+    },
+    "name": "authorize_calendar",
+    "outputSchema": {
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Cancel a meeting job owned by this runtime; cross-process work is refused.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "job_id": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "job_id"
+      ],
+      "type": "object"
+    },
+    "name": "cancel_meeting_job",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Read/cancel a delivery operation. Cancellation is possible only before the provider attempt. Uncertain sends cannot be retried.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "integer"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "cancel_operation",
+    "outputSchema": {
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Read/cancel a delivery operation. Cancellation is possible only before the provider attempt. Uncertain sends cannot be retried.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "integer"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "cancel_scheduled_send",
+    "outputSchema": {
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Suggest category and labels using configured AI; never applies changes.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "classify_email",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Mark a local task complete or reopen it with revision checking.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "completed": {
+          "type": "boolean"
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "expected_revision": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "expected_revision"
+      ],
+      "type": "object"
+    },
+    "name": "complete_task",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Create a contact in a chosen address book (local or a Google book already allowed to write). The book is required.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "birthday": {
+          "type": "string"
+        },
+        "book": {
+          "type": "string"
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "emails": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "org": {
+          "type": "string"
+        },
+        "phones": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "book"
+      ],
+      "type": "object"
+    },
+    "name": "create_contact",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Create a recoverable draft; never sends. Uses an explicit account, reply source, or user-configured default account. Supports reply/reply_all/forward.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account": {
+          "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "bcc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ]
+        },
+        "body": {
+          "type": "string"
+        },
+        "cc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "format": {
+          "enum": [
+            "text",
+            "html"
+          ]
+        },
+        "idempotency_key": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "mode": {
+          "enum": [
+            "new",
+            "reply",
+            "reply_all",
+            "forward"
+          ]
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "signature_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "subject": {
+          "type": "string"
+        },
+        "to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ]
+        }
+      },
+      "required": [
+        "body",
+        "idempotency_key"
+      ],
+      "type": "object"
+    },
+    "name": "create_draft",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Qamille calendar: create event. Google requires explicit calendar consent; local uses the desktop calendar. Mutations require revision/idempotency as declared.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "description": "Required for Google calendars",
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "all_day": {
+          "type": "boolean"
+        },
+        "attendees": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "string"
+          ]
+        },
+        "calendar_id": {
+          "description": "local or exact Google calendar ID",
+          "type": "string"
+        },
+        "description": {
+          "description": "Notes",
+          "type": "string"
+        },
+        "end": {
+          "description": "Exclusive end",
+          "type": "string"
+        },
+        "expected_revision": {
+          "description": "Revision from read_event",
+          "type": "string"
+        },
+        "id": {
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "idempotency_key": {
+          "description": "Required for creations",
+          "type": "string"
+        },
+        "location": {
+          "description": "Location",
+          "type": "string"
+        },
+        "meeting_link": {
+          "description": "Optional HTTPS link for local events",
+          "type": "string"
+        },
+        "minutes": {
+          "maximum": 1440,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "online": {
+          "type": "boolean"
+        },
+        "recurrence": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "reminders": {
+          "type": "object"
+        },
+        "scope": {
+          "enum": [
+            "instance",
+            "series",
+            "following"
+          ],
+          "type": "string"
+        },
+        "send_updates": {
+          "enum": [
+            "all",
+            "externalOnly",
+            "none"
+          ],
+          "type": "string"
+        },
+        "start": {
+          "description": "RFC3339 with offset, or date for all-day",
+          "type": "string"
+        },
+        "time_zone": {
+          "description": "IANA zone",
+          "type": "string"
+        },
+        "title": {
+          "description": "Event title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "start",
+        "idempotency_key"
+      ],
+      "type": "object"
+    },
+    "name": "create_event",
+    "outputSchema": {
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Create a local task from a real email or saved meeting, keeping the original source reference.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "due": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "idempotency_key": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "source_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "source_type": {
+          "enum": [
+            "email",
+            "meeting"
+          ]
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_type",
+        "source_id",
+        "idempotency_key"
+      ],
+      "type": "object"
+    },
+    "name": "create_task_from_source",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Remove a draft after revision verification; queued drafts must be cancelled first.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "expected_revision": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "expected_revision"
+      ],
+      "type": "object"
+    },
+    "name": "delete_draft",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Qamille calendar: delete event. Google requires explicit calendar consent; local uses the desktop calendar. Mutations require revision/idempotency as declared.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "description": "Required for Google calendars",
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "calendar_id": {
+          "description": "local or exact Google calendar ID",
+          "type": "string"
+        },
+        "expected_revision": {
+          "description": "Revision from read_event",
+          "type": "string"
+        },
+        "id": {
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "scope": {
+          "enum": [
+            "instance",
+            "series",
+            "following"
+          ],
+          "type": "string"
+        },
+        "send_updates": {
+          "enum": [
+            "all",
+            "externalOnly",
+            "none"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "expected_revision"
+      ],
+      "type": "object"
+    },
+    "name": "delete_event",
+    "outputSchema": {
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Delete a signature after verifying its revision.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "expected_revision": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "expected_revision"
+      ],
+      "type": "object"
+    },
+    "name": "delete_signature",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Copy an attachment to managed storage and return a readable file handle.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "attachment_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "email_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "email_id",
+        "attachment_id"
+      ],
+      "type": "object"
+    },
+    "name": "download_attachment",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Apply a validated message action with individual batch outcomes. Remote changes use the same service as desktop.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "action": {
+          "enum": [
+            "pin",
+            "unpin",
+            "mute",
+            "unmute",
+            "snooze",
+            "unsnooze",
+            "changeReminder",
+            "clearReminder",
+            "setDue",
+            "clearDue",
+            "setAside",
+            "archive",
+            "moveToInbox",
+            "moveToTrash",
+            "moveToFolder",
+            "attachLabel",
+            "detachLabel",
+            "markAsDone",
+            "markAsUndone",
+            "markAsSeen",
+            "markAsUnseen",
+            "markAsSpam",
+            "markThreadAsPriority",
+            "unmarkThreadAsPriority",
+            "changeCategoryPersonal",
+            "changeCategoryNotification",
+            "changeCategoryNewsletters"
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "ids": {
+          "items": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9]+$",
+                "type": "string"
+              },
+              {
+                "minimum": 1,
+                "type": "integer"
+              }
+            ]
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "type": "array"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "scope": {
+          "enum": [
+            "message",
+            "thread"
+          ]
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "action",
+        "ids"
+      ],
+      "type": "object"
+    },
+    "name": "email_action",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Export exact original EML or MBOX to a managed file; no messages marked read.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "format": {
+          "enum": [
+            "eml",
+            "mbox"
+          ]
+        },
+        "ids": {
+          "items": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9]+$",
+                "type": "string"
+              },
+              {
+                "minimum": 1,
+                "type": "integer"
+              }
+            ]
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "type": "array"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ids",
+        "format"
+      ],
+      "type": "object"
+    },
+    "name": "export_emails",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Export events as an ICS managed file handle (not inline content).",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "description": "Required for Google calendars",
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "calendar_id": {
+          "description": "local or exact Google calendar ID",
+          "type": "string"
+        },
+        "cursor": {
+          "description": "Opaque continuation from this query",
+          "type": "string"
+        },
+        "from": {
+          "description": "RFC3339 with offset or YYYY-MM-DD",
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query": {
+          "description": "Text to search",
+          "type": "string"
+        },
+        "to": {
+          "description": "Exclusive range end",
+          "type": "string"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "export_events",
+    "outputSchema": {
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Export selected saved meeting content as Markdown/TXT/JSON to a managed file.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "format": {
+          "enum": [
+            "markdown",
+            "txt",
+            "json"
+          ]
+        },
+        "id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "export_meeting",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List groups of contacts that may be the same person. Read-only: merging is done by the user in the app.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "include_possible": {
+          "type": "boolean"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "find_duplicates",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Qamille calendar: find free slots. Google requires explicit calendar consent; local uses the desktop calendar. Mutations require revision/idempotency as declared.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "description": "Required for Google calendars",
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "buffer_minutes": {
+          "maximum": 1440,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "calendar_id": {
+          "description": "local or exact Google calendar ID",
+          "type": "string"
+        },
+        "calendar_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "date": {
+          "description": "YYYY-MM-DD in the requested/app time zone, restricted to configured work hours",
+          "type": "string"
+        },
+        "from": {
+          "description": "RFC3339 with offset or YYYY-MM-DD",
+          "type": "string"
+        },
+        "minutes": {
+          "maximum": 1440,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "time_zone": {
+          "description": "IANA zone",
+          "type": "string"
+        },
+        "to": {
+          "description": "Exclusive range end",
+          "type": "string"
+        },
+        "weekdays": {
+          "items": {
+            "maximum": 7,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "maxItems": 7,
+          "type": "array"
+        },
+        "work_end": {
+          "description": "Working day end HH:MM",
+          "type": "string"
+        },
+        "work_start": {
+          "description": "Working day start HH:MM",
+          "type": "string"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "find_free_slots",
+    "outputSchema": {
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Generate a reply and save it as a draft, never send. Requires an idempotency key.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "idempotency_key": {
+          "type": "string"
+        },
+        "instruction": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "idempotency_key"
+      ],
+      "type": "object"
+    },
+    "name": "generate_reply",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Read one account's connection, retention, and mail capabilities.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "account_id"
+      ],
+      "type": "object"
+    },
+    "name": "get_account_status",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Qamille calendar: get calendar operation. Google requires explicit calendar consent; local uses the desktop calendar. Mutations require revision/idempotency as declared.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "description": "Required for Google calendars",
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "calendar_id": {
+          "description": "local or exact Google calendar ID",
+          "type": "string"
+        },
+        "id": {
+          "type": [
+            "string",
+            "integer"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "get_calendar_operation",
+    "outputSchema": {
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Read one contact of the unified address book with all its sources.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "get_contact",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Read a durable meeting processing job.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "job_id": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "job_id"
+      ],
+      "type": "object"
+    },
+    "name": "get_meeting_job",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Read/cancel a delivery operation. Cancellation is possible only before the provider attempt. Uncertain sends cannot be retried.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "integer"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "get_operation",
+    "outputSchema": {
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Read safe regional/composer preferences without credentials or MCP grants.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "get_preferences",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Read server version, effective account count and regional settings. No credentials or permission changes.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "get_server_info",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Preview or apply an ICS import from a managed handle or inline ics text. Never reads arbitrary paths.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "description": "Required for Google calendars",
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "apply": {
+          "description": "false previews an ICS import",
+          "type": "boolean"
+        },
+        "calendar_id": {
+          "description": "local or exact Google calendar ID",
+          "type": "string"
+        },
+        "handle": {
+          "description": "Managed ICS file handle; use either handle or ics",
+          "type": "string"
+        },
+        "ics": {
+          "description": "iCalendar text, maximum 1 MiB",
+          "type": "string"
+        },
+        "idempotency_key": {
+          "description": "Required for creations",
+          "type": "string"
+        },
+        "send_updates": {
+          "enum": [
+            "all",
+            "externalOnly",
+            "none"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "import_events",
+    "outputSchema": {
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Import a managed audio file as a saved meeting with a processing job. No microphone initialization.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "handle": {
+          "type": "string"
+        },
+        "idempotency_key": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "handle",
+        "idempotency_key"
+      ],
+      "type": "object"
+    },
+    "name": "import_meeting",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Mark cards as the same person in the unified address book. Writes to no address book and deletes nothing.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "keys": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 2,
+          "type": "array"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "keys"
+      ],
+      "type": "object"
+    },
+    "name": "link_contacts",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List accounts, effective mail capabilities and synchronization state. Never returns credentials.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "list_accounts",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Read local task/label operation metadata, without message bodies or secrets.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "list_activity",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List the address books (local, Google, mail-observed) with whether each can be written and when it last synchronized.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "list_address_books",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List attachment metadata without exposing internal paths.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "email_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "email_id"
+      ],
+      "type": "object"
+    },
+    "name": "list_attachments",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Qamille calendar: list calendars. Google requires explicit calendar consent; local uses the desktop calendar. Mutations require revision/idempotency as declared.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "description": "Required for Google calendars",
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "cursor": {
+          "description": "Opaque continuation from this query",
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "list_calendars",
+    "outputSchema": {
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List local/remote-linked drafts, revisions and scheduling state.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "list_drafts",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List mail with shared validated filters, account isolation, and stable cursor pagination.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "filter": {
+          "type": "string"
+        },
+        "folder": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "page": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "page_size": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "query": {
+          "type": "string"
+        },
+        "sort": {
+          "type": "string"
+        },
+        "threads": {
+          "type": "boolean"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "list_emails",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Qamille calendar: list events. Google requires explicit calendar consent; local uses the desktop calendar. Mutations require revision/idempotency as declared.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "description": "Required for Google calendars",
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "calendar_id": {
+          "description": "local or exact Google calendar ID",
+          "type": "string"
+        },
+        "cursor": {
+          "description": "Opaque continuation from this query",
+          "type": "string"
+        },
+        "from": {
+          "description": "RFC3339 with offset or YYYY-MM-DD",
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query": {
+          "description": "Text to search",
+          "type": "string"
+        },
+        "to": {
+          "description": "Exclusive range end",
+          "type": "string"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "list_events",
+    "outputSchema": {
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List locally observed mail folders and counts; coverage is explicit.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "list_folders",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List observed message labels and locally created label names.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "scope": {
+          "enum": [
+            "local",
+            "server"
+          ]
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "list_labels",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List saved meetings with content excluded from summaries and stable pagination.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "list_meetings",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List durable deliveries, including scheduled, sent, failed and uncertain states.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "offset": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "list_operations",
+    "outputSchema": {
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List durable deliveries, including scheduled, sent, failed and uncertain states.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "offset": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "list_outbox",
+    "outputSchema": {
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List composer signatures.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "list_signatures",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List persistent local tasks linked to email or meeting sources.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "completed": {
+          "type": "boolean"
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "list_tasks",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Create, rename or delete provider labels; explicit local scope is also available. Deleting a label never deletes its messages.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "action": {
+          "enum": [
+            "create",
+            "rename",
+            "delete"
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "expected_revision": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        },
+        "idempotency_key": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "new_name": {
+          "type": "string"
+        },
+        "scope": {
+          "enum": [
+            "local",
+            "server"
+          ]
+        }
+      },
+      "required": [
+        "action",
+        "name",
+        "account_id"
+      ],
+      "type": "object"
+    },
+    "name": "manage_label",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Read extracted attachment text with pagination; unsupported extraction is an explicit error.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "attachment_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "email_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_chars": {
+          "maximum": 16000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "offset": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "email_id",
+        "attachment_id"
+      ],
+      "type": "object"
+    },
+    "name": "read_attachment",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Read a draft including paginated body/quote and expected_revision.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_chars": {
+          "maximum": 16000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "offset": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "read_draft",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Read a message without marking it read. Body is paginated. include_thread retains the legacy local-conversation view when requested.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "format": {
+          "enum": [
+            "text",
+            "html",
+            "headers"
+          ]
+        },
+        "id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "include_thread": {
+          "type": "boolean"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_chars": {
+          "maximum": 16000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "offset": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "read_email",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Qamille calendar: read event. Google requires explicit calendar consent; local uses the desktop calendar. Mutations require revision/idempotency as declared.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "description": "Required for Google calendars",
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "calendar_id": {
+          "description": "local or exact Google calendar ID",
+          "type": "string"
+        },
+        "id": {
+          "type": [
+            "string",
+            "integer"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "read_event",
+    "outputSchema": {
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Read a managed file as bounded base64 chunks.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "bytes": {
+          "maximum": 49152,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "handle": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "offset": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "handle"
+      ],
+      "type": "object"
+    },
+    "name": "read_file",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Read saved meeting summary, actions, notes, revision and jobs. Transcript requires read_meeting_segments.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "notes": {
+          "type": "boolean"
+        },
+        "transcript": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "read_meeting",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Read timestamped transcript segments from a selected preserved version.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "offset": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "read_meeting_segments",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Read a full provider conversation or explicitly request locally available members.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "scope": {
+          "enum": [
+            "local",
+            "server"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "read_thread",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Snapshot a file from host-configured QAMILLE_MCP_FILE_ROOTS into managed storage. Paths outside those roots are denied.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "name": "register_file",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Remove an attachment by index with revision verification.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "expected_revision": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "index": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "index",
+        "expected_revision"
+      ],
+      "type": "object"
+    },
+    "name": "remove_draft_attachment",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Qamille calendar: respond to event. Google requires explicit calendar consent; local uses the desktop calendar. Mutations require revision/idempotency as declared.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "description": "Required for Google calendars",
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "calendar_id": {
+          "description": "local or exact Google calendar ID",
+          "type": "string"
+        },
+        "expected_revision": {
+          "description": "Revision from read_event",
+          "type": "string"
+        },
+        "id": {
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "rsvp": {
+          "enum": [
+            "accepted",
+            "tentative",
+            "declined"
+          ],
+          "type": "string"
+        },
+        "send_updates": {
+          "enum": [
+            "all",
+            "externalOnly",
+            "none"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "expected_revision",
+        "rsvp"
+      ],
+      "type": "object"
+    },
+    "name": "respond_to_event",
+    "outputSchema": {
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Read/cancel a delivery operation. Cancellation is possible only before the provider attempt. Uncertain sends cannot be retried.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "integer"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "retry_operation",
+    "outputSchema": {
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Create or update a composer signature with optimistic revision control.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "body": {
+          "type": "string"
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "expected_revision": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "html": {
+          "type": "boolean"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "idempotency_key": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "body"
+      ],
+      "type": "object"
+    },
+    "name": "save_signature",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Send or schedule an immutable draft revision through the durable outbox. Returns delivery state, not a delivery receipt. date is RFC3339 or an app-local date.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "expected_revision": {
+          "type": "integer"
+        },
+        "id": {
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "idempotency_key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "expected_revision",
+        "idempotency_key"
+      ],
+      "type": "object"
+    },
+    "name": "schedule_draft",
+    "outputSchema": {
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Search the unified address book: local and Google contacts, plus people seen in mail. Each result lists its sources.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "search_contacts",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Search local/server/auto mail with from:, to:, cc:, subject:, body:, dates, labels, OR, exclusions, and parentheses. Returns actual coverage.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "folder": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "page": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "page_size": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "query": {
+          "type": "string"
+        },
+        "scope": {
+          "enum": [
+            "local",
+            "server",
+            "auto"
+          ]
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "type": "object"
+    },
+    "name": "search_emails",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Qamille calendar: search events. Google requires explicit calendar consent; local uses the desktop calendar. Mutations require revision/idempotency as declared.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "description": "Required for Google calendars",
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "calendar_id": {
+          "description": "local or exact Google calendar ID",
+          "type": "string"
+        },
+        "cursor": {
+          "description": "Opaque continuation from this query",
+          "type": "string"
+        },
+        "from": {
+          "description": "RFC3339 with offset or YYYY-MM-DD",
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query": {
+          "description": "Text to search",
+          "type": "string"
+        },
+        "to": {
+          "description": "Exclusive range end",
+          "type": "string"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "search_events",
+    "outputSchema": {
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Search included meeting transcripts/notes/summaries with versioned sources.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "type": "object"
+    },
+    "name": "search_meetings",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Search the local semantic index. Coverage is limited to indexed content; citations are retrieved from current sources.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "type": "object"
+    },
+    "name": "semantic_search",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Send or schedule an immutable draft revision through the durable outbox. Returns delivery state, not a delivery receipt. date is RFC3339 or an app-local date.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "expected_revision": {
+          "type": "integer"
+        },
+        "id": {
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "idempotency_key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "expected_revision",
+        "idempotency_key"
+      ],
+      "type": "object"
+    },
+    "name": "send_draft",
+    "outputSchema": {
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Create a durable draft and send through the same outbox pipeline. Repeating the same key never creates another delivery.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "attachments": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "type": "array"
+        },
+        "bcc": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "string",
+            "array"
+          ]
+        },
+        "body": {
+          "type": "string"
+        },
+        "cc": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "string",
+            "array"
+          ]
+        },
+        "format": {
+          "enum": [
+            "plain",
+            "html",
+            "rich"
+          ],
+          "type": "string"
+        },
+        "html": {
+          "type": "string"
+        },
+        "idempotency_key": {
+          "type": "string"
+        },
+        "signature_id": {
+          "type": [
+            "string",
+            "integer",
+            "null"
+          ]
+        },
+        "subject": {
+          "type": "string"
+        },
+        "to": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "string",
+            "array"
+          ]
+        }
+      },
+      "required": [
+        "account_id",
+        "subject",
+        "body",
+        "idempotency_key"
+      ],
+      "type": "object"
+    },
+    "name": "send_email",
+    "outputSchema": {
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Start a source-linked meeting summary job using configured AI.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "expected_revision": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "idempotency_key": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "expected_revision",
+        "idempotency_key"
+      ],
+      "type": "object"
+    },
+    "name": "summarize_meeting",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Synchronize authorized accounts; result contains success/error for each account.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "sync_accounts",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Qamille calendar: sync calendar. Google requires explicit calendar consent; local uses the desktop calendar. Mutations require revision/idempotency as declared.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "description": "Required for Google calendars",
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "calendar_id": {
+          "description": "local or exact Google calendar ID",
+          "type": "string"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "name": "sync_calendar",
+    "outputSchema": {
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Synchronize cloud drafts using the account provider. Conflicting local and remote changes are preserved and reported.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "direction": {
+          "enum": [
+            "pull",
+            "push",
+            "both"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "account_id"
+      ],
+      "type": "object"
+    },
+    "name": "sync_drafts",
+    "outputSchema": {
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Start a saved-audio transcription job using an already configured model; no microphone access. provider: compute (the compute server, default) or external (the OpenAI-compatible endpoint); local and remote are their former names.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "expected_revision": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "idempotency_key": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "model": {
+          "type": "string"
+        },
+        "provider": {
+          "enum": [
+            "compute",
+            "external",
+            "local",
+            "remote"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "expected_revision",
+        "idempotency_key"
+      ],
+      "type": "object"
+    },
+    "name": "transcribe_meeting",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Undo a pending desktop/MCP Undo action before its deadline; cannot recall sent mail.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "undo_operation",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Edit a contact in every writable address book that holds it. Only the fields you pass change.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "birthday": {
+          "type": "string"
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "emails": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "org": {
+          "type": "string"
+        },
+        "phones": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "update_contact",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Patch an existing draft; omitted fields remain unchanged and stale revisions are rejected.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "bcc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ]
+        },
+        "body": {
+          "type": "string"
+        },
+        "cc": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "expected_revision": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "format": {
+          "enum": [
+            "text",
+            "html"
+          ]
+        },
+        "id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "signature_id": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "pattern": "^[0-9]+$",
+                  "type": "string"
+                },
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "subject": {
+          "type": "string"
+        },
+        "to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "expected_revision"
+      ],
+      "type": "object"
+    },
+    "name": "update_draft",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Qamille calendar: update event. Google requires explicit calendar consent; local uses the desktop calendar. Mutations require revision/idempotency as declared.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "description": "Required for Google calendars",
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "all_day": {
+          "type": "boolean"
+        },
+        "attendees": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "string"
+          ]
+        },
+        "calendar_id": {
+          "description": "local or exact Google calendar ID",
+          "type": "string"
+        },
+        "description": {
+          "description": "Notes",
+          "type": "string"
+        },
+        "end": {
+          "description": "Exclusive end",
+          "type": "string"
+        },
+        "expected_revision": {
+          "description": "Revision from read_event",
+          "type": "string"
+        },
+        "id": {
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "idempotency_key": {
+          "description": "Required for creations",
+          "type": "string"
+        },
+        "location": {
+          "description": "Location",
+          "type": "string"
+        },
+        "meeting_link": {
+          "description": "Optional HTTPS link for local events",
+          "type": "string"
+        },
+        "minutes": {
+          "maximum": 1440,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "online": {
+          "type": "boolean"
+        },
+        "recurrence": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "reminders": {
+          "type": "object"
+        },
+        "scope": {
+          "enum": [
+            "instance",
+            "series",
+            "following"
+          ],
+          "type": "string"
+        },
+        "send_updates": {
+          "enum": [
+            "all",
+            "externalOnly",
+            "none"
+          ],
+          "type": "string"
+        },
+        "start": {
+          "description": "RFC3339 with offset, or date for all-day",
+          "type": "string"
+        },
+        "time_zone": {
+          "description": "IANA zone",
+          "type": "string"
+        },
+        "title": {
+          "description": "Event title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "expected_revision"
+      ],
+      "type": "object"
+    },
+    "name": "update_event",
+    "outputSchema": {
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Save meeting notes with revision verification.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "expected_revision": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "notes",
+        "expected_revision"
+      ],
+      "type": "object"
+    },
+    "name": "update_meeting_notes",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Update regional settings, working hours, weekdays and default account/calendar with a recoverable transaction. MCP grants cannot be changed.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "default_account_id": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "pattern": "^[0-9]+$",
+                  "type": "string"
+                },
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "default_calendar_id": {
+          "type": "string"
+        },
+        "expected_revision": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "locale": {
+          "type": "string"
+        },
+        "time_zone": {
+          "type": "string"
+        },
+        "undo_seconds": {
+          "maximum": 30,
+          "minimum": 5,
+          "type": "integer"
+        },
+        "user_name": {
+          "type": "string"
+        },
+        "working_hours": {
+          "additionalProperties": false,
+          "properties": {
+            "end": {
+              "type": "string"
+            },
+            "start": {
+              "type": "string"
+            },
+            "weekdays": {
+              "items": {
+                "maximum": 7,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "maxItems": 7,
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "expected_revision"
+      ],
+      "type": "object"
+    },
+    "name": "update_preferences",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
+    },
+    "description": "Patch a local task with optimistic revision checking.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "account_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]+$",
+              "type": "string"
+            },
+            {
+              "minimum": 1,
+              "type": "integer"
+            }
+          ]
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "due": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expected_revision": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "expected_revision"
+      ],
+      "type": "object"
+    },
+    "name": "update_task",
+    "outputSchema": {
+      "properties": {
+        "data": {},
+        "meta": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "data",
+        "meta"
+      ],
+      "type": "object"
+    }
+  }
+]

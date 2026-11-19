@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-contacts-resolve-conflict"
+description = "Enables the contacts_resolve_conflict command without any pre-configured scope."
+commands.allow = ["contacts_resolve_conflict"]
+
+[[permission]]
+identifier = "deny-contacts-resolve-conflict"
+description = "Denies the contacts_resolve_conflict command without any pre-configured scope."
+commands.deny = ["contacts_resolve_conflict"]

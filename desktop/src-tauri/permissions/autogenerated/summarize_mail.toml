@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-summarize-mail"
+description = "Enables the summarize_mail command without any pre-configured scope."
+commands.allow = ["summarize_mail"]
+
+[[permission]]
+identifier = "deny-summarize-mail"
+description = "Denies the summarize_mail command without any pre-configured scope."
+commands.deny = ["summarize_mail"]

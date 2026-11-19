@@ -1,0 +1,21 @@
+.onboarding {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--ground, var(--bg));
+}
+.onboarding-main {
+  display: grid;
+  gap: 14px;
+  align-content: center;
+  justify-items: start;
+  width: min(440px, calc(100% - 32px));
+  margin: auto;
+  padding: 24px 0;
+}
+.onboarding-main h1 {
+  margin: 0;
+}
+.onboarding-main .server-connect {
+  width: 100%;
+}

@@ -1,0 +1,54 @@
+/* MeetingNotice: the card of a detail state. Every rule stays under its root class. */
+.meeting-notice {
+  display: grid;
+  gap: 14px;
+  justify-items: start;
+  align-self: center;
+  max-width: 420px;
+  margin: auto;
+  padding: 28px;
+
+  & h3 {
+    margin: 0;
+    font-size: var(--text-xl);
+    font-weight: 600;
+  }
+  & .state-text {
+    margin: 0;
+    font-size: var(--text-lg);
+    line-height: 1.5;
+    color: var(--text-secondary);
+  }
+  & .state-note {
+    margin: 0;
+    font-size: var(--text-xs);
+    color: var(--muted);
+  }
+  & .notice {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 10px 12px;
+    font-size: var(--text-sm);
+    line-height: 1.45;
+    color: var(--body-text);
+    background: var(--summary-bg);
+    border: 1px solid var(--summary-border);
+    border-radius: var(--radius-lg);
+
+    & svg {
+      flex: none;
+      margin-top: 1px;
+    }
+  }
+  & .notice.danger {
+    color: var(--danger);
+    background: var(--danger-bg);
+    border-color: var(--danger-border);
+  }
+  & .state-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}

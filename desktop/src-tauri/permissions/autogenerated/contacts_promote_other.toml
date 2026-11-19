@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-contacts-promote-other"
+description = "Enables the contacts_promote_other command without any pre-configured scope."
+commands.allow = ["contacts_promote_other"]
+
+[[permission]]
+identifier = "deny-contacts-promote-other"
+description = "Denies the contacts_promote_other command without any pre-configured scope."
+commands.deny = ["contacts_promote_other"]

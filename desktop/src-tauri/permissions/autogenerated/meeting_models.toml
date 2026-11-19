@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-meeting-models"
+description = "Enables the meeting_models command without any pre-configured scope."
+commands.allow = ["meeting_models"]
+
+[[permission]]
+identifier = "deny-meeting-models"
+description = "Denies the meeting_models command without any pre-configured scope."
+commands.deny = ["meeting_models"]

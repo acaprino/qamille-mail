@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-print-mail"
+description = "Enables the print_mail command without any pre-configured scope."
+commands.allow = ["print_mail"]
+
+[[permission]]
+identifier = "deny-print-mail"
+description = "Denies the print_mail command without any pre-configured scope."
+commands.deny = ["print_mail"]

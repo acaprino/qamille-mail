@@ -1,0 +1,33 @@
+{
+  "app": "Qamille",
+  "tagPrefix": "v",
+  "extraTags": [
+    "core-v"
+  ],
+  "files": [
+    "desktop/package.json",
+    "desktop/package-lock.json",
+    "desktop/src-tauri/Cargo.toml",
+    "desktop/src-tauri/tauri.conf.json"
+  ],
+  "adopt": [
+    "server/Cargo.toml",
+    "compute/Cargo.toml",
+    "app/Cargo.toml"
+  ],
+  "locks": [
+    "desktop/src-tauri/Cargo.lock",
+    "server/Cargo.lock",
+    "compute/Cargo.lock",
+    "app/Cargo.lock"
+  ],
+  "crates": [
+    "qamille-desktop"
+  ],
+  "adoptCrates": [
+    "qamille-server",
+    "qamille-compute",
+    "qamille"
+  ],
+  "prepare": []
+}

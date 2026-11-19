@@ -1,0 +1,147 @@
+/* RecipientsInput: chips and the text box in one field, as high as every control at least, and the
+   suggestions below it on the toast layer (ruling R13: an Ark floating list sits above any dialog). */
+[data-scope='combobox'][data-part='root'] {
+  min-width: 0;
+}
+[data-scope='combobox'][data-part='control'] {
+  display: block;
+  min-width: 0;
+}
+[data-scope='tags-input'][data-part='control'] {
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--control-height);
+  padding: 3px 6px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+}
+/* Locked while a message is sending: the whole field dims, like the date field, and its own text box
+   inside does not halve it again. */
+[data-scope='tags-input'][data-part='control']:has(input:disabled) {
+  opacity: 0.5;
+}
+[data-scope='tags-input'][data-part='control'] input:disabled {
+  opacity: 1;
+}
+[data-scope='tags-input'][data-part='control']:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+[data-scope='tags-input'][data-part='item'] {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+}
+[data-scope='tags-input'][data-part='item-preview'] {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  height: 24px;
+  padding: 0 2px 0 8px;
+  color: var(--text);
+  font-size: var(--text-xs);
+  background: var(--label-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+[data-scope='tags-input'][data-part='item-preview'][hidden] {
+  display: none;
+}
+[data-scope='tags-input'][data-part='item-preview'][data-highlighted] {
+  background: var(--selection);
+  border-color: var(--accent);
+}
+[data-scope='tags-input'][data-part='item'][data-invalid] [data-part='item-preview'] {
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+}
+/* Not by colour alone (Contrast themes, colour blindness): a refused address is also underlined. */
+[data-scope='tags-input'][data-part='item'][data-invalid] [data-part='item-text'] {
+  text-decoration: underline wavy;
+  text-underline-offset: 3px;
+}
+[data-scope='tags-input'][data-part='item-text'] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-scope='tags-input'][data-part='item-delete-trigger'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+  border-radius: var(--radius-sm);
+}
+[data-scope='tags-input'][data-part='item-delete-trigger']:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+/* The box that takes the typing (it is Combobox's input carrying TagsInput's behavior, so it is selected by position) fills what the chips leave, and wraps below them when it is too narrow. */
+[data-scope='tags-input'][data-part='control'] > [data-part='input'] {
+  flex: 1 1 120px;
+  min-width: 0;
+  height: 24px;
+  padding: 0 2px;
+  font: inherit;
+  font-size: var(--text-sm);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+[data-scope='tags-input'][data-part='control'] > [data-part='input']:focus-visible {
+  outline: none;
+}
+
+[data-scope='combobox'][data-part='positioner'] {
+  z-index: var(--z-toast);
+}
+[data-scope='combobox'][data-part='content'] {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 280px;
+  padding: 4px;
+  overflow-y: auto;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  font-size: var(--text-sm);
+  outline: none;
+  z-index: var(--z-toast);
+}
+[data-scope='combobox'][data-part='content'][hidden] {
+  display: none;
+}
+[data-scope='combobox'][data-part='item'] {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 28px;
+  padding: 5px 8px;
+  cursor: default;
+  border-radius: var(--radius-sm);
+}
+[data-scope='combobox'][data-part='item'][data-highlighted] {
+  background: var(--hover);
+}
+[data-scope='combobox'][data-part='item'] small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

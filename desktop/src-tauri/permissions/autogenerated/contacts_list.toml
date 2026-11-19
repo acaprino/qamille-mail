@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-contacts-list"
+description = "Enables the contacts_list command without any pre-configured scope."
+commands.allow = ["contacts_list"]
+
+[[permission]]
+identifier = "deny-contacts-list"
+description = "Denies the contacts_list command without any pre-configured scope."
+commands.deny = ["contacts_list"]

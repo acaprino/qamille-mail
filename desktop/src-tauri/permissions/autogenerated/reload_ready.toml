@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-reload-ready"
+description = "Enables the reload_ready command without any pre-configured scope."
+commands.allow = ["reload_ready"]
+
+[[permission]]
+identifier = "deny-reload-ready"
+description = "Denies the reload_ready command without any pre-configured scope."
+commands.deny = ["reload_ready"]

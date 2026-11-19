@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-legacy-local-status"
+description = "Enables the legacy_local_status command without any pre-configured scope."
+commands.allow = ["legacy_local_status"]
+
+[[permission]]
+identifier = "deny-legacy-local-status"
+description = "Denies the legacy_local_status command without any pre-configured scope."
+commands.deny = ["legacy_local_status"]

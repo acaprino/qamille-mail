@@ -1,0 +1,247 @@
+/* Everything here sits on the dark sidebar and uses its tokens: the accent is the ring and the
+   dot of the footer, nothing else. No continuous motion on the card. The component draws two
+   surfaces, the card (.activity-indicator) and the panel (.activity-panel): every rule hangs from one. */
+.activity-indicator {
+  margin: 0 0 6px;
+
+  & .activity-line {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid var(--sidebar-active);
+    border-radius: var(--radius-xl);
+    background: var(--sidebar-hover);
+    color: var(--sidebar-text);
+    text-align: left;
+    font-family: var(--font-text);
+  }
+  & .activity-line:hover {
+    background: var(--sidebar-active);
+  }
+  & .activity-ring {
+    position: absolute;
+    inset: -3px;
+    width: 32px;
+    height: 32px;
+    transform: rotate(-90deg);
+  }
+  & .activity-ring circle {
+    fill: none;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+  }
+  & .activity-ring .track {
+    stroke: var(--sidebar-active);
+  }
+  & .activity-ring .value {
+    stroke: var(--accent-on-sidebar);
+  }
+  & .activity-card-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    font-size: var(--text-xs);
+    color: var(--sidebar-text-active);
+    line-height: 1.25;
+  }
+  & .activity-card-text small {
+    color: var(--sidebar-muted);
+    font-size: var(--text-2xs);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  & .activity-more {
+    font-variant-numeric: tabular-nums;
+    color: var(--accent-on-sidebar);
+    font-size: var(--text-2xs);
+    font-weight: 600;
+  }
+  /* A quiet activity: dimmed, with no word (a word reads as an error). */
+  & .activity-icon.quiet {
+    opacity: 0.4;
+  }
+}
+
+.activity-indicator,
+.activity-panel {
+  & .activity-chip {
+    position: relative;
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: var(--radius-lg);
+    background: var(--sidebar-active);
+    color: var(--accent-on-sidebar);
+  }
+}
+
+.activity-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0 0 6px;
+  padding: 8px 6px 4px;
+  border: 1px solid var(--sidebar-active);
+  border-radius: var(--radius-xl);
+  background: var(--sidebar-hover);
+  color: var(--sidebar-text);
+  font-family: var(--font-text);
+  max-height: min(60vh, 440px);
+  overflow: auto;
+
+  &:focus {
+    outline: none;
+  }
+  & .activity-heading {
+    padding: 0 6px 2px;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--sidebar-text-active);
+  }
+  & .activity-section {
+    padding: 8px 6px 2px;
+    font-size: var(--text-2xs);
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--sidebar-muted);
+  }
+  & .activity-row,
+  & .activity-recent {
+    display: grid;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 6px;
+    min-height: 32px;
+    border-radius: var(--radius-md);
+    font-size: var(--text-xs);
+    color: var(--sidebar-text);
+    text-align: left;
+    width: 100%;
+  }
+  & .activity-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  & button.activity-row:hover {
+    background: var(--sidebar-active);
+  }
+  & .activity-recent {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  & .activity-row .activity-chip,
+  & .activity-recent .activity-chip {
+    width: 24px;
+    height: 24px;
+  }
+  & .activity-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    line-height: 1.25;
+  }
+  & .activity-percent,
+  & .activity-duration,
+  & .activity-time {
+    color: var(--sidebar-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  & .activity-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.25;
+  }
+  & .activity-text strong {
+    font-weight: 500;
+    color: var(--sidebar-text-active);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  & .activity-text small {
+    color: var(--sidebar-muted);
+    font-size: var(--text-2xs);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Tones: done is the quiet default; an undone row is struck through and grey; a failure is red. */
+  & .tone-event .activity-chip {
+    color: var(--sidebar-muted);
+  }
+  /* The sidebar is dark in both themes while --success and --danger follow the theme: mixing them
+     with the sidebar's white keeps a legible green and red on it either way. */
+  & .tone-ok .activity-chip {
+    color: color-mix(in srgb, var(--success) 50%, var(--sidebar-text-active));
+  }
+  & .tone-undone .activity-chip,
+  & .undone .activity-text strong {
+    color: var(--sidebar-muted);
+  }
+  & .undone .activity-text strong {
+    text-decoration: line-through;
+  }
+  & .tone-error .activity-chip,
+  & .tone-error .activity-text strong {
+    color: color-mix(in srgb, var(--danger) 50%, var(--sidebar-text-active));
+  }
+  & .activity-empty {
+    padding: 6px 8px 8px;
+    font-size: var(--text-xs);
+    color: var(--sidebar-muted);
+  }
+  & .activity-all {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 4px 0 2px;
+    padding: 7px 8px;
+    border-top: 1px solid var(--sidebar-active);
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    color: var(--accent-on-sidebar);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    width: 100%;
+  }
+  & .activity-all:hover {
+    background: var(--sidebar-active);
+  }
+  & .activity-row.quiet {
+    opacity: 0.6;
+  }
+  /* The panel is the one place a spinner may turn, and only for work with no percent. */
+  @media (prefers-reduced-motion: reduce) {
+    & .activity-glyph.spinning {
+      animation: none;
+    }
+  }
+}
+
+/* A collapsed sidebar is a 72 px column: the panel floats beside it instead. */
+.sidebar.collapsed {
+  & .activity-panel {
+    position: fixed;
+    left: 80px;
+    bottom: 12px;
+    width: 300px;
+    z-index: var(--z-toast);
+    margin: 0;
+    box-shadow: var(--shadow);
+  }
+  & .activity-indicator .activity-card-text,
+  & .activity-indicator .activity-more {
+    display: none;
+  }
+  & .activity-indicator .activity-line {
+    justify-content: center;
+    padding: 6px 0;
+    border: 0;
+    background: transparent;
+  }
+}

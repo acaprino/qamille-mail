@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-reminder-dismiss"
+description = "Enables the reminder_dismiss command without any pre-configured scope."
+commands.allow = ["reminder_dismiss"]
+
+[[permission]]
+identifier = "deny-reminder-dismiss"
+description = "Denies the reminder_dismiss command without any pre-configured scope."
+commands.deny = ["reminder_dismiss"]

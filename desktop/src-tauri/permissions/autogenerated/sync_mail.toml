@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-sync-mail"
+description = "Enables the sync_mail command without any pre-configured scope."
+commands.allow = ["sync_mail"]
+
+[[permission]]
+identifier = "deny-sync-mail"
+description = "Denies the sync_mail command without any pre-configured scope."
+commands.deny = ["sync_mail"]

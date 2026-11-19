@@ -1,0 +1,113 @@
+/* Windows Contrast themes (forced colours, audit F10). Windows replaces every colour with the few of
+   the user's theme and drops box-shadows, so what the app tells only with a tint (the selected row,
+   the active page, a checked switch) or a shadow ring would vanish. Here each of those states also
+   gets a border or an outline in a system colour, which the theme keeps. Only system colour keywords
+   (Highlight, HighlightText, CanvasText, ButtonText, ButtonFace, GrayText, Canvas): never a token, never
+   a literal. `forced-color-adjust: none` only on the small parts drawn by background alone. */
+@media (forced-colors: active) {
+  /* Focus: a ring in the theme's highlight, also where the app draws it as a shadow. */
+  :focus-visible,
+  [data-focus-visible] {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+  /* Fields whose page style draws the focus on their container with a tint or a shadow (the
+     search, the assistant's question) or hides the outline (the calendar title): the theme drops
+     both, so these get the ring too. */
+  .global-search:focus-within,
+  .ask-form:focus-within,
+  section.calendar-page .title-input:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  /* The selected row, the active page and the current tab: a highlighted edge. */
+  .mail-row.selected,
+  .reply-row.selected,
+  .contact-row.active,
+  .sidebar nav button.active,
+  .settings-nav button.active,
+  .composer-tab.active,
+  .attachment.active,
+  .profile.active,
+  .mail-display button.active,
+  .format-toolbar button.active,
+  .search-filter-button.active,
+  [data-scope='tabs'] [data-part='trigger'][data-selected],
+  [data-scope='select'][data-part='item'][data-state='checked'],
+  [data-scope='date-picker'][data-part='table-cell-trigger'][data-selected] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+  /* The item the arrow keys are on in a list box. */
+  [data-scope='select'][data-part='item'][data-highlighted],
+  [data-scope='combobox'][data-part='item'][data-highlighted],
+  [data-scope='tags-input'][data-part='item-preview'][data-highlighted] {
+    outline: 1px dashed Highlight;
+    outline-offset: -1px;
+  }
+
+  /* Chips, tags and counts are tinted pills: a border keeps their shape. */
+  .tag,
+  .origin-chip,
+  .nav-count,
+  [data-scope='tags-input'][data-part='item-preview'] {
+    border: 1px solid CanvasText;
+  }
+
+  /* Borders that mean something: the priority edge is an inset shadow, which the theme drops. */
+  .mail-row[data-section='priority'] {
+    border-left: 3px solid Highlight;
+  }
+
+  /* Switch: the track and the thumb are backgrounds only. */
+  button[role='switch'] {
+    border: 1px solid ButtonText;
+  }
+  button[role='switch'] [data-part='fill'],
+  button[role='switch'] [data-part='thumb'] {
+    forced-color-adjust: none;
+  }
+  button[role='switch'][aria-checked='true'] [data-part='fill'] {
+    background-color: Highlight !important;
+    opacity: 1 !important;
+  }
+  button[role='switch'][aria-checked='false'] [data-part='fill'] {
+    opacity: 0 !important;
+  }
+  button[role='switch'] [data-part='thumb'] {
+    background-color: ButtonText !important;
+  }
+  button[role='switch'][aria-checked='true'] [data-part='thumb'] {
+    background-color: HighlightText !important;
+  }
+  button[role='switch']:disabled {
+    border-color: GrayText;
+  }
+
+  /* Checkbox: checked is a filled box. */
+  [data-scope='checkbox'][data-part='control'] {
+    border-color: ButtonText;
+  }
+  [data-scope='checkbox'][data-part='control'][data-state='checked'],
+  [data-scope='checkbox'][data-part='control'][data-state='indeterminate'] {
+    forced-color-adjust: none;
+    background: Highlight;
+    border-color: Highlight;
+    color: HighlightText;
+  }
+
+  /* A dialog and a panel float over the page with a shadow: an edge separates them. */
+  [data-scope='dialog'][data-part='content'],
+  [data-scope='popover'][data-part='content'],
+  [data-scope='tooltip'][data-part='content'],
+  [data-scope='toast'][data-part='root'] {
+    border: 1px solid CanvasText;
+  }
+
+  /* Disabled stays visibly disabled when opacity is all that marks it. */
+  button:disabled {
+    color: GrayText;
+    border-color: GrayText;
+  }
+}

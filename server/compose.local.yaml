@@ -1,0 +1,76 @@
+# Il server di Qamille sul proprio PC, con Docker (guida: docs/server-sul-pc.md).
+#
+#   cp .env.local.example .env      # poi scrivi la chiave amministratore
+#   docker compose -f compose.local.yaml up -d
+#   docker compose -f compose.local.yaml run --rm server user create <nome>
+#
+# Le due porte sono pubblicate SOLO su 127.0.0.1: il login in chiaro è ammesso dal gateway della
+# rete del compose (172.30.88.1), da cui arriva la porta pubblicata, quindi solo da questo
+# computer. Mai pubblicare su 0.0.0.0: con il chiaro aperto chiunque entrerebbe senza TLS.
+# Se 172.30.88.0/24 è già usata sul PC, cambia sottorete e indirizzi qui sotto insieme.
+
+name: qamille-local
+
+services:
+  server:
+    # L'immagine pubblica, indicata con il digest. Il digest qui sotto è un segnaposto
+    # (formato valido, non scaricabile): lo sostituisce il Task 8 della wave 2 con quello
+    # della prima immagine pubblicata. Finché è tutto zeri, `up` fallisce: è voluto.
+    image: ghcr.io/acaprino/qamille-server@sha256:0000000000000000000000000000000000000000000000000000000000000000
+    platform: linux/amd64
+    restart: unless-stopped
+    # PID 1 raccoglie i processi che finiscono: il figlio dell'assistente interno non lascia zombie.
+    init: true
+    # Assistente interno (QAMILLE_LLM_PROVIDER=builtin, QAMILLE_LLM_BUILTIN_MODEL=llm-piccolo): il modello
+    # gira in questo container. Dai a Docker la memoria che serve (docs/server-sul-pc.md): con
+    # `mem_limit` il limite di questo servizio, altrimenti quello di Docker Desktop. Il server
+    # rifiuta di avviare il modello se la memoria libera non basta (503), non si blocca.
+    # mem_limit: 8g
+    environment:
+      QAMILLE_DATA_DIR: /data
+      QAMILLE_BIND: 0.0.0.0:8787
+      QAMILLE_ADMIN_BIND: 172.30.88.2:8788
+      QAMILLE_PLAINTEXT_FROM: 172.30.88.1
+      QAMILLE_ADMIN_PLAINTEXT_FROM: 172.30.88.1
+      QAMILLE_ADMIN_KEY: ${QAMILLE_ADMIN_KEY:?scrivila in .env}
+      QAMILLE_MODELS_DIR: /data/models
+      QAMILLE_EDITION: self-hosted
+      # Assistente interno: spento finché QAMILLE_LLM_PROVIDER è vuoto (esempio: builtin e llm-piccolo,
+      # da installare poi dalla pagina /admin o con `model install llm-piccolo`). Il token di
+      # Hugging Face sta solo in .env.
+      QAMILLE_LLM_PROVIDER: ${QAMILLE_LLM_PROVIDER:-}
+      QAMILLE_LLM_BUILTIN_MODEL: ${QAMILLE_LLM_BUILTIN_MODEL:-}
+      QAMILLE_LLM_BUILTIN_CONTEXT: ${QAMILLE_LLM_BUILTIN_CONTEXT:-}
+      QAMILLE_LLM_BUILTIN_IDLE_SECS: ${QAMILLE_LLM_BUILTIN_IDLE_SECS:-}
+      QAMILLE_LLM_BUILTIN_SLOTS: ${QAMILLE_LLM_BUILTIN_SLOTS:-}
+      QAMILLE_LLM_ACCEPT_LICENSE: ${QAMILLE_LLM_ACCEPT_LICENSE:-}
+      QAMILLE_MODELS_MIRROR_URL: ${QAMILLE_MODELS_MIRROR_URL:-}
+      QAMILLE_HF_TOKEN: ${QAMILLE_HF_TOKEN:-}
+      QAMILLE_SYNC_KEY: ${QAMILLE_SYNC_KEY:-}
+      QAMILLE_SYNC_KEY_OLD: ${QAMILLE_SYNC_KEY_OLD:-}
+    volumes:
+      - qamille_local_data:/data
+    ports:
+      - "127.0.0.1:8787:8787"
+      - "127.0.0.1:8788:8788"
+    networks:
+      qamille-local:
+        ipv4_address: 172.30.88.2
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  qamille-local:
+    name: qamille-local
+    ipam:
+      config:
+        - subnet: 172.30.88.0/24
+          gateway: 172.30.88.1
+
+volumes:
+  qamille_local_data:

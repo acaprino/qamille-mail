@@ -1,0 +1,3 @@
+# rustc crashes on this PC when many compiles run at once (STATUS_STACK_BUFFER_OVERRUN).
+[build]
+jobs = 1

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-server-start-checkout"
+description = "Enables the server_start_checkout command without any pre-configured scope."
+commands.allow = ["server_start_checkout"]
+
+[[permission]]
+identifier = "deny-server-start-checkout"
+description = "Denies the server_start_checkout command without any pre-configured scope."
+commands.deny = ["server_start_checkout"]

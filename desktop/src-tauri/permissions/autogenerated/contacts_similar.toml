@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-contacts-similar"
+description = "Enables the contacts_similar command without any pre-configured scope."
+commands.allow = ["contacts_similar"]
+
+[[permission]]
+identifier = "deny-contacts-similar"
+description = "Denies the contacts_similar command without any pre-configured scope."
+commands.deny = ["contacts_similar"]

@@ -1,0 +1,36 @@
+/* Two classes: the Svelte-scoped rule outranked the reading width of .message-body (760px) in styles.css,
+   and an HTML message spans the pane like the boxes above it. */
+.message-body.html-body {
+  white-space: normal;
+  max-width: none;
+
+  & .remote-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    font-size: var(--text-sm);
+    color: var(--muted);
+  }
+  & .remote-bar button {
+    flex: none;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--accent);
+    font: inherit;
+    cursor: default;
+  }
+  & iframe {
+    display: block;
+    width: 100%;
+    border: 0;
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+  }
+}

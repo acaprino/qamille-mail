@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-release-attachment-imports"
+description = "Enables the release_attachment_imports command without any pre-configured scope."
+commands.allow = ["release_attachment_imports"]
+
+[[permission]]
+identifier = "deny-release-attachment-imports"
+description = "Denies the release_attachment_imports command without any pre-configured scope."
+commands.deny = ["release_attachment_imports"]

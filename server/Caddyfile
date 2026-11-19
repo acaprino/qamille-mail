@@ -1,0 +1,24 @@
+# Caddy davanti a qamille-server: TLS (certificato automatico per il dominio) e
+# inoltro verso server:8787 sulla rete del compose.
+#
+# Il server crede a X-Forwarded-For e X-Forwarded-Proto solo perché la connessione
+# arriva dall'indirizzo di Caddy, elencato in QAMILLE_TRUSTED_PROXIES. Caddy
+# sovrascrive entrambe le intestazioni: un valore mandato dal client non arriva mai
+# al server. La pagina /admin non passa di qui: sta sull'ascolto amministrativo,
+# raggiungibile solo con un tunnel SSH (vedi README.md).
+
+{$QAMILLE_DOMAIN} {
+	reverse_proxy server:8787 {
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+		header_up -X-Real-IP
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
+	# Nessuna direttiva `log`: Caddy non scrive il log di accesso, che conterrebbe
+	# gli indirizzi dei clienti (il server li tiene solo in memoria).
+}

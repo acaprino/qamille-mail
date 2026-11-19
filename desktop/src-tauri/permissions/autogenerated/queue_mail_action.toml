@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-queue-mail-action"
+description = "Enables the queue_mail_action command without any pre-configured scope."
+commands.allow = ["queue_mail_action"]
+
+[[permission]]
+identifier = "deny-queue-mail-action"
+description = "Denies the queue_mail_action command without any pre-configured scope."
+commands.deny = ["queue_mail_action"]

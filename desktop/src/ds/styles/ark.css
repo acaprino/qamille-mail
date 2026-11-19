@@ -1,0 +1,61 @@
+@import './nav.css';
+@import './ark/toast.css';
+@import './ark/recipients.css';
+@import './ark/select.css';
+@import './ark/checkbox.css';
+@import './ark/switch.css';
+@import './ark/tabs.css';
+@import './ark/slider.css';
+@import './ark/date-picker.css';
+@import './ark/dialog.css';
+@import './ark/popover.css';
+
+/* The look of the Ark UI parts (ADR-0011). Ark gives the behavior and writes data-scope, data-part and
+   data-state on every part; the rules here select on those, so nothing needs a class of its own.
+   Every value is a token. Layers stay on the ladder of theme.css, portals included. */
+
+/* Tooltip: the hint of a Button with `tip`. A dark chip over any ground, in the sidebar's colors. */
+[data-scope='tooltip'][data-part='positioner'] {
+  z-index: var(--z-toast);
+}
+[data-scope='tooltip'][data-part='content'] {
+  z-index: var(--z-toast);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 280px;
+  padding: 4px 8px;
+  color: var(--sidebar-text-active);
+  background: var(--sidebar);
+  border: 1px solid var(--sidebar-active);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-2xs);
+  line-height: 1.4;
+}
+/* The entry animation only while open: a closing tip then has no animation, so Ark's presence unmounts it
+   at once (with the animation on every state, a closed tip stayed on screen next to the new one). */
+[data-scope='tooltip'][data-part='content'][data-state='open'] {
+  animation: tooltip-in var(--motion-panel) var(--ease-out);
+}
+[data-scope='tooltip'][data-part='content'][hidden] {
+  display: none;
+}
+[data-scope='tooltip'][data-part='content'][data-instant] {
+  animation: none;
+}
+[data-scope='tooltip'][data-part='content'] kbd {
+  padding: 0 4px;
+  line-height: 1.4;
+  color: var(--sidebar-muted);
+  border-color: var(--sidebar-active);
+}
+@keyframes tooltip-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-scope='tooltip'][data-part='content'] {
+    animation: none;
+  }
+}

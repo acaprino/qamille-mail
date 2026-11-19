@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-sync-resolve-removal"
+description = "Enables the sync_resolve_removal command without any pre-configured scope."
+commands.allow = ["sync_resolve_removal"]
+
+[[permission]]
+identifier = "deny-sync-resolve-removal"
+description = "Denies the sync_resolve_removal command without any pre-configured scope."
+commands.deny = ["sync_resolve_removal"]

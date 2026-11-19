@@ -1,0 +1,166 @@
+# qamille-server in produzione: il server dietro Caddy (TLS) e l'ascolto
+# amministrativo solo su 127.0.0.1 dell'host (tunnel SSH). Vedi README.md.
+#
+#   cp .env.example .env      # poi compila .env
+#   docker compose up -d --build
+#
+# La rete ha indirizzi fissi perché il server riconosce il proxy dal suo IP
+# (QAMILLE_TRUSTED_PROXIES) e accetta il chiaro sull'ascolto amministrativo solo
+# dal gateway della rete, da cui arriva la porta pubblicata su 127.0.0.1
+# (QAMILLE_ADMIN_PLAINTEXT_FROM). Se 172.30.87.0/24 o fd00:5a7c:87::/64 sono già
+# usate sull'host, cambia le sottoreti e gli indirizzi qui sotto insieme.
+#
+# IPv6 è acceso sulla rete perché Caddy veda l'indirizzo vero dei clienti IPv6:
+# senza, Docker li inoltra con il suo proxy e arrivano tutti dal gateway, cioè da
+# un'origine sola per il limite dei tentativi. Richiede Docker 27 o più recente
+# (ip6tables attivo); vedi README.md, «IPv6».
+#
+# Aggiornamento da Sparklone: le variabili SPARKLONE_* del vecchio .env valgono
+# ancora; per tenere utenti, modelli e certificati imposta i nomi dei volumi
+# (QAMILLE_*_VOLUME) come in .env.example e README.md, «Aggiornamento da Sparklone».
+
+name: qamille
+
+services:
+  server:
+    build:
+      # La radice del repository: il server dipende da ../compute.
+      context: ..
+      dockerfile: server/Dockerfile
+      platforms:
+        - linux/amd64
+    image: qamille-server:local
+    platform: linux/amd64
+    restart: unless-stopped
+    # PID 1 raccoglie i processi che finiscono: il figlio dell'assistente interno non lascia zombie.
+    init: true
+    # Assistente interno (QAMILLE_LLM_PROVIDER=builtin, QAMILLE_LLM_BUILTIN_MODEL=llm-piccolo): il modello
+    # gira in questo container. Dai a Docker la memoria che serve (docs/server-sul-pc.md): con
+    # `mem_limit` il limite di questo servizio, altrimenti quello di Docker Desktop. Il server
+    # rifiuta di avviare il modello se la memoria libera non basta (503), non si blocca.
+    # mem_limit: 8g
+    environment:
+      QAMILLE_DATA_DIR: /data
+      # Calcolo (wave 3): EmbeddingGemma 2 in /data/models/embeddinggemma-2, whisper in
+      # /data/models/speech; installati dall'amministratore (README, «Calcolo in serve»).
+      QAMILLE_MODELS_DIR: /data/models
+      QAMILLE_COMPUTE_MAX_IN_FLIGHT_PER_USER: ${QAMILLE_COMPUTE_MAX_IN_FLIGHT_PER_USER:-${SPARKLONE_COMPUTE_MAX_IN_FLIGHT_PER_USER:-2}}
+      # Assistente (gateway LLM): spento finché QAMILLE_LLM_PROVIDER è vuoto. Le variabili vuote
+      # contano come assenti. La chiave del provider sta solo in .env, mai scritta qui.
+      QAMILLE_LLM_PROVIDER: ${QAMILLE_LLM_PROVIDER:-}
+      QAMILLE_LLM_BASE_URL: ${QAMILLE_LLM_BASE_URL:-}
+      QAMILLE_LLM_MODEL: ${QAMILLE_LLM_MODEL:-}
+      QAMILLE_LLM_ALLOWED_MODELS: ${QAMILLE_LLM_ALLOWED_MODELS:-}
+      QAMILLE_LLM_MAX_OUTPUT_TOKENS: ${QAMILLE_LLM_MAX_OUTPUT_TOKENS:-}
+      QAMILLE_LLM_CONTEXT_TOKENS: ${QAMILLE_LLM_CONTEXT_TOKENS:-}
+      QAMILLE_LLM_MAX_REQUEST_BYTES: ${QAMILLE_LLM_MAX_REQUEST_BYTES:-}
+      QAMILLE_LLM_TIMEOUT_SECS: ${QAMILLE_LLM_TIMEOUT_SECS:-}
+      QAMILLE_LLM_MAX_IN_FLIGHT_PER_USER: ${QAMILLE_LLM_MAX_IN_FLIGHT_PER_USER:-}
+      QAMILLE_LLM_MAX_IN_FLIGHT_TOTAL: ${QAMILLE_LLM_MAX_IN_FLIGHT_TOTAL:-}
+      QAMILLE_LLM_MAX_TOKENS_PER_DAY_PER_USER: ${QAMILLE_LLM_MAX_TOKENS_PER_DAY_PER_USER:-}
+      QAMILLE_LLM_LABEL: ${QAMILLE_LLM_LABEL:-}
+      QAMILLE_LLM_EXTERNAL: ${QAMILLE_LLM_EXTERNAL:-}
+      QAMILLE_LLM_BUILTIN_MODEL: ${QAMILLE_LLM_BUILTIN_MODEL:-}
+      QAMILLE_LLM_BUILTIN_CONTEXT: ${QAMILLE_LLM_BUILTIN_CONTEXT:-}
+      QAMILLE_LLM_BUILTIN_IDLE_SECS: ${QAMILLE_LLM_BUILTIN_IDLE_SECS:-}
+      QAMILLE_LLM_BUILTIN_SLOTS: ${QAMILLE_LLM_BUILTIN_SLOTS:-}
+      QAMILLE_LLM_BUILTIN_PROGRAM: ${QAMILLE_LLM_BUILTIN_PROGRAM:-}
+      QAMILLE_LLM_ACCEPT_LICENSE: ${QAMILLE_LLM_ACCEPT_LICENSE:-}
+      QAMILLE_MODELS_MIRROR_URL: ${QAMILLE_MODELS_MIRROR_URL:-}
+      QAMILLE_HF_TOKEN: ${QAMILLE_HF_TOKEN:-}
+      QAMILLE_SYNC_KEY: ${QAMILLE_SYNC_KEY:-}
+      QAMILLE_SYNC_KEY_OLD: ${QAMILLE_SYNC_KEY_OLD:-}
+      QAMILLE_LLM_API_KEY: ${QAMILLE_LLM_API_KEY:-}
+      # Raggiungibile solo dalla rete del compose: la porta 8787 non è pubblicata.
+      QAMILLE_BIND: 0.0.0.0:8787
+      QAMILLE_TRUSTED_PROXIES: 172.30.87.2,fd00:5a7c:87::2
+      # Ascolto amministrativo sull'indirizzo privato del container, pubblicato solo
+      # su 127.0.0.1:8788 dell'host. Il server non parte se l'eccezione al chiaro
+      # (QAMILLE_ADMIN_PLAINTEXT_FROM) accompagna un ascolto pubblico o 0.0.0.0.
+      QAMILLE_ADMIN_BIND: 172.30.87.3:8788
+      QAMILLE_ADMIN_PLAINTEXT_FROM: 172.30.87.1
+      QAMILLE_ADMIN_KEY: ${QAMILLE_ADMIN_KEY:-${SPARKLONE_ADMIN_KEY:-}}
+      QAMILLE_EDITION: ${QAMILLE_EDITION:-${SPARKLONE_EDITION:-self-hosted}}
+    volumes:
+      - data:/data
+    ports:
+      - "127.0.0.1:8788:8788"
+    networks:
+      qamille:
+        ipv4_address: 172.30.87.3
+        ipv6_address: fd00:5a7c:87::3
+    read_only: true
+    # The transcription work lives in /data/compute-work (0700); /tmp is a small private tmpfs
+    # for whatever a library may still write there.
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  # Esempio: un modello interno con Ollama, nella stessa rete e senza porte pubblicate. Togli i
+  # commenti qui e in `volumes:`, poi imposta in .env QAMILLE_LLM_PROVIDER=openai-compatible,
+  # QAMILLE_LLM_BASE_URL=http://ollama:11434/v1 e QAMILLE_LLM_MODEL=qwen2.5:14b. Prima del primo
+  # uso scarica il modello:  docker compose exec ollama ollama pull qwen2.5:14b
+  # ollama:
+  #   image: ollama/ollama
+  #   restart: unless-stopped
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   networks:
+  #     - qamille
+
+  caddy:
+    # Versione e digest fissati: un aggiornamento si fa cambiando questa riga.
+    image: caddy:2.11.9@sha256:4e2425f6009577e7c651010f16679c28f7d12df3e7b1914f941a7a3370746b3c
+    restart: unless-stopped
+    depends_on:
+      - server
+    environment:
+      QAMILLE_DOMAIN: ${QAMILLE_DOMAIN:-${SPARKLONE_DOMAIN:?imposta QAMILLE_DOMAIN in .env}}
+    ports:
+      - "${QAMILLE_HTTP_PORT:-${SPARKLONE_HTTP_PORT:-80}}:80"
+      - "${QAMILLE_HTTPS_PORT:-${SPARKLONE_HTTPS_PORT:-443}}:443"
+      - "${QAMILLE_HTTPS_PORT:-${SPARKLONE_HTTPS_PORT:-443}}:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    tmpfs:
+      - /tmp
+    networks:
+      qamille:
+        ipv4_address: 172.30.87.2
+        ipv6_address: fd00:5a7c:87::2
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      # Solo per ascoltare su 80 e 443.
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  qamille:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.30.87.0/24
+          gateway: 172.30.87.1
+        - subnet: fd00:5a7c:87::/64
+          gateway: fd00:5a7c:87::1
+
+volumes:
+  # server.db: utenti, dispositivi, hash. Da salvare (vedi README.md, «Backup»).
+  # Nomi espliciti: un'installazione nata come Sparklone li punta ai volumi
+  # sparklone_* esistenti (README.md, «Aggiornamento da Sparklone»).
+  data:
+    name: ${QAMILLE_DATA_VOLUME:-qamille_data}
+  caddy_data:
+    name: ${QAMILLE_CADDY_DATA_VOLUME:-qamille_caddy_data}
+  caddy_config:
+    name: ${QAMILLE_CADDY_CONFIG_VOLUME:-qamille_caddy_config}
+  # Solo con l'esempio di Ollama sopra:
+  # ollama_data:

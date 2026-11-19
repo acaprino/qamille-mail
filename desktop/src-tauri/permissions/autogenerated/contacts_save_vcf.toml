@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-contacts-save-vcf"
+description = "Enables the contacts_save_vcf command without any pre-configured scope."
+commands.allow = ["contacts_save_vcf"]
+
+[[permission]]
+identifier = "deny-contacts-save-vcf"
+description = "Denies the contacts_save_vcf command without any pre-configured scope."
+commands.deny = ["contacts_save_vcf"]

@@ -1,0 +1,29 @@
+/* The section has no wrapper of its own: every rule hangs from one of its own classes. */
+.index-account {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+
+  & progress {
+    width: 100%;
+    height: 6px;
+    accent-color: var(--accent);
+  }
+  & p {
+    margin: 6px 0;
+  }
+  & strong {
+    overflow-wrap: anywhere;
+  }
+  & .index-progress {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin: 8px 0 4px;
+    font-size: var(--text-xs);
+  }
+}
+.index-notice {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}

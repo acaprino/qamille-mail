@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-queue-draft-action"
+description = "Enables the queue_draft_action command without any pre-configured scope."
+commands.allow = ["queue_draft_action"]
+
+[[permission]]
+identifier = "deny-queue-draft-action"
+description = "Denies the queue_draft_action command without any pre-configured scope."
+commands.deny = ["queue_draft_action"]

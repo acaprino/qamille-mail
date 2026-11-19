@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-render-body"
+description = "Enables the render_body command without any pre-configured scope."
+commands.allow = ["render_body"]
+
+[[permission]]
+identifier = "deny-render-body"
+description = "Denies the render_body command without any pre-configured scope."
+commands.deny = ["render_body"]

@@ -1,0 +1,55 @@
+/* The surface is the design system's popover, made for menus; this one holds a small form. It is
+   drawn in a portal, so its rules hang on its own class, not on the page. */
+[data-scope='popover'][data-part='content'].record-popover {
+  width: 300px;
+  padding: 14px;
+
+  & .record-form {
+    display: grid;
+    gap: 10px;
+  }
+  & .record-form .field {
+    margin-bottom: 0;
+  }
+  & .record-sources {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin: 0;
+    font-size: var(--text-xs);
+    line-height: 1.4;
+    color: var(--muted);
+  }
+  & .record-sources svg {
+    flex: none;
+    margin-top: 1px;
+  }
+  & .record-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  /* The popover styles every button inside it as a full-width menu item: these are real buttons. */
+  & .record-actions button[class] {
+    width: auto;
+    padding: 0 12px;
+    justify-content: center;
+    text-align: center;
+  }
+  & .record-actions button[aria-disabled='true'] {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+.record-trigger[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: default;
+}
+/* The line under the button: a flex item of the header row that takes a row of its own. */
+.record-why {
+  flex: 1 0 100%;
+  margin: -4px 0 0;
+  font-size: var(--text-xs);
+  text-align: right;
+  color: var(--muted);
+}

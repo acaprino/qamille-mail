@@ -1,0 +1,18 @@
+/* The section has no wrapper of its own: every rule hangs from one of its own classes. */
+.storage-fields {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.storage-confirmation {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+
+  & p {
+    margin: 0 0 10px;
+    font-size: var(--text-sm);
+    line-height: 1.5;
+  }
+}

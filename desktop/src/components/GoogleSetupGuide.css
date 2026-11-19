@@ -1,0 +1,76 @@
+.google-setup-guide {
+  & .google-setup-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  & h2 {
+    margin: 5px 0 16px;
+  }
+  & p {
+    font-size: var(--text-sm);
+    line-height: 1.65;
+  }
+  & .google-setup-intro,
+  & .google-setup-note {
+    color: var(--text-secondary);
+  }
+  & ol {
+    margin: 22px 0;
+    padding-left: 24px;
+  }
+  & li {
+    padding-left: 6px;
+    margin-bottom: 22px;
+  }
+  & li::marker {
+    color: var(--accent-text);
+    font-weight: 600;
+  }
+  & li strong {
+    font-size: var(--text-md);
+  }
+  & li p {
+    margin: 6px 0 9px;
+    color: var(--text-secondary);
+  }
+  & a {
+    color: var(--accent-text);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    font-size: var(--text-sm);
+  }
+  & .google-setup-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+  }
+  & .google-setup-scopes {
+    display: grid;
+    gap: 5px;
+    margin: 10px 0;
+  }
+  & code {
+    font-size: var(--text-xs);
+    overflow-wrap: anywhere;
+  }
+  & .google-setup-note {
+    padding: 12px;
+    margin-bottom: 16px;
+    background: var(--ground);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+  }
+  & .google-setup-error {
+    color: var(--danger);
+    margin-top: 12px;
+  }
+  & .google-setup-actions {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 24px;
+  }
+}

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Qamille · Amministrazione</title>
+<link rel="stylesheet" href="/admin/app.css">
+<script src="/admin/app.js" defer></script>
+</head>
+<body>
+<header class="bar">
+  <h1>Qamille · Amministrazione</h1>
+  <button id="lock" type="button" class="secondary" hidden>Esci</button>
+</header>
+<main>
+  <section id="key-section" class="card narrow" aria-labelledby="key-title">
+    <h2 id="key-title">Chiave amministratore</h2>
+    <p class="hint">La chiave resta solo in questa pagina, in memoria: ricaricando o chiudendo la scheda va scritta di nuovo. Non si salva nel browser.</p>
+    <form id="key-form" autocomplete="off">
+      <label for="key-input">Chiave</label>
+      <input id="key-input" name="admin-key" type="password" autocomplete="off" spellcheck="false" required>
+      <button id="key-submit" type="submit">Entra</button>
+    </form>
+    <p id="key-error" class="error" role="alert" hidden></p>
+  </section>
+
+  <section id="users-section" aria-labelledby="users-title" hidden>
+    <div class="toolbar">
+      <h2 id="users-title">Utenti</h2>
+      <div class="toolbar-actions">
+        <button id="refresh" type="button" class="secondary">Aggiorna</button>
+        <button id="new-user-toggle" type="button">Nuovo utente</button>
+      </div>
+    </div>
+
+    <form id="new-user-form" class="card" autocomplete="off" hidden>
+      <h3>Nuovo utente</h3>
+      <div class="fields">
+        <label>Username
+          <input id="new-username" type="text" maxlength="64" spellcheck="false" required>
+        </label>
+        <label>Email (facoltativa)
+          <input id="new-email" type="email" maxlength="254" spellcheck="false">
+        </label>
+        <label>Massimo di dispositivi (vuoto: predefinito)
+          <input id="new-max" type="number" min="0" step="1" inputmode="numeric">
+        </label>
+      </div>
+      <div class="actions">
+        <button id="new-user-submit" type="submit">Crea</button>
+        <button id="new-user-cancel" type="button" class="secondary">Annulla</button>
+      </div>
+    </form>
+
+    <div id="secret-box" class="card secret" role="status" hidden>
+      <p id="secret-label"></p>
+      <div class="secret-row">
+        <code id="secret-value"></code>
+        <button id="secret-copy" type="button">Copia</button>
+      </div>
+      <p class="hint">Viene mostrata una volta sola: comunicala all'utente, che la cambierà al primo accesso.</p>
+      <button id="secret-close" type="button" class="secondary">Fatto</button>
+    </div>
+
+    <p id="status" class="status" role="status"></p>
+    <p id="error" class="error" role="alert" hidden></p>
+
+    <div class="table-wrap">
+      <table id="users-table">
+        <thead>
+          <tr>
+            <th scope="col">Username</th>
+            <th scope="col">Email</th>
+            <th scope="col">Stato</th>
+            <th scope="col">Dispositivi attivi</th>
+            <th scope="col">Massimo</th>
+            <th scope="col" id="llm-col" hidden>Token assistente</th>
+            <th scope="col">Azioni</th>
+          </tr>
+        </thead>
+        <tbody id="users-body"></tbody>
+      </table>
+    </div>
+    <p id="empty" class="hint" hidden>Nessun utente. Crea il primo con «Nuovo utente».</p>
+  </section>
+
+  <section id="models-section" aria-labelledby="models-title" hidden>
+    <div class="toolbar">
+      <h2 id="models-title">Modelli</h2>
+      <div class="toolbar-actions">
+        <button id="models-refresh" type="button" class="secondary">Aggiorna</button>
+      </div>
+    </div>
+    <p id="models-host" class="hint"></p>
+    <p id="models-status" class="status" role="status"></p>
+    <p id="models-error" class="error" role="alert" hidden></p>
+    <div class="table-wrap">
+      <table id="models-table">
+        <thead>
+          <tr>
+            <th scope="col">Modello</th>
+            <th scope="col">Tipo</th>
+            <th scope="col">Stato</th>
+            <th scope="col">Disco richiesto</th>
+            <th scope="col">Memoria richiesta</th>
+            <th scope="col">Licenza</th>
+            <th scope="col">Azioni</th>
+          </tr>
+        </thead>
+        <tbody id="models-body"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+</body>
+</html>

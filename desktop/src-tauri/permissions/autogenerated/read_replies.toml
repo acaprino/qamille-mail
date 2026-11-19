@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-read-replies"
+description = "Enables the read_replies command without any pre-configured scope."
+commands.allow = ["read_replies"]
+
+[[permission]]
+identifier = "deny-read-replies"
+description = "Denies the read_replies command without any pre-configured scope."
+commands.deny = ["read_replies"]

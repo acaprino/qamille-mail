@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "qamille": {
+      "command": "D:\\Projects\\qamille\\artifacts\\mcp\\qamille-mcp.exe",
+      "args": ["--mcp"]
+    }
+  }
+}

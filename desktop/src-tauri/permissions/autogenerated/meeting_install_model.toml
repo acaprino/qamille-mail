@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-meeting-install-model"
+description = "Enables the meeting_install_model command without any pre-configured scope."
+commands.allow = ["meeting_install_model"]
+
+[[permission]]
+identifier = "deny-meeting-install-model"
+description = "Denies the meeting_install_model command without any pre-configured scope."
+commands.deny = ["meeting_install_model"]

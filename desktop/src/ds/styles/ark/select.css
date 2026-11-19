@@ -1,0 +1,111 @@
+/* Select: a button that shows the choice and a list of items on the popover layer. */
+[data-scope='select'][data-part='root'] {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+[data-scope='select'][data-part='label'] {
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+[data-scope='select'][data-part='trigger'] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  height: var(--control-height);
+  padding: 0 10px;
+  color: inherit;
+  text-align: left;
+  font-size: var(--text-sm);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+}
+[data-scope='select'][data-part='trigger']:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--hover);
+}
+[data-scope='select'][data-part='trigger'][data-state='open'] {
+  border-color: var(--accent);
+}
+[data-scope='select'][data-part='value-text'] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-scope='select'][data-part='trigger'][data-placeholder-shown]
+  [data-scope='select'][data-part='value-text'] {
+  color: var(--muted);
+}
+[data-scope='select'][data-part='indicator'] {
+  display: inline-flex;
+  flex: none;
+  color: var(--muted);
+}
+/* Above Modal and SidePanel, where most Selects live (ruling R7: every Ark floating list is at --z-toast). */
+[data-scope='select'][data-part='positioner'] {
+  z-index: var(--z-toast);
+}
+[data-scope='select'][data-part='content'] {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 280px;
+  padding: 4px;
+  overflow-y: auto;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  font-size: var(--text-sm);
+  outline: none;
+  z-index: var(--z-toast);
+  animation: select-in var(--motion-panel) var(--ease-out);
+}
+[data-scope='select'][data-part='content'][hidden] {
+  display: none;
+}
+[data-scope='select'][data-part='item'] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+  padding: 0 8px;
+  cursor: default;
+  border-radius: var(--radius-sm);
+}
+[data-scope='select'][data-part='item'][data-highlighted] {
+  background: var(--hover);
+}
+[data-scope='select'][data-part='item'][data-state='checked'] {
+  font-weight: 500;
+  color: var(--accent-text);
+}
+[data-scope='select'][data-part='item'][data-disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+[data-scope='select'][data-part='item-indicator'] {
+  display: inline-flex;
+  flex: none;
+}
+[data-scope='select'][data-part='item-indicator'][hidden] {
+  display: none;
+}
+@keyframes select-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-scope='select'][data-part='content'] {
+    animation: none;
+  }
+}

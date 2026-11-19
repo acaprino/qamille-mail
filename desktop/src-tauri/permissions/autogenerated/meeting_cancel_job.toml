@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-meeting-cancel-job"
+description = "Enables the meeting_cancel_job command without any pre-configured scope."
+commands.allow = ["meeting_cancel_job"]
+
+[[permission]]
+identifier = "deny-meeting-cancel-job"
+description = "Denies the meeting_cancel_job command without any pre-configured scope."
+commands.deny = ["meeting_cancel_job"]

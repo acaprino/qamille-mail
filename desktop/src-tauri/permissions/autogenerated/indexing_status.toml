@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-indexing-status"
+description = "Enables the indexing_status command without any pre-configured scope."
+commands.allow = ["indexing_status"]
+
+[[permission]]
+identifier = "deny-indexing-status"
+description = "Denies the indexing_status command without any pre-configured scope."
+commands.deny = ["indexing_status"]

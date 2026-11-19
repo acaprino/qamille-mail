@@ -1,0 +1,97 @@
+// First start of the Professional build (access wave 2, spec A8): a full-window screen with
+// «Sign in to Qamille» and the secondary «Continue without an account». It tries the server by
+// itself; an unreachable server still lets the person in, locally. The window has no frame, so the
+// screen carries the window controls.
+import { useEffect, useState } from 'react';
+import Button from '../ds/primitives/Button';
+import { call, desktop } from '../lib/api';
+import { tr } from '../lib/i18n';
+import type { Probe } from '../lib/server-connect';
+import type { AppEdition } from './ComputeSettings';
+import ServerConnect from './server-connect/ServerConnect';
+import WindowControls from './WindowControls';
+import './Onboarding.css';
+
+export type OnboardingProps = {
+  edition: AppEdition;
+  consented: string[];
+  onDone: () => void;
+  onerror: (message: string) => void;
+};
+
+export default function Onboarding({ edition, consented, onDone, onerror }: OnboardingProps) {
+  const [probe, setProbe] = useState<Probe | null>(null);
+  const [signingIn, setSigningIn] = useState<'sign_in' | 'sign_up' | null>(null);
+  const server = edition.server ?? '';
+
+  function tryServer() {
+    setProbe(null);
+    void call<Probe>('server_probe', { url: server })
+      .then(setProbe)
+      .catch(() => setProbe({ kind: 'unreachable' }));
+  }
+  useEffect(tryServer, [server]);
+  async function finish() {
+    try {
+      await call('server_finish_onboarding');
+    } finally {
+      onDone();
+    }
+  }
+  const found = probe?.kind === 'found';
+
+  return (
+    <div className="onboarding">
+      {desktop && (
+        <header className="startup-window-bar" data-tauri-drag-region="">
+          <span data-tauri-drag-region="">Qamille</span>
+          <WindowControls onerror={onerror} />
+        </header>
+      )}
+      <main className="onboarding-main">
+        <h1>{tr('Accedi a Qamille', 'Sign in to Qamille')}</h1>
+        {!signingIn && (
+          <>
+            <p role="status" className="muted">
+              {probe === null
+                ? tr('Sto provando il server…', 'Trying the server…')
+                : found
+                  ? tr('Il server è pronto.', 'The server is ready.')
+                  : probe.kind === 'incompatible'
+                    ? tr("Versione del server incompatibile: aggiorna l'app.", 'Incompatible server version: update the app.')
+                    : tr('Il server non risponde.', 'The server does not answer.')}
+            </p>
+            <div className="button-row onboarding-actions">
+              <Button variant="primary" disabled={!found} onClick={() => setSigningIn('sign_in')}>
+                {tr('Accedi', 'Sign in')}
+              </Button>
+              {found && probe.info.signup && (
+                <Button variant="secondary" onClick={() => setSigningIn('sign_up')}>
+                  {tr('Crea account', 'Create account')}
+                </Button>
+              )}
+              {probe !== null && !found && (
+                <Button variant="secondary" onClick={tryServer}>
+                  {tr('Riprova', 'Retry')}
+                </Button>
+              )}
+            </div>
+          </>
+        )}
+        {signingIn && (
+          <ServerConnect
+            preset={server}
+            consented={consented}
+            defaultDeviceName={edition.default_device_name}
+            signUp={signingIn === 'sign_up'}
+            onDone={() => void finish()}
+            onCancel={() => void finish()}
+          />
+        )}
+        <Button variant="text" className="onboarding-local" onClick={() => void finish()}>
+          {tr('Continua senza account', 'Continue without an account')}
+        </Button>
+      </main>
+    </div>
+  );
+}

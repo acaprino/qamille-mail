@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-history-fetch-folder"
+description = "Enables the history_fetch_folder command without any pre-configured scope."
+commands.allow = ["history_fetch_folder"]
+
+[[permission]]
+identifier = "deny-history-fetch-folder"
+description = "Denies the history_fetch_folder command without any pre-configured scope."
+commands.deny = ["history_fetch_folder"]

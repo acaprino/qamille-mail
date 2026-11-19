@@ -1,0 +1,40 @@
+/* MeetingHeader: title, when, how long, who. Every rule stays under its root class. */
+.detail-head {
+  display: grid;
+  gap: 4px;
+  padding: 18px 28px 0;
+
+  & .detail-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  & .detail-title {
+    margin: 0;
+    font-size: var(--text-2xl);
+    font-weight: 600;
+    text-wrap: balance;
+  }
+  & .detail-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 14px;
+    font-size: var(--text-sm);
+    color: var(--muted);
+  }
+  & .detail-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  & .tag {
+    padding: 1px 7px;
+    font-size: var(--text-2xs);
+    color: var(--danger);
+    background: var(--danger-bg);
+    border: 1px solid var(--danger-border);
+    border-radius: var(--radius-full);
+  }
+}

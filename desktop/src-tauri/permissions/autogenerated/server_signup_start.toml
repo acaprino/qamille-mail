@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-server-signup-start"
+description = "Enables the server_signup_start command without any pre-configured scope."
+commands.allow = ["server_signup_start"]
+
+[[permission]]
+identifier = "deny-server-signup-start"
+description = "Denies the server_signup_start command without any pre-configured scope."
+commands.deny = ["server_signup_start"]

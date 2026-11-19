@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-server-signup-confirm"
+description = "Enables the server_signup_confirm command without any pre-configured scope."
+commands.allow = ["server_signup_confirm"]
+
+[[permission]]
+identifier = "deny-server-signup-confirm"
+description = "Denies the server_signup_confirm command without any pre-configured scope."
+commands.deny = ["server_signup_confirm"]

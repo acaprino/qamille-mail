@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-contacts-sync-book"
+description = "Enables the contacts_sync_book command without any pre-configured scope."
+commands.allow = ["contacts_sync_book"]
+
+[[permission]]
+identifier = "deny-contacts-sync-book"
+description = "Denies the contacts_sync_book command without any pre-configured scope."
+commands.deny = ["contacts_sync_book"]

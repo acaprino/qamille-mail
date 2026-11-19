@@ -1,0 +1,18 @@
+# Contesto della build: la radice del repository, ma solo server/ e compute/.
+*
+!server
+!compute
+server/target
+compute/target
+server/data
+server/tests
+server/.env
+server/.env.*
+server/*.db
+server/*.db-wal
+server/*.db-shm
+server/compose.yaml
+server/Caddyfile
+server/README.md
+server/compose.local.yaml
+server/.env.local.example

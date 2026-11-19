@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-configure-indexing"
+description = "Enables the configure_indexing command without any pre-configured scope."
+commands.allow = ["configure_indexing"]
+
+[[permission]]
+identifier = "deny-configure-indexing"
+description = "Denies the configure_indexing command without any pre-configured scope."
+commands.deny = ["configure_indexing"]

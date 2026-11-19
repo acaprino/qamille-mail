@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-contacts-unlink"
+description = "Enables the contacts_unlink command without any pre-configured scope."
+commands.allow = ["contacts_unlink"]
+
+[[permission]]
+identifier = "deny-contacts-unlink"
+description = "Denies the contacts_unlink command without any pre-configured scope."
+commands.deny = ["contacts_unlink"]

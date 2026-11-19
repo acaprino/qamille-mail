@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-meeting-correct-segment"
+description = "Enables the meeting_correct_segment command without any pre-configured scope."
+commands.allow = ["meeting_correct_segment"]
+
+[[permission]]
+identifier = "deny-meeting-correct-segment"
+description = "Denies the meeting_correct_segment command without any pre-configured scope."
+commands.deny = ["meeting_correct_segment"]

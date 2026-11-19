@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-window-snap-button"
+description = "Enables the window_snap_button command without any pre-configured scope."
+commands.allow = ["window_snap_button"]
+
+[[permission]]
+identifier = "deny-window-snap-button"
+description = "Denies the window_snap_button command without any pre-configured scope."
+commands.deny = ["window_snap_button"]

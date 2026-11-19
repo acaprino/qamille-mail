@@ -1,0 +1,24 @@
+/* Settings > Meetings has no box of its own (it is part of the Settings page): its rules hang on
+   its own class names. */
+.model-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  font-size: var(--text-xs);
+
+  & progress {
+    flex: 1;
+    min-width: 0;
+    height: 6px;
+    accent-color: var(--accent);
+  }
+  & span {
+    color: var(--muted);
+    white-space: nowrap;
+  }
+}
+.meeting-error {
+  color: var(--danger);
+  overflow-wrap: anywhere;
+}

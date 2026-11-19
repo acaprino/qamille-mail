@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-contacts-import-vcf"
+description = "Enables the contacts_import_vcf command without any pre-configured scope."
+commands.allow = ["contacts_import_vcf"]
+
+[[permission]]
+identifier = "deny-contacts-import-vcf"
+description = "Denies the contacts_import_vcf command without any pre-configured scope."
+commands.deny = ["contacts_import_vcf"]

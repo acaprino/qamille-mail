@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-install-search-model"
+description = "Enables the install_search_model command without any pre-configured scope."
+commands.allow = ["install_search_model"]
+
+[[permission]]
+identifier = "deny-install-search-model"
+description = "Denies the install_search_model command without any pre-configured scope."
+commands.deny = ["install_search_model"]

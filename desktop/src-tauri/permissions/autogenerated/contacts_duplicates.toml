@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-contacts-duplicates"
+description = "Enables the contacts_duplicates command without any pre-configured scope."
+commands.allow = ["contacts_duplicates"]
+
+[[permission]]
+identifier = "deny-contacts-duplicates"
+description = "Denies the contacts_duplicates command without any pre-configured scope."
+commands.deny = ["contacts_duplicates"]

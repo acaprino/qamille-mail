@@ -1,0 +1,34 @@
+.google-sign-in-dialog {
+  & .google-dialog-heading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  & h2 {
+    margin: 0;
+  }
+  & p {
+    line-height: 1.65;
+    margin: 0 0 12px;
+  }
+  & .google-sign-in-help {
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+  }
+  & .google-sign-in-error {
+    color: var(--danger);
+    overflow-wrap: anywhere;
+  }
+  & .google-help-link {
+    color: var(--accent-text);
+    text-decoration: underline;
+    text-align: left;
+  }
+  & .google-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 22px;
+  }
+}

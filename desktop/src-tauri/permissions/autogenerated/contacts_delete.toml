@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-contacts-delete"
+description = "Enables the contacts_delete command without any pre-configured scope."
+commands.allow = ["contacts_delete"]
+
+[[permission]]
+identifier = "deny-contacts-delete"
+description = "Denies the contacts_delete command without any pre-configured scope."
+commands.deny = ["contacts_delete"]

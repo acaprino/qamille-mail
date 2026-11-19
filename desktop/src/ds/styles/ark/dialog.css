@@ -1,0 +1,199 @@
+/* The rules for the parts are in :where(), so they have no specificity: a page class on the primitive
+   (print.css, .contact-dialog) overrides them the way it overrode .modal.
+   Modal and SidePanel (ADR-0008, ADR-0011), both on Ark UI Dialog. Ark writes data-scope, data-part and
+   data-state; the primitives add data-variant ("modal" or "side"), data-size and data-narrow to tell the
+   two apart. A modal draws in a Portal over everything on --z-modal; a side panel fills its pane
+   (the nearest positioned ancestor) on --z-panel. */
+
+/* Modal: asks for a decision before continuing. */
+:where([data-scope='dialog'][data-part='backdrop'][data-variant='modal']) {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  background: var(--scrim);
+  animation: dialog-veil-in var(--motion-panel) var(--ease-out);
+}
+:where([data-scope='dialog'][data-part='positioner'][data-variant='modal']) {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+:where([data-scope='dialog'][data-part='content'][data-variant='modal']) {
+  width: min(var(--modal-md), calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  padding: 22px;
+  overflow: auto;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow);
+  outline: none;
+  animation: dialog-in var(--motion-panel) var(--ease-out);
+}
+:where([data-scope='dialog'][data-part='content'][data-variant='modal'][data-size='sm']) {
+  width: min(var(--modal-sm), calc(100vw - 48px));
+}
+:where([data-scope='dialog'][data-part='content'][data-variant='modal'][data-size='lg']) {
+  width: min(var(--modal-lg), calc(100vw - 48px));
+}
+[data-scope='dialog'][data-part='content'][data-variant='modal'] h2 {
+  margin: 0 0 12px;
+  font-size: var(--text-xl);
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+/* The last row of actions stays in view when a dialog is taller than the window (enlarged text, a
+   small window): it sticks to the bottom edge and the content scrolls under it. The negative margins
+   stretch its fill over the dialog's 22px padding without moving the buttons; the shadow masks the
+   content scrolling just above them and paints nothing when the dialog fits. */
+:where([data-scope='dialog'][data-part='content'][data-variant='modal'])
+  :is(
+    .modal-actions,
+    .contact-actions,
+    .google-dialog-actions,
+    .google-setup-actions,
+    .button-row
+  ):last-child {
+  position: sticky;
+  bottom: -22px;
+  z-index: 1;
+  margin-inline: -22px;
+  margin-bottom: -22px;
+  padding-inline: 22px;
+  padding-bottom: 22px;
+  background: var(--surface);
+  box-shadow: 0 -10px 0 var(--surface);
+  /* A hairline above the row while more content waits below it: the scroll of the dialog drives it,
+     so a dialog that fits (no scroll) and one scrolled to the end draw none. */
+  animation: modal-actions-edge linear both;
+  animation-timeline: scroll(nearest block);
+}
+/* Not motion: the hairline follows the scroll position and never moves by itself, so it stays when
+   the system asks for reduced motion (styles.css turns every animation off then). */
+@media (prefers-reduced-motion: reduce) {
+  :where([data-scope='dialog'][data-part='content'][data-variant='modal'])
+    :is(
+      .modal-actions,
+      .contact-actions,
+      .google-dialog-actions,
+      .google-setup-actions,
+      .button-row
+    ):last-child {
+    animation: modal-actions-edge linear both !important;
+    animation-timeline: scroll(nearest block) !important;
+  }
+}
+@keyframes modal-actions-edge {
+  0%,
+  98% {
+    box-shadow:
+      0 -10px 0 var(--surface),
+      0 -11px 0 var(--border);
+  }
+  100% {
+    box-shadow: 0 -10px 0 var(--surface);
+  }
+}
+
+/* Side panel: looks at or edits one thing without leaving the view; not modal. */
+:where([data-scope='dialog'][data-part='positioner'][data-variant='side']) {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-panel);
+  display: flex;
+  justify-content: flex-end;
+}
+:where([data-scope='dialog'][data-part='backdrop'][data-variant='side']) {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  background: var(--scrim-soft);
+  cursor: default;
+}
+:where([data-scope='dialog'][data-part='content'][data-variant='side']) {
+  position: relative;
+  width: min(var(--panel-wide), 78%);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  color: var(--text);
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  outline: none;
+  animation: side-panel-in var(--motion-panel) var(--ease-out);
+}
+:where([data-scope='dialog'][data-part='content'][data-variant='side'][data-narrow]) {
+  width: min(var(--panel-narrow), 100%);
+}
+@media (max-width: 1180px) {
+  :where([data-scope='dialog'][data-part='content'][data-variant='side']) {
+    width: 100%;
+  }
+  :where([data-scope='dialog'][data-part='content'][data-variant='side'][data-narrow]) {
+    width: min(var(--panel-narrow), 100%);
+  }
+}
+.side-panel-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 10px 0 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  min-width: 0;
+}
+.side-panel-bar .panel-title {
+  min-width: 0;
+  flex: 1;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.side-panel-bar .panel-close {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.side-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+@keyframes dialog-veil-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+@keyframes side-panel-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :where([data-scope='dialog'][data-part='backdrop']),
+  :where([data-scope='dialog'][data-part='content']) {
+    animation: none;
+  }
+}

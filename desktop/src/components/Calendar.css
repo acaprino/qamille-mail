@@ -1,0 +1,696 @@
+/* Calendar.tsx styles. Every rule starts with section.calendar-page: it keeps them on this page, and the
+   element type lifts them above the global .calendar-page rules in styles.css, as Svelte scoping did. */
+section.calendar-page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding: 20px 24px;
+}
+section.calendar-page .cal-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 24px;
+}
+
+/* Calendar rail */
+section.calendar-page .cal-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+section.calendar-page .rail-title {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  line-height: 36px;
+  margin: 0 0 -6px;
+  padding: 0 8px;
+}
+section.calendar-page .rail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+section.calendar-page .rail-group h3 {
+  margin: 0 0 4px;
+  padding: 0 8px;
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+section.calendar-page .cal-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 32px;
+  padding: 5px 8px;
+  border-radius: var(--radius-md);
+  color: var(--nav-text);
+  font-weight: 500;
+  text-align: left;
+  transition:
+    background-color 120ms ease-out,
+    color 120ms ease-out;
+}
+section.calendar-page .cal-row:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+section.calendar-page .cal-row:focus-visible {
+  outline-offset: -2px;
+}
+section.calendar-page .cal-row.active {
+  background: var(--selection);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+section.calendar-page .cal-dot {
+  flex-shrink: 0;
+  width: 11px;
+  height: 11px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid currentColor;
+  transition: background-color 120ms ease-out;
+}
+section.calendar-page .cal-row.active .cal-dot {
+  background: var(--cal-color, var(--accent));
+  border-color: var(--cal-color, var(--accent));
+}
+section.calendar-page .cal-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+section.calendar-page .cal-tag {
+  flex-shrink: 0;
+  font-size: var(--text-2xs);
+  font-weight: 400;
+  color: var(--muted);
+}
+section.calendar-page .rail-callout {
+  display: grid;
+  gap: 9px;
+  padding: 11px 12px 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+}
+section.calendar-page .rail-callout p {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+section.calendar-page .rail-callout small {
+  font-size: var(--text-2xs);
+  line-height: 1.5;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+section.calendar-page .rail-action {
+  justify-self: start;
+  font-size: var(--text-xs);
+}
+section.calendar-page .rail-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 8px;
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+section.calendar-page .rail-error {
+  color: var(--danger);
+}
+section.calendar-page .spinner {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Toolbar */
+section.calendar-page .cal-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+section.calendar-page .calendar-toolbar {
+  gap: 16px;
+  min-height: var(--control-height);
+  margin-bottom: 12px;
+}
+section.calendar-page .week-title {
+  margin: 0 0 0 8px;
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+section.calendar-page .week-title::first-letter {
+  text-transform: uppercase;
+}
+section.calendar-page .toolbar-actions {
+  min-width: 0;
+  gap: 8px !important;
+}
+section.calendar-page .sync-note {
+  min-width: 0;
+  font-size: var(--text-2xs);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The class is on the button: only its icon turns, not the button with its hover square and ring. */
+section.calendar-page .icon-button.spinning {
+  display: inline-flex;
+  animation: none;
+}
+section.calendar-page .spinning svg {
+  animation: spin 0.9s linear infinite;
+}
+
+/* Week grid */
+section.calendar-page .week-grid {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+section.calendar-page .week-scroll {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+section.calendar-page .week-body {
+  user-select: none;
+}
+section.calendar-page .all-day-row {
+  display: grid;
+  grid-template-columns: 52px repeat(var(--cols, 7), minmax(0, 1fr));
+  border-bottom: 1px solid var(--border);
+}
+section.calendar-page .all-day-row > div {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  min-width: 0;
+  min-height: 28px;
+  padding: 3px 2px;
+  border-left: 1px solid var(--border);
+}
+section.calendar-page .all-day-chip {
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  background: var(--selection);
+  color: var(--accent-text);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+section.calendar-page .all-day-chip:hover {
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+}
+section.calendar-page .day-slot {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  padding: 0;
+  border-radius: 0;
+  cursor: default;
+  touch-action: pan-y;
+}
+section.calendar-page .day-slot:focus-visible {
+  outline-offset: -2px;
+}
+section.calendar-page .slot-hint {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 7px;
+  border-radius: var(--radius-sm);
+  background: var(--hover);
+  color: var(--muted);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+section.calendar-page .calendar-event,
+section.calendar-page .month-chip {
+  --tone: var(--cal-color, var(--accent));
+  background: color-mix(in srgb, var(--tone) 15%, var(--surface));
+  color: color-mix(in srgb, var(--tone) 65%, var(--text));
+  box-shadow: inset 3px 0 0 var(--tone);
+}
+section.calendar-page .calendar-event:hover,
+section.calendar-page .month-chip:hover {
+  background: color-mix(in srgb, var(--tone) 26%, var(--surface));
+}
+section.calendar-page .calendar-event.editing,
+section.calendar-page .month-chip.editing,
+section.calendar-page .all-day-chip.editing {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* View switch */
+section.calendar-page .view-switch {
+  box-sizing: border-box;
+  display: inline-flex;
+  height: var(--control-height);
+  padding: 2px;
+  border-radius: var(--radius-md);
+  background: var(--label-bg);
+}
+section.calendar-page .view-switch button {
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-md) - 2px);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--muted);
+}
+section.calendar-page .view-switch button:hover {
+  color: var(--text);
+}
+section.calendar-page .view-switch button.active {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Current time */
+section.calendar-page .now-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  height: 2px;
+  margin-top: -1px;
+  background: var(--danger);
+  pointer-events: none;
+}
+section.calendar-page .now-line::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+
+/* Month grid */
+section.calendar-page .month-head,
+section.calendar-page .month-cells {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+section.calendar-page .month-head {
+  border-bottom: 1px solid var(--border);
+  background: var(--ground);
+}
+section.calendar-page .month-head span {
+  padding: 8px 0;
+  text-align: center;
+  font-size: var(--text-2xs);
+  color: var(--muted);
+}
+section.calendar-page .month-cells {
+  flex: 1;
+  min-height: 0;
+  grid-template-rows: repeat(6, minmax(0, 1fr));
+}
+section.calendar-page .month-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  min-height: 0;
+  padding: 3px 3px 2px;
+  overflow: hidden;
+  border-left: 1px solid var(--border);
+  border-top: 1px solid var(--border-soft);
+}
+section.calendar-page .month-cell:nth-child(7n + 1) {
+  border-left: 0;
+}
+section.calendar-page .month-cell.outside {
+  background: color-mix(in srgb, var(--ground) 60%, transparent);
+}
+section.calendar-page .month-cell.outside .month-daynum {
+  color: var(--muted);
+}
+section.calendar-page .month-slot {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  padding: 0;
+  border-radius: 0;
+}
+section.calendar-page .month-slot:hover {
+  background: var(--hover);
+}
+section.calendar-page .month-daynum {
+  position: relative;
+  align-self: flex-start;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+section.calendar-page .month-daynum:hover {
+  background: var(--hover);
+}
+section.calendar-page .month-cell.today .month-daynum {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+section.calendar-page .month-chip {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+section.calendar-page .month-chip em {
+  margin-right: 5px;
+  font-style: normal;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+section.calendar-page .month-more {
+  position: relative;
+  align-self: flex-start;
+  padding: 0 6px;
+  font-size: var(--text-2xs);
+  color: var(--muted);
+}
+section.calendar-page .month-more:hover {
+  color: var(--text);
+}
+section.calendar-page .draft-event {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 3px 7px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: var(--shadow-sm);
+  pointer-events: none;
+}
+section.calendar-page .calendar-event.compact,
+section.calendar-page .draft-event.compact {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding-block: 0;
+}
+section.calendar-page .compact strong {
+  flex-shrink: 0;
+  max-width: 70%;
+}
+section.calendar-page .compact span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+section.calendar-page .draft-event strong {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+section.calendar-page .draft-event span {
+  font-size: var(--text-2xs);
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Event sheet: a narrow side panel (ADR-0008); layout comes from styles.css */
+section.calendar-page .event-sheet form {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+section.calendar-page .sheet-body {
+  padding: 14px 20px 18px;
+}
+section.calendar-page fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+section.calendar-page .title-input {
+  width: 100%;
+  padding: 4px 0 8px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+section.calendar-page .title-input:focus-visible {
+  outline: none;
+  border-bottom-color: var(--accent);
+  box-shadow: 0 1px 0 var(--accent);
+}
+section.calendar-page .title-input::placeholder {
+  color: var(--muted);
+  font-weight: 500;
+}
+section.calendar-page .sheet-note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 12px 0 0;
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+section.calendar-page .sheet-grid {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px 12px;
+  margin-top: 18px;
+}
+section.calendar-page .sheet-grid .k {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--muted);
+}
+section.calendar-page .sheet-grid .k.top {
+  align-self: start;
+  padding-top: 8px;
+}
+section.calendar-page .sheet-grid .v {
+  padding: 7px 0;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+section.calendar-page .sheet-grid > input,
+section.calendar-page .sheet-grid > .dt > input,
+section.calendar-page .sheet-grid > textarea {
+  width: 100%;
+  min-width: 0;
+}
+section.calendar-page .sheet-grid > input,
+section.calendar-page .sheet-grid > .dt > input {
+  box-sizing: border-box;
+  height: var(--control-height);
+  padding: 0 9px;
+  font-size: var(--text-sm);
+}
+section.calendar-page .sheet-grid > textarea {
+  min-height: 92px;
+}
+section.calendar-page .dt {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px;
+  gap: 6px;
+}
+section.calendar-page .dt.date-only {
+  grid-template-columns: minmax(0, 1fr);
+}
+section.calendar-page .dt input[type='time'] {
+  font-variant-numeric: tabular-nums;
+}
+section.calendar-page .when-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: -2px;
+  font-size: var(--text-xs);
+}
+section.calendar-page .check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-xs);
+}
+section.calendar-page .field-error {
+  color: var(--danger);
+  font-weight: 500;
+}
+section.calendar-page .rule {
+  grid-column: 1 / -1;
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border-soft);
+}
+section.calendar-page .hint {
+  grid-column: 2;
+  margin-top: -6px;
+  font-size: var(--text-2xs);
+  color: var(--muted);
+}
+section.calendar-page .join {
+  justify-self: start;
+  font-size: var(--text-xs);
+}
+section.calendar-page .sheet-foot {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px 14px 20px;
+  border-top: 1px solid var(--border);
+}
+section.calendar-page .sheet-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-md);
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+section.calendar-page .sheet-error svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+section.calendar-page .scope {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--muted);
+}
+section.calendar-page .foot-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+section.calendar-page .spacer {
+  flex: 1;
+}
+section.calendar-page .confirm-text {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--danger);
+}
+section.calendar-page .danger-text,
+section.calendar-page .danger-solid {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--control-height);
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+section.calendar-page .danger-text {
+  margin-left: -10px;
+  color: var(--danger);
+}
+section.calendar-page .danger-text:hover {
+  background: var(--danger-bg);
+}
+section.calendar-page .danger-solid {
+  background: var(--danger);
+  color: var(--surface);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  section.calendar-page .cal-row,
+  section.calendar-page .cal-dot {
+    transition: none;
+  }
+}
+@media (max-width: 1000px) {
+  section.calendar-page .cal-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 14px;
+  }
+  section.calendar-page .cal-rail {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 10px 20px;
+    overflow: visible;
+  }
+  section.calendar-page .rail-title {
+    display: none;
+  }
+  section.calendar-page .rail-group {
+    width: 220px;
+  }
+  section.calendar-page .sync-note {
+    display: none;
+  }
+}

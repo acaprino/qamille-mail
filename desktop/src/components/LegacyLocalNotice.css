@@ -1,0 +1,12 @@
+.legacy-local-notice {
+  display: grid;
+  gap: 6px;
+  margin: 8px 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface, var(--ground));
+}
+.legacy-local-notice p {
+  margin: 0;
+}

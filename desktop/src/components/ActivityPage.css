@@ -1,0 +1,108 @@
+.activity-page {
+  width: 100%;
+  overflow: auto;
+  padding: 24px 28px;
+
+  & .feed-filters {
+    margin-bottom: 8px;
+  }
+  & .feed {
+    max-width: 760px;
+  }
+  & .feed-day {
+    margin: 18px 0 6px;
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  & .feed-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  & .feed-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 4px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  & .feed-chip {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: var(--radius-lg);
+    background: var(--hover);
+    color: var(--accent-text);
+  }
+  & .feed-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.3;
+  }
+  & .feed-text strong {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--text);
+  }
+  & .feed-text small {
+    color: var(--muted);
+    font-size: var(--text-xs);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  & .feed-time {
+    color: var(--muted);
+    font-size: var(--text-xs);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  & .assistant-mark {
+    display: inline-grid;
+    place-items: center;
+    color: var(--accent-text);
+  }
+  /* Tones: done is green, an undone row is grey and struck through, a failure is red. */
+  & .tone-ok .feed-chip {
+    background: var(--success-bg);
+    color: var(--success);
+  }
+  & .tone-undone .feed-chip {
+    color: var(--muted);
+  }
+  & .undone .feed-text strong {
+    color: var(--muted);
+    text-decoration: line-through;
+  }
+  & .tone-error .feed-chip {
+    background: var(--danger-bg);
+    color: var(--danger);
+  }
+  & .tone-error .feed-text strong {
+    color: var(--danger);
+  }
+  & .feed-row.quiet {
+    opacity: 0.6;
+  }
+  & .feed-more {
+    display: flex;
+    justify-content: center;
+    padding: 16px 0;
+  }
+  & .feed-empty {
+    margin: 24px 0;
+    color: var(--muted);
+    font-size: var(--text-sm);
+    line-height: 1.6;
+    max-width: 52ch;
+  }
+}

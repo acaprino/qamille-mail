@@ -1,0 +1,38 @@
+/* MeetingProgress: a running job. The class sits on the compact block and on the notice card. */
+.meeting-progress {
+  &.inline {
+    display: grid;
+    gap: 10px;
+    justify-items: start;
+    max-width: 420px;
+
+    & h3 {
+      margin: 0;
+      font-size: var(--text-lg);
+      font-weight: 600;
+    }
+  }
+  & .phase,
+  & .reassure {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+  }
+  & .reassure {
+    font-size: var(--text-xs);
+    color: var(--muted);
+  }
+  & .bar {
+    width: 100%;
+    height: 6px;
+    background: var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+  & .bar > span {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    border-radius: var(--radius-sm);
+  }
+}

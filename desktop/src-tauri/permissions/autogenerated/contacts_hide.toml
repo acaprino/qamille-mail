@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-contacts-hide"
+description = "Enables the contacts_hide command without any pre-configured scope."
+commands.allow = ["contacts_hide"]
+
+[[permission]]
+identifier = "deny-contacts-hide"
+description = "Denies the contacts_hide command without any pre-configured scope."
+commands.deny = ["contacts_hide"]

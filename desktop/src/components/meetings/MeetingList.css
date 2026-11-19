@@ -1,0 +1,159 @@
+.meetings-column {
+  display: flex;
+  flex-direction: column;
+  width: 352px;
+  min-width: 300px;
+  flex-shrink: 0;
+  min-height: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+
+  & .list-top {
+    display: grid;
+    gap: 10px;
+    padding: 14px 14px 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  & .list-top-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  & .list-top h1 {
+    margin: 0;
+    font-size: var(--text-xl);
+    font-weight: 600;
+  }
+  & .list-search {
+    position: relative;
+  }
+  & .list-search input {
+    width: 100%;
+    height: var(--control-height);
+    padding: 0 10px 0 30px;
+  }
+  & .list-search-icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    display: flex;
+    transform: translateY(-50%);
+    color: var(--muted);
+    pointer-events: none;
+  }
+  & .list-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  & .group-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    padding: 12px 14px 4px;
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  /* The heading of the results repeats what was typed: it keeps its case. */
+  & .group-label.results {
+    text-transform: none;
+    letter-spacing: normal;
+    font-size: var(--text-xs);
+    font-weight: 500;
+  }
+  & .group-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--danger);
+  }
+  & .items,
+  & .hits {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  & .hit-item {
+    display: grid;
+    gap: 2px;
+    width: 100%;
+    padding: 9px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  & .hit-item:hover {
+    background: var(--hover);
+  }
+  & .hit-item.selected {
+    background: var(--selection);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+  & .hit-item:focus-visible {
+    outline-offset: -2px;
+  }
+  & .hit-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-weight: 500;
+  }
+  & .hit-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  & .hit-where {
+    flex: none;
+    font-size: var(--text-xs);
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+  }
+  & .hit-fragment {
+    font-size: var(--text-xs);
+    line-height: 1.45;
+    color: var(--text-secondary);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  & mark {
+    padding: 0 1px;
+    color: inherit;
+    background: var(--highlight);
+    border-radius: var(--radius-sm);
+  }
+  & .list-note {
+    margin: 0;
+    padding: 18px 14px;
+    display: grid;
+    gap: 10px;
+    justify-items: start;
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    color: var(--muted);
+  }
+  & .list-note p {
+    margin: 0;
+  }
+  & .list-more {
+    padding: 8px 14px 14px;
+  }
+  & .list-more button {
+    color: var(--accent-text);
+  }
+  /* Waiting, but not `disabled`: that would drop the keyboard focus of whoever pressed it. */
+  & .list-more button[aria-disabled='true'] {
+    opacity: 0.5;
+    cursor: default;
+  }
+}

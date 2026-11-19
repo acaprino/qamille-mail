@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-server-record-llm-consent"
+description = "Enables the server_record_llm_consent command without any pre-configured scope."
+commands.allow = ["server_record_llm_consent"]
+
+[[permission]]
+identifier = "deny-server-record-llm-consent"
+description = "Denies the server_record_llm_consent command without any pre-configured scope."
+commands.deny = ["server_record_llm_consent"]

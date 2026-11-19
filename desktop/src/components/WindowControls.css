@@ -1,0 +1,30 @@
+.window-controls {
+  display: flex;
+  flex-shrink: 0;
+  align-self: stretch;
+  margin-left: auto;
+
+  /* Caption buttons, as Windows draws them: the full height of the bar, square, 46 px wide. */
+  & .icon-button {
+    width: 46px;
+    height: auto;
+    border-radius: 0;
+  }
+  & .icon-button:focus-visible {
+    outline-offset: -4px;
+  }
+  & .window-close:hover {
+    color: var(--on-window-close);
+    background: var(--window-close);
+  }
+}
+
+/* Over the maximize button Windows handles the mouse (snap layouts) and reports hover and press. */
+.window-controls .icon-button[data-caption='hover'],
+.window-controls .icon-button[data-caption='pressed'] {
+  background: var(--hover);
+  color: var(--text);
+}
+.window-controls .icon-button[data-caption='pressed'] {
+  background: var(--border);
+}

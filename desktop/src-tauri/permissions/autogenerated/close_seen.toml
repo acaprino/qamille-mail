@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-close-seen"
+description = "Enables the close_seen command without any pre-configured scope."
+commands.allow = ["close_seen"]
+
+[[permission]]
+identifier = "deny-close-seen"
+description = "Denies the close_seen command without any pre-configured scope."
+commands.deny = ["close_seen"]

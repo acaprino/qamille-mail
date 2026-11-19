@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-server-delete-account-browser"
+description = "Enables the server_delete_account_browser command without any pre-configured scope."
+commands.allow = ["server_delete_account_browser"]
+
+[[permission]]
+identifier = "deny-server-delete-account-browser"
+description = "Denies the server_delete_account_browser command without any pre-configured scope."
+commands.deny = ["server_delete_account_browser"]

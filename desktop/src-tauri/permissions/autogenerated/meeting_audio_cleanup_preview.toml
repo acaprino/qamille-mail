@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-meeting-audio-cleanup-preview"
+description = "Enables the meeting_audio_cleanup_preview command without any pre-configured scope."
+commands.allow = ["meeting_audio_cleanup_preview"]
+
+[[permission]]
+identifier = "deny-meeting-audio-cleanup-preview"
+description = "Denies the meeting_audio_cleanup_preview command without any pre-configured scope."
+commands.deny = ["meeting_audio_cleanup_preview"]

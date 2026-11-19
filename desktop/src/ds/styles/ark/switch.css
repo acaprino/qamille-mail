@@ -1,0 +1,17 @@
+/* Switch: unlumen's Apple Switch (ds/unlumen/apple-switch.tsx) with its label; the label is the row. */
+.switch-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  font-size: var(--text-sm);
+  cursor: default;
+}
+.switch-row[data-disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+.switch-row button[role='switch']:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

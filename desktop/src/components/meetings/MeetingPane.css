@@ -1,0 +1,13 @@
+/* MeetingPane: the note shown while nothing is open (none selected, loading, could not read). */
+.pane-note {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  margin: auto;
+  font-size: var(--text-sm);
+  color: var(--muted);
+
+  & p {
+    margin: 0;
+  }
+}

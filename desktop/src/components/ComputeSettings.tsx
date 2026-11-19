@@ -408,6 +408,8 @@ export default function ComputeSettings() {
                         )
                       : tr('Sei uscito da questo dispositivo', 'Signed out of this device'),
                   );
+                  // Professional needs an account: back to its sign-in screen.
+                  if (professional) return window.location.reload();
                   await load();
                 })
               }
@@ -484,6 +486,7 @@ export default function ComputeSettings() {
                     await call('server_delete_account_browser', { provider: 'google' });
                     setDeleting(false);
                     notify(tr('Account eliminato', 'Account deleted'));
+                    if (professional) return window.location.reload();
                     await load();
                   })
                 }
@@ -502,6 +505,7 @@ export default function ComputeSettings() {
                   setDeleting(false);
                   setDeletePassword('');
                   notify(tr('Account eliminato', 'Account deleted'));
+                  if (professional) return window.location.reload();
                   await load();
                 })
               }

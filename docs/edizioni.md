@@ -9,13 +9,13 @@ Una sola app e un solo server, dallo stesso commit. Le edizioni differiscono per
 | | Open source self-hosted | Professional |
 | --- | --- | --- |
 | Chi lo usa | chi installa il proprio server (un ufficio, una persona) | i clienti del servizio del venditore |
-| App | senza server preimpostato; primo avvio locale | server del venditore preimpostato; primo avvio «Accedi a Qamille» |
+| App | senza server preimpostato; si usa anche senza account | server del venditore preimpostato; account obbligatorio: senza accesso mostra «Accedi a Qamille» (a ogni avvio e dopo l'uscita) |
 | Account | li crea l'amministratore | registrazione dall'app, per posta o con Google |
 | Accesso con Google | facoltativo (client dell'organizzazione) | acceso |
 | Abbonamenti | spenti: il calcolo è per tutti gli utenti attivi | prova, piani, `402` senza abbonamento |
 | Che cosa si paga | niente | il calcolo sul server (e domani la sincronizzazione) |
 
-Senza abbonamento, o senza server, l'app funziona in locale in entrambe le edizioni: posta, ricerca, riunioni.
+L'edizione open source funziona anche senza account e senza server: posta, ricerca, riunioni in locale. La Professional chiede sempre l'accesso (decisione del proprietario, 2026-11-19: è il servizio che si vende; chi vuole l'app senza account ha l'open source); con l'account ma senza abbonamento la posta resta in locale e il calcolo sul server chiede l'abbonamento.
 
 ## Che cosa si imposta e dove
 

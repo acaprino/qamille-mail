@@ -1,7 +1,8 @@
-// First start of the Professional build (access wave 2, spec A8): a full-window screen with
-// «Sign in to Qamille» and the secondary «Continue without an account». It tries the server by
-// itself; an unreachable server still lets the person in, locally. The window has no frame, so the
-// screen carries the window controls.
+// The sign-in screen of the Professional build (access wave 2, spec A8): a full-window screen with
+// «Sign in to Qamille» and «Create account». The Professional app needs an account (owner,
+// 2026-11-19): the screen shows at every start without a session and after signing out, and there
+// is no way past it without signing in; an unreachable server offers «Retry». It tries the server
+// by itself. The window has no frame, so the screen carries the window controls.
 import { useEffect, useState } from 'react';
 import Button from '../ds/primitives/Button';
 import { call, desktop } from '../lib/api';
@@ -85,12 +86,9 @@ export default function Onboarding({ edition, consented, onDone, onerror }: Onbo
             defaultDeviceName={edition.default_device_name}
             signUp={signingIn === 'sign_up'}
             onDone={() => void finish()}
-            onCancel={() => void finish()}
+            onCancel={() => setSigningIn(null)}
           />
         )}
-        <Button variant="text" className="onboarding-local" onClick={() => void finish()}>
-          {tr('Continua senza account', 'Continue without an account')}
-        </Button>
       </main>
     </div>
   );

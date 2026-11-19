@@ -67,5 +67,9 @@ jobs:
           cache: npm
           cache-dependency-path: desktop/package-lock.json
       - run: npm ci
+      # The ArtCraft engines the app imports are downloaded, not committed (AGENTS.md, «Motori ArtCraft»).
+      - run: npm run artcraft:sync
       - run: npm run check
       - run: npm run test:ds
+      # Browser tests of the preview that guard the editions (Edge is on the Windows runner).
+      - run: npm run test:browser -- onboarding-professional

@@ -548,6 +548,9 @@ mod tests {
         LlmModelSpec { ..*s }
     }
 
+    // The free disk space is known only on Windows (memory::available_disk_bytes): elsewhere the
+    // install does not check it before downloading.
+    #[cfg(windows)]
     #[test]
     fn install_needs_free_disk() {
         let bytes = payload(1000);

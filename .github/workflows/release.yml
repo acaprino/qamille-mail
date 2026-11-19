@@ -4,7 +4,8 @@ name: Release
 # what is project-specific is in .github/release.json, the version logic in
 # .github/scripts/release.mjs.
 #   1. the merged pull request's label chooses the step: release:major, release:minor, otherwise patch;
-#   2. the next version is written in every version file (and the project's Cargo.lock entries);
+#   2. the next version is written in every version file (and the project's Cargo.lock entries); the first release,
+#      when the repository has no release tag yet, is the version the files already have (1.0.0);
 #   3. the build runs on the project's runner: build-release.bat --no-install on Windows unless release.json
 #      says otherwise;
 #   4. the version commit and the tag <prefix><version> go on main (plus the "extraTags" of release.json, such as
@@ -91,13 +92,18 @@ jobs:
         id: version
         run: |
           $current = node .github/scripts/release.mjs current
-          $version = node .github/scripts/release.mjs bump '${{ needs.plan.outputs.step }}'
-          if ($LASTEXITCODE) { exit 1 }
+          git fetch --tags --quiet
+          # The first release has nothing to step from: it is the version already in the files.
+          if (git tag --list "$(node .github/scripts/release.mjs config tagPrefix)*") {
+            $version = node .github/scripts/release.mjs bump '${{ needs.plan.outputs.step }}'
+          } else {
+            $version = $current
+          }
+          if ($LASTEXITCODE -or -not $version) { exit 1 }
           # The first tag is the release's own (v1.2.3); the others (core-v1.2.3) go on the same commit.
           $tags = @(node .github/scripts/release.mjs tags $version)
           if ($LASTEXITCODE -or -not $tags) { exit 1 }
           $tag = $tags[0]
-          git fetch --tags --quiet
           foreach ($t in $tags) { if (git tag --list $t) { Write-Error "$t already exists"; exit 1 } }
           "version=$version" >> $env:GITHUB_OUTPUT
           "tag=$tag" >> $env:GITHUB_OUTPUT
@@ -136,7 +142,8 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -- @(node .github/scripts/release.mjs paths)
-          git commit -m "release $tag"
+          # Empty for the first release, whose version is already in the files.
+          git commit --allow-empty -m "release $tag"
           $tags = '${{ steps.version.outputs.tags }}' -split ' '
           foreach ($t in $tags) { git tag -a $t -m "${{ steps.version.outputs.app }} ${{ steps.version.outputs.version }}" }
           git push origin "HEAD:refs/heads/main" @($tags | ForEach-Object { "refs/tags/$_" })

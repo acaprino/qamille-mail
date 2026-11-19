@@ -149,6 +149,8 @@ test('adopt keeps CRLF line endings', () => {
 test('the release workflow tags and pushes every tag of `release.mjs tags`', () => {
   const workflow = readFileSync(join(root, '.github', 'workflows', 'release.yml'), 'utf8');
   assert.match(workflow, /release\.mjs tags \$version/);
+  assert.match(workflow, /if \(git tag --list "\$\(node \.github\/scripts\/release\.mjs config tagPrefix\)\*"\) \{\s+\$version = node \.github\/scripts\/release\.mjs bump /, 'the first release keeps the current version');
+  assert.match(workflow, /git commit --allow-empty /, 'the first release has nothing to commit');
   assert.match(workflow, /foreach \(\$t in \$tags\) \{ git tag -a \$t/);
   assert.match(workflow, /refs\/tags\/\$_/);
   assert.match(workflow, /gh release create \$tag /, 'the GitHub Release is for the first tag only');

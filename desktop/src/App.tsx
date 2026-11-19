@@ -659,13 +659,14 @@ export default function App() {
       s.fatal = errorText(e);
     }
   }
-  // The Professional build drops a session of another server (EX-20) and shows its first start
-  // until the person signs in or chooses this computer only.
+  // The Professional build drops a session of another server (EX-20) and, without a session,
+  // shows its sign-in screen: the Professional app needs an account (owner, 2026-11-19).
   async function checkEdition() {
     const edition = await call<AppEdition>('app_edition').catch(() => null);
     if (edition?.kind !== 'professional') return;
     if (await call<boolean>('server_startup_check').catch(() => false)) await loadWorkspace();
-    if (!s.workspace?.settings.onboarding_done) s.onboarding = edition;
+    const status = await call<{ connected: boolean }>('server_status').catch(() => null);
+    if (!status?.connected) s.onboarding = edition;
   }
   // A snapshot of the backend that predates a mark must not show its message unread again.
   function emailShownAsRead<T extends { id: number; read: boolean }>(email: T): T {

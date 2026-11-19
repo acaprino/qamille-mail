@@ -296,6 +296,11 @@ pub trait ComputeBackend: Send + Sync + 'static {
     fn models(&self) -> Vec<ModelStatus>;
     /// Starts installing `id` and returns at once; progress is in [`Self::models`].
     fn install(&self, id: &str) -> Result<ModelStatus, ComputeError>;
+    /// The embedding model in use and its quantization label: what `/health` declares and the
+    /// app records with its index (D4).
+    fn embedding_identity(&self) -> (String, String) {
+        (MODEL_ID.to_owned(), QUANTIZATION.to_owned())
+    }
     /// Called every few seconds: frees what has been idle (the model after 60 s).
     fn release_idle(&self) {}
     /// The server stops: child processes end now (a blocking task still running may keep the
@@ -605,6 +610,8 @@ pub struct ComputeState {
     llm_route: Option<(usize, u64)>,
     /// The assistant's settings from `/admin` (`/admin/api/llm`); `None`: not on this server.
     llm_admin: Option<Arc<crate::llm::LlmAdmin>>,
+    /// The embedding model chosen from `/admin` (`/admin/api/embedding`); `None`: not on this server.
+    embedding_admin: Option<Arc<crate::embedding::EmbeddingAdmin>>,
     model_gate: Arc<Gate>,
     parser_gate: Arc<Gate>,
     speech_gate: Arc<Gate>,
@@ -630,6 +637,7 @@ impl ComputeState {
             llm: crate::llm::LlmHolder::default(),
             llm_route: None,
             llm_admin: None,
+            embedding_admin: None,
             model_gate: Arc::new(Gate::new(queue)),
             parser_gate: Arc::new(Gate::new(queue)),
             speech_gate: Arc::new(Gate::with_permits(speech::default_parallelism(), speech::SPEECH_QUEUE)),
@@ -675,6 +683,13 @@ impl ComputeState {
         self.llm = holder;
         self.llm_route = Some(route);
         self.llm_admin = Some(admin);
+        self
+    }
+
+    /// With the embedding model that `/admin` can change at run time (`backend` already answers
+    /// with the model it chose).
+    pub fn with_embedding_admin(mut self, admin: Arc<crate::embedding::EmbeddingAdmin>) -> Self {
+        self.embedding_admin = Some(admin);
         self
     }
 
@@ -940,10 +955,13 @@ async fn read_limited(body: axum::body::Body, limit: usize) -> Result<Bytes, Com
     axum::body::to_bytes(body, limit).await.map_err(|_| ComputeError::PayloadTooLarge)
 }
 
-fn check_model(model: Option<&str>) -> Result<(), ComputeError> {
+/// No model, the server's embedding model in use (`active`), or the built-in id: the apps
+/// released so far always send it, after checking the model `/health` declares against their index.
+fn check_model(model: Option<&str>, active: &str) -> Result<(), ComputeError> {
     match model {
         None | Some(MODEL_ID) => Ok(()),
-        Some(_) => Err(ComputeError::ModelMissing(format!("This server serves only {MODEL_ID}."))),
+        Some(model) if model == active => Ok(()),
+        Some(_) => Err(ComputeError::ModelMissing(format!("This server serves only {active}."))),
     }
 }
 
@@ -966,12 +984,13 @@ async fn health(State(state): State<ComputeState>, request: Request) -> Response
         let all = state.clone();
         let models = tokio::task::spawn_blocking(move || all.all_models()).await.unwrap_or_default();
         let speech_ready = models.iter().any(|model| model.id.starts_with(speech::ID_PREFIX) && model.state == "ready");
+        let (embedding_model, quantization) = state.backend.embedding_identity();
         body["mode"] = serde_json::json!(state.mode);
         body["models"] = serde_json::json!(models);
         body["embedding"] = serde_json::json!({
-            "model": MODEL_ID,
+            "model": embedding_model,
             "dimensions": DIM,
-            "quantization": QUANTIZATION,
+            "quantization": quantization,
         });
         body["limits"] = serde_json::json!({
             "max_file_bytes": MAX_FILE_BYTES,
@@ -983,7 +1002,7 @@ async fn health(State(state): State<ComputeState>, request: Request) -> Response
         body["capabilities"] = serde_json::json!({
             "embeddings": true,
             "chunks": true,
-            "image_embeddings": true,
+            "image_embeddings": embedding_model == MODEL_ID,
             "extract": true,
             "transcriptions": speech_ready,
         });
@@ -1030,7 +1049,8 @@ struct EmbeddingsRequest {
 async fn embeddings(State(state): State<ComputeState>, caller: Option<axum::Extension<Caller>>, ticket: Option<axum::Extension<UsageTicket>>, body: Bytes) -> Result<Response, ComputeError> {
     let request: EmbeddingsRequest = parse_json(&body)?;
     drop(body);
-    check_model(request.model.as_deref())?;
+    let (active, _) = state.backend.embedding_identity();
+    check_model(request.model.as_deref(), &active)?;
     if request.dimensions.is_some_and(|d| d != DIM) {
         return Err(ComputeError::InvalidRequest(format!("This server serves {DIM} dimensions.")));
     }
@@ -1048,9 +1068,11 @@ async fn embeddings(State(state): State<ComputeState>, caller: Option<axum::Exte
     }
     let permit = admitted(&state, caller.as_ref().map(|c| &c.0), &state.model_gate).await?;
     let backend = Arc::clone(&state.backend);
-    let (vectors, tokens) = blocking(move || {
+    // The model is named after the vectors are made: the one that made them, even if the
+    // panel changed it while this request waited its turn.
+    let ((vectors, tokens), active) = blocking(move || {
         let _permit = permit;
-        backend.embed_counted(&inputs)
+        Ok((backend.embed_counted(&inputs)?, backend.embedding_identity().0))
     })
     .await?;
     if let Some(axum::Extension(ticket)) = ticket {
@@ -1064,7 +1086,7 @@ async fn embeddings(State(state): State<ComputeState>, caller: Option<axum::Exte
     Ok(Json(serde_json::json!({
         "object": "list",
         "data": data,
-        "model": MODEL_ID,
+        "model": active,
         "usage": {"prompt_tokens": tokens, "total_tokens": tokens},
     }))
     .into_response())
@@ -1080,7 +1102,7 @@ struct ChunksRequest {
 async fn chunks(State(state): State<ComputeState>, caller: Option<axum::Extension<Caller>>, body: Bytes) -> Result<Response, ComputeError> {
     let request: ChunksRequest = parse_json(&body)?;
     drop(body);
-    check_model(request.model.as_deref())?;
+    check_model(request.model.as_deref(), &state.backend.embedding_identity().0)?;
     let permit = admitted(&state, caller.as_ref().map(|c| &c.0), &state.model_gate).await?;
     let backend = Arc::clone(&state.backend);
     let chunks = blocking(move || {
@@ -1092,6 +1114,11 @@ async fn chunks(State(state): State<ComputeState>, caller: Option<axum::Extensio
 }
 
 async fn embed_image(State(state): State<ComputeState>, caller: Option<axum::Extension<Caller>>, headers: HeaderMap, body: axum::body::Body) -> Result<Response, ComputeError> {
+    // With another embedding model images are not searched: said before the upload is read or
+    // any slot is taken, not after megabytes that nobody will use.
+    if state.backend.embedding_identity().0 != MODEL_ID {
+        return Err(ComputeError::DocumentUnreadable(crate::embedding::IMAGES_UNAVAILABLE.to_owned()));
+    }
     if declared_length(&headers).is_some_and(|length| length > MAX_FILE_BYTES as u64) {
         return Err(ComputeError::PayloadTooLarge);
     }
@@ -1104,13 +1131,13 @@ async fn embed_image(State(state): State<ComputeState>, caller: Option<axum::Ext
     }
     let permit = admitted(&state, caller.as_ref().map(|c| &c.0), &state.model_gate).await?;
     let backend = Arc::clone(&state.backend);
-    let vector = blocking(move || {
+    let (vector, model) = blocking(move || {
         let _permit = permit;
         let _upload = upload;
-        backend.embed_image(&body)
+        Ok((backend.embed_image(&body)?, backend.embedding_identity().0))
     })
     .await?;
-    Ok(Json(serde_json::json!({"model": MODEL_ID, "embedding": vector})).into_response())
+    Ok(Json(serde_json::json!({"model": model, "embedding": vector})).into_response())
 }
 
 async fn extract(State(state): State<ComputeState>, caller: Option<axum::Extension<Caller>>, headers: HeaderMap, mut multipart: Multipart) -> Result<Response, ComputeError> {
@@ -1182,7 +1209,45 @@ pub fn admin_routes(state: ComputeState) -> Router<crate::http::AppState> {
         .route("/admin/api/models/{id}/install", post(admin_install))
         .route("/admin/api/models/{id}", axum::routing::delete(admin_remove))
         .route("/admin/api/llm", get(admin_llm).put(admin_llm_save).delete(admin_llm_reset))
+        .route("/admin/api/embedding", get(admin_embedding).put(admin_embedding_save).delete(admin_embedding_reset))
         .layer(axum::Extension(state))
+}
+
+fn embedding_admin(state: &ComputeState) -> Result<Arc<crate::embedding::EmbeddingAdmin>, crate::error::ServerError> {
+    state.embedding_admin.clone().ok_or_else(crate::error::ServerError::not_found)
+}
+
+/// `GET /admin/api/embedding`: the embedding model saved and the one in use; of the service's key
+/// only its last four characters.
+async fn admin_embedding(_admin: crate::http::AdminAuth, axum::Extension(state): axum::Extension<ComputeState>) -> Result<Response, crate::error::ServerError> {
+    let admin = embedding_admin(&state)?;
+    let view = tokio::task::spawn_blocking(move || admin.view()).await.map_err(crate::error::ServerError::internal)?;
+    Ok(Json(view).into_response())
+}
+
+/// `PUT /admin/api/embedding`: tries the service with one call, then saves it in the data folder
+/// and applies it at once. A service whose vectors are not of the index's length changes nothing.
+async fn admin_embedding_save(
+    _admin: crate::http::AdminAuth,
+    axum::Extension(state): axum::Extension<ComputeState>,
+    crate::http::JsonBody(input): crate::http::JsonBody<crate::embedding::EmbeddingSettingsInput>,
+) -> Result<Response, crate::error::ServerError> {
+    let admin = embedding_admin(&state)?;
+    let view = tokio::task::spawn_blocking(move || admin.update(input))
+        .await
+        .map_err(crate::error::ServerError::internal)?
+        .map_err(crate::error::ServerError::InvalidRequest)?;
+    Ok(Json(view).into_response())
+}
+
+/// `DELETE /admin/api/embedding`: back to the local model.
+async fn admin_embedding_reset(_admin: crate::http::AdminAuth, axum::Extension(state): axum::Extension<ComputeState>) -> Result<Response, crate::error::ServerError> {
+    let admin = embedding_admin(&state)?;
+    let view = tokio::task::spawn_blocking(move || admin.reset())
+        .await
+        .map_err(crate::error::ServerError::internal)?
+        .map_err(crate::error::ServerError::InvalidRequest)?;
+    Ok(Json(view).into_response())
 }
 
 fn llm_admin(state: &ComputeState) -> Result<Arc<crate::llm::LlmAdmin>, crate::error::ServerError> {

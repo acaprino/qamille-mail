@@ -314,7 +314,7 @@ fn the_page_has_a_models_section_hidden_until_the_key_is_given() {
     assert!(script.contains("byId('models-section').hidden = false"));
     assert!(function_text(script, "lock").contains("byId('models-section').hidden = true"));
     // Shown together with the users, after the key is accepted.
-    assert!(function_text(script, "loadUsers").contains("models-section") || function_text(script, "loadUsers").contains("loadModels"));
+    assert!(function_text(script, "loadAll").contains("await loadModels();"));
 }
 
 #[test]
@@ -369,7 +369,7 @@ fn models_are_rendered_with_text_content_only() {
 #[test]
 fn remove_asks_for_a_second_click_and_uses_no_browser_dialog() {
     let script = page_script();
-    assert!(script.contains("Sicuro? Rimuovi"));
+    assert!(script.contains("secondClick(remove, 'Conferma: rimuovi «'"));
     for dialog in ["confirm(", "alert(", "prompt("] {
         assert!(!script.contains(dialog), "app.js contiene «{dialog}»");
     }
@@ -405,4 +405,92 @@ async fn the_page_is_still_served_with_the_security_headers_and_the_models_secti
     }
     let html = request(ts.admin(), "GET", "/admin", None, loopback(), &[]).await.text;
     assert!(html.contains("id=\"models-section\""));
+}
+
+// --- The «Embedding» section ---------------------------------------------------------------
+
+#[test]
+fn the_embedding_section_is_hidden_until_the_key_is_given_and_uses_the_admin_api() {
+    let html = page_html();
+    let at = html.find("id=\"embedding-section\"").expect("la sezione");
+    let tag = &html[html[..at].rfind('<').unwrap()..at + html[at..].find('>').unwrap()];
+    assert!(tag.contains("hidden"), "{tag}");
+    let script = page_script();
+    assert!(function_text(script, "lock").contains("byId('embedding-section').hidden = true"));
+    for call in ["api('GET', '/embedding')", "api('PUT', '/embedding', body)"] {
+        assert!(script.contains(call), "manca {call}");
+    }
+    // The key of the service is typed and sent; the field is emptied when the save worked and at «Esci».
+    assert!(html.contains("id=\"embedding-key\" type=\"password\" autocomplete=\"off\""));
+    assert!(function_text(script, "renderEmbedding").contains("byId('embedding-key').value = ''"));
+    assert!(function_text(script, "lock").contains("byId('embedding-key').value = ''"));
+}
+
+#[test]
+fn another_embedding_model_asks_for_a_second_click() {
+    let script = page_script();
+    // The form asks before it runs the save, and the save is the only place that sends.
+    let asked = script.find("if (embeddingChanges() && !secondClick(save, 'Conferma: cambia modello', setEmbeddingStatus)) return;").expect("la conferma");
+    let run = script.find("runEmbedding(save, saveEmbedding);").expect("il salvataggio");
+    assert!(asked < run, "la conferma viene prima della richiesta");
+    assert_eq!(script.matches("api('PUT', '/embedding', body)").count(), 1);
+    assert!(function_text(script, "saveEmbedding").contains("api('PUT', '/embedding', body)"));
+    // The page says what a change costs, and that vectors keep the index's length.
+    let html = page_html();
+    assert!(html.contains("id=\"embedding-warning\"") && html.contains("reindicizzare"));
+    assert!(html.contains("id=\"embedding-dim\""));
+    assert!(function_text(script, "renderEmbedding").contains("String(data.dimensions)"));
+}
+
+// --- What costs waits for a second click, and «Esci» really closes -----------------------------
+
+#[test]
+fn what_costs_waits_for_a_second_click() {
+    let script = page_script();
+    // The first click arms and stops there; only a click on an armed button goes on.
+    let helper = function_text(script, "secondClick");
+    assert!(helper.contains("if (disarm(button)) return true;"), "{helper}");
+    assert!(helper.contains("    return false;\n  }\n"), "{helper}");
+    assert_eq!(helper.matches("return true;").count(), 1, "{helper}");
+    for (guard, action) in [
+        ("secondClick(reset, ", "'/reset-password')"),
+        ("secondClick(remove, 'Conferma: cancella «'", "api('DELETE', '/users/' + encodeURIComponent(user.id))"),
+        ("secondClick(revoke, ", "'/devices/' + encodeURIComponent(device.id))"),
+        ("secondClick(remove, 'Conferma: rimuovi «'", "api('DELETE', '/models/' + encodeURIComponent(model.id))"),
+        ("secondClick(button, 'Conferma: scarta", "runLlm(button, resetLlm)"),
+        ("secondClick(save, 'Conferma: cambia modello'", "runEmbedding(save, saveEmbedding)"),
+    ] {
+        let asked = script.find(&format!("!{guard}")).unwrap_or_else(|| panic!("manca la conferma {guard}"));
+        let done = script.find(action).unwrap_or_else(|| panic!("manca {action}"));
+        assert!(asked < done && done - asked < 700, "{action} non segue la sua conferma");
+        assert!(script[asked..done].contains(")) return;"), "{action} parte anche senza conferma");
+        assert_eq!(script.matches(action).count(), 1, "{action} ha una sola strada");
+    }
+}
+
+#[test]
+fn an_answer_that_arrives_after_esci_draws_nothing() {
+    let script = page_script();
+    assert!(function_text(script, "lock").contains("session += 1;"));
+    let api = function_text(script, "api");
+    assert!(api.contains("const mine = session;"));
+    // After each wait, before anything is read or drawn; and before a stale 401 can lock the new session.
+    assert_eq!(api.matches("if (mine !== session) throw new Unauthorized('sessione chiusa');").count(), 3, "{api}");
+    assert!(api.find("if (mine !== session)").unwrap() < api.find("response.status === 401").unwrap());
+    // «Esci» leaves no button armed for whoever comes next.
+    assert!(function_text(script, "lock").contains("disarmAll();"));
+}
+
+#[test]
+fn a_section_that_does_not_load_says_so_instead_of_vanishing() {
+    let script = page_script();
+    for (load, section) in [("loadModels", "models"), ("loadLlm", "llm"), ("loadEmbedding", "embedding")] {
+        let text = function_text(script, load);
+        assert!(text.contains(&format!("byId('{section}-section').hidden = e.status === 404;")), "{load}");
+        assert!(text.contains("syncNav();"), "{load}");
+    }
+    // The one-time password is shown before the table reload, which may fail.
+    for shown in ["result.temporary_password);\n        await loadUsers();", "created.temporary_password);\n        await loadUsers();"] {
+        assert!(script.contains(shown), "{shown}");
+    }
 }

@@ -148,6 +148,11 @@ pub struct Config {
     pub hf_token: Option<HfToken>,
     /// Sincronizzazione delle caselle (spenta senza `QAMILLE_SYNC_KEY`).
     pub sync: SyncConfig,
+    /// Secondi senza vettori dopo un cambio del modello di embedding dal pannello: un messaggio
+    /// che un'app stava indicizzando con il modello di prima si ferma invece di finire con quello
+    /// nuovo. Più di due tempi massimi di una richiesta di calcolo (300 s). Non si imposta dal
+    /// file né dall'ambiente: accorciarla riapre quel caso (le prove la mettono a 0).
+    pub embedding_switch_pause_secs: u64,
 }
 
 impl Config {
@@ -182,6 +187,7 @@ impl Config {
             models_mirror_url: None,
             hf_token: None,
             sync: SyncConfig::default(),
+            embedding_switch_pause_secs: 660,
         }
     }
 

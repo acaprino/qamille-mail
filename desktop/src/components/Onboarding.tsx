@@ -50,45 +50,52 @@ export default function Onboarding({ edition, consented, onDone, onerror }: Onbo
         </header>
       )}
       <main className="onboarding-main">
-        <h1>{tr('Accedi a Qamille', 'Sign in to Qamille')}</h1>
-        {!signingIn && (
-          <>
-            <p role="status" className="muted">
-              {probe === null
-                ? tr('Sto provando il server…', 'Trying the server…')
-                : found
-                  ? tr('Il server è pronto.', 'The server is ready.')
-                  : probe.kind === 'incompatible'
-                    ? tr("Versione del server incompatibile: aggiorna l'app.", 'Incompatible server version: update the app.')
-                    : tr('Il server non risponde.', 'The server does not answer.')}
-            </p>
-            <div className="button-row onboarding-actions">
-              <Button variant="primary" disabled={!found} onClick={() => setSigningIn('sign_in')}>
-                {tr('Accedi', 'Sign in')}
-              </Button>
-              {found && probe.info.signup && (
-                <Button variant="secondary" onClick={() => setSigningIn('sign_up')}>
-                  {tr('Crea account', 'Create account')}
+        <section className="onboarding-card" aria-labelledby="onboarding-title">
+          <span className="brand-mark onboarding-mark" aria-hidden="true">
+            <svg width="16" height="20" viewBox="0 0 21 25" fill="none">
+              <path d="M12 1 2 14h8l-1 10 10-14h-8l1-9Z" fill="currentColor" />
+            </svg>
+          </span>
+          <h1 id="onboarding-title">{tr('Accedi a Qamille', 'Sign in to Qamille')}</h1>
+          {!signingIn && (
+            <>
+              <p role="status" className="muted">
+                {probe === null
+                  ? tr('Sto provando il server…', 'Trying the server…')
+                  : found
+                    ? tr('Il server è pronto.', 'The server is ready.')
+                    : probe.kind === 'incompatible'
+                      ? tr("Versione del server incompatibile: aggiorna l'app.", 'Incompatible server version: update the app.')
+                      : tr('Il server non risponde.', 'The server does not answer.')}
+              </p>
+              <div className="onboarding-actions">
+                <Button variant="primary" disabled={!found} onClick={() => setSigningIn('sign_in')}>
+                  {tr('Accedi', 'Sign in')}
                 </Button>
-              )}
-              {probe !== null && !found && (
-                <Button variant="secondary" onClick={tryServer}>
-                  {tr('Riprova', 'Retry')}
-                </Button>
-              )}
-            </div>
-          </>
-        )}
-        {signingIn && (
-          <ServerConnect
-            preset={server}
-            consented={consented}
-            defaultDeviceName={edition.default_device_name}
-            signUp={signingIn === 'sign_up'}
-            onDone={() => void finish()}
-            onCancel={() => setSigningIn(null)}
-          />
-        )}
+                {found && probe.info.signup && (
+                  <Button variant="secondary" onClick={() => setSigningIn('sign_up')}>
+                    {tr('Crea account', 'Create account')}
+                  </Button>
+                )}
+                {probe !== null && !found && (
+                  <Button variant="secondary" onClick={tryServer}>
+                    {tr('Riprova', 'Retry')}
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
+          {signingIn && (
+            <ServerConnect
+              preset={server}
+              consented={consented}
+              defaultDeviceName={edition.default_device_name}
+              signUp={signingIn === 'sign_up'}
+              onDone={() => void finish()}
+              onCancel={() => setSigningIn(null)}
+            />
+          )}
+        </section>
       </main>
     </div>
   );

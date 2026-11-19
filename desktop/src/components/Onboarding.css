@@ -1,3 +1,6 @@
+/* The Professional sign-in screen: one card in the middle of the window, the same width at every step (the
+   choice, the consent, the form), so nothing jumps sideways. The fixed window bar is 48px: the same padding at
+   the foot keeps the card in the middle of the whole window. */
 .onboarding {
   display: flex;
   flex-direction: column;
@@ -5,17 +8,49 @@
   background: var(--ground, var(--bg));
 }
 .onboarding-main {
+  flex: 1;
   display: grid;
-  gap: 14px;
-  align-content: center;
-  justify-items: start;
-  width: min(440px, calc(100% - 32px));
-  margin: auto;
-  padding: 24px 0;
+  place-items: center;
+  padding: 48px 16px;
 }
-.onboarding-main h1 {
+.onboarding-card {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  width: min(440px, 100%);
+  padding: 32px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow);
+}
+.onboarding-card .onboarding-mark {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-xl);
+}
+.onboarding-card h1 {
+  margin: 0;
+  font-size: var(--text-3xl);
+}
+.onboarding-card [role='status'] {
   margin: 0;
 }
-.onboarding-main .server-connect {
+/* The two actions stacked at full width: the primary first. */
+.onboarding-actions {
+  display: grid;
+  gap: 8px;
   width: 100%;
+  margin-top: 4px;
+}
+.onboarding-actions > button {
+  width: 100%;
+  height: 40px;
+}
+/* The consent and the form read as text: aligned left inside the card. */
+.onboarding-card .server-connect {
+  width: 100%;
+  margin-top: 0;
+  text-align: left;
 }

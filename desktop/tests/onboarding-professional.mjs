@@ -3,7 +3,21 @@
 // with the server down either: «Retry»), «Cancel» back to the screen, a start with a session straight to the
 // mail, signing out back to the screen, no address field anywhere; the self-hosted build has no sign-in screen.
 import assert from 'node:assert/strict';
+import { mkdirSync } from 'node:fs';
+import path from 'node:path';
 import { chromium, expect } from '@playwright/test';
+
+// With QAMILLE_SHOTS_DIR set (CI), the screens are also saved there to be looked at.
+const shots = process.env.QAMILLE_SHOTS_DIR;
+if (shots) mkdirSync(shots, { recursive: true });
+async function shoot(page, name) {
+  if (!shots) return;
+  for (const [width, height] of [[1280, 800], [960, 680]]) {
+    await page.setViewportSize({ width, height });
+    await page.screenshot({ path: path.join(shots, `${name}-${width}x${height}.png`) });
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
+}
 
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const errors = [];
@@ -23,6 +37,7 @@ try {
     const { page, context } = await start({ edition: 'professional' });
     await expect(page.getByRole('heading', { name: 'Sign in to Qamille' })).toBeVisible();
     await expect(page.getByText('The server is ready.')).toBeVisible();
+    await shoot(page, 'signin-choice');
     assert.equal(await noAccountButton(page), 0, 'no way past the screen without an account');
     assert.equal(await page.getByLabel('Server address').count(), 0, 'no address field in the Professional build');
     // «Cancel» in the form goes back to the screen, never into the app.
@@ -31,7 +46,9 @@ try {
     await expect(page.getByRole('heading', { name: 'Sign in to Qamille' })).toBeVisible();
     assert.equal(await page.getByRole('button', { name: /^New message/ }).count(), 0, 'Cancel does not open the app');
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await shoot(page, 'signin-consent');
     await page.getByRole('button', { name: 'I agree, continue', exact: true }).click();
+    await shoot(page, 'signin-form');
     await page.getByLabel('Username or email').fill('mario');
     await page.getByLabel('Password', { exact: true }).fill('una password lunga');
     await page.locator('.server-connect').getByRole('button', { name: 'Sign in', exact: true }).click();
@@ -51,6 +68,7 @@ try {
     await expect(page.getByText('The server does not answer.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Retry', exact: true })).toBeVisible();
+    await shoot(page, 'signin-server-down');
     assert.equal(await noAccountButton(page), 0, 'no way past the screen with the server down');
     assert.equal(await page.getByRole('button', { name: /^New message/ }).count(), 0, 'the mail does not open without an account');
     console.log('PASS with the server down the screen stays, with «Retry»');

@@ -39,7 +39,7 @@ export default function ResetPasswordStep({ url, onDone, onBack }: ResetPassword
         <input type="email" value={email} autoComplete="email" disabled={sent} onChange={(e) => setEmail(e.currentTarget.value)} />
       </Field>
       {!sent ? (
-        <div className="button-row">
+        <div className="button-row step-actions">
           <Button
             variant="primary"
             disabled={busy || !email.includes('@')}
@@ -81,7 +81,7 @@ export default function ResetPasswordStep({ url, onDone, onBack }: ResetPassword
           <p className="field-help">
             {tr('Tutti i dispositivi dell’account verranno scollegati.', 'Every device of the account will be signed out.')}
           </p>
-          <div className="button-row">
+          <div className="button-row step-actions">
             <Button variant="primary" type="submit" disabled={busy || !code.trim() || password.length < 10}>
               {tr('Imposta la nuova password', 'Set the new password')}
             </Button>

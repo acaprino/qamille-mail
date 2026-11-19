@@ -23,6 +23,8 @@ export type OnboardingProps = {
 export default function Onboarding({ edition, consented, onDone, onerror }: OnboardingProps) {
   const [probe, setProbe] = useState<Probe | null>(null);
   const [signingIn, setSigningIn] = useState<'sign_in' | 'sign_up' | null>(null);
+  // The card's title names the step: signing in, or creating the account (also when opened from the form).
+  const [creating, setCreating] = useState(false);
   const server = edition.server ?? '';
 
   function tryServer() {
@@ -56,7 +58,9 @@ export default function Onboarding({ edition, consented, onDone, onerror }: Onbo
               <path d="M12 1 2 14h8l-1 10 10-14h-8l1-9Z" fill="currentColor" />
             </svg>
           </span>
-          <h1 id="onboarding-title">{tr('Accedi a Qamille', 'Sign in to Qamille')}</h1>
+          <h1 id="onboarding-title">
+            {signingIn && creating ? tr('Crea il tuo account', 'Create your account') : tr('Accedi a Qamille', 'Sign in to Qamille')}
+          </h1>
           {!signingIn && (
             <>
               <p role="status" className="muted">
@@ -91,6 +95,8 @@ export default function Onboarding({ edition, consented, onDone, onerror }: Onbo
               consented={consented}
               defaultDeviceName={edition.default_device_name}
               signUp={signingIn === 'sign_up'}
+              titled
+              onCreatingChange={setCreating}
               onDone={() => void finish()}
               onCancel={() => setSigningIn(null)}
             />

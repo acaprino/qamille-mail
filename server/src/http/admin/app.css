@@ -33,6 +33,9 @@
 
 * { box-sizing: border-box; }
 
+/* An element with the hidden attribute stays hidden even where a rule gives it a display (.fields, form label). */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   background: var(--bg);

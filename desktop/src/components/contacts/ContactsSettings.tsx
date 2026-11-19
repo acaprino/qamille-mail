@@ -2,8 +2,9 @@ import { useEffect } from 'react';
 import Button from '../../ds/primitives/Button';
 import Checkbox from '../../ds/primitives/Checkbox';
 import Field from '../../ds/primitives/Field';
+import Icon from '../../ds/primitives/Icon';
 import { call, errorText } from '../../lib/api';
-import { tr } from '../../lib/i18n';
+import { bookLabel, tr } from '../../lib/i18n';
 import { formatDateTime } from '../../lib/regional';
 import { useReactive } from '../../lib/store';
 import type { BookView, ContactSettings, ContactSyncReport } from '../../lib/types';
@@ -21,7 +22,7 @@ export default function ContactsSettings({ notify }: ContactsSettingsProps) {
   }));
   const writable = s.books.filter((b) => b.writable);
   const googleBooks = s.books.filter((b) => b.kind === 'Google' || b.kind === 'GoogleOther');
-  const labelOf = (id: string) => s.books.find((b) => b.id === id)?.label ?? id;
+  const labelOf = (id: string) => bookLabel(s.books.find((b) => b.id === id)?.label ?? id);
 
   async function load() {
     try {
@@ -116,7 +117,7 @@ export default function ContactsSettings({ notify }: ContactsSettingsProps) {
                 disabled={s.busy}
                 onChange={(on) => void toggle(book, on)}
               >
-                {book.label}
+                {bookLabel(book.label)}
               </Checkbox>
               <small className="muted">
                 {book.last_sync
@@ -161,20 +162,24 @@ export default function ContactsSettings({ notify }: ContactsSettingsProps) {
           <li key={id}>
             <span>{labelOf(id)}</span>
             <Button
-              variant="text"
+              variant="icon"
               disabled={index === 0}
               aria-label={`${tr('Sposta su', 'Move up')}: ${labelOf(id)}`}
               onClick={() => move(index, -1)}
             >
-              ↑
+              <span className="chevron-up">
+                <Icon name="chevron" size={16} />
+              </span>
             </Button>
             <Button
-              variant="text"
+              variant="icon"
               disabled={index === s.priority.length - 1}
               aria-label={`${tr('Sposta giù', 'Move down')}: ${labelOf(id)}`}
               onClick={() => move(index, 1)}
             >
-              ↓
+              <span className="chevron-down">
+                <Icon name="chevron" size={16} />
+              </span>
             </Button>
           </li>
         ))}
@@ -188,7 +193,7 @@ export default function ContactsSettings({ notify }: ContactsSettingsProps) {
         )}
         <input
           value={s.roles}
-          placeholder="info, vendite, segreteria"
+          placeholder={tr('info, vendite, segreteria', 'info, sales, office')}
           onChange={(event) => {
             s.roles = event.currentTarget.value;
             s.saved = false;

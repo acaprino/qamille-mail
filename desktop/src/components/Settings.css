@@ -10,6 +10,7 @@
     margin: 8px 0 3px;
   }
   & .google-setup-help .text-button {
+    padding: 0;
     color: var(--accent-text);
     text-decoration: underline;
     text-underline-offset: 3px;

@@ -348,6 +348,7 @@ export default function MeetingSettings({ settings, onSettingsChange, notify }: 
             </Button>
             <Button
               variant="primary"
+              className="danger"
               aria-disabled={s.cleaning ? 'true' : undefined}
               aria-busy={s.cleaning ? 'true' : undefined}
               onClick={confirmCleanup}

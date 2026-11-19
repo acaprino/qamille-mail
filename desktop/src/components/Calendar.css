@@ -199,6 +199,14 @@ section.calendar-page .week-scroll {
   flex: 1;
   height: auto;
   min-height: 0;
+  scrollbar-gutter: stable;
+}
+/* The header and the all-day row reserve the grid's scrollbar gutter too, so their columns stay on the grid's. */
+section.calendar-page .week-head,
+section.calendar-page .all-day-row {
+  overflow: hidden;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
 }
 section.calendar-page .week-body {
   user-select: none;
@@ -439,6 +447,14 @@ section.calendar-page .draft-event {
   box-shadow: var(--shadow-sm);
   pointer-events: none;
 }
+/* A tall block shows the whole title, on the lines it has room for, instead of one cut line over empty space. */
+section.calendar-page .calendar-event:not(.compact) strong {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--title-lines, 1);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 section.calendar-page .calendar-event.compact,
 section.calendar-page .draft-event.compact {
   flex-direction: row;
@@ -478,7 +494,7 @@ section.calendar-page .event-sheet form {
   flex-direction: column;
 }
 section.calendar-page .sheet-body {
-  padding: 14px 20px 18px;
+  padding: 14px var(--panel-pad-x, 20px) 18px;
 }
 section.calendar-page fieldset {
   min-width: 0;
@@ -601,7 +617,7 @@ section.calendar-page .join {
 section.calendar-page .sheet-foot {
   display: grid;
   gap: 10px;
-  padding: 12px 14px 14px 20px;
+  padding: 12px var(--panel-pad-x, 20px) 14px;
   border-top: 1px solid var(--border);
 }
 section.calendar-page .sheet-error {
@@ -687,8 +703,20 @@ section.calendar-page .danger-solid {
   section.calendar-page .rail-title {
     display: none;
   }
+  /* Stacked over the grid, each group is one line: its name, then its calendars as chips sized to their
+     names, instead of a lone 220px column beside an empty band. */
   section.calendar-page .rail-group {
-    width: 220px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    width: auto;
+  }
+  section.calendar-page .rail-group h3 {
+    margin: 0;
+  }
+  section.calendar-page .rail-group .cal-row {
+    width: auto;
   }
   section.calendar-page .sync-note {
     display: none;

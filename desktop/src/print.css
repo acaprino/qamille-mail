@@ -43,6 +43,11 @@
 }
 .mail-row:has(.mail-checkbox:checked) {
   box-shadow: inset 2px 0 var(--accent);
+  /* Lighter than the open message's --selection: a ticked row and the open one are told apart by more than
+     the colour of their edge. */
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+.mail-row.selected:has(.mail-checkbox:checked) {
   background: var(--selection);
 }
 .message-output-actions {

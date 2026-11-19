@@ -173,7 +173,7 @@ export default function MeetingMenu({ detail, title, notify, onchange, ondeleted
             <Button variant="secondary" onClick={() => void close()}>
               {tr('Annulla', 'Cancel')}
             </Button>
-            <Button variant="primary" aria-busy={ariaBusy} onClick={() => void remove()}>
+            <Button variant="primary" className="danger" aria-busy={ariaBusy} onClick={() => void remove()}>
               {tr('Elimina', 'Delete')}
             </Button>
           </div>

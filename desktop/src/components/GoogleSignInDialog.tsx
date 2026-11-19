@@ -28,8 +28,8 @@ export default function GoogleSignInDialog({
       aria-labelledby="google-sign-in-title"
       onClose={hide}
     >
-      <div className="google-dialog-heading">
-        <Icon name={error ? 'info' : 'link'} size={20} />
+      <div className={error ? 'google-dialog-heading failed' : 'google-dialog-heading'}>
+        <Icon name={error ? 'alert' : 'link'} size={20} />
         <h2 id="google-sign-in-title">{tr('Accedi con Google', 'Sign in with Google')}</h2>
       </div>
       {error ? (

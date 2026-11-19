@@ -7,7 +7,7 @@
 // into the one button (a trigger made with Button's own `tip` would hide it from the popover).
 import { Popover as ArkPopover } from '@ark-ui/react/popover';
 import { Portal } from '@ark-ui/react/portal';
-import { useState, type ReactElement, type ReactNode } from 'react';
+import { useId, useState, type ReactElement, type ReactNode } from 'react';
 import Tooltip from './Tooltip';
 
 export type PopoverProps = {
@@ -23,8 +23,12 @@ export type PopoverProps = {
 export default function Popover({ open, onOpenChange, trigger, label, tip, className, children }: PopoverProps) {
   const [own, setOwn] = useState(false);
   const shown = open ?? own;
+  // The popover finds its trigger by id to hang from it; a Tooltip on the same button would give it its own
+  // id, and the surface would open at the window's corner. Both roots share one id.
+  const triggerId = `popover-trigger-${useId()}`;
   return (
     <ArkPopover.Root
+      ids={{ trigger: triggerId }}
       open={shown}
       onOpenChange={(details) => {
         if (open === undefined) setOwn(details.open);
@@ -35,7 +39,7 @@ export default function Popover({ open, onOpenChange, trigger, label, tip, class
       positioning={{ placement: 'bottom-end', gutter: 4 }}
     >
       {tip ? (
-        <Tooltip text={tip}>
+        <Tooltip text={tip} triggerId={triggerId}>
           <ArkPopover.Trigger asChild>{trigger}</ArkPopover.Trigger>
         </Tooltip>
       ) : (

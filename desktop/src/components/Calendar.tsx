@@ -120,12 +120,15 @@ function eventStyle(item: { from: number; until: number; column: number; columns
   const top = (item.from / 60) * HOUR_HEIGHT;
   const height = Math.max(((item.until - item.from) / 60) * HOUR_HEIGHT - 2, 22);
   const width = 100 / item.columns;
+  // The title takes the lines the block has room for (16px each), above the 14px time line and the padding.
+  const titleLines = Math.max(1, Math.floor((height - 20) / 16));
   return {
     top: `${top}px`,
     height: `${height}px`,
     left: `calc(${item.column * width}% + 2px)`,
     width: `calc(${width}% - 4px)`,
-  };
+    '--title-lines': titleLines,
+  } as React.CSSProperties;
 }
 const blockStyle = (from: number, until: number) => ({
   top: `${(from / 60) * HOUR_HEIGHT}px`,
@@ -849,7 +852,9 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
     if (!element) return;
     const { rangeDays, todayKey, nowMinute } = derive();
     const minute = rangeDays.includes(todayKey) ? nowMinute : 8 * 60;
-    element.scrollTop = Math.max(0, (minute / 60) * HOUR_HEIGHT - 3 * HOUR_HEIGHT);
+    // Start on an hour line with room above it: its label is centred on the line and would be cut in half.
+    const hour = Math.max(0, Math.floor(minute / 60) - 3);
+    element.scrollTop = Math.max(0, hour * HOUR_HEIGHT - 10);
   }, []);
   // The month cells' height decides how many event lines fit (Svelte's bind:clientHeight).
   const monthCells = useCallback((element: HTMLDivElement | null) => {
@@ -1121,7 +1126,7 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
                           title={event.title}
                           onClick={() => requestEvent(event)}
                         >
-                          {!isAllDay(event) && <em>{formatDateTime(event.start, { hour: '2-digit', minute: '2-digit' })}</em>}
+                          {!isAllDay(event) && <em>{formatDateTime(event.start, { hour: 'numeric', minute: '2-digit' })}</em>}
                           {event.title || tr('(Senza titolo)', '(No title)')}
                         </button>
                       ))}
@@ -1211,7 +1216,7 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
                         >
                           <strong>{item.event.title || tr('(Senza titolo)', '(No title)')}</strong>
                           <span>
-                            {formatDateTime(item.event.start, { hour: '2-digit', minute: '2-digit' })}
+                            {formatDateTime(item.event.start, { hour: 'numeric', minute: '2-digit' })}
                             {item.event.location ? ` · ${item.event.location}` : ''}
                           </span>
                         </button>

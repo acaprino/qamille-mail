@@ -356,15 +356,29 @@ export default function AccountStorage({ accounts, changed, notify }: AccountSto
                   'Usage covers known mail data and drafts. Shared components such as the search model are separate. Full mailbox coverage is checked during sync.',
                 )}
               </p>
-              <Button
-                variant="secondary"
-                disabled={state.saving || !!state.confirmation}
-                onClick={() => void refreshUsage()}
-              >
-                {tr("Aggiorna lo stato dell'archivio", 'Refresh storage status')}
-              </Button>
+              {/* The two actions in one row, apart; the confirmation that a save can ask replaces Save. */}
+              <div className="button-row">
+                <Button
+                  variant="secondary"
+                  disabled={state.saving || !!state.confirmation}
+                  onClick={() => void refreshUsage()}
+                >
+                  {tr("Aggiorna lo stato dell'archivio", 'Refresh storage status')}
+                </Button>
+                {!state.confirmation && (
+                  <Button
+                    variant="primary"
+                    disabled={state.saving || invalidLimit}
+                    onClick={() => void save()}
+                  >
+                    {state.saving
+                      ? tr('Salvataggio…', 'Saving…')
+                      : tr("Salva l'archivio dell'account", 'Save account storage')}
+                  </Button>
+                )}
+              </div>
 
-              {state.confirmation ? (
+              {state.confirmation && (
                 <div className="storage-confirmation" role="alert">
                   <p>{state.confirmation}</p>
                   <p>
@@ -398,16 +412,6 @@ export default function AccountStorage({ accounts, changed, notify }: AccountSto
                     </Button>
                   </div>
                 </div>
-              ) : (
-                <Button
-                  variant="primary"
-                  disabled={state.saving || invalidLimit}
-                  onClick={() => void save()}
-                >
-                  {state.saving
-                    ? tr('Salvataggio…', 'Saving…')
-                    : tr("Salva l'archivio dell'account", 'Save account storage')}
-                </Button>
               )}
             </>
           ) : null}

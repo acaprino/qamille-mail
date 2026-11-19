@@ -136,6 +136,7 @@ export default function ComputeSettings() {
         </a>
       </p>
       <Select
+        className="settings-select"
         label={tr('Calcolo', 'Compute')}
         value={status.compute_mode}
         items={[
@@ -321,6 +322,7 @@ export default function ComputeSettings() {
               <div className="button-row">
                 <Button
                   variant="primary"
+                  className="danger"
                   disabled={busy}
                   onClick={() =>
                     void run(async () => {

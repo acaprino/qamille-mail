@@ -5,9 +5,10 @@ import Checkbox from '../ds/primitives/Checkbox';
 import Count from '../ds/primitives/Count';
 import Icon from '../ds/primitives/Icon';
 import Modal from '../ds/primitives/Modal';
+import Popover from '../ds/primitives/Popover';
 import Select from '../ds/primitives/Select';
 import { call, desktop, errorText, initials } from '../lib/api';
-import { folderLabel, isItalian, tr } from '../lib/i18n';
+import { bookLabel, folderLabel, isItalian, tr } from '../lib/i18n';
 import { useReactive } from '../lib/store';
 import { cn } from '../lib/utils';
 import {
@@ -72,6 +73,7 @@ export default function Contacts({ notify }: ContactsProps) {
     selectedId: null as string | null,
     duplicates: [] as DuplicateView[],
     panel: false,
+    menu: false,
     lastBook: '',
     busy: false,
     syncing: false,
@@ -343,6 +345,14 @@ export default function Contacts({ notify }: ContactsProps) {
   const primaryLine = (c: ContactView) =>
     c.fields.emails[0]?.value || c.fields.phones[0]?.value || '';
   const displayName = (c: ContactView) => c.fields.name || primaryLine(c) || '—';
+  // The row's second line: what the name line does not already say.
+  const detailLine = (c: ContactView) =>
+    [
+      c.fields.name ? primaryLine(c) : c.fields.emails[0] ? c.fields.phones[0]?.value : '',
+      c.hidden ? tr('nascosto', 'hidden') : '',
+    ]
+      .filter(Boolean)
+      .join(' · ');
 
   const form = s.form;
   const merging = s.merging;
@@ -373,12 +383,39 @@ export default function Contacts({ notify }: ContactsProps) {
                 <Count value={s.duplicates.length} className="nav-count" />
               </Button>
             )}
-            <Button variant="secondary" onClick={() => fileInput.current?.click()}>
-              {tr('Importa .vcf', 'Import .vcf')}
-            </Button>
-            <Button variant="secondary" onClick={() => void exportLocal()}>
-              {tr('Esporta .vcf', 'Export .vcf')}
-            </Button>
+            {/* The file actions in a menu: the toolbar stays on one row in the side column. */}
+            <div className="more-actions">
+              <Popover
+                open={s.menu}
+                onOpenChange={(open) => (s.menu = open)}
+                label={tr('Azioni sulla rubrica', 'Address book actions')}
+                tip={tr('Altre azioni', 'More actions')}
+                trigger={
+                  <Button variant="icon" aria-label={tr('Altre azioni sulla rubrica', 'More address book actions')}>
+                    <Icon name="more" size={18} />
+                  </Button>
+                }
+              >
+                <button
+                  onClick={() => {
+                    s.menu = false;
+                    fileInput.current?.click();
+                  }}
+                >
+                  <Icon name="upload" size={15} />
+                  {tr('Importa .vcf', 'Import .vcf')}
+                </button>
+                <button
+                  onClick={() => {
+                    s.menu = false;
+                    void exportLocal();
+                  }}
+                >
+                  <Icon name="download" size={15} />
+                  {tr('Esporta .vcf', 'Export .vcf')}
+                </button>
+              </Popover>
+            </div>
             <input
               ref={fileInput}
               className="sr-only"
@@ -403,7 +440,7 @@ export default function Contacts({ notify }: ContactsProps) {
               onChange={(value) => (s.bookFilter = value)}
               items={[
                 { value: 'all', label: tr('Tutte le rubriche', 'All address books') },
-                ...s.books.map((b) => ({ value: b.id, label: b.label })),
+                ...s.books.map((b) => ({ value: b.id, label: bookLabel(b.label) })),
               ]}
             />
             <Checkbox checked={s.showHidden} onChange={(on) => (s.showHidden = on)}>
@@ -464,21 +501,21 @@ export default function Contacts({ notify }: ContactsProps) {
                   >
                     <span className="account-avatar">{initials(displayName(c))}</span>
                     <span className="contact-main">
-                      <strong>{displayName(c)}</strong>
-                      <small className="muted">
-                        {primaryLine(c)}
-                        {c.hidden ? ` · ${tr('nascosto', 'hidden')}` : ''}
-                      </small>
-                      <span className="contact-origins">
-                        {c.origins.map((origin) => (
-                          <span
-                            key={origin.key}
-                            className={cn('origin-chip', !origin.writable && 'origin-readonly')}
-                          >
-                            {origin.label}
-                          </span>
-                        ))}
+                      <span className="contact-head">
+                        <strong>{displayName(c)}</strong>
+                        <span className="contact-origins">
+                          {c.origins.map((origin) => (
+                            <span
+                              key={origin.key}
+                              className={cn('origin-chip', !origin.writable && 'origin-readonly')}
+                              title={bookLabel(origin.label)}
+                            >
+                              {bookLabel(origin.label)}
+                            </span>
+                          ))}
+                        </span>
                       </span>
+                      {detailLine(c) && <small className="muted">{detailLine(c)}</small>}
                     </span>
                   </button>
                 </ContactListItem>
@@ -548,7 +585,7 @@ export default function Contacts({ notify }: ContactsProps) {
               <dl className="contact-facts">
                 {(selected.fields.org || selected.fields.title) && (
                   <>
-                    <dt>{tr('Lavoro', 'Work')}</dt>
+                    <dt>{tr('Azienda', 'Company')}</dt>
                     <dd>
                       {[selected.fields.title, selected.fields.org].filter(Boolean).join(' · ')}
                     </dd>
@@ -589,7 +626,7 @@ export default function Contacts({ notify }: ContactsProps) {
                 {selected.origins.map((origin) => (
                   <li key={origin.key}>
                     <span className={cn('origin-chip', !origin.writable && 'origin-readonly')}>
-                      {origin.label}
+                      {bookLabel(origin.label)}
                     </span>
                     <small className="muted">
                       {origin.writable ? syncLabel(origin.sync) : tr('Sola lettura', 'Read-only')}
@@ -609,7 +646,7 @@ export default function Contacts({ notify }: ContactsProps) {
               </ul>
             </>
           ) : (
-            <p className="muted">
+            <p className="muted contact-detail-empty">
               {tr(
                 'Scegli un contatto per vederne i dettagli.',
                 'Choose a contact to see its details.',
@@ -652,7 +689,9 @@ export default function Contacts({ notify }: ContactsProps) {
           <h2>{tr('Elimina contatto', 'Delete contact')}</h2>
           <p className="muted">
             {tr('Scegli da quali rubriche eliminare', 'Choose which address books to delete from')}{' '}
-            «{displayName(target)}».
+            {tr('«', '“')}
+            {displayName(target)}
+            {tr('».', '”.')}
           </p>
           {writableOrigins(target).map((origin) => (
             <div className="merge-book" key={origin.key}>
@@ -664,7 +703,7 @@ export default function Contacts({ notify }: ContactsProps) {
                     : s.deleteBooks.filter((b) => b !== origin.book))
                 }
               >
-                {origin.label}
+                {bookLabel(origin.label)}
               </Checkbox>
             </div>
           ))}
@@ -680,6 +719,7 @@ export default function Contacts({ notify }: ContactsProps) {
             </Button>
             <Button
               variant="primary"
+              className="danger"
               disabled={s.busy || !s.deleteBooks.length}
               onClick={() => void confirmDelete()}
             >

@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useFocusAfterStep } from '../../lib/focus-after-step';
 import Button from '../../ds/primitives/Button';
 import Field from '../../ds/primitives/Field';
+import GoogleMark from '../../ds/primitives/GoogleMark';
 import { call, errorText } from '../../lib/api';
 import ResetPasswordStep from './ResetPasswordStep';
 import SignUpStep from './SignUpStep';
@@ -317,6 +318,7 @@ export default function ServerConnect({ preset = null, consented, defaultDeviceN
                 </p>
               ) : (
                 <Button variant="secondary" type="button" disabled={busy || (signUpWithGoogle && termsBlock(info?.legal, terms))} onClick={() => void signInWithBrowser('google')}>
+                  <GoogleMark />
                   {preset && info?.google_signup
                     ? tr('Continua con Google', 'Continue with Google')
                     : tr('Accedi con Google', 'Sign in with Google')}

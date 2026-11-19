@@ -611,6 +611,9 @@ export default function MailList({
         : t(' disponibili', ' available')
       : '';
 
+  // «All caught up» is the news of the views that ask for work (the inbox, the to-do list); elsewhere an empty view
+  // simply holds no messages.
+  const caughtUp = view === 'Inbox' || view === 'Tasks';
   return (
     <section
       className="mail-list"
@@ -743,7 +746,7 @@ export default function MailList({
         )}
         {!loading && !items.length && (
           <div className="empty-list">
-            <Icon name={search ? 'search' : 'check'} size={30} />
+            <Icon name={search ? 'search' : caughtUp ? 'check' : 'mail'} size={30} />
             <h3>
               {searchError
                 ? t('Ricerca da correggere', 'Search needs correction')
@@ -751,7 +754,9 @@ export default function MailList({
                   ? page.search?.coverage !== 'complete'
                     ? t('Nessun risultato nella posta disponibile', 'No results in available mail')
                     : t('Nessuna email corrisponde ai filtri', 'No email matches these filters')
-                  : t('Sei in pari', 'You’re all caught up')}
+                  : caughtUp
+                    ? t('Sei in pari', 'You’re all caught up')
+                    : t('Nessun messaggio', 'No messages')}
             </h3>
             <p>
               {search

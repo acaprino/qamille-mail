@@ -1,6 +1,6 @@
 import Button from '../../ds/primitives/Button';
 import Icon from '../../ds/primitives/Icon';
-import { tr } from '../../lib/i18n';
+import { bookLabel, tr } from '../../lib/i18n';
 import type { DuplicateView } from '../../lib/types';
 
 export type DuplicatesPanelProps = {
@@ -42,7 +42,7 @@ export default function DuplicatesPanel({
             {group.members.map((member) => (
               <li key={member.key}>
                 <strong>{member.fields.name || member.fields.emails[0]?.value || '—'}</strong>
-                <span className="origin-chip">{member.label}</span>
+                <span className="origin-chip">{bookLabel(member.label)}</span>
                 <small className="muted">
                   {member.fields.emails.map((e) => e.value).join(', ')}
                 </small>
@@ -53,11 +53,12 @@ export default function DuplicatesPanel({
             <Button variant="secondary" disabled={busy} onClick={() => same(group)}>
               {tr('Stessa persona', 'Same person')}
             </Button>
-            <Button variant="primary" disabled={busy} onClick={() => merge(group)}>
-              {tr('Unisci…', 'Merge…')}
-            </Button>
             <Button variant="secondary" disabled={busy} onClick={() => different(group)}>
               {tr('Persone diverse', 'Different people')}
+            </Button>
+            {/* The action that goes on to a dialog closes the row, as in a dialog's own buttons. */}
+            <Button variant="primary" disabled={busy} onClick={() => merge(group)}>
+              {tr('Unisci…', 'Merge…')}
             </Button>
           </div>
         </article>

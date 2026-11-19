@@ -3,7 +3,7 @@ import Button from '../../ds/primitives/Button';
 import Checkbox from '../../ds/primitives/Checkbox';
 import Modal from '../../ds/primitives/Modal';
 import { errorText } from '../../lib/api';
-import { tr } from '../../lib/i18n';
+import { bookLabel, tr } from '../../lib/i18n';
 import { useReactive } from '../../lib/store';
 import type {
   BookAction,
@@ -152,17 +152,12 @@ export default function MergeDialog({
         {group.members.map((member) => (
           <li key={member.key}>
             <strong>{member.fields.name || '—'}</strong>
-            <span className="origin-chip">{member.label}</span>
+            <span className="origin-chip">{bookLabel(member.label)}</span>
             <small className="muted">{member.fields.emails.map((e) => e.value).join(', ')}</small>
           </li>
         ))}
       </ul>
-      {fields && (
-        <>
-          <h3>{tr('Contatto risultante', 'Merged contact')}</h3>
-          <ContactFieldsEditor fields={fields} onFieldsChange={setFields} />
-        </>
-      )}
+      {/* Where the card is kept comes first, in view: below the long editor it was under the buttons. */}
       <fieldset className="merge-books">
         <legend>{tr('Dove tenerlo?', 'Where to keep it?')}</legend>
         <div className="merge-shortcuts">
@@ -180,7 +175,7 @@ export default function MergeDialog({
               disabled={!usable(book)}
               onChange={(on) => toggle(book.id, on)}
             >
-              {book.label}
+              {bookLabel(book.label)}
             </Checkbox>
             {!usable(book) && (
               <>
@@ -195,6 +190,12 @@ export default function MergeDialog({
           </div>
         ))}
       </fieldset>
+      {fields && (
+        <>
+          <h3>{tr('Contatto risultante', 'Merged contact')}</h3>
+          <ContactFieldsEditor fields={fields} onFieldsChange={setFields} />
+        </>
+      )}
       {s.actions.length > 0 && (
         <ul className="merge-preview" aria-label={tr('Cosa succederà', 'What will happen')}>
           {s.actions.map((action, index) => (

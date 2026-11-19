@@ -3,7 +3,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-bottom: 20px;
+    margin-bottom: 12px;
   }
   & h2 {
     margin: 0;
@@ -16,19 +16,25 @@
     color: var(--text-secondary);
     font-size: var(--text-sm);
   }
-  & .google-sign-in-error {
+  /* The warning sign says it failed; the message itself reads as text. */
+  & .google-dialog-heading.failed svg {
     color: var(--danger);
+  }
+  & .google-sign-in-error {
     overflow-wrap: anywhere;
   }
+  /* A link in the text: it starts on the text's edge. */
   & .google-help-link {
+    padding: 0;
     color: var(--accent-text);
     text-decoration: underline;
+    text-underline-offset: 3px;
     text-align: left;
   }
   & .google-dialog-actions {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
-    margin-top: 22px;
+    margin-top: 20px;
   }
 }

@@ -1813,7 +1813,8 @@ export default function App() {
                           : tr('messaggi salvati', 'saved messages')}
                       </p>
                     </div>
-                    <Button variant="primary" onClick={() => void compose()}>
+                    {/* The sidebar's New message is the window's one primary action. */}
+                    <Button variant="secondary" onClick={() => void compose()}>
                       <Icon name="plus" size={17} />
                       {tr('Nuovo messaggio', 'New message')}
                     </Button>

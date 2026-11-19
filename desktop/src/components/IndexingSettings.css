@@ -1,7 +1,7 @@
 /* The section has no wrapper of its own: every rule hangs from one of its own classes. */
 .index-account {
   padding: 14px 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--border);
 
   & progress {
     width: 100%;

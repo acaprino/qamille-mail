@@ -1,6 +1,6 @@
 [package]
 name = "qamille-server"
-version = "1.1.1"
+version = "1.1.2"
 edition = "2024"
 description = "Server di Qamille: utenti, dispositivi, accesso con password e calcolo"
 publish = false

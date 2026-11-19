@@ -1751,6 +1751,16 @@ export default function App() {
                     total={s.visibleOrder.length}
                     step={stepReader}
                     notify={notify}
+                    connectMailbox={{
+                      connected: () => {
+                        notify(tr('Account Google collegato', 'Google account connected'));
+                        void refresh();
+                      },
+                      otherWays: () => {
+                        navigate('Settings');
+                        void tick().then(() => settingsPanel.current?.showSection('Accounts'));
+                      },
+                    }}
                   />
                 </>
               ) : view === 'Settings' ? (

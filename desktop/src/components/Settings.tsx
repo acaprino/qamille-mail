@@ -120,6 +120,14 @@ export default function Settings({
       disposed.current = true;
     };
   }, []);
+  // The Professional build carries its own Google client: the guide to make one and the fields to enter it
+  // are for the self-hosted build only.
+  const [professional, setProfessional] = useState(false);
+  useEffect(() => {
+    void call<{ kind: string }>('app_edition')
+      .then((edition) => !disposed.current && setProfessional(edition.kind === 'professional'))
+      .catch(() => {});
+  }, []);
 
   // A change made elsewhere, such as the top bar's appearance toggle, reaches this form
   // unless the same field already has an unsaved edit here.
@@ -508,7 +516,7 @@ export default function Settings({
                       ? tr('Aggiungi un account Google', 'Add a Google account')
                       : tr('Accedi con Google', 'Sign in with Google')}
                 </Button>
-                <div className="google-setup-help" hidden={hasGmail}>
+                <div className="google-setup-help" hidden={hasGmail || professional}>
                   <p>
                     {tr(
                       'Prima configurazione di Qamille?',
@@ -521,6 +529,7 @@ export default function Settings({
                 </div>
                 <details
                   className="settings-details"
+                  hidden={professional}
                   open={form.developerSettings}
                   onToggle={(e) => (form.developerSettings = e.currentTarget.open)}
                 >

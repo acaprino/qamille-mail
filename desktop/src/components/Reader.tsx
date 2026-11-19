@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react';
+import ConnectMailbox from './ConnectMailbox';
 import Button from '../ds/primitives/Button';
 import Icon from '../ds/primitives/Icon';
 import Popover from '../ds/primitives/Popover';
@@ -27,6 +28,8 @@ export type ReaderProps = {
   total?: number;
   step?: (delta: number) => void;
   notify: (message: string, error?: boolean) => void;
+  /** No mailbox at all: the empty pane offers to connect one (see ConnectMailbox). */
+  connectMailbox?: { connected: () => void; otherWays: () => void };
   outputBusy: boolean;
   printEmail: (id: number, thread: boolean) => void;
   exportEmail: (id: number) => void;
@@ -64,6 +67,7 @@ export default function Reader({
   dark,
   people = noPeople,
   inView = true,
+  connectMailbox,
 }: ReaderProps) {
   // The reader's own addresses: on a message they are one person, named "you".
   const self = new Set(accounts.map((account) => account.email.trim().toLowerCase()));
@@ -504,6 +508,13 @@ export default function Reader({
             </span>
           </div>
         </>
+      ) : connectMailbox && !accounts.length ? (
+        <div className="reader-empty">
+          <div className="empty-art">
+            <Icon name="mail" size={36} />
+          </div>
+          <ConnectMailbox connected={connectMailbox.connected} otherWays={connectMailbox.otherWays} />
+        </div>
       ) : (
         <div className="reader-empty">
           <div className="empty-art">

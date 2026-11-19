@@ -108,6 +108,10 @@
     clear(byId('users-body'));
     byId('users-section').hidden = true;
     byId('models-section').hidden = true;
+    byId('llm-section').hidden = true;
+    byId('llm-key').value = '';
+    setLlmStatus('');
+    setLlmError('');
     clearTimeout(modelsTimer);
     modelsTimer = null;
     removeArmed = null;
@@ -177,6 +181,7 @@
     byId('users-section').hidden = false;
     byId('lock').hidden = false;
     await loadModels();
+    await loadLlm();
   }
 
   function renderUsers(users) {
@@ -481,6 +486,7 @@
       return;
     }
     setModelsError('');
+    lastModels = data.models || [];
     byId('models-section').hidden = false;
     const host = data.host || {};
     const parts = [];
@@ -490,6 +496,138 @@
     renderModels(data.models, host);
     if (data.models.some((m) => m.state === 'downloading')) {
       modelsTimer = setTimeout(() => loadModels().catch(() => {}), 2000);
+    }
+  }
+
+  // --- Assistente: chi risponde (spento, API compatibile OpenAI, modello locale) -------------
+  // La chiave del provider non torna mai dal server: solo da dove viene e le ultime lettere.
+
+  let lastModels = [];
+
+  function setLlmStatus(message) {
+    byId('llm-status').textContent = message || '';
+  }
+
+  function setLlmError(message) {
+    const node = byId('llm-error');
+    node.textContent = message || '';
+    node.hidden = !message;
+  }
+
+  function llmProvider() {
+    const checked = document.querySelector('input[name="llm-provider"]:checked');
+    return checked ? checked.value : 'none';
+  }
+
+  function showLlmFields() {
+    const provider = llmProvider();
+    byId('llm-openai').hidden = provider !== 'openai-compatible';
+    byId('llm-key-box').hidden = provider !== 'openai-compatible';
+    byId('llm-builtin').hidden = provider !== 'builtin';
+  }
+
+  function describeLlm(data) {
+    const parts = [];
+    if (data.active) {
+      const who = data.active.provider === 'builtin'
+        ? 'modello locale ' + data.active.model
+        : data.active.model + ' tramite ' + data.active.label;
+      parts.push('In uso ora: ' + who + '.');
+    } else {
+      parts.push('In uso ora: nessun assistente.');
+    }
+    parts.push(data.source === 'admin' ? 'Impostazioni salvate da questo pannello.' : 'Impostazioni della configurazione del server.');
+    if (data.restart_required) parts.push('Il modello locale scelto parte al prossimo riavvio del server.');
+    return parts.join(' ');
+  }
+
+  function renderLlm(data) {
+    setLlmError('');
+    byId('llm-section').hidden = false;
+    byId('llm-now').textContent = describeLlm(data);
+    for (const radio of document.querySelectorAll('input[name="llm-provider"]')) {
+      radio.checked = radio.value === data.provider;
+    }
+    byId('llm-base-url').value = data.base_url || '';
+    byId('llm-model').value = data.model || '';
+    byId('llm-allowed').value = (data.allowed_models || []).join(', ');
+    byId('llm-cap').value = String(data.max_tokens_per_day_per_user || 0);
+    byId('llm-key').value = '';
+    byId('llm-key-remove').checked = false;
+    const key = data.api_key;
+    const hint = byId('llm-key-hint');
+    if (!key) hint.textContent = 'Nessuna chiave impostata: un servizio esterno come OpenAI la chiede.';
+    else if (key.from === 'admin') hint.textContent = 'Chiave impostata da questo pannello (' + key.hint + '). Lascia il campo vuoto per tenerla.';
+    else hint.textContent = 'Chiave della configurazione del server (' + key.hint + '). Lascia il campo vuoto per usarla.';
+    byId('llm-key-remove-label').hidden = !(key && key.from === 'admin');
+    const select = byId('llm-builtin-model');
+    clear(select);
+    const local = lastModels.filter((model) => model.kind === 'llm');
+    for (const model of local) {
+      const ready = model.state === 'ready';
+      select.append(el('option', { value: model.id, text: model.id + (ready ? '' : ' (non scaricato)') }));
+    }
+    if (data.builtin_model && !local.some((model) => model.id === data.builtin_model)) {
+      select.append(el('option', { value: data.builtin_model, text: data.builtin_model }));
+    }
+    if (data.builtin_model) select.value = data.builtin_model;
+    showLlmFields();
+  }
+
+  async function loadLlm() {
+    let data;
+    try {
+      data = await api('GET', '/llm');
+    } catch (e) {
+      if (e instanceof Unauthorized) throw e;
+      // Senza le rotte di calcolo la sezione non c'è.
+      if (e.status === 404) byId('llm-section').hidden = true;
+      else setLlmError(e.message);
+      return;
+    }
+    renderLlm(data);
+  }
+
+  async function saveLlm() {
+    const capText = byId('llm-cap').value.trim();
+    const cap = capText ? Number(capText) : 0;
+    if (!Number.isInteger(cap) || cap < 0) {
+      setLlmError('Il limite è un numero intero da 0 in su (0: nessun limite).');
+      return;
+    }
+    const body = {
+      provider: llmProvider(),
+      base_url: byId('llm-base-url').value.trim() || null,
+      model: byId('llm-model').value.trim() || null,
+      allowed_models: byId('llm-allowed').value.split(',').map((name) => name.trim()).filter(Boolean),
+      max_tokens_per_day_per_user: cap,
+      builtin_model: byId('llm-builtin-model').value || null,
+      remove_api_key: byId('llm-key-remove').checked,
+    };
+    const key = byId('llm-key').value.trim();
+    byId('llm-key').value = '';
+    if (key) body.api_key = key;
+    const data = await api('PUT', '/llm', body);
+    renderLlm(data);
+    setLlmStatus(data.restart_required ? 'Salvate: il modello locale parte al prossimo riavvio del server.' : 'Salvate e applicate.');
+  }
+
+  async function resetLlm() {
+    const data = await api('DELETE', '/llm');
+    renderLlm(data);
+    setLlmStatus('Vale di nuovo la configurazione del server.');
+  }
+
+  async function runLlm(button, action) {
+    if (button) button.disabled = true;
+    setLlmError('');
+    setLlmStatus('');
+    try {
+      await action();
+    } catch (e) {
+      if (!(e instanceof Unauthorized)) setLlmError(e.message);
+    } finally {
+      if (button) button.disabled = false;
     }
   }
 
@@ -561,6 +699,18 @@
     byId('secret-copy').addEventListener('click', copySecret);
     byId('secret-close').addEventListener('click', hideSecret);
     byId('models-refresh').addEventListener('click', (event) => run(event.currentTarget, loadModels));
+    for (const radio of document.querySelectorAll('input[name="llm-provider"]')) {
+      radio.addEventListener('change', showLlmFields);
+    }
+    byId('llm-form').addEventListener('submit', (event) => {
+      event.preventDefault();
+      runLlm(byId('llm-save'), saveLlm);
+    });
+    byId('llm-reset').addEventListener('click', (event) => runLlm(event.currentTarget, resetLlm));
+    byId('llm-refresh').addEventListener('click', (event) => runLlm(event.currentTarget, async () => {
+      await loadModels();
+      await loadLlm();
+    }));
     lock('');
   }
 

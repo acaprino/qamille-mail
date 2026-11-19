@@ -74,6 +74,9 @@ pub struct Server {
     real_llm_models: bool,
     /// Il servizio di sincronizzazione delle caselle; `None` senza `QAMILLE_SYNC_KEY`.
     sync: Option<Arc<sync::SyncService>>,
+    /// L'assistente della configurazione (file e ambiente), prima delle impostazioni salvate dal
+    /// pannello: ci si torna quando il pannello le toglie.
+    llm_base: llm::LlmConfig,
 }
 
 struct ComputeParts {
@@ -127,7 +130,7 @@ impl Server {
     /// Come [`Server::open`], con l'orologio iniettato e le migrazioni che il file
     /// `server.db` può contenere (le estensioni aggiungono le loro).
     pub fn open_with_migrations(
-        config: Config,
+        mut config: Config,
         clock: Arc<dyn Clock>,
         migrations: &[db::Migration],
     ) -> Result<Self, StartError> {
@@ -136,6 +139,14 @@ impl Server {
             path: config.data_dir.display().to_string(),
             reason: e.to_string(),
         })?;
+        // Le impostazioni dell'assistente salvate dal pannello valgono sopra il file e l'ambiente.
+        let llm_base = config.llm.clone();
+        if let Some(settings) = llm::LlmSettings::load(&config.data_dir.join(llm::SETTINGS_FILE)) {
+            match settings.applied_to(&config.llm) {
+                Ok(llm) => config.llm = llm,
+                Err(error) => tracing::error!(%error, "impostazioni dell'assistente del pannello non valide: vale la configurazione"),
+            }
+        }
         let db = Db::open(&config.database_path(), migrations)?;
         let accounts = Arc::new(Accounts::new(db, &config, Arc::clone(&clock)));
         let sync = sync::SyncService::new(Arc::clone(&accounts), &config).map(Arc::new);
@@ -154,7 +165,7 @@ impl Server {
             edition: config.edition,
             admin,
             entitlement: None,
-            llm: None,
+            llm: llm::LlmHolder::default(),
             sync: config.sync.enabled().then(|| Arc::new(sync::SyncInfo { available: true })),
             info: None,
             account: None,
@@ -175,6 +186,7 @@ impl Server {
             llm_models: None,
             real_llm_models: false,
             sync,
+            llm_base,
         })
     }
 
@@ -284,12 +296,6 @@ impl Server {
             speech,
             transcription_parallelism,
         });
-        // `/v1/info` dichiara il provider dell'assistente, che c'è solo con il calcolo montato.
-        self.state.llm = self
-            .config
-            .llm
-            .enabled()
-            .then(|| Arc::new(llm::LlmInfo::from_config(&self.config.llm)));
         self.compute = OnceLock::new();
         self
     }
@@ -364,11 +370,25 @@ impl Server {
                 }
                 None => state,
             };
+            // The assistant `/v1/info` declares and `/admin/api/llm` changes at run time: one holder
+            // for the public state and the compute state.
+            let holder = self.state.llm.clone();
+            let accounts = Arc::clone(&self.state.accounts);
+            let admin = llm::LlmAdmin::new(
+                holder.clone(),
+                self.llm_base.clone(),
+                self.config.data_dir.join(llm::SETTINGS_FILE),
+                Arc::clone(&accounts),
+                Arc::clone(&sink),
+                supervisor.clone().zip(self.config.llm.builtin_model.clone()).map(|(supervisor, model)| (model, supervisor)),
+            );
+            let route = (self.config.llm.max_request_bytes, self.config.llm.timeout_secs);
+            let state = state.with_llm_admin(holder.clone(), route, Arc::new(admin));
             if !self.config.llm.enabled() {
+                holder.replace(None);
                 return state;
             }
             // `Server::open` ha già validato la configurazione: qui non può fallire.
-            let accounts = Arc::clone(&self.state.accounts);
             let gateway = if builtin {
                 match supervisor {
                     Some(supervisor) => llm::LlmGateway::with_supervisor(&self.config.llm, accounts, sink, supervisor),
@@ -378,12 +398,15 @@ impl Server {
                 llm::LlmGateway::new(&self.config.llm, accounts, sink)
             };
             match gateway {
-                Ok(gateway) => state.with_llm(Arc::new(gateway)),
+                Ok(gateway) => {
+                    holder.replace(Some(Arc::new(gateway)));
+                }
                 Err(error) => {
+                    holder.replace(None);
                     tracing::error!(%error, "gateway LLM non montato");
-                    state
                 }
             }
+            state
         }))
     }
 

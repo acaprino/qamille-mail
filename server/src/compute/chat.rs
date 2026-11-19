@@ -17,7 +17,7 @@ use tower_http::timeout::TimeoutLayer;
 
 use super::{Caller, ComputeError, ComputeState, socket_of};
 use crate::ext::Resource;
-use crate::llm::{BUSY_RETRY_S, LlmGateway, LlmSlot, ROUTE_EXTRA_SECS};
+use crate::llm::{BUSY_RETRY_S, LlmSlot, ROUTE_EXTRA_SECS};
 
 /// L'intestazione con cui l'app dichiara a quale provider ha dato il consenso:
 /// `<external>;<label>`.
@@ -26,12 +26,13 @@ pub const CONSENT_HEADER: &str = "x-qamille-llm-consent";
 /// Chi è, per i contatori, il chiamante senza utente (la credenziale fissa delle prove).
 const FIXED_USER: &str = "(fixed)";
 
-pub(super) fn routes(state: &ComputeState, gateway: &Arc<LlmGateway>) -> Router<ComputeState> {
-    let config = gateway.config();
-    let limit = DefaultBodyLimit::max(config.max_request_bytes);
+/// The route, with the body limit and the time limit of the configuration the server started with:
+/// the gateway behind it may change at run time (`/admin/api/llm`), the route stays.
+pub(super) fn routes(state: &ComputeState, max_request_bytes: usize, timeout_secs: u64) -> Router<ComputeState> {
+    let limit = DefaultBodyLimit::max(max_request_bytes);
     let timeout = TimeoutLayer::with_status_code(
         StatusCode::REQUEST_TIMEOUT,
-        Duration::from_secs(config.timeout_secs + ROUTE_EXTRA_SECS),
+        Duration::from_secs(timeout_secs + ROUTE_EXTRA_SECS),
     );
     Router::new()
         .route("/v1/chat/completions", post(chat_completions)
@@ -50,7 +51,7 @@ fn user_of(caller: &Caller) -> &str {
 /// L'ordine dei controlli: chiave e diritto (`401`, `402`), consenso (`409`), tetto giornaliero
 /// (`429`), posto tra le richieste in volo (`429`); poi la lettura del corpo e la validazione.
 async fn require_llm(State(state): State<ComputeState>, mut request: Request, next: Next) -> Response {
-    let Some(gateway) = state.llm.clone() else {
+    let Some(gateway) = state.llm.get() else {
         return ComputeError::NotFound.into_response();
     };
     let caller = match super::authorize(&state, request.headers(), socket_of(&request), Resource::Llm).await {
@@ -78,15 +79,15 @@ async fn require_llm(State(state): State<ComputeState>, mut request: Request, ne
 }
 
 async fn chat_completions(
-    State(state): State<ComputeState>,
     caller: Option<axum::Extension<Caller>>,
     slot: Option<axum::Extension<Arc<LlmSlot>>>,
     body: Bytes,
 ) -> Result<Response, ComputeError> {
-    let (Some(gateway), Some(axum::Extension(caller)), Some(axum::Extension(slot))) = (&state.llm, caller, slot)
-    else {
+    let (Some(axum::Extension(caller)), Some(axum::Extension(slot))) = (caller, slot) else {
         return Err(ComputeError::NotFound);
     };
+    // The gateway the request entered with, even if `/admin` changed it since.
+    let gateway = Arc::clone(slot.gateway());
     let answer = gateway.complete(user_of(&caller), slot, body.to_vec()).await?;
     Ok((StatusCode::OK, [(header::CONTENT_TYPE, "application/json")], answer).into_response())
 }

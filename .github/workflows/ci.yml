@@ -3,6 +3,8 @@ name: ci
 on:
   pull_request:
     branches: [develop]
+  # By hand on a branch (Actions, Run workflow): the same checks without a pull request.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -23,7 +25,7 @@ jobs:
             server
             compute
       - name: Server tests
-        run: cargo test --manifest-path server/Cargo.toml --jobs 2 --locked
+        run: cargo test --manifest-path server/Cargo.toml --jobs 2 --locked --no-fail-fast
       - name: Compute tests
         run: cargo test --manifest-path compute/Cargo.toml --jobs 2 --locked
       - name: Local compose is valid

@@ -59,9 +59,9 @@ pub struct AppState {
     pub admin: Option<Arc<AdminState>>,
     /// Il diritto di usare il calcolo; senza, ogni utente attivo può usarlo.
     pub entitlement: Option<Arc<dyn Entitlement>>,
-    /// Ciò che `GET /v1/info` dichiara dell'assistente; `None` senza provider (il campo `llm`
-    /// manca, come un `null`).
-    pub llm: Option<Arc<crate::llm::LlmInfo>>,
+    /// L'assistente in uso, che `/admin` può cambiare a caldo: `GET /v1/info` lo dichiara; vuoto
+    /// senza provider (il campo `llm` manca, come un `null`).
+    pub llm: crate::llm::LlmHolder,
     /// Ciò che `GET /v1/info` dichiara della sincronizzazione; `None` senza `QAMILLE_SYNC_KEY`.
     pub sync: Option<Arc<crate::sync::SyncInfo>>,
     /// Campi in più di `GET /v1/info`.
@@ -601,8 +601,8 @@ async fn info(State(state): State<AppState>) -> Response {
     body.insert("version".to_owned(), serde_json::json!(env!("CARGO_PKG_VERSION")));
     body.insert("api".to_owned(), serde_json::json!(API_VERSION));
     body.insert("edition".to_owned(), serde_json::json!(state.edition.as_str()));
-    if let Some(llm) = &state.llm {
-        body.insert("llm".to_owned(), serde_json::json!(**llm));
+    if let Some(gateway) = state.llm.get() {
+        body.insert("llm".to_owned(), serde_json::json!(gateway.info()));
     }
     if let Some(sync) = &state.sync {
         body.insert("sync".to_owned(), serde_json::json!(**sync));
@@ -813,7 +813,7 @@ async fn admin_list_users(
         "users": users,
         "default_max_devices": state.accounts.default_max_devices(),
     });
-    if state.llm.is_some() {
+    if state.llm.get().is_some() {
         body["llm"] = serde_json::json!(true);
     }
     if let Some(extra) = extra {

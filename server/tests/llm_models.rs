@@ -208,7 +208,11 @@ async fn the_admin_list_shows_memory_and_disk_before_install() {
     assert_eq!(details["in_use"], false);
     assert_eq!(details["pinned"], true);
     assert!(list["host"]["available_memory_mb"].is_u64(), "{list}");
+    // Free disk space is read only where the platform tells it (qamille_compute::memory): Windows.
+    #[cfg(windows)]
     assert!(list["host"]["available_disk_bytes"].is_u64(), "{list}");
+    #[cfg(not(windows))]
+    assert!(list["host"]["available_disk_bytes"].is_null(), "{list}");
     // Only the language models carry the block.
     assert!(list["models"].as_array().unwrap().iter().filter(|m| m["kind"] != "llm").all(|m| m.get("llm").is_none()));
 }

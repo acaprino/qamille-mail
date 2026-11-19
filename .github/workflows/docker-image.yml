@@ -22,7 +22,7 @@ on:
         default: develop
 
 permissions:
-  contents: read
+  contents: write # after a Release: its notes get the image's pull line
   packages: write
 
 concurrency:
@@ -80,3 +80,17 @@ jobs:
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
         run: echo "ghcr.io/acaprino/qamille-server@$DIGEST" >> "$GITHUB_STEP_SUMMARY"
+      # The release has one file (the desktop zip); the server image is named in its notes.
+      - name: Image in the release notes
+        if: github.event_name == 'workflow_run'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.value }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q .body > notes.md
+          if ! grep -q "$IMAGE:$VERSION" notes.md; then
+            printf '\n\n## Server image\n\n```\ndocker pull %s:%s\n```\n\nDigest: `%s`\n' "$IMAGE" "$VERSION" "$DIGEST" >> notes.md
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file notes.md
+          fi

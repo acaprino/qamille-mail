@@ -1,17 +1,20 @@
 //! Gateway LLM: configurazione, validazione, inoltro al provider (ureq su `spawn_blocking`,
 //! nessun redirect, risposte limitate) e traduzione degli errori. La chiave del provider sta
-//! solo nell'ambiente (INV-32) e non compare mai in un `Debug`.
+//! nell'ambiente o nelle impostazioni scelte dal pannello `/admin` (INV-32, [`SETTINGS_FILE`]) e
+//! non compare mai in un `Debug`, in un log o in una risposta.
 
 use std::collections::HashMap;
 use std::fmt;
+use std::io::Write;
 use std::net::IpAddr;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::accounts::Accounts;
 use crate::compute::{ComputeError, Usage, UsageSink};
@@ -830,6 +833,14 @@ pub struct LlmSlot {
     _permit: OwnedSemaphorePermit,
 }
 
+impl LlmSlot {
+    /// Il gateway con cui la richiesta è entrata: resta quello anche se il pannello lo cambia
+    /// mentre la richiesta è in volo.
+    pub fn gateway(&self) -> &Arc<LlmGateway> {
+        &self.gateway
+    }
+}
+
 impl Drop for LlmSlot {
     fn drop(&mut self) {
         let mut map = self.gateway.in_flight.lock().unwrap_or_else(|p| p.into_inner());
@@ -1120,5 +1131,339 @@ impl LlmGateway {
             .read_to_vec()
             .map_err(|_| unavailable())?;
         filter_response(&raw, outgoing.prompt_chars)
+    }
+}
+
+// --- Impostazioni dal pannello /admin ----------------------------------------------------------
+
+/// Il file, nella cartella dei dati, con le impostazioni dell'assistente scelte dal pannello
+/// `/admin`: all'avvio e a ogni salvataggio hanno la precedenza sulla configurazione (file e
+/// ambiente). Scritto con permessi 0600: può contenere la chiave del provider.
+pub const SETTINGS_FILE: &str = "llm-settings.json";
+
+/// L'assistente in uso, sostituito a caldo quando il pannello salva impostazioni nuove. Una
+/// richiesta già entrata tiene il gateway del suo [`LlmSlot`] fino alla fine.
+#[derive(Clone, Default)]
+pub struct LlmHolder(Arc<RwLock<Option<Arc<LlmGateway>>>>);
+
+impl fmt::Debug for LlmHolder {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("LlmHolder").field(&self.get().is_some()).finish()
+    }
+}
+
+impl LlmHolder {
+    /// Il gateway in uso, se c'è un provider.
+    pub fn get(&self) -> Option<Arc<LlmGateway>> {
+        self.0.read().unwrap_or_else(|p| p.into_inner()).clone()
+    }
+
+    /// Mette `gateway` al posto di quello in uso e restituisce il precedente.
+    pub fn replace(&self, gateway: Option<Arc<LlmGateway>>) -> Option<Arc<LlmGateway>> {
+        std::mem::replace(&mut *self.0.write().unwrap_or_else(|p| p.into_inner()), gateway)
+    }
+}
+
+fn trimmed(value: Option<&str>) -> Option<String> {
+    value.map(str::trim).filter(|v| !v.is_empty()).map(str::to_owned)
+}
+
+/// Le impostazioni dell'assistente scelte dal pannello. `api_key` `None`: vale la chiave della
+/// configurazione (`QAMILLE_LLM_API_KEY`), se c'è; nessuna chiave dell'ambiente viene copiata qui.
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LlmSettings {
+    /// `none`, `openai-compatible` o `builtin`.
+    pub provider: String,
+    #[serde(default)]
+    pub base_url: Option<String>,
+    #[serde(default)]
+    pub model: Option<String>,
+    #[serde(default)]
+    pub allowed_models: Vec<String>,
+    /// 0 = nessun tetto.
+    #[serde(default)]
+    pub max_tokens_per_day_per_user: u64,
+    #[serde(default)]
+    pub builtin_model: Option<String>,
+    #[serde(default)]
+    pub api_key: Option<String>,
+}
+
+impl fmt::Debug for LlmSettings {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LlmSettings")
+            .field("provider", &self.provider)
+            .field("model", &self.model)
+            .field("builtin_model", &self.builtin_model)
+            .field("api_key", &self.api_key.as_ref().map(|_| "<nascosta>"))
+            .finish_non_exhaustive()
+    }
+}
+
+impl LlmSettings {
+    /// Ciò che dice la configurazione, senza la sua chiave (che resta dov'è).
+    pub fn from_config(config: &LlmConfig) -> LlmSettings {
+        LlmSettings {
+            provider: config.provider.as_str().to_owned(),
+            base_url: config.base_url.clone(),
+            model: config.model.clone(),
+            allowed_models: config.allowed_models.clone(),
+            max_tokens_per_day_per_user: config.max_tokens_per_day_per_user,
+            builtin_model: config.builtin_model.clone(),
+            api_key: None,
+        }
+    }
+
+    /// Le impostazioni salvate in `path`; nessun file: `None`. Un file illeggibile o non valido
+    /// vale come assente, con un avviso (mai il suo contenuto nel log).
+    pub fn load(path: &Path) -> Option<LlmSettings> {
+        let bytes = match std::fs::read(path) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return None,
+            Err(_) => {
+                tracing::warn!(file = SETTINGS_FILE, "impostazioni dell'assistente illeggibili: valgono quelle della configurazione");
+                return None;
+            }
+        };
+        match serde_json::from_slice(&bytes) {
+            Ok(settings) => Some(settings),
+            Err(_) => {
+                tracing::warn!(file = SETTINGS_FILE, "impostazioni dell'assistente non valide: valgono quelle della configurazione");
+                None
+            }
+        }
+    }
+
+    /// Scritte in `path` per intero o per niente: un file temporaneo (0600 su Unix), poi lo
+    /// spostamento al suo posto.
+    pub fn save(&self, path: &Path) -> std::io::Result<()> {
+        let body = serde_json::to_vec_pretty(self).map_err(std::io::Error::other)?;
+        let temporary = path.with_extension("json.tmp");
+        {
+            let mut options = std::fs::OpenOptions::new();
+            options.write(true).create(true).truncate(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::OpenOptionsExt;
+                options.mode(0o600);
+            }
+            let mut file = options.open(&temporary)?;
+            file.write_all(&body)?;
+            file.sync_all()?;
+        }
+        std::fs::rename(&temporary, path)
+    }
+
+    /// `base` con queste impostazioni sopra, validata come la configurazione all'avvio.
+    pub fn applied_to(&self, base: &LlmConfig) -> Result<LlmConfig, ConfigError> {
+        let mut config = base.clone();
+        config.provider = LlmProvider::parse(&self.provider)?;
+        config.max_tokens_per_day_per_user = self.max_tokens_per_day_per_user;
+        match config.provider {
+            LlmProvider::None => {}
+            LlmProvider::OpenAiCompatible => {
+                let same_service = base.provider == LlmProvider::OpenAiCompatible
+                    && trimmed(base.base_url.as_deref()) == trimmed(self.base_url.as_deref());
+                config.base_url = trimmed(self.base_url.as_deref());
+                config.model = trimmed(self.model.as_deref());
+                config.allowed_models = self.allowed_models.iter().filter_map(|m| trimmed(Some(m))).collect();
+                if let Some(key) = self.api_key.as_deref().and_then(ApiKey::new) {
+                    config.api_key = Some(key);
+                }
+                if !same_service {
+                    // Nome, natura e contesto dichiarati per un altro servizio ingannerebbero il consenso.
+                    config.label = None;
+                    config.external = None;
+                    config.context_tokens = None;
+                }
+            }
+            LlmProvider::Builtin => {
+                config.builtin_model = trimmed(self.builtin_model.as_deref());
+                config.base_url = None;
+                config.model = None;
+                config.allowed_models = Vec::new();
+                config.context_tokens = None;
+                config.external = None;
+                config.label = None;
+                if base.provider != LlmProvider::Builtin {
+                    config.timeout_secs = config.timeout_secs.max(BUILTIN_TIMEOUT_SECS);
+                }
+            }
+        }
+        config.validate()?;
+        Ok(config)
+    }
+}
+
+/// Il corpo di `PUT /admin/api/llm`. Mai in un `Debug`: può portare la chiave.
+#[derive(Deserialize)]
+pub struct LlmSettingsInput {
+    pub provider: String,
+    #[serde(default)]
+    pub base_url: Option<String>,
+    #[serde(default)]
+    pub model: Option<String>,
+    #[serde(default)]
+    pub allowed_models: Vec<String>,
+    #[serde(default)]
+    pub max_tokens_per_day_per_user: u64,
+    #[serde(default)]
+    pub builtin_model: Option<String>,
+    /// Una chiave nuova; vuota o assente: resta quella già impostata dal pannello.
+    #[serde(default)]
+    pub api_key: Option<String>,
+    /// Toglie la chiave impostata dal pannello (torna a valere quella della configurazione, se c'è).
+    #[serde(default)]
+    pub remove_api_key: bool,
+}
+
+/// Ciò che le impostazioni chiedono: un gateway (o nessuno) subito, o un riavvio per un modello
+/// locale che questo server non ha acceso.
+enum Next {
+    Run(Option<Arc<LlmGateway>>),
+    Restart,
+}
+
+/// Le impostazioni dell'assistente dal pannello: cosa è salvato, cosa gira, e il cambio a caldo.
+pub struct LlmAdmin {
+    holder: LlmHolder,
+    /// La configurazione del file e dell'ambiente, prima delle impostazioni salvate.
+    base: LlmConfig,
+    path: PathBuf,
+    accounts: Arc<Accounts>,
+    sink: Arc<dyn UsageSink>,
+    /// Il modello locale con cui il server è partito e il suo supervisore: un modello locale si
+    /// applica subito solo se è questo.
+    builtin: Option<(String, Arc<LlmSupervisor>)>,
+    /// Un salvataggio alla volta.
+    lock: Mutex<()>,
+    /// Le impostazioni salvate nominano un modello locale che parte al prossimo avvio.
+    restart_required: AtomicBool,
+}
+
+impl fmt::Debug for LlmAdmin {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LlmAdmin").field("path", &self.path).finish_non_exhaustive()
+    }
+}
+
+/// Le ultime quattro lettere di una chiave lunga, per riconoscerla; di una corta, nessuna.
+fn key_hint(key: &ApiKey) -> String {
+    let chars: Vec<char> = key.expose().chars().collect();
+    if chars.len() < 16 {
+        return "…".to_owned();
+    }
+    format!("…{}", chars[chars.len() - 4..].iter().collect::<String>())
+}
+
+impl LlmAdmin {
+    pub fn new(
+        holder: LlmHolder,
+        base: LlmConfig,
+        path: PathBuf,
+        accounts: Arc<Accounts>,
+        sink: Arc<dyn UsageSink>,
+        builtin: Option<(String, Arc<LlmSupervisor>)>,
+    ) -> LlmAdmin {
+        LlmAdmin { holder, base, path, accounts, sink, builtin, lock: Mutex::new(()), restart_required: AtomicBool::new(false) }
+    }
+
+    /// Ciò che mostra `GET /admin/api/llm`: della chiave solo da dove viene e le sue ultime
+    /// quattro lettere, mai il valore.
+    pub fn view(&self) -> serde_json::Value {
+        let saved = LlmSettings::load(&self.path);
+        let source = if saved.is_some() { "admin" } else { "config" };
+        let settings = saved.unwrap_or_else(|| LlmSettings::from_config(&self.base));
+        let key = match settings.api_key.as_deref().and_then(ApiKey::new) {
+            Some(key) => Some(("admin", key)),
+            None => self.base.api_key.clone().map(|key| ("config", key)),
+        };
+        let active = self.holder.get().map(|gateway| {
+            let info = gateway.info();
+            serde_json::json!({"provider": gateway.config().provider.as_str(), "model": info.model, "label": info.label, "external": info.external})
+        });
+        serde_json::json!({
+            "source": source,
+            "provider": settings.provider,
+            "base_url": settings.base_url,
+            "model": settings.model,
+            "allowed_models": settings.allowed_models,
+            "max_tokens_per_day_per_user": settings.max_tokens_per_day_per_user,
+            "builtin_model": settings.builtin_model,
+            "api_key": key.map(|(from, key)| serde_json::json!({"from": from, "hint": key_hint(&key)})),
+            "active": active,
+            "builtin_now": self.builtin.as_ref().map(|(model, _)| model.clone()),
+            "restart_required": self.restart_required.load(Ordering::SeqCst),
+        })
+    }
+
+    /// Salva le impostazioni e le applica: un errore di validazione non salva né cambia nulla.
+    pub fn update(&self, input: LlmSettingsInput) -> Result<serde_json::Value, ConfigError> {
+        let _one_at_a_time = self.lock.lock().unwrap_or_else(|p| p.into_inner());
+        let previous = LlmSettings::load(&self.path);
+        let api_key = if input.remove_api_key {
+            None
+        } else {
+            trimmed(input.api_key.as_deref()).or_else(|| previous.and_then(|p| p.api_key))
+        };
+        let settings = LlmSettings {
+            provider: input.provider.trim().to_owned(),
+            base_url: input.base_url,
+            model: input.model,
+            allowed_models: input.allowed_models,
+            max_tokens_per_day_per_user: input.max_tokens_per_day_per_user,
+            builtin_model: input.builtin_model,
+            api_key,
+        };
+        let config = settings.applied_to(&self.base)?;
+        let next = self.next_for(&config)?;
+        settings
+            .save(&self.path)
+            .map_err(|_| invalid("llm_settings", "il file delle impostazioni non si scrive nella cartella dei dati"))?;
+        self.switch(next);
+        tracing::info!(provider = config.provider.as_str(), "impostazioni dell'assistente salvate dal pannello");
+        Ok(self.view())
+    }
+
+    /// Cancella le impostazioni salvate: torna a valere la configurazione del file e dell'ambiente.
+    pub fn reset(&self) -> Result<serde_json::Value, ConfigError> {
+        let _one_at_a_time = self.lock.lock().unwrap_or_else(|p| p.into_inner());
+        let next = self.next_for(&self.base)?;
+        match std::fs::remove_file(&self.path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(_) => return Err(invalid("llm_settings", "il file delle impostazioni non si cancella")),
+        }
+        self.switch(next);
+        tracing::info!(provider = self.base.provider.as_str(), "impostazioni dell'assistente tolte dal pannello: vale la configurazione");
+        Ok(self.view())
+    }
+
+    fn next_for(&self, config: &LlmConfig) -> Result<Next, ConfigError> {
+        match config.provider {
+            LlmProvider::None => Ok(Next::Run(None)),
+            LlmProvider::OpenAiCompatible => {
+                let gateway = LlmGateway::new(config, Arc::clone(&self.accounts), Arc::clone(&self.sink))?;
+                Ok(Next::Run(Some(Arc::new(gateway))))
+            }
+            LlmProvider::Builtin => match &self.builtin {
+                Some((model, supervisor)) if config.builtin_model.as_deref() == Some(model.as_str()) => {
+                    let gateway = LlmGateway::with_supervisor(config, Arc::clone(&self.accounts), Arc::clone(&self.sink), Arc::clone(supervisor))?;
+                    Ok(Next::Run(Some(Arc::new(gateway))))
+                }
+                _ => Ok(Next::Restart),
+            },
+        }
+    }
+
+    fn switch(&self, next: Next) {
+        match next {
+            Next::Run(gateway) => {
+                // Il figlio locale non si ferma qui: il suo supervisore lo spegne dopo l'inattività.
+                self.holder.replace(gateway);
+                self.restart_required.store(false, Ordering::SeqCst);
+            }
+            Next::Restart => self.restart_required.store(true, Ordering::SeqCst),
+        }
     }
 }

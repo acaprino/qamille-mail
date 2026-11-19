@@ -237,3 +237,18 @@ tr.details td { background: var(--bg); }
 .model-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 0.3rem; }
 
 progress { width: 8rem; vertical-align: middle; }
+
+/* Assistente: la scelta del provider e i campi di ciascuno */
+.choices { border: 0; padding: 0; margin: 0 0 0.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; }
+.choices legend { font-weight: 600; margin-bottom: 0.5rem; padding: 0; }
+form label.inline { flex-direction: row; align-items: center; gap: 0.4rem; }
+#llm-key-box { margin-top: 0.5rem; }
+select {
+  font: inherit;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  min-width: 0;
+}

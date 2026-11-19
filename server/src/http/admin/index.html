@@ -85,6 +85,59 @@
     <p id="empty" class="hint" hidden>Nessun utente. Crea il primo con «Nuovo utente».</p>
   </section>
 
+  <section id="llm-section" aria-labelledby="llm-title" hidden>
+    <div class="toolbar">
+      <h2 id="llm-title">Assistente</h2>
+      <div class="toolbar-actions">
+        <button id="llm-refresh" type="button" class="secondary">Aggiorna</button>
+      </div>
+    </div>
+    <p id="llm-now" class="hint"></p>
+    <form id="llm-form" class="card" autocomplete="off">
+      <fieldset class="choices">
+        <legend>Chi risponde alle domande</legend>
+        <label class="inline"><input type="radio" name="llm-provider" value="none"> Nessuno (assistente spento)</label>
+        <label class="inline"><input type="radio" name="llm-provider" value="openai-compatible"> API compatibile OpenAI</label>
+        <label class="inline"><input type="radio" name="llm-provider" value="builtin"> Modello locale su questo server</label>
+      </fieldset>
+      <div id="llm-openai" class="fields" hidden>
+        <label>Indirizzo base
+          <input id="llm-base-url" type="url" spellcheck="false" placeholder="https://api.openai.com/v1">
+        </label>
+        <label>Chiave API
+          <input id="llm-key" type="password" autocomplete="off" spellcheck="false">
+        </label>
+        <label>Modello predefinito
+          <input id="llm-model" type="text" spellcheck="false" placeholder="gpt-4.1-mini">
+        </label>
+        <label>Altri modelli ammessi, separati da virgole
+          <input id="llm-allowed" type="text" spellcheck="false">
+        </label>
+      </div>
+      <div id="llm-key-box" hidden>
+        <p id="llm-key-hint" class="hint"></p>
+        <label id="llm-key-remove-label" class="inline"><input id="llm-key-remove" type="checkbox"> Togli la chiave impostata qui</label>
+      </div>
+      <div id="llm-builtin" class="fields" hidden>
+        <label>Modello locale
+          <select id="llm-builtin-model"></select>
+        </label>
+        <p class="hint">I modelli locali si scaricano dalla sezione «Modelli», qui sotto.</p>
+      </div>
+      <div class="fields">
+        <label>Token al giorno per utente (0: nessun limite)
+          <input id="llm-cap" type="number" min="0" step="1" inputmode="numeric">
+        </label>
+      </div>
+      <div class="actions">
+        <button id="llm-save" type="submit">Salva e applica</button>
+        <button id="llm-reset" type="button" class="secondary">Torna alla configurazione del server</button>
+      </div>
+      <p id="llm-status" class="status" role="status"></p>
+      <p id="llm-error" class="error" role="alert" hidden></p>
+    </form>
+  </section>
+
   <section id="models-section" aria-labelledby="models-title" hidden>
     <div class="toolbar">
       <h2 id="models-title">Modelli</h2>

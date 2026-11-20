@@ -477,7 +477,7 @@ test('the latest release of the toolkit is downloaded, verified and synced', asy
     const desktop = desktopOf({ dependencies: { react: '19.3.1' }, old: true });
     const log = lines();
     const release = await latestToolkitRelease(cacheDir, log.log, api);
-    assert.deepEqual(release, { tag: 'v1.2.3', dir: join(cacheDir, 'v1.2.3', 'package') });
+    assert.deepEqual(release, { tag: 'v1.2.3', dir: join(cacheDir, 'v1.2.3', 'package'), cached: join(cacheDir, 'v1.2.3') });
     assert.deepEqual(requests.filter((url) => url.startsWith('/asset/')), ['/asset/manifest', '/asset/package']);
     await syncToolkit({ desktop, release, log: log.log });
     assert.deepEqual(tree(vendorOf(desktop)), tree(packageDir));
@@ -509,5 +509,138 @@ test('a release whose manifest lacks the toolkit is not used', async () => {
     assert.deepEqual([...log], ['toolkit: v1.2.3 could not be downloaded (@acaprino/toolkit is not in the manifest of v1.2.3)']);
   } finally {
     await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+// A local GitHub that serves one toolkit release: `tag`, and as its package `packageDir` packed as a .tgz.
+// `serve(dir)` swaps the package for the following requests, under the same tag. `assets()` counts the downloads.
+async function fakeToolkitRelease({ tag = 'v1.2.3', packageDir }) {
+  const repo = '/repos/acaprino/toolkit';
+  const requests = [];
+  let api = '';
+  let tgz;
+  let manifest;
+  const serve = (dir) => {
+    tgz = readFileSync(packTgz(dir, join(fresh('release'), 'acaprino-toolkit.tgz')));
+    manifest = { version: tag.slice(1), packages: [{ name: '@acaprino/toolkit', file: 'acaprino-toolkit.tgz', sha256: sha256(tgz) }] };
+  };
+  serve(packageDir);
+  const server = createServer((req, res) => {
+    requests.push(req.url);
+    const send = (body, type = 'application/json') => { res.writeHead(200, { 'Content-Type': type }); res.end(body); };
+    if (req.url === `${repo}/releases/latest`) {
+      send(JSON.stringify({ tag_name: tag, assets: [
+        { name: 'manifest.json', url: `${api}/asset/manifest` },
+        { name: 'acaprino-toolkit.tgz', url: `${api}/asset/package` },
+      ] }));
+    } else if (req.url === `${repo}/compare/main...${tag}`) send(JSON.stringify({ status: 'behind' }));
+    else if (req.url === '/asset/manifest') send(JSON.stringify(manifest));
+    else if (req.url === '/asset/package') send(tgz, 'application/octet-stream');
+    else { res.writeHead(404); res.end('not found'); }
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  api = `http://127.0.0.1:${server.address().port}`;
+  return {
+    api,
+    serve,
+    assets: () => requests.filter((url) => url.startsWith('/asset/')).length,
+    close: () => new Promise((resolve) => server.close(resolve)),
+  };
+}
+
+test('a cached release that fails its checks is removed from the cache, and the next run downloads it again', async () => {
+  const packageDir = toolkitPackage();
+  const github = await fakeToolkitRelease({ packageDir });
+  try {
+    const cacheDir = fresh('cache');
+    const entry = join(cacheDir, 'v1.2.3');
+    const desktop = desktopOf({ old: true });
+    const before = tree(vendorOf(desktop));
+    // The first run downloads the release; its .complete marker is written before any check of the package.
+    const first = await latestToolkitRelease(cacheDir, () => {}, github.api);
+    assert.equal(github.assets(), 2, 'the manifest and the package');
+    assert.equal(existsSync(join(entry, '.complete')), true);
+    // The cached copy is damaged. The next run trusts the marker: nothing is downloaded, and the sync refuses it.
+    write(join(first.dir, 'dist', 'index.js'), 'export const toolkit = "damaged";\n');
+    const second = await latestToolkitRelease(cacheDir, () => {}, github.api);
+    assert.equal(github.assets(), 2, 'a complete entry is not downloaded again');
+    assert.deepEqual(second, first);
+    const log = lines();
+    await assert.rejects(syncToolkit({ desktop, release: second, log: log.log }), (error) => {
+      assert.match(error.message, /dist\/index\.js does not match provenance\.json/);
+      assert.match(error.message, /The cached copy of v1\.2\.3 was removed, so the next run downloads it again\./);
+      return true;
+    });
+    assert.equal(existsSync(entry), false, 'the broken entry is gone from the cache');
+    assertKept(desktop, before);
+    assert.deepEqual([...log], []);
+    // The run after that downloads the release again, and now the package is whole.
+    const third = await latestToolkitRelease(cacheDir, log.log, github.api);
+    assert.equal(github.assets(), 4, 'downloaded again');
+    await syncToolkit({ desktop, release: third, log: log.log });
+    assert.deepEqual(tree(vendorOf(desktop)), tree(packageDir));
+    assert.deepEqual([...log], ['toolkit: v1.2.3 downloaded from acaprino/toolkit', synced()]);
+  } finally {
+    await github.close();
+  }
+});
+
+test('a package that fails its checks and did not come from the cache leaves no cache to remove', async () => {
+  const dir = toolkitPackage();
+  write(join(dir, 'dist', 'index.js'), 'export const toolkit = "tampered";\n');
+  const desktop = desktopOf({ old: true });
+  await assert.rejects(syncToolkit({ desktop, release: releaseOf(dir), log: () => {} }), (error) => {
+    assert.doesNotMatch(error.message, /cached copy/);
+    return true;
+  });
+  assert.equal(existsSync(dir), true, 'the folder of the package is not deleted when no cache folder was named');
+});
+
+test('a release whose tag is not v<version of its provenance.json> is refused, and the old copy stays', async () => {
+  const dir = toolkitPackage();
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  // A package of version 1.2.3 uploaded to another release, or to a tag that only looks like its own.
+  for (const tag of ['v1.2.4', 'v1.2.30', 'v1.2', '1.2.3', 'toolkit-v1.2.3']) {
+    const log = lines();
+    await assert.rejects(syncToolkit({ desktop, release: releaseOf(dir, tag), log: log.log }), (error) => {
+      assert.ok(error.message.includes(`the release ${tag} holds a package whose provenance.json says version "1.2.3", which is the tag v1.2.3`), error.message);
+      assert.match(error.message, /uploaded to the wrong release/);
+      assert.doesNotMatch(error.message, /cached copy/);
+      return true;
+    }, tag);
+    assertKept(desktop, before);
+    assert.deepEqual([...log], [], tag);
+  }
+  // A provenance.json with no version cannot belong to any tag.
+  const unversioned = toolkitPackage();
+  const provenance = JSON.parse(readFileSync(join(unversioned, 'provenance.json'), 'utf8'));
+  delete provenance.version;
+  write(join(unversioned, 'provenance.json'), `${JSON.stringify(provenance, null, 2)}\n`);
+  await assert.rejects(syncToolkit({ desktop, release: releaseOf(unversioned), log: () => {} }), /says version null\. A package was uploaded to the wrong release/);
+  assertKept(desktop, before);
+  // The right tag passes; a package built in TOOLKIT_DIR has no tag to check.
+  await syncToolkit({ desktop, release: releaseOf(dir, 'v1.2.3'), log: () => {} });
+  assert.deepEqual(tree(vendorOf(desktop)), tree(dir));
+});
+
+test('a release of the wrong tag is refused with the package and the cache it came from, end to end', async () => {
+  // Version 1.2.3 was uploaded to the release v1.2.4.
+  const github = await fakeToolkitRelease({ tag: 'v1.2.4', packageDir: toolkitPackage() });
+  try {
+    const cacheDir = fresh('cache');
+    const desktop = desktopOf({ old: true });
+    const before = tree(vendorOf(desktop));
+    const release = await latestToolkitRelease(cacheDir, () => {}, github.api);
+    assert.equal(release.tag, 'v1.2.4');
+    await assert.rejects(syncToolkit({ desktop, release, log: () => {} }), (error) => {
+      assert.match(error.message, /the release v1\.2\.4 holds a package whose provenance\.json says version "1\.2\.3"/);
+      assert.match(error.message, /The cached copy of v1\.2\.4 was removed/);
+      return true;
+    });
+    assert.equal(existsSync(join(cacheDir, 'v1.2.4')), false);
+    assertKept(desktop, before);
+  } finally {
+    await github.close();
   }
 });

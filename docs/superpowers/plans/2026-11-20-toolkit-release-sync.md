@@ -171,6 +171,7 @@ In Qamille, la logica «ultima release che sta su `main`, scaricata e verificata
 Dipende dal proprietario: va fatto dopo che ha dato il consenso al push e ha unito la PR `develop` → `main` del toolkit.
 
 - [ ] **Step 1:** con il consenso del proprietario:
+  - prima del push, nel toolkit: `git fetch origin` e `git merge origin/main` in `develop` (un merge commit, niente rebase né force). Il `main` remoto può avere commit che `develop` non ha (è successo: e1b9865, con conflitto in `README.md`), e senza il merge la PR non sarebbe unibile;
   - push di `develop` in `acaprino/toolkit`;
   - una PR `develop` → `main` con la descrizione dei Task 1-2;
   - la unisce il proprietario.

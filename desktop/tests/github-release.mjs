@@ -36,8 +36,10 @@ const pack = (file, files, extra = {}) => ({ file, data: tgz(files), extra });
 const sha256 = (data) => createHash('sha256').update(data).digest('hex');
 
 // A GitHub that serves one repository: releases/latest names `tag`, compare answers `status`, and the assets are the
-// manifest.json plus the packages, at API-style asset URLs. `requests` lists what was asked, in order.
-async function fakeGitHub({ repo, tag, status = 'behind', packages, manifestPackages }) {
+// manifest.json plus the packages, at API-style asset URLs. `requests` lists what was asked, in order. `rateLimited`
+// names the requests ('latest', 'compare') that GitHub's API answers with its rate-limit 403, as it does an
+// unauthenticated client that is out of its 60 requests an hour.
+async function fakeGitHub({ repo, tag, status = 'behind', packages, manifestPackages, rateLimited = [] }) {
   const requests = [];
   const assets = new Map();
   const names = [];
@@ -49,12 +51,18 @@ async function fakeGitHub({ repo, tag, status = 'behind', packages, manifestPack
   const server = createServer((req, res) => {
     const send = (code, body, type) => { res.writeHead(code, { 'Content-Type': type }); res.end(body); };
     const asset = /^\/repos\/[^/]+\/[^/]+\/releases\/assets\/(\d+)$/.exec(req.url)?.[1];
+    const limit = () => {
+      res.writeHead(403, { 'Content-Type': 'application/json', 'X-RateLimit-Limit': '60', 'X-RateLimit-Remaining': '0' });
+      res.end(JSON.stringify({ message: 'API rate limit exceeded for 203.0.113.7.', documentation_url: 'https://docs.github.com/rest/overview/rate-limits-for-the-rest-api' }));
+    };
     if (req.url === `/repos/${repo}/releases/latest`) {
       requests.push({ url: req.url, authorization: req.headers.authorization });
+      if (rateLimited.includes('latest')) return limit();
       const list = [...assets].map(([id, { name }]) => ({ name, url: `${api}/repos/${repo}/releases/assets/${id}` }));
       send(200, JSON.stringify({ tag_name: tag, assets: list }), 'application/json');
     } else if (req.url === `/repos/${repo}/compare/main...${tag}`) {
       requests.push({ url: req.url, authorization: req.headers.authorization });
+      if (rateLimited.includes('compare')) return limit();
       send(200, JSON.stringify({ status }), 'application/json');
     } else if (asset && assets.has(asset)) {
       const { name, data } = assets.get(asset);
@@ -256,6 +264,31 @@ test('no network keeps the cache and returns null', async () => {
   assert.match(log[0], /^thing: latest release of acme\/thing not reachable \(.+\)$/);
   assert.deepEqual(readdirSync(cache), ['v1.0.0']);
   assert.equal(readFileSync(join(cache, 'v1.0.0', '.complete'), 'utf8'), 'v1.0.0\n');
+});
+
+test("GitHub's rate-limit 403 keeps the cache, returns null and says which request was refused", async () => {
+  // Out of requests on releases/latest, or one request later, on the compare that checks the tag is on main.
+  for (const [refused, what] of [['latest', /^thing: latest release of acme\/thing not reachable \(403 Forbidden for .+\/repos\/acme\/thing\/releases\/latest\)$/], ['compare', /^thing: could not check that v1\.2\.3 is on main \(403 Forbidden for .+\/repos\/acme\/thing\/compare\/main\.\.\.v1\.2\.3\)$/]]) {
+    const github = await fakeGitHub({ repo: REPO, tag: 'v1.2.3', packages: [thingPackage()], rateLimited: [refused] });
+    const cache = fresh('cache');
+    mkdirSync(join(cache, 'v1.0.0'), { recursive: true });
+    writeFileSync(join(cache, 'v1.0.0', '.complete'), 'v1.0.0\n');
+    const log = lines();
+    const { calls, unpack } = unpacker();
+    try {
+      const found = await latestMainRelease({ repo: REPO, cache, label: 'thing', unpack, log: log.log, api: github.api });
+      assert.equal(found, null, refused);
+      assert.equal(log.length, 1, refused);
+      assert.match(log[0], what, refused);
+      // Nothing was downloaded or unpacked, and the release already in the cache is untouched.
+      assert.equal(calls.length, 0, refused);
+      assert.equal(github.requests().some((url) => url.startsWith('asset:')), false, refused);
+      assert.deepEqual(readdirSync(cache), ['v1.0.0'], refused);
+      assert.equal(readFileSync(join(cache, 'v1.0.0', '.complete'), 'utf8'), 'v1.0.0\n', refused);
+    } finally {
+      await github.close();
+    }
+  }
 });
 
 test('a cache path with spaces unpacks', async () => {

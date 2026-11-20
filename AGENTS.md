@@ -28,8 +28,14 @@
   `desktop/scripts/github-release.mjs`, come per ArtCraft), controlla gli SHA-256 del manifest e ogni file
   contro `provenance.json`, e sostituisce `desktop/vendor/toolkit/` (generata, ignorata da git). Usata solo se il
   suo tag è in `main`; senza rete resta la copia già presente. Non fissare versioni o commit del toolkit in Qamille.
+- Una release il cui tag non è `v<versione di provenance.json>`, o con file che non corrispondono a `provenance.json`,
+  è rifiutata; se veniva dalla cache (`desktop/.cache/toolkit`), la sua cartella viene rimossa e il lancio
+  successivo la scarica di nuovo.
+- `toolkit:sync` è manuale: non fa parte di `predev` né di `prebuild` (a differenza di `artcraft:sync`), quindi va
+  lanciato a mano quando serve una versione nuova del toolkit.
 - `TOOLKIT_DIR` forza un checkout locale del toolkit (modifiche non ancora rilasciate): lo script esegue lì
-  `npm run release -- --skip-test` e prende il pacchetto da `release/`.
+  `npm run release -- --skip-test` e prende il pacchetto da `release/`. Quel comando ha bisogno delle dipendenze del
+  checkout: `npm ci` una volta lì dentro, prima del primo `toolkit:sync` con `TOOLKIT_DIR`.
 - L'unica fonte è il repository ufficiale `acaprino/toolkit`: niente fork, copie a mano o pacchetti di altra
   origine in `desktop/vendor/toolkit/`.
 

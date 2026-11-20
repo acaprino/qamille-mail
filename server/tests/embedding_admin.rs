@@ -6,6 +6,7 @@ mod support;
 
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use axum::Router;
 use axum::body::Bytes;
@@ -76,6 +77,8 @@ struct Upstream {
     silent_usage: AtomicBool,
     /// Rifiuta con `400` gli ingressi più lunghi di così (0: nessun limite).
     max_input: AtomicUsize,
+    /// Risponde dopo due secondi (un modello che si sta caricando).
+    slow: AtomicBool,
     seen: Mutex<Vec<(Option<String>, Value)>>,
 }
 
@@ -85,6 +88,9 @@ async fn upstream_embeddings(State(upstream): State<Arc<Upstream>>, headers: Hea
     let count = body["input"].as_array().map_or(1, Vec::len);
     let longest = body["input"].as_array().map_or(0, |inputs| inputs.iter().filter_map(Value::as_str).map(str::len).max().unwrap_or(0));
     upstream.seen.lock().unwrap().push((authorization, body));
+    if upstream.slow.load(Ordering::SeqCst) {
+        tokio::time::sleep(Duration::from_secs(2)).await;
+    }
     let max_input = upstream.max_input.load(Ordering::SeqCst);
     if max_input > 0 && longest > max_input {
         return (StatusCode::BAD_REQUEST, "input too long for this model").into_response();
@@ -114,6 +120,7 @@ async fn upstream(length: usize) -> (Arc<Upstream>, String) {
         other_vectors: AtomicBool::new(false),
         silent_usage: AtomicBool::new(false),
         max_input: AtomicUsize::new(0),
+        slow: AtomicBool::new(false),
         seen: Mutex::new(Vec::new()),
     });
     let router = Router::new().route("/v1/embeddings", post(upstream_embeddings)).with_state(Arc::clone(&state));
@@ -159,6 +166,22 @@ async fn embed(ts: &TestServer, device_key: &str, inputs: &[&str]) -> TestRespon
 
 async fn embed_image(ts: &TestServer, device_key: &str) -> TestResponse {
     request_raw(&ts.public, "POST", "/qamille/v1/embeddings/image", Some(b"un'immagine".to_vec()), loopback(), &[("authorization", &bearer(device_key))]).await
+}
+
+/// Come le app di questa versione: con il modello che hanno controllato in `/health`.
+async fn embed_checked(ts: &TestServer, device_key: &str, checked: &str) -> TestResponse {
+    let body = serde_json::to_vec(&json!({"model": MODEL_ID, "input": ["uno"], "dimensions": DIM})).unwrap();
+    let auth = bearer(device_key);
+    request_raw(&ts.public, "POST", "/v1/embeddings", Some(body), loopback(), &[("authorization", auth.as_str()), ("x-qamille-embedding-model", checked)]).await
+}
+
+async fn embed_image_checked(ts: &TestServer, device_key: &str, checked: &str) -> TestResponse {
+    let auth = bearer(device_key);
+    request_raw(&ts.public, "POST", "/qamille/v1/embeddings/image", Some(b"un'immagine".to_vec()), loopback(), &[("authorization", auth.as_str()), ("x-qamille-embedding-model", checked)]).await
+}
+
+fn records_file(ts: &TestServer) -> std::path::PathBuf {
+    ts.dir.path().join("embedding-models.json")
 }
 
 fn settings_file(ts: &TestServer) -> std::path::PathBuf {
@@ -362,6 +385,8 @@ async fn after_a_switch_no_vectors_for_a_while() {
     assert_eq!(embed(&ts, &login.device_key, &["prima"]).await.status, 200, "senza cambio, nessuna pausa");
     assert_eq!(admin(&ts, "PUT", Some(remote_settings(&url))).await.status, 200);
     let calls = service.seen.lock().unwrap().len();
+    // Anche le immagini: prima la pausa, così il messaggio si ferma invece di finire senza di loro.
+    assert_eq!(embed_image(&ts, &login.device_key).await.code(), Some("rate_limited"));
 
     assert_eq!(health(&ts, &login.device_key).await.body["embedding"]["model"], REMOTE_MODEL);
     let paused = embed(&ts, &login.device_key, &["dopo"]).await;
@@ -485,4 +510,92 @@ async fn a_settings_file_with_an_external_address_is_ignored_at_startup() {
     assert_eq!(view.body["provider"], "builtin", "{}", view.text);
     assert!(view.body["base_url"].is_null() && view.body["api_key"].is_null(), "{}", view.text);
     assert_eq!(embed(&ts, &login.device_key, &["uno"]).await.body["model"], MODEL_ID);
+}
+
+#[tokio::test]
+async fn a_name_keeps_its_number_through_the_local_model_and_another_model() {
+    // Il caso di manutenzione più comune: si torna al modello locale, il servizio si ricostruisce
+    // con un'altra build, si salva di nuovo lo stesso nome. Le app che non hanno ancora
+    // reindicizzato hanno un indice con il nome di prima: deve cambiare, o mescolerebbero vettori.
+    let ts = server(Local::new(true));
+    let login = user_with_device(&ts, "mario", "una password lunga").await;
+    let (service, url) = upstream(DIM).await;
+    assert_eq!(admin(&ts, "PUT", Some(remote_settings(&url))).await.body["active"]["model"], REMOTE_MODEL);
+    assert_eq!(admin(&ts, "DELETE", None).await.body["active"]["model"], MODEL_ID);
+    service.other_vectors.store(true, Ordering::SeqCst);
+    let again = admin(&ts, "PUT", Some(remote_settings(&url))).await;
+    let declared = format!("{REMOTE_MODEL}#1");
+    assert_eq!(again.body["active"]["model"], declared.as_str(), "{}", again.text);
+    assert_eq!(health(&ts, &login.device_key).await.body["embedding"]["model"], declared.as_str());
+
+    // E all'inverso: un altro modello in mezzo non fa perdere il numero a chi lo aveva.
+    let mut other = remote_settings(&url);
+    other["model"] = json!("altro-embed");
+    assert_eq!(admin(&ts, "PUT", Some(other)).await.body["active"]["model"], "altro-embed");
+    let back = admin(&ts, "PUT", Some(remote_settings(&url))).await;
+    assert_eq!(back.body["active"]["model"], declared.as_str(), "{}", back.text);
+
+    // Il ricordo dei nomi non porta segreti.
+    let records = std::fs::read_to_string(records_file(&ts)).unwrap();
+    assert!(records.contains(REMOTE_MODEL) && !records.contains(SERVICE_KEY), "{records}");
+}
+
+#[tokio::test]
+async fn a_second_save_while_the_first_tries_the_service_is_refused_at_once() {
+    let ts = server(Local::new(true));
+    let (service, url) = upstream(DIM).await;
+    service.slow.store(true, Ordering::SeqCst);
+    let first = admin(&ts, "PUT", Some(remote_settings(&url)));
+    let second = async {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        admin(&ts, "PUT", Some(remote_settings(&url))).await
+    };
+    let (first, second) = tokio::join!(first, second);
+    assert_eq!(first.status, 200, "{}", first.text);
+    assert_eq!(second.status, 400, "{}", second.text);
+    assert!(second.body["error"]["message"].as_str().unwrap_or_default().contains("Un altro salvataggio è in corso"), "{}", second.text);
+    assert_eq!(service.seen.lock().unwrap().len(), 1, "una sola chiamata di prova");
+}
+
+#[tokio::test]
+async fn the_pause_ends_and_survives_a_restart() {
+    let ts = server_with_pause(Local::new(true), 1);
+    let login = user_with_device(&ts, "mario", "una password lunga").await;
+    let (_service, url) = upstream(DIM).await;
+    assert_eq!(admin(&ts, "PUT", Some(remote_settings(&url))).await.status, 200);
+    assert_eq!(embed(&ts, &login.device_key, &["uno"]).await.code(), Some("rate_limited"));
+    tokio::time::sleep(Duration::from_millis(1100)).await;
+    assert_eq!(embed(&ts, &login.device_key, &["uno"]).await.status, 200, "la pausa finisce da sola");
+
+    // Un riavvio durante la pausa non la toglie.
+    let ts = server_with_pause(Local::new(true), 60);
+    let login = user_with_device(&ts, "mario", "una password lunga").await;
+    assert_eq!(admin(&ts, "PUT", Some(remote_settings(&url))).await.status, 200);
+    let restarted = ts_server(&ts).with_compute(Local::new(true), Arc::new(Speech), 1);
+    let ts = rebuild(restarted, ts);
+    let paused = embed(&ts, &login.device_key, &["uno"]).await;
+    assert_eq!(paused.code(), Some("rate_limited"), "{}", paused.text);
+    assert!(paused.body["error"]["retry_after_s"].as_u64().is_some_and(|left| (1..=60).contains(&left)), "{}", paused.text);
+}
+
+#[tokio::test]
+async fn a_batch_of_a_message_begun_with_another_model_is_a_pause() {
+    let ts = server(Local::new(true));
+    let login = user_with_device(&ts, "mario", "una password lunga").await;
+    // Lo stesso modello che l'app ha controllato: vettori. Un altro: una pausa breve, e l'app
+    // ricomincia il messaggio dal controllo di `/health`.
+    assert_eq!(embed_checked(&ts, &login.device_key, MODEL_ID).await.status, 200);
+    let refused = embed_checked(&ts, &login.device_key, "un-altro-modello").await;
+    assert_eq!((refused.status.as_u16(), refused.code()), (429, Some("rate_limited")), "{}", refused.text);
+    assert_eq!(refused.body["error"]["retry_after_s"], 10, "{}", refused.text);
+
+    let (_service, url) = upstream(DIM).await;
+    assert_eq!(admin(&ts, "PUT", Some(remote_settings(&url))).await.status, 200);
+    // L'app aveva controllato il modello locale prima del cambio: niente vettori del modello nuovo.
+    assert_eq!(embed_checked(&ts, &login.device_key, MODEL_ID).await.code(), Some("rate_limited"));
+    assert_eq!(embed_image_checked(&ts, &login.device_key, MODEL_ID).await.code(), Some("rate_limited"));
+    let answer = embed_checked(&ts, &login.device_key, REMOTE_MODEL).await;
+    assert_eq!((answer.status.as_u16(), answer.body["model"].as_str()), (200, Some(REMOTE_MODEL)), "{}", answer.text);
+    // Le app rilasciate non mandano il modello: come prima.
+    assert_eq!(embed(&ts, &login.device_key, &["uno"]).await.status, 200);
 }

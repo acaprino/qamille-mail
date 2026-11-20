@@ -7,33 +7,45 @@
 //!   un'altra non si salva (chiamata di prova) e, più tardi, non raggiunge mai un'app;
 //! - il modello in uso è quello che `/health` dichiara: l'app che ha un indice fatto con un altro
 //!   modello si ferma e propone di reindicizzare (spec del calcolo, D4). Se dietro lo stesso nome
-//!   i vettori cambiano (un'altra build, un altro servizio), il nome dichiarato prende `#n`;
-//! - dopo un cambio fatto dal pannello i vettori si fermano per un po' ([`EmbeddingHolder::switch`]):
-//!   un messaggio che l'app aveva cominciato con il modello di prima non finisce con quello nuovo;
+//!   i vettori cambiano (un'altra build, un altro servizio), il nome dichiarato prende `#n`, e lo
+//!   tiene anche se nel frattempo si torna al modello locale o se ne salva un altro ([`RECORDS_FILE`]);
+//! - dopo un cambio fatto dal pannello i vettori si fermano per un po' ([`EmbeddingHolder::switch`],
+//!   anche dopo un riavvio): un messaggio che l'app aveva cominciato con il modello di prima non
+//!   finisce con quello nuovo; le app di questa versione mandano anche il modello che hanno
+//!   controllato ([`crate::compute::EXPECTED_MODEL_HEADER`]);
 //! - con un modello remoto le immagini non si cercano: i loro vettori verrebbero da un altro modello.
 //!
 //! Il testo della posta resta sull'infrastruttura di chi gestisce il server: un indirizzo esterno
-//! è rifiutato (anche un nome che si risolve in un indirizzo pubblico), perché l'app non può
-//! ancora chiedere il consenso degli utenti. La spezzatura dei passaggi resta locale, con il
-//! tokenizer di EmbeddingGemma 2.
+//! è rifiutato, e a ogni connessione il nome deve risolversi in indirizzi privati ([`InternalOnly`]),
+//! perché l'app non può ancora chiedere il consenso degli utenti. La spezzatura dei passaggi resta
+//! locale, con il tokenizer di EmbeddingGemma 2.
 //!
 //! Nel log: mai chiavi, testi o vettori.
 
+use std::collections::BTreeMap;
 use std::fmt;
-use std::net::{IpAddr, ToSocketAddrs};
+use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, MutexGuard, RwLock, TryLockError};
-use std::time::{Duration, Instant};
+use std::sync::{Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
+use ureq::http::Uri;
+use ureq::unversioned::resolver::{DefaultResolver, ResolvedSocketAddrs, Resolver};
+use ureq::unversioned::transport::{DefaultConnector, NextTimeout};
 
-use crate::compute::{ComputeBackend, ComputeError, DIM, MODEL_ID, ModelStatus};
+use crate::compute::{ComputeBackend, ComputeError, DIM, MODEL_ID, ModelStatus, expected_model};
 use crate::config::is_local_or_private;
 use crate::llm::{ApiKey, BaseUrl, key_hint, parse_base_url, save_private, trimmed};
 
 /// Il file, nella cartella dei dati, con il modello di embedding scelto dal pannello. Scritto con
 /// permessi 0600: può contenere la chiave del servizio.
 pub const SETTINGS_FILE: &str = "embedding-settings.json";
+/// Il file, accanto, di ciò che si ricorda dei modelli remoti salvati, per nome: quante volte i
+/// vettori dietro quel nome sono cambiati e il vettore della frase di prova; e la fine della pausa
+/// dopo l'ultimo cambio. Senza segreti, e non si cancella tornando al modello locale: il `#n` di
+/// un nome resta anche se nel frattempo si è usato un altro modello.
+pub const RECORDS_FILE: &str = "embedding-models.json";
 pub const PROVIDER_BUILTIN: &str = "builtin";
 pub const PROVIDER_OPENAI: &str = "openai-compatible";
 /// L'app registra il nome dichiarato nell'indice in 47 byte: uno più lungo non coinciderebbe mai
@@ -70,12 +82,18 @@ pub enum RemoteError {
     BadAnswer,
     /// Vettori di un'altra lunghezza (quella trovata).
     WrongLength(usize),
+    /// Il nome del servizio (l'host) non si risolve.
+    NotResolved(String),
+    /// Il nome del servizio si risolve (anche) in un indirizzo pubblico: nessuna connessione.
+    PublicAddress(String),
 }
 
 impl RemoteError {
     /// Per il log: mai un contenuto.
     fn label(&self) -> &'static str {
         match self {
+            RemoteError::NotResolved(_) => "not_resolved",
+            RemoteError::PublicAddress(_) => "public_address",
             RemoteError::Unreachable => "unreachable",
             RemoteError::KeyRefused => "key_refused",
             RemoteError::RateLimited { .. } => "rate_limited",
@@ -101,7 +119,53 @@ impl fmt::Display for RemoteError {
                 f,
                 "Il modello ha restituito {found} valori per vettore: l'indice ne usa {DIM}. Scegli un modello che accetta `dimensions: {DIM}`."
             ),
+            RemoteError::NotResolved(host) => write!(f, "Il nome «{host}» non si risolve da questo server."),
+            RemoteError::PublicAddress(host) => {
+                write!(f, "Il nome «{host}» si risolve in un indirizzo pubblico: il testo della posta uscirebbe dal server.")
+            }
         }
+    }
+}
+
+/// Il resolver del client verso il servizio: ogni connessione (la prova, l'avvio, ogni richiesta
+/// dopo) va solo a indirizzi di loopback o privati. Un nome è interno per dove si risolve, non per
+/// come è scritto: in un container con un dominio di ricerca `embeddings` può diventare un host
+/// pubblico, anche giorni dopo il salvataggio. La ricerca del nome sta nel tempo della chiamata.
+#[derive(Debug, Default)]
+struct InternalOnly<R = DefaultResolver>(R);
+
+/// Il segno, dentro l'errore del client, di un nome che si risolve in un indirizzo pubblico.
+#[derive(Debug)]
+struct PublicAddressFound;
+
+impl fmt::Display for PublicAddressFound {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("the service name resolves to a public address")
+    }
+}
+
+impl std::error::Error for PublicAddressFound {}
+
+impl<R: Resolver> Resolver for InternalOnly<R> {
+    fn resolve(&self, uri: &Uri, config: &ureq::config::Config, timeout: NextTimeout) -> Result<ResolvedSocketAddrs, ureq::Error> {
+        let found = self.0.resolve(uri, config, timeout)?;
+        if found.is_empty() {
+            return Err(ureq::Error::HostNotFound);
+        }
+        // Un solo indirizzo pubblico tra quelli del nome basta: il client potrebbe usare quello.
+        if found.iter().any(|address| !is_local_or_private(address.ip())) {
+            return Err(ureq::Error::Io(io::Error::new(io::ErrorKind::PermissionDenied, PublicAddressFound)));
+        }
+        Ok(found)
+    }
+}
+
+/// Perché la richiesta non è partita: il nome, poi tutto il resto (nessun dettaglio di rete).
+fn transport_error(error: &ureq::Error, host: &str) -> RemoteError {
+    match error {
+        ureq::Error::HostNotFound => RemoteError::NotResolved(host.to_owned()),
+        ureq::Error::Io(io) if io.get_ref().is_some_and(|inner| inner.is::<PublicAddressFound>()) => RemoteError::PublicAddress(host.to_owned()),
+        _ => RemoteError::Unreachable,
     }
 }
 
@@ -187,31 +251,11 @@ fn cosine(a: &[f32], b: &[f32]) -> f64 {
     a.iter().zip(b).map(|(x, y)| f64::from(*x) * f64::from(*y)).sum()
 }
 
-/// Almeno un indirizzo, e tutti di loopback o privati.
-fn all_internal(addresses: &[IpAddr]) -> bool {
-    !addresses.is_empty() && addresses.iter().all(|ip| is_local_or_private(*ip))
-}
-
-/// Un nome è interno se lo sono gli indirizzi in cui si risolve, non per come è scritto: in un
-/// container con un dominio di ricerca, `embeddings` può diventare un host pubblico.
-fn resolves_internally(base: &BaseUrl) -> Result<(), String> {
-    if base.host.parse::<IpAddr>().is_ok() {
-        return Ok(());
-    }
-    let port = base.port.unwrap_or(if base.https { 443 } else { 80 });
-    let addresses: Vec<IpAddr> = (base.host.as_str(), port).to_socket_addrs().map(|found| found.map(|address| address.ip()).collect()).unwrap_or_default();
-    if addresses.is_empty() {
-        return Err(format!("Il nome «{}» non si risolve da questo server.", base.host));
-    }
-    if !all_internal(&addresses) {
-        return Err(format!("Il nome «{}» si risolve in un indirizzo pubblico: il testo della posta uscirebbe dal server.", base.host));
-    }
-    Ok(())
-}
-
 /// Il servizio compatibile con OpenAI che calcola i vettori (`POST <base>/embeddings`).
 pub struct RemoteEmbedder {
     url: String,
+    /// L'host dell'indirizzo, per dire quale nome non si risolve.
+    host: String,
     /// Il nome per il servizio.
     model: String,
     /// Il nome per le app ([`declared`]).
@@ -229,17 +273,17 @@ impl fmt::Debug for RemoteEmbedder {
 }
 
 impl RemoteEmbedder {
-    fn new(url: String, model: String, identity: String, key: Option<ApiKey>, timeout: Duration) -> RemoteEmbedder {
-        let agent: ureq::Agent = ureq::Agent::config_builder()
+    fn new(base: &BaseUrl, model: String, identity: String, key: Option<ApiKey>, timeout: Duration) -> RemoteEmbedder {
+        let config = ureq::Agent::config_builder()
             .timeout_global(Some(timeout))
             .max_redirects(0)
             .max_redirects_will_error(false)
             .http_status_as_error(false)
             // Mai il proxy dell'ambiente (HTTP_PROXY...): l'indirizzo lo sceglie l'operatore.
             .proxy(None)
-            .build()
-            .into();
-        RemoteEmbedder { url, model, identity, key, agent, last_error: Mutex::new(None) }
+            .build();
+        let agent = ureq::Agent::with_parts(config, DefaultConnector::new(), InternalOnly::<DefaultResolver>::default());
+        RemoteEmbedder { url: base.endpoint("/embeddings"), host: base.host.clone(), model, identity, key, agent, last_error: Mutex::new(None) }
     }
 
     /// Il nome che le app vedono.
@@ -287,7 +331,7 @@ impl RemoteEmbedder {
         if let Some(key) = &self.key {
             request = request.header("Authorization", format!("Bearer {}", key.expose()));
         }
-        let mut response = request.send(&body[..]).map_err(|_| RemoteError::Unreachable)?;
+        let mut response = request.send(&body[..]).map_err(|error| transport_error(&error, &self.host))?;
         let status = response.status().as_u16();
         if !(200..300).contains(&status) {
             return Err(match status {
@@ -322,24 +366,44 @@ impl RemoteEmbedder {
 
 /// Il servizio remoto in uso, sostituito a caldo dal pannello; `None`: il modello locale. Una
 /// richiesta già partita finisce con il modello che aveva.
+/// Il servizio e la pausa stanno sotto un solo lucchetto: una richiesta li legge una volta
+/// ([`Self::in_use`]) e usa per i vettori lo stesso modello con cui li etichetta.
 #[derive(Clone, Default)]
-pub struct EmbeddingHolder(Arc<Held>);
+pub struct EmbeddingHolder(Arc<RwLock<Held>>);
 
 #[derive(Default)]
 struct Held {
-    remote: RwLock<Option<Arc<RemoteEmbedder>>>,
+    remote: Option<Arc<RemoteEmbedder>>,
     /// Fino a quando, dopo un cambio di modello dal pannello, non si danno vettori.
-    quiet_until: Mutex<Option<Instant>>,
+    quiet_until: Option<Instant>,
 }
 
 impl EmbeddingHolder {
+    fn read(&self) -> RwLockReadGuard<'_, Held> {
+        self.0.read().unwrap_or_else(|p| p.into_inner())
+    }
+
+    fn write(&self) -> RwLockWriteGuard<'_, Held> {
+        self.0.write().unwrap_or_else(|p| p.into_inner())
+    }
+
     pub fn get(&self) -> Option<Arc<RemoteEmbedder>> {
-        self.0.remote.read().unwrap_or_else(|p| p.into_inner()).clone()
+        self.read().remote.clone()
+    }
+
+    /// Una sola lettura per richiesta: il servizio che fa i vettori (nessuno: il modello locale),
+    /// oppure, finché dura la pausa dopo un cambio, `rate_limited` con i secondi che mancano.
+    fn in_use(&self) -> Result<Option<Arc<RemoteEmbedder>>, ComputeError> {
+        let held = self.read();
+        if let Some(left) = held.quiet_until.and_then(|until| until.checked_duration_since(Instant::now())) {
+            return Err(ComputeError::RateLimited { retry_after_s: left.as_secs().clamp(1, 600) });
+        }
+        Ok(held.remote.clone())
     }
 
     /// Senza pausa: all'avvio, o quando il modello dichiarato resta lo stesso.
     fn replace(&self, remote: Option<Arc<RemoteEmbedder>>) {
-        *self.0.remote.write().unwrap_or_else(|p| p.into_inner()) = remote;
+        self.write().remote = remote;
     }
 
     /// Un altro modello, a server acceso. L'app controlla il modello una volta per messaggio e
@@ -347,17 +411,14 @@ impl EmbeddingHolder {
     /// prima del cambio si ferma (una pausa che non gli costa tentativi) invece di finire con
     /// vettori di due modelli sotto il nome del primo. Quando riprova, vede il modello nuovo.
     fn switch(&self, remote: Option<Arc<RemoteEmbedder>>, pause: Duration) {
-        *self.0.quiet_until.lock().unwrap_or_else(|p| p.into_inner()) = (!pause.is_zero()).then(|| Instant::now() + pause);
-        self.replace(remote);
+        let mut held = self.write();
+        held.quiet_until = (!pause.is_zero()).then(|| Instant::now() + pause);
+        held.remote = remote;
     }
 
-    /// Dopo un cambio di modello, finché dura la pausa: `rate_limited` con i secondi che mancano.
-    fn paused(&self) -> Result<(), ComputeError> {
-        let until = *self.0.quiet_until.lock().unwrap_or_else(|p| p.into_inner());
-        match until.and_then(|until| until.checked_duration_since(Instant::now())) {
-            Some(left) => Err(ComputeError::RateLimited { retry_after_s: left.as_secs().clamp(1, 600) }),
-            None => Ok(()),
-        }
+    /// All'avvio: il resto della pausa di un cambio fatto prima del riavvio.
+    fn quiet_for(&self, left: Duration) {
+        self.write().quiet_until = Some(Instant::now() + left);
     }
 }
 
@@ -370,6 +431,11 @@ pub struct SwitchableBackend {
 impl SwitchableBackend {
     pub fn new(local: Arc<dyn ComputeBackend>, remote: EmbeddingHolder) -> SwitchableBackend {
         SwitchableBackend { local, remote }
+    }
+
+    /// Il nome dichiarato di ciò che [`EmbeddingHolder::in_use`] ha restituito.
+    fn identity_of(&self, remote: &Option<Arc<RemoteEmbedder>>) -> String {
+        remote.as_ref().map_or_else(|| self.local.embedding_identity().0, |remote| remote.identity().to_owned())
     }
 }
 
@@ -384,20 +450,45 @@ impl ComputeBackend for SwitchableBackend {
     }
 
     fn embed_counted(&self, inputs: &[String]) -> Result<(Vec<Vec<f32>>, u64), ComputeError> {
-        self.remote.paused()?;
-        let Some(remote) = self.remote.get() else {
-            return self.local.embed_counted(inputs);
+        self.embed_as(inputs, None).map(|(vectors, tokens, _)| (vectors, tokens))
+    }
+
+    fn embed_as(&self, inputs: &[String], expected: Option<&str>) -> Result<(Vec<Vec<f32>>, u64, String), ComputeError> {
+        let remote = self.remote.in_use()?;
+        let identity = self.identity_of(&remote);
+        expected_model(expected, &identity)?;
+        let (vectors, tokens) = match &remote {
+            // shortcut: remote calls wait at the local model's gate (one at a time), give the remote provider its own gate when a server needs parallel batches
+            Some(remote) => remote.serve(inputs)?,
+            None => self.local.embed_counted(inputs)?,
         };
-        // shortcut: remote calls wait at the local model's gate (one at a time), give the remote provider its own gate when a server needs parallel batches
-        remote.serve(inputs)
+        Ok((vectors, tokens, identity))
     }
 
     fn embed_image(&self, bytes: &[u8]) -> Result<Vec<f32>, ComputeError> {
-        if self.remote.get().is_some() {
+        self.embed_image_as(bytes, None).map(|(vector, _)| vector)
+    }
+
+    /// Prima la pausa e il modello controllato dal client: un messaggio cominciato prima di un
+    /// cambio si ferma, invece di finire senza le sue immagini; poi le immagini rifiutate con un
+    /// modello remoto (solo quell'immagine).
+    fn check_image(&self, expected: Option<&str>) -> Result<(), ComputeError> {
+        let remote = self.remote.in_use()?;
+        expected_model(expected, &self.identity_of(&remote))?;
+        match remote {
+            Some(_) => Err(ComputeError::DocumentUnreadable(IMAGES_UNAVAILABLE.to_owned())),
+            None => Ok(()),
+        }
+    }
+
+    fn embed_image_as(&self, bytes: &[u8], expected: Option<&str>) -> Result<(Vec<f32>, String), ComputeError> {
+        let remote = self.remote.in_use()?;
+        let identity = self.identity_of(&remote);
+        expected_model(expected, &identity)?;
+        if remote.is_some() {
             return Err(ComputeError::DocumentUnreadable(IMAGES_UNAVAILABLE.to_owned()));
         }
-        self.remote.paused()?;
-        self.local.embed_image(bytes)
+        Ok((self.local.embed_image(bytes)?, identity))
     }
 
     fn extract(&self, name: &str, bytes: &[u8]) -> Result<String, ComputeError> {
@@ -492,7 +583,7 @@ impl EmbeddingSettings {
         let (base, model) = self.checked()?;
         let key = self.api_key.as_deref().and_then(ApiKey::new);
         let identity = declared(&model, self.generation);
-        Ok(RemoteEmbedder::new(base.endpoint("/embeddings"), model, identity, key, timeout))
+        Ok(RemoteEmbedder::new(&base, model, identity, key, timeout))
     }
 
     /// L'indirizzo e il nome del modello, se rispettano le regole.
@@ -517,6 +608,80 @@ impl EmbeddingSettings {
     }
 }
 
+/// Ciò che si ricorda di un modello remoto salvato ([`RECORDS_FILE`]).
+#[derive(Clone, Serialize, Deserialize)]
+struct Record {
+    /// Quante volte, dietro questo nome, i vettori sono cambiati ([`declared`]).
+    generation: u32,
+    /// Il vettore della frase di prova all'ultimo salvataggio: il confronto per il prossimo.
+    probe: Vec<f32>,
+}
+
+/// Il contenuto di [`RECORDS_FILE`].
+#[derive(Default, Serialize, Deserialize)]
+struct Records {
+    #[serde(default)]
+    models: BTreeMap<String, Record>,
+    /// Fino a quando (secondi Unix) i vettori restano fermi dopo l'ultimo cambio di modello: la
+    /// pausa continua dopo un riavvio.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    quiet_until: Option<u64>,
+}
+
+fn now_unix() -> u64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |since| since.as_secs())
+}
+
+impl Records {
+    /// Nessun file: vuoto. Un file illeggibile vale come vuoto, con un avviso: i `#n` ripartono da
+    /// capo, e le app che vedono un nome senza numero reindicizzano se i vettori non coincidono.
+    fn load(path: &Path) -> Records {
+        match std::fs::read(path) {
+            Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or_else(|_| {
+                tracing::warn!(file = RECORDS_FILE, "file dei modelli di embedding non valido: si riparte da capo");
+                Records::default()
+            }),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Records::default(),
+            Err(_) => {
+                tracing::warn!(file = RECORDS_FILE, "file dei modelli di embedding illeggibile: si riparte da capo");
+                Records::default()
+            }
+        }
+    }
+
+    fn save(&self, path: &Path) -> Result<(), String> {
+        let body = serde_json::to_vec_pretty(self).map_err(|_| "Il file dei modelli non si può salvare.".to_owned())?;
+        save_private(path, &body).map_err(|_| "Il file dei modelli non si scrive nella cartella dei dati.".to_owned())
+    }
+
+    /// Un file di impostazioni di una versione che teneva qui il vettore di prova: il suo nome
+    /// passa nel file dei modelli con il suo numero. Vero se è cambiato qualcosa.
+    fn adopt(&mut self, settings: &EmbeddingSettings) -> bool {
+        let (Some(model), Some(probe)) = (trimmed(settings.model.as_deref()), settings.probe.clone()) else { return false };
+        if self.models.contains_key(&model) {
+            return false;
+        }
+        self.models.insert(model, Record { generation: settings.generation, probe });
+        true
+    }
+
+    /// Il numero del nome `model` con questo vettore di prova: lo stesso di prima se i vettori
+    /// coincidono, uno in più se dietro il nome c'è un altro modello, 0 per un nome nuovo.
+    fn generation_for(&self, model: &str, probe: &[f32]) -> u32 {
+        match self.models.get(model) {
+            Some(record) if cosine(&record.probe, probe) < SAME_VECTORS => record.generation.saturating_add(1),
+            Some(record) => record.generation,
+            None => 0,
+        }
+    }
+
+    /// Il resto della pausa salvata, mai più lungo di `pause`.
+    fn quiet_left(&self, pause: Duration) -> Option<Duration> {
+        let left = self.quiet_until?.checked_sub(now_unix()).filter(|left| *left > 0)?;
+        Some(Duration::from_secs(left).min(pause))
+    }
+}
+
 /// Il corpo di `PUT /admin/api/embedding`. Mai in un `Debug`: può portare la chiave.
 #[derive(Deserialize)]
 pub struct EmbeddingSettingsInput {
@@ -537,6 +702,8 @@ pub struct EmbeddingAdmin {
     holder: EmbeddingHolder,
     local: Arc<dyn ComputeBackend>,
     path: PathBuf,
+    /// [`RECORDS_FILE`], accanto alle impostazioni.
+    records_path: PathBuf,
     /// Quanto restano fermi i vettori dopo un cambio di modello ([`EmbeddingHolder::switch`]).
     pause: Duration,
     /// Un salvataggio alla volta.
@@ -553,7 +720,12 @@ impl EmbeddingAdmin {
     /// Con le impostazioni salvate in `path` già applicate, senza chiamata di prova: il servizio
     /// può non essere ancora partito. Impostazioni non più valide: vale il modello locale.
     pub fn new(holder: EmbeddingHolder, local: Arc<dyn ComputeBackend>, path: PathBuf, pause: Duration) -> EmbeddingAdmin {
+        let records_path = path.with_file_name(RECORDS_FILE);
+        let mut records = Records::load(&records_path);
         if let Some(settings) = EmbeddingSettings::load(&path) {
+            if records.adopt(&settings) && records.save(&records_path).is_err() {
+                tracing::warn!(file = RECORDS_FILE, "file dei modelli di embedding non scritto");
+            }
             match settings.embedder(TIMEOUT) {
                 Ok(remote) => {
                     tracing::info!(model = remote.identity(), "modello di embedding remoto scelto dal pannello");
@@ -562,7 +734,11 @@ impl EmbeddingAdmin {
                 Err(_) => tracing::error!(file = SETTINGS_FILE, "impostazioni del modello di embedding non valide: vale il modello locale"),
             }
         }
-        EmbeddingAdmin { holder, local, path, pause, lock: Mutex::new(()) }
+        // Un cambio di modello fatto poco prima di un riavvio: la sua pausa continua.
+        if let Some(left) = records.quiet_left(pause) {
+            holder.quiet_for(left);
+        }
+        EmbeddingAdmin { holder, local, path, records_path, pause, lock: Mutex::new(()) }
     }
 
     /// Un salvataggio alla volta; il secondo non aspetta il primo (la sua prova può durare 20 s).
@@ -574,14 +750,27 @@ impl EmbeddingAdmin {
         }
     }
 
-    /// Mette in uso `remote` (`None`: il modello locale). Con un altro nome dichiarato, i vettori
-    /// si fermano per la pausa.
-    fn put_in_use(&self, remote: Option<Arc<RemoteEmbedder>>) {
-        let name = |remote: &Option<Arc<RemoteEmbedder>>| remote.as_ref().map_or_else(|| MODEL_ID.to_owned(), |remote| remote.identity().to_owned());
-        if name(&self.holder.get()) == name(&remote) {
-            self.holder.replace(remote);
-        } else {
+    /// Il nome che le app vedono con `remote` in uso (`None`: il modello locale).
+    fn declared_with(&self, remote: Option<&RemoteEmbedder>) -> String {
+        remote.map_or_else(|| self.local.embedding_identity().0, |remote| remote.identity().to_owned())
+    }
+
+    /// Vero se mettere in uso `remote` cambia il nome dichiarato: allora i vettori si fermano per la
+    /// pausa, e la sua fine si scrive in `records` (che il chiamante salva) per un riavvio.
+    fn begins_pause(&self, remote: Option<&RemoteEmbedder>, records: &mut Records) -> bool {
+        let changes = self.declared_with(self.holder.get().as_deref()) != self.declared_with(remote);
+        if changes && !self.pause.is_zero() {
+            records.quiet_until = Some(now_unix().saturating_add(self.pause.as_secs()));
+        }
+        changes
+    }
+
+    /// Mette in uso `remote` (`None`: il modello locale), con la pausa se cambia il nome dichiarato.
+    fn put_in_use(&self, remote: Option<Arc<RemoteEmbedder>>, changes: bool) {
+        if changes {
             self.holder.switch(remote, self.pause);
+        } else {
+            self.holder.replace(remote);
         }
     }
 
@@ -630,28 +819,34 @@ impl EmbeddingAdmin {
             })
         };
         let mut settings = EmbeddingSettings { provider: provider.to_owned(), base_url, model: trimmed(input.model.as_deref()), api_key, generation: 0, probe: None };
-        let (base, model) = settings.checked()?;
+        let (_, model) = settings.checked()?;
         if !matches!(self.builtin_state().as_str(), "ready" | "loading") {
             return Err(format!("Installa prima il modello locale «{MODEL_ID}» dalla sezione «Modelli»: il suo tokenizer taglia i passaggi anche con un modello remoto."));
         }
-        resolves_internally(&base)?;
-        // Un testo fisso nostro, mai la posta di qualcuno.
+        // Un testo fisso nostro, mai la posta di qualcuno. Il client risolve il nome e lo rifiuta
+        // se non è interno ([`InternalOnly`]), dentro gli stessi 20 secondi.
         let (vectors, _) = settings.embedder(PROBE_TIMEOUT)?.embed(&[PROBE.to_owned()]).map_err(|error| match error {
             RemoteError::Unreachable => PROBE_UNREACHABLE.to_owned(),
             other => other.to_string(),
         })?;
         let probe = vectors.into_iter().next().ok_or_else(|| RemoteError::BadAnswer.to_string())?;
-        // Lo stesso nome di prima: se i vettori non sono più gli stessi, per le app è un altro modello.
-        if let Some(saved) = previous.filter(|saved| trimmed(saved.model.as_deref()).as_deref() == Some(model.as_str())) {
-            let changed = saved.probe.as_ref().is_some_and(|old| cosine(old, &probe) < SAME_VECTORS);
-            settings.generation = if changed { saved.generation.saturating_add(1) } else { saved.generation };
+        // Lo stesso nome di una volta qualunque (anche prima di un ritorno al modello locale o di
+        // un altro modello): se i vettori non sono più gli stessi, per le app è un altro modello.
+        let mut records = Records::load(&self.records_path);
+        if let Some(previous) = &previous {
+            records.adopt(previous);
         }
-        settings.probe = Some(probe);
+        settings.generation = records.generation_for(&model, &probe);
+        records.models.insert(model, Record { generation: settings.generation, probe });
         let remote = settings.embedder(TIMEOUT)?;
+        let changes = self.begins_pause(Some(&remote), &mut records);
+        // Prima il ricordo del nome, poi le impostazioni: dopo un'interruzione tra i due, il numero
+        // è già quello nuovo e il salvataggio seguente non lo perde.
+        records.save(&self.records_path)?;
         let body = serde_json::to_vec_pretty(&settings).map_err(|_| "Le impostazioni non si possono salvare.".to_owned())?;
         save_private(&self.path, &body).map_err(|_| "Il file delle impostazioni non si scrive nella cartella dei dati.".to_owned())?;
         tracing::info!(model = remote.identity(), "modello di embedding remoto salvato dal pannello");
-        self.put_in_use(Some(Arc::new(remote)));
+        self.put_in_use(Some(Arc::new(remote)), changes);
         Ok(self.view())
     }
 
@@ -661,16 +856,23 @@ impl EmbeddingAdmin {
         self.back_to_builtin()
     }
 
+    /// Il file dei modelli resta: i `#n` dei nomi servono anche al prossimo modello remoto.
     fn back_to_builtin(&self) -> Result<serde_json::Value, String> {
+        let mut records = Records::load(&self.records_path);
+        let changes = self.begins_pause(None, &mut records);
+        // La pausa che non si scrive dura comunque fino al prossimo riavvio: non blocca il ritorno.
+        if changes && !self.pause.is_zero() && records.save(&self.records_path).is_err() {
+            tracing::warn!(file = RECORDS_FILE, "fine della pausa non scritta");
+        }
         match std::fs::remove_file(&self.path) {
             Ok(()) => {}
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(_) => return Err("Il file delle impostazioni non si cancella.".to_owned()),
         }
-        if self.holder.get().is_some() {
+        if changes {
             tracing::info!(model = MODEL_ID, "modello di embedding locale ripristinato dal pannello");
         }
-        self.put_in_use(None);
+        self.put_in_use(None, changes);
         Ok(self.view())
     }
 }
@@ -734,27 +936,80 @@ mod tests {
         assert_eq!((declared("bge-m3", 0), declared("bge-m3", 2)), ("bge-m3".to_owned(), "bge-m3#2".to_owned()));
     }
 
+    /// Un resolver finto: questi indirizzi per ogni nome, senza rete.
+    #[derive(Debug)]
+    struct Fixed(Vec<&'static str>);
+
+    impl Resolver for Fixed {
+        fn resolve(&self, _: &Uri, _: &ureq::config::Config, _: NextTimeout) -> Result<ResolvedSocketAddrs, ureq::Error> {
+            let mut found = self.empty();
+            for address in &self.0 {
+                found.push(address.parse().unwrap());
+            }
+            Ok(found)
+        }
+    }
+
+    fn resolved(addresses: Vec<&'static str>) -> Result<ResolvedSocketAddrs, ureq::Error> {
+        let uri: Uri = "http://embeddings:8080/v1/embeddings".parse().unwrap();
+        InternalOnly(Fixed(addresses)).resolve(&uri, &ureq::config::Config::default(), NextTimeout::default())
+    }
+
     #[test]
-    fn a_name_is_internal_by_where_it_resolves() {
-        let private: IpAddr = "10.0.0.5".parse().unwrap();
-        let public: IpAddr = "93.184.216.34".parse().unwrap();
-        assert!(all_internal(&[private, "127.0.0.1".parse().unwrap(), "fd00::1".parse().unwrap()]));
+    fn every_connection_goes_only_where_the_name_resolves_internally() {
+        assert!(resolved(vec!["10.0.0.5:8080", "127.0.0.1:8080", "[fd00::1]:8080"]).is_ok());
         // Un solo indirizzo pubblico tra quelli del nome basta a rifiutarlo; nessun indirizzo, anche.
-        assert!(!all_internal(&[private, public]));
-        assert!(!all_internal(&[]));
-        assert!(resolves_internally(&parse_base_url("http://localhost:11434/v1").unwrap()).is_ok());
-        assert!(resolves_internally(&parse_base_url("http://10.0.0.5:11434/v1").unwrap()).is_ok());
+        let public = resolved(vec!["10.0.0.5:8080", "93.184.216.34:8080"]).unwrap_err();
+        assert_eq!(transport_error(&public, "embeddings"), RemoteError::PublicAddress("embeddings".to_owned()));
+        let none = resolved(vec![]).unwrap_err();
+        assert_eq!(transport_error(&none, "embeddings"), RemoteError::NotResolved("embeddings".to_owned()));
+        // Il pannello dice quale nome e perché.
+        assert!(RemoteError::PublicAddress("embeddings".to_owned()).to_string().contains("«embeddings» si risolve in un indirizzo pubblico"));
+        // Un altro errore di rete resta «non risponde», senza dettagli.
+        assert_eq!(transport_error(&ureq::Error::ConnectionFailed, "embeddings"), RemoteError::Unreachable);
     }
 
     #[test]
     fn the_pause_after_a_switch_ends_and_a_plain_replace_has_none() {
         let holder = EmbeddingHolder::default();
         holder.replace(None);
-        assert!(holder.paused().is_ok());
+        assert!(holder.in_use().is_ok());
         holder.switch(None, Duration::from_secs(660));
-        assert!(matches!(holder.paused(), Err(ComputeError::RateLimited { retry_after_s }) if (1..=600).contains(&retry_after_s)));
-        holder.switch(None, Duration::ZERO);
-        assert!(holder.paused().is_ok());
+        assert!(matches!(holder.in_use(), Err(ComputeError::RateLimited { retry_after_s }) if (1..=600).contains(&retry_after_s)));
+        // Una sostituzione senza cambio di nome non tocca la pausa in corso.
+        holder.replace(None);
+        assert!(holder.in_use().is_err());
+        // La pausa finisce davvero, senza che nessuno la tolga.
+        holder.switch(None, Duration::from_millis(300));
+        assert!(holder.in_use().is_err());
+        std::thread::sleep(Duration::from_millis(400));
+        assert!(holder.in_use().is_ok());
+    }
+
+    #[test]
+    fn a_name_keeps_its_number_whatever_was_saved_in_between() {
+        let mut a = vec![0.0f32; DIM];
+        a[0] = 1.0;
+        let mut b = vec![0.0f32; DIM];
+        b[1] = 1.0;
+        let mut records = Records::default();
+        assert_eq!(records.generation_for("x", &a), 0);
+        records.models.insert("x".to_owned(), Record { generation: 0, probe: a.clone() });
+        assert_eq!(records.generation_for("x", &a), 0);
+        assert_eq!(records.generation_for("x", &b), 1);
+        records.models.insert("x".to_owned(), Record { generation: 1, probe: b.clone() });
+        assert_eq!(records.generation_for("x", &b), 1);
+        // Un file di impostazioni di prima, con il vettore dentro: il suo numero non si perde.
+        let mut legacy = Records::default();
+        let old = EmbeddingSettings { provider: PROVIDER_OPENAI.to_owned(), base_url: None, model: Some("y".to_owned()), api_key: None, generation: 2, probe: Some(a.clone()) };
+        assert!(legacy.adopt(&old));
+        assert_eq!(legacy.generation_for("y", &a), 2);
+        assert!(!legacy.adopt(&old), "una volta sola");
+        // La pausa salvata non dura più di quella impostata, e quella passata non c'è più.
+        legacy.quiet_until = Some(now_unix() + 10_000);
+        assert_eq!(legacy.quiet_left(Duration::from_secs(660)), Some(Duration::from_secs(660)));
+        legacy.quiet_until = Some(now_unix().saturating_sub(5));
+        assert_eq!(legacy.quiet_left(Duration::from_secs(660)), None);
     }
 
     #[test]

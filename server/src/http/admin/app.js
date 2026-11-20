@@ -11,6 +11,8 @@
   // «Esci» (o una chiave rifiutata) chiude la sessione: una risposta partita prima non ridisegna nulla.
   let session = 0;
   let defaultMax = 0;
+  // Gli utenti dell'ultimo caricamento: aprire o chiudere una riga, o annullare, li ridisegna senza rete.
+  let lastUsers = [];
   let llmOn = false;
   const openDetails = new Set();
 
@@ -135,6 +137,10 @@
   function lock(message) {
     adminKey = null;
     session += 1;
+    lastUsers = [];
+    // Un accesso ancora in corso non tiene occupato «Entra»: la sua risposta non conta più.
+    byId('key-submit').disabled = false;
+    byId('key-submit').removeAttribute('aria-busy');
     openDetails.clear();
     hideSecret();
     clear(byId('users-body'));
@@ -193,16 +199,27 @@
 
   // Un'azione che costa chiede un secondo clic sullo stesso pulsante. Il primo lo arma e lo dice;
   // Esc, o il fuoco che va altrove, lo disarmano. Vero quando il clic è il secondo.
-  const armedSay = new WeakMap();
+  const armedAt = new WeakMap();
 
-  function secondClick(button, label, say) {
+  // Il pulsante di un'azione che costa: l'etichetta di conferma è già dentro, nascosta, così armarlo
+  // non ne cambia la misura né sposta nulla, e il secondo clic cade dove è caduto il primo.
+  function guardedButton(label, armedLabel, className) {
+    return el('button', { type: 'button', className: (className ? className + ' ' : '') + 'guarded' },
+      el('span', { className: 'when-plain', text: label }),
+      el('span', { className: 'when-armed', text: armedLabel }));
+  }
+
+  function secondClick(button, what) {
+    // Un doppio clic è due clic in pochi millisecondi: il secondo conta solo dopo mezzo secondo.
+    if (button.classList.contains('confirm') && Date.now() - armedAt.get(button) < 500) return false;
     if (disarm(button)) return true;
-    armedSay.set(button, say);
-    button.setAttribute('data-plain', button.textContent);
-    if (!button.classList.contains('danger')) button.setAttribute('data-calm', '');
-    button.textContent = label;
-    button.classList.add('danger', 'confirm');
-    say('Premi di nuovo per confermare, Esc per annullare.');
+    armedAt.set(button, Date.now());
+    button.classList.add('confirm');
+    // Che cosa succederà: al passaggio del mouse e a chi legge la pagina con la voce, senza
+    // aggiungere righe che sposterebbero il pulsante.
+    const hint = what + ' Premi di nuovo per confermare, Esc per annullare.';
+    button.setAttribute('title', hint);
+    byId('armed-note').textContent = hint;
     button.addEventListener('blur', () => disarm(button), { once: true });
     return false;
   }
@@ -217,11 +234,9 @@
   // Vero se il pulsante era armato.
   function disarm(button) {
     if (!button.classList.contains('confirm')) return false;
-    button.textContent = button.getAttribute('data-plain');
     button.classList.remove('confirm');
-    if (button.hasAttribute('data-calm')) button.classList.remove('danger');
-    button.removeAttribute('data-calm');
-    armedSay.get(button)('');
+    button.removeAttribute('title');
+    byId('armed-note').textContent = '';
     return true;
   }
 
@@ -295,6 +310,7 @@
   }
 
   function renderUsers(users) {
+    lastUsers = users;
     const body = byId('users-body');
     clear(body);
     byId('empty').hidden = users.length > 0;
@@ -309,17 +325,11 @@
         text: open ? 'Chiudi' : 'Gestisci',
         'aria-expanded': open ? 'true' : 'false',
       });
-      manage.addEventListener('click', () => run(manage, async () => {
-        const flip = () => (openDetails.has(user.id) ? openDetails.delete(user.id) : openDetails.add(user.id));
-        flip();
-        try {
-          await reloadUsers(user);
-        } catch (e) {
-          // La riga è rimasta com'era: anche ciò che ricordiamo.
-          flip();
-          throw e;
-        }
-      }));
+      manage.addEventListener('click', () => {
+        if (openDetails.has(user.id)) openDetails.delete(user.id);
+        else openDetails.add(user.id);
+        redrawUsers(user);
+      });
       body.append(el('tr', { 'data-user': user.username, className: open ? 'open' : null },
         el('td', {},
           el('strong', { text: user.username }),
@@ -334,6 +344,12 @@
         renderDetails(user, details);
       }
     }
+  }
+
+  // La tabella di prima, ridisegnata (una riga aperta o chiusa), con il fuoco sulla riga dell'utente.
+  function redrawUsers(user) {
+    renderUsers(lastUsers);
+    focusUser(user.username);
   }
 
   // Dopo un'azione su un utente: la tabella aggiornata, con il fuoco di nuovo sulla sua riga.
@@ -367,9 +383,9 @@
   function rowActions(user) {
     const box = el('div', { className: 'row-actions' });
 
-    const reset = el('button', { type: 'button', className: 'secondary', text: 'Reimposta password' });
+    const reset = guardedButton('Reimposta password', 'Sì, reimposta', 'secondary');
     reset.addEventListener('click', () => {
-      if (!secondClick(reset, 'Conferma: reimposta e disconnetti i dispositivi', setStatus)) return;
+      if (!secondClick(reset, 'Una nuova password provvisoria per «' + user.username + '»; i suoi dispositivi vengono disconnessi.')) return;
       run(reset, async () => {
         const result = await api('POST', '/users/' + encodeURIComponent(user.id) + '/reset-password');
         // Prima la password, che si vede una volta sola: la tabella può non ricaricarsi.
@@ -398,9 +414,9 @@
       box.replaceChildren(maxEditor(user));
     });
 
-    const remove = el('button', { type: 'button', className: 'danger', text: 'Cancella' });
+    const remove = guardedButton('Cancella', 'Sì, cancella', 'danger');
     remove.addEventListener('click', () => {
-      if (!secondClick(remove, 'Conferma: cancella «' + user.username + '»', setStatus)) return;
+      if (!secondClick(remove, 'Cancella «' + user.username + '» con i suoi dispositivi.')) return;
       run(remove, async () => {
         await api('DELETE', '/users/' + encodeURIComponent(user.id));
         openDetails.delete(user.id);
@@ -432,7 +448,7 @@
       await reloadUsers(user);
       setStatus('Massimo di dispositivi aggiornato per «' + user.username + '».');
     });
-    const back = () => run(cancel, () => reloadUsers(user));
+    const back = () => redrawUsers(user);
     useDefault.addEventListener('click', () => submit(useDefault, null));
     cancel.addEventListener('click', back);
     setTimeout(() => input.focus(), 0);
@@ -471,9 +487,9 @@
       }
       const list = el('ul', { className: 'devices', 'aria-label': 'Dispositivi di ' + user.username });
       for (const device of data.devices) {
-        const revoke = el('button', { type: 'button', className: 'danger', text: 'Revoca' });
+        const revoke = guardedButton('Revoca', 'Sì, revoca', 'danger');
         revoke.addEventListener('click', () => {
-          if (!secondClick(revoke, 'Conferma: revoca', setStatus)) return;
+          if (!secondClick(revoke, 'Revoca il dispositivo «' + device.name + '»: dovrà accedere di nuovo.')) return;
           run(revoke, async () => {
             await api('DELETE', '/users/' + encodeURIComponent(user.id) + '/devices/' + encodeURIComponent(device.id));
             await reloadUsers(user);
@@ -547,11 +563,18 @@
       box.append(el('span', { className: 'hint', text: 'Scaricamento in corso…' }));
       return box;
     }
+    // Il servizio scelto in «Embedding» non è un file di questo server: non c'è nulla da installare.
+    if (model.kind === 'embedding' && !model.total_bytes) {
+      box.append(el('span', { className: 'hint', text: 'Servizio interno: si cambia dalla sezione «Embedding».' }));
+      return box;
+    }
+    // In caricamento è già installato.
+    if (model.state === 'loading') return box;
     if (model.state === 'ready') {
       if (details === null) return box;
-      const remove = el('button', { type: 'button', className: 'danger', text: 'Rimuovi' });
+      const remove = guardedButton('Rimuovi', 'Sì, rimuovi', 'danger');
       remove.addEventListener('click', () => {
-        if (!secondClick(remove, 'Conferma: rimuovi «' + model.id + '»', setModelsStatus)) return;
+        if (!secondClick(remove, 'Rimuove il modello «' + model.id + '» da questo server.')) return;
         runModels(remove, async () => {
           await api('DELETE', '/models/' + encodeURIComponent(model.id));
           setModelsStatus('Modello «' + model.id + '» rimosso.');
@@ -588,10 +611,11 @@
     return box;
   }
 
+  // Vero se ha disegnato la tabella.
   function renderModels(models, host) {
     const body = byId('models-body');
     // Un «Rimuovi» armato aspetta il secondo clic: la tabella si ridisegna al giro dopo.
-    if (body.querySelector('button.confirm')) return;
+    if (body.querySelector('button.confirm')) return false;
     // Durante uno scaricamento la tabella si ridisegna ogni due secondi: il fuoco resta sulla sua riga.
     const row = document.activeElement.closest('tr[data-model]');
     const focused = row ? row.getAttribute('data-model') : null;
@@ -612,6 +636,7 @@
         if (button) button.focus();
       }
     }
+    return true;
   }
 
   function setModelsStatus(message) {
@@ -644,8 +669,9 @@
     if (typeof host.available_memory_mb === 'number') parts.push('Memoria libera: ' + formatMemory(host.available_memory_mb));
     if (typeof host.available_disk_bytes === 'number') parts.push('Spazio libero: ' + formatBytes(host.available_disk_bytes));
     byId('models-host').textContent = parts.join(' · ');
-    renderModels(data.models, host);
-    if (data.models.some((m) => m.state === 'downloading')) {
+    const drawn = renderModels(data.models, host);
+    // Anche quando il disegno è saltato: uno scaricamento finito intanto deve comparire.
+    if (!drawn || data.models.some((m) => m.state === 'downloading')) {
       modelsTimer = setTimeout(() => loadModels().catch(() => {}), 2000);
     }
   }
@@ -802,10 +828,13 @@
     return embeddingProvider() === 'builtin' ? lastEmbedding.builtin.model : byId('embedding-model').value.trim();
   }
 
-  // Vero se salvando ora cambierebbe il modello: le app dovrebbero reindicizzare.
+  // Vero se salvando ora il modello può cambiare: le app dovrebbero reindicizzare.
   function embeddingChanges() {
     const choice = embeddingChoice();
-    return choice !== '' && choice !== lastEmbedding.active.model.split('#')[0];
+    if (choice === '') return false;
+    if (choice !== lastEmbedding.active.model.split('#')[0]) return true;
+    // Lo stesso nome a un altro indirizzo può dare altri vettori: allora il server lo rinomina.
+    return embeddingProvider() === 'openai-compatible' && byId('embedding-base-url').value.trim() !== (lastEmbedding.base_url || '');
   }
 
   function showEmbeddingFields() {
@@ -919,13 +948,17 @@
       byId('key-input').value = '';
       if (!value) return;
       adminKey = value;
+      const started = session;
       runKey(byId('key-submit'), loadAll).then(() => {
-        // Non entrati (il server non risponde, un errore): la chiave non resta in memoria.
-        if (byId('shell').hidden) adminKey = null;
+        // Non entrati (il server non risponde, un errore): la chiave non resta in memoria. Se
+        // intanto si è usciti e rientrati, la chiave è quella del nuovo accesso: resta.
+        if (session === started && byId('shell').hidden) adminKey = null;
       });
     });
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') disarmAll();
+      // Invio tenuto premuto ripete il clic: su un pulsante conta solo il primo.
+      if (event.repeat && event.key === 'Enter' && event.target instanceof Element && event.target.closest('button')) event.preventDefault();
     });
     // Dove un clic non dà il fuoco al pulsante (Safari) l'uscita dal pulsante non si vede: un clic
     // su qualunque altra cosa disarma, prima che quel clic faccia il suo.
@@ -974,7 +1007,7 @@
     });
     byId('llm-reset').addEventListener('click', (event) => {
       const button = event.currentTarget;
-      if (!secondClick(button, 'Conferma: scarta ciò che è salvato qui', setLlmStatus)) return;
+      if (!secondClick(button, 'Scarta le impostazioni salvate da questo pannello, chiave compresa: vale di nuovo la configurazione del server.')) return;
       runLlm(button, resetLlm);
     });
     byId('llm-refresh').addEventListener('click', (event) => runLlm(event.currentTarget, async () => {
@@ -985,11 +1018,12 @@
       radio.addEventListener('change', showEmbeddingFields);
     }
     byId('embedding-model').addEventListener('input', showEmbeddingFields);
+    byId('embedding-base-url').addEventListener('input', showEmbeddingFields);
     byId('embedding-form').addEventListener('submit', (event) => {
       event.preventDefault();
       const save = byId('embedding-save');
       // Un altro modello: tutte le app reindicizzano, quindi un secondo clic.
-      if (embeddingChanges() && !secondClick(save, 'Conferma: cambia modello', setEmbeddingStatus)) return;
+      if (embeddingChanges() && !secondClick(save, 'Cambia il modello di embedding: se i vettori cambiano, ogni app chiederà di reindicizzare.')) return;
       runEmbedding(save, saveEmbedding);
     });
     byId('embedding-refresh').addEventListener('click', (event) => runEmbedding(event.currentTarget, loadEmbedding));

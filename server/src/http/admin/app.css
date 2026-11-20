@@ -473,16 +473,29 @@ button.danger {
 
 button.danger:enabled:hover { background: var(--danger-bg); border-color: var(--danger); }
 
-/* Armed: the next click does it. The label may be long (a username): it wraps. */
-button.danger.confirm, button.danger.confirm:enabled:hover {
-  height: auto;
-  min-height: var(--control);
-  padding-block: 5px;
+/* A button that asks twice holds both labels in one cell: as wide as the longer from the start, so
+   arming it moves nothing and the second click lands where the first did. */
+button.guarded { display: inline-grid; grid-auto-flow: column; }
+button.guarded > span { grid-area: 1 / 1; text-align: center; }
+button.guarded .when-armed, button.guarded.confirm .when-plain { visibility: hidden; }
+button.guarded.confirm .when-armed { visibility: visible; }
+
+/* Armed: the next click does it. */
+button.confirm, button.confirm:enabled:hover {
   background: var(--danger);
   border-color: var(--danger);
   color: var(--on-danger);
-  text-align: left;
-  white-space: normal;
+}
+
+/* Read by a screen reader, not shown. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 button:disabled { opacity: 0.55; cursor: not-allowed; }

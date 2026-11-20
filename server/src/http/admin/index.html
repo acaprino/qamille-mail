@@ -24,6 +24,7 @@
 </div>
 
 <div id="shell" class="shell" hidden>
+  <p id="armed-note" class="sr-only" role="status"></p>
   <a class="skip" href="#content">Vai al contenuto</a>
   <aside class="sidebar">
     <p class="brand"><span class="brand-mark" aria-hidden="true">Q</span><span class="brand-name">Qamille</span><span class="brand-sub">Server</span></p>
@@ -146,7 +147,7 @@
         </fieldset>
         <div id="llm-openai" class="fields" hidden>
           <label class="field">Indirizzo base
-            <input id="llm-base-url" type="url" spellcheck="false" placeholder="https://api.openai.com/v1">
+            <input id="llm-base-url" type="text" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="https://api.openai.com/v1">
           </label>
           <label class="field">Modello predefinito
             <input id="llm-model" type="text" spellcheck="false" autocapitalize="none" placeholder="gpt-4.1-mini">
@@ -178,7 +179,7 @@
         <div class="form-foot">
           <div class="actions">
             <button id="llm-save" type="submit">Salva e applica</button>
-            <button id="llm-reset" type="button" class="secondary">Torna alla configurazione del server</button>
+            <button id="llm-reset" type="button" class="secondary guarded"><span class="when-plain">Torna alla configurazione del server</span><span class="when-armed">Sì, scarta le impostazioni</span></button>
           </div>
           <p id="llm-status" class="status" role="status"></p>
           <p id="llm-error" class="note note-danger" role="alert" hidden></p>
@@ -220,7 +221,7 @@
         <p id="embedding-builtin-note" class="note note-warn" hidden>EmbeddingGemma 2 non è installato: installalo dalla sezione «Modelli». Serve anche con un'API, per dividere i testi in passaggi.</p>
         <div id="embedding-openai" class="fields" hidden>
           <label class="field">Indirizzo base
-            <input id="embedding-base-url" type="url" spellcheck="false" placeholder="http://ollama:11434/v1">
+            <input id="embedding-base-url" type="text" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="http://ollama:11434/v1">
           </label>
           <label class="field">Modello
             <input id="embedding-model" type="text" maxlength="40" spellcheck="false" autocapitalize="none" placeholder="embeddinggemma">
@@ -236,12 +237,12 @@
           </div>
         </div>
         <div id="embedding-warning" class="callout callout-warn" role="status" hidden>
-          <p><strong>Stai per cambiare modello: ogni app chiederà di reindicizzare la posta.</strong></p>
+          <p><strong>Stai per cambiare modello o indirizzo: se i vettori cambiano, ogni app chiederà di reindicizzare la posta.</strong></p>
           <p>Finché non lo fa, in quell'app la ricerca per significato resta ferma; quella per parole continua. Con un modello di solo testo le immagini non si cercano per significato.</p>
         </div>
         <div class="form-foot">
           <div class="actions">
-            <button id="embedding-save" type="submit">Salva e applica</button>
+            <button id="embedding-save" type="submit" class="guarded"><span class="when-plain">Salva e applica</span><span class="when-armed">Sì, cambia modello</span></button>
           </div>
           <p id="embedding-status" class="status" role="status"></p>
           <p id="embedding-error" class="note note-danger" role="alert" hidden></p>

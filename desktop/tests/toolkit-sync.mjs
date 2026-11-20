@@ -6,11 +6,11 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import test from 'node:test';
-import { latestToolkitRelease, syncToolkit } from '../scripts/sync-toolkit.mjs';
+import { latestToolkitRelease, renameRetrying, replaceVendor, syncToolkit } from '../scripts/sync-toolkit.mjs';
 
 const TAR = process.platform === 'win32' ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
 const cache = join(import.meta.dirname, '..', '.cache');
@@ -45,14 +45,12 @@ function toolkitPackage({ peerDependencies, version = '1.2.3', commit = COMMIT, 
   return dir;
 }
 
-// The desktop folder of Qamille: its package.json, and optionally a copy of the toolkit synced earlier.
+// The desktop folder of Qamille: its package.json, and optionally a copy of the toolkit synced earlier (a whole,
+// verifiable package, version 0.9.0, with an old.txt that no newer package has).
 function desktopOf({ dependencies = { react: '19.3.1' }, devDependencies = {}, old = false } = {}) {
   const desktop = fresh('desktop');
   write(join(desktop, 'package.json'), `${JSON.stringify({ name: 'qamille-desktop', dependencies, devDependencies }, null, 2)}\n`);
-  if (old) {
-    write(join(desktop, 'vendor', 'toolkit', 'old.txt'), 'old\n');
-    write(join(desktop, 'vendor', 'toolkit', 'provenance.json'), '{ "version": "0.9.0" }\n');
-  }
+  if (old) cpSync(toolkitPackage({ version: '0.9.0', commit: '9'.repeat(40), files: { 'old.txt': 'old\n' } }), join(desktop, 'vendor', 'toolkit'), { recursive: true });
   return desktop;
 }
 
@@ -72,10 +70,11 @@ const lines = () => { const list = []; list.log = (line) => list.push(line); ret
 const releaseOf = (dir, tag = 'v1.2.3') => ({ tag, dir });
 const synced = (tag = 'v1.2.3') => `toolkit: ${tag} (${COMMIT.slice(0, 7)}) synced`;
 
-// The old copy is untouched and no staging folder is left.
+// The old copy is untouched and no staging or aside folder is left.
 const assertKept = (desktop, before) => {
   assert.deepEqual(tree(vendorOf(desktop)), before);
   assert.equal(existsSync(`${vendorOf(desktop)}.part`), false);
+  assert.equal(existsSync(`${vendorOf(desktop)}.old`), false);
 };
 
 test('a verified package lands in vendor/toolkit', async () => {
@@ -163,6 +162,24 @@ test('an exact peer that equals Qamille passes, whether it is a dependency or a 
   assert.deepEqual(tree(vendorOf(desktop)), tree(dir));
 });
 
+test('an exact peer may be written =1.2.3 or v1.2.3, in the toolkit or in Qamille', async () => {
+  // Equal once the prefix is taken off: passes, with no line.
+  const equal = toolkitPackage({ peerDependencies: { react: 'v19.3.1', 'react-dom': '=19.3.1' } });
+  const log = lines();
+  await syncToolkit({ desktop: desktopOf({ dependencies: { react: '19.3.1', 'react-dom': 'v19.3.1' } }), release: releaseOf(equal), log: log.log });
+  assert.deepEqual([...log], [synced()]);
+  // Different: still an exact peer, so it stops the sync and is not mistaken for a range.
+  for (const peer of ['v19.0.0', '=19.0.0']) {
+    const other = toolkitPackage({ peerDependencies: { react: peer } });
+    const log = lines();
+    await assert.rejects(syncToolkit({ desktop: desktopOf(), release: releaseOf(other), log: log.log }), (error) => {
+      assert.ok(error.message.includes(`react is exactly ${peer} in the toolkit, but Qamille has 19.3.1`), error.message);
+      return true;
+    });
+    assert.deepEqual([...log], [], peer);
+  }
+});
+
 test('a range peer is reported, not enforced', async () => {
   const dir = toolkitPackage({ peerDependencies: { react: '^18.0.0 || ^19.0.0', 'react-dom': '^18.0.0', 'solid-js': '^1.0.0' } });
   // react-dom is far from the range and still passes; solid-js is not Qamille's at all, so it is not mentioned.
@@ -198,6 +215,136 @@ test('no release but a copy keeps the copy', async () => {
   assertKept(desktop, before);
 });
 
+test('no release and a copy that no longer matches its provenance.json is not kept as good', async () => {
+  const mess = {
+    // A sync that died half-way through deleting the old code: provenance.json survived, a file did not.
+    'a file is missing': (copy) => rmSync(join(copy, 'dist', 'index.js')),
+    'a file was changed': (copy) => write(join(copy, 'dist', 'index.js'), 'export const toolkit = "edited";\n'),
+    'a file was added': (copy) => write(join(copy, 'dist', 'extra.js'), 'extra\n'),
+    'provenance.json is gone': (copy) => rmSync(join(copy, 'provenance.json')),
+  };
+  for (const [what, spoil] of Object.entries(mess)) {
+    const desktop = desktopOf({ old: true });
+    spoil(vendorOf(desktop));
+    const before = tree(vendorOf(desktop));
+    const log = lines();
+    await assert.rejects(syncToolkit({ desktop, release: null, log: log.log }), (error) => {
+      assert.match(error.message, /^toolkit: no release of acaprino\/toolkit's main reachable, and the copy in vendor\/toolkit fails its checks/, what);
+      assert.match(error.message, /network/, what);
+      assert.match(error.message, /TOOLKIT_DIR/, what);
+      assert.match(error.message, /dist\/index\.js|dist\/extra\.js|no provenance\.json/, what);
+      return true;
+    });
+    assertKept(desktop, before);
+    assert.deepEqual([...log], [], what);
+  }
+});
+
+test('vendor/toolkit.old without vendor/toolkit is the copy of an interrupted sync: it comes back, even offline', async () => {
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  renameSync(vendorOf(desktop), `${vendorOf(desktop)}.old`);
+  const log = lines();
+  await syncToolkit({ desktop, release: null, log: log.log });
+  assert.deepEqual([...log], [
+    'toolkit: vendor/toolkit was missing, the previous copy of an interrupted sync is back',
+    "toolkit: no release of the toolkit's main reachable, keeping the existing copy",
+  ]);
+  assertKept(desktop, before);
+});
+
+test('vendor/toolkit.old without vendor/toolkit is restored before a new package replaces it', async () => {
+  const dir = toolkitPackage();
+  const desktop = desktopOf({ old: true });
+  renameSync(vendorOf(desktop), `${vendorOf(desktop)}.old`);
+  await syncToolkit({ desktop, release: releaseOf(dir), log: () => {} });
+  assert.deepEqual(tree(vendorOf(desktop)), tree(dir));
+  assert.equal(existsSync(`${vendorOf(desktop)}.old`), false);
+});
+
+test('a vendor/toolkit.old left beside vendor/toolkit is removed, and never replaces it', async () => {
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  write(join(`${vendorOf(desktop)}.old`, 'stale.txt'), 'stale\n');
+  await syncToolkit({ desktop, release: null, log: () => {} });
+  assertKept(desktop, before);
+});
+
+// A rename that fails as it does on Windows when a file of the folder is held open (EPERM), for the moves `fails`
+// names by their folders' base names; every other rename really happens.
+const failingRename = (fails) => (from, to) => {
+  if (fails(basename(from), basename(to))) throw Object.assign(new Error(`EPERM: operation not permitted, rename '${basename(from)}' -> '${basename(to)}'`), { code: 'EPERM' });
+  renameSync(from, to);
+};
+
+test('a new copy that cannot be put in place brings the old one back', () => {
+  const dir = toolkitPackage();
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  assert.throws(() => replaceVendor(dir, desktop, failingRename((from) => from === 'toolkit.part')), /EPERM/);
+  assertKept(desktop, before);
+});
+
+test('an old copy that cannot be put aside stays where it is', () => {
+  const dir = toolkitPackage();
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  assert.throws(() => replaceVendor(dir, desktop, failingRename((from, to) => to === 'toolkit.old')), /EPERM/);
+  assertKept(desktop, before);
+});
+
+test('when the old copy cannot be put back either it waits in vendor/toolkit.old, and the next sync restores it', async () => {
+  const dir = toolkitPackage();
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  assert.throws(
+    () => replaceVendor(dir, desktop, failingRename((from) => from === 'toolkit.part' || from === 'toolkit.old')),
+    (error) => /EPERM/.test(error.message) && /toolkit\.old/.test(error.message),
+  );
+  // What a crash between the two renames would have left: no vendor/toolkit, the old copy beside it, no .part.
+  assert.equal(existsSync(vendorOf(desktop)), false);
+  assert.deepEqual(tree(`${vendorOf(desktop)}.old`), before);
+  assert.equal(existsSync(`${vendorOf(desktop)}.part`), false);
+  await syncToolkit({ desktop, release: null, log: () => {} });
+  assertKept(desktop, before);
+});
+
+test('a rename that the system refuses for a moment is tried again; any other error is not', () => {
+  const calls = [];
+  const waits = [];
+  const flaky = (failures, code) => {
+    let count = 0;
+    return () => { calls.push(code); if (count++ < failures) throw Object.assign(new Error(code), { code }); };
+  };
+  const options = (rename, extra = {}) => ({ rename, wait: (ms) => waits.push(ms), ...extra });
+  renameRetrying('a', 'b', options(flaky(2, 'EPERM')));
+  assert.equal(calls.length, 3, 'two refusals, then it works');
+  assert.deepEqual(waits, [100, 200]);
+  calls.length = 0;
+  waits.length = 0;
+  assert.throws(() => renameRetrying('a', 'b', options(flaky(99, 'EBUSY'), { attempts: 3 })), /EBUSY/);
+  assert.equal(calls.length, 3, 'given up after the attempts');
+  assert.deepEqual(waits, [100, 200]);
+  calls.length = 0;
+  waits.length = 0;
+  assert.throws(() => renameRetrying('a', 'b', options(flaky(1, 'ENOENT'))), /ENOENT/);
+  assert.equal(calls.length, 1, 'a missing folder is not a busy one');
+  assert.deepEqual(waits, []);
+});
+
+test('a link inside the package is refused and the old copy stays', async () => {
+  const dir = toolkitPackage();
+  const elsewhere = fresh('elsewhere');
+  write(join(elsewhere, 'outside.txt'), 'outside\n');
+  // A junction needs no administrator rights on Windows (a file symlink does); elsewhere it is a plain symlink.
+  symlinkSync(elsewhere, join(dir, 'dist', 'linked'), 'junction');
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  await assert.rejects(syncToolkit({ desktop, release: releaseOf(dir), log: () => {} }), /dist\/linked is not a plain file/);
+  assertKept(desktop, before);
+  assert.equal(readFileSync(join(elsewhere, 'outside.txt'), 'utf8'), 'outside\n', 'what the link pointed at is untouched');
+});
+
 // The package folder as a .tgz with one top folder, "package", written to `out` (the system tar, as in a release).
 function packTgz(packageDir, out) {
   mkdirSync(dirname(out), { recursive: true });
@@ -207,13 +354,14 @@ function packTgz(packageDir, out) {
 
 // TOOLKIT_DIR: a fake checkout. Its `npm run release` copies a prebuilt release/ (the .tgz and its manifest) into
 // place and records the arguments it got, as the toolkit's scripts/release.mjs would leave release/.
-function fakeCheckout({ manifestSha = null, packageDir = toolkitPackage() } = {}) {
+// `releaseScript` replaces what that script does (to make it fail, or leave nothing behind).
+function fakeCheckout({ manifestSha = null, packageDir = toolkitPackage(), releaseScript = null } = {}) {
   const checkout = fresh('checkout');
   const tgz = packTgz(packageDir, join(checkout, 'prebuilt', 'acaprino-toolkit-1.2.3.tgz'));
   const manifest = { version: '1.2.3', packages: [{ name: '@acaprino/toolkit', file: 'acaprino-toolkit-1.2.3.tgz', sha256: manifestSha ?? sha256(readFileSync(tgz)) }] };
   write(join(checkout, 'prebuilt', 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
   write(join(checkout, 'package.json'), `${JSON.stringify({ name: 'fake-toolkit', scripts: { release: 'node make-release.mjs' } })}\n`);
-  write(join(checkout, 'make-release.mjs'), [
+  write(join(checkout, 'make-release.mjs'), releaseScript ?? [
     "import { cpSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';",
     "rmSync('release', { recursive: true, force: true });",
     "mkdirSync('release');",
@@ -261,6 +409,33 @@ test('TOOLKIT_DIR: a package that differs from its provenance.json is refused an
   await assert.rejects(syncToolkit({ desktop, source: checkout, log: () => {} }), /dist\/index\.js does not match provenance\.json/);
   assertKept(desktop, before);
   assert.equal(existsSync(join(desktop, '.cache', 'toolkit-local')), false, 'the staging folder is removed, refused or not');
+});
+
+test('TOOLKIT_DIR: a release script that fails is reported with the folder, and the old copy stays', async () => {
+  const { checkout } = fakeCheckout({ releaseScript: 'process.exit(1);\n' });
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  await assert.rejects(syncToolkit({ desktop, source: checkout, log: () => {} }), (error) => {
+    assert.match(error.message, /^toolkit: /);
+    assert.ok(error.message.includes('TOOLKIT_DIR'), error.message);
+    assert.ok(error.message.includes(checkout), error.message);
+    assert.match(error.message, /exit code 1/);
+    return true;
+  });
+  assertKept(desktop, before);
+  assert.equal(existsSync(join(desktop, '.cache', 'toolkit-local')), false, 'the staging folder is removed');
+});
+
+test('TOOLKIT_DIR: a release script that leaves no manifest is reported with the folder', async () => {
+  const { checkout } = fakeCheckout({ releaseScript: '' });
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  await assert.rejects(syncToolkit({ desktop, source: checkout, log: () => {} }), (error) => {
+    assert.match(error.message, /^toolkit: npm run release left no release\/manifest\.json in TOOLKIT_DIR /);
+    assert.ok(error.message.includes(checkout), error.message);
+    return true;
+  });
+  assertKept(desktop, before);
 });
 
 test('TOOLKIT_DIR that is not a checkout of the toolkit is refused', async () => {

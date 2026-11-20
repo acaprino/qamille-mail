@@ -207,7 +207,7 @@ check('8. the custom title bar keeps what a Windows title bar does (audit F2 F4 
 });
 
 // Node strips the type annotations of these dependency-free modules.
-const { isHistoryButton, isStrayDrop, opensLinkElsewhere } = await import(pathToFileURL(path.join(desktop, 'src/lib/browser-guards.ts')).href);
+const { externalAddress, fragmentOf, isHistoryButton, isStrayDrop, opensLinkElsewhere } = await import(pathToFileURL(path.join(desktop, 'src/lib/browser-guards.ts')).href);
 const { imeComposing } = await import(pathToFileURL(path.join(desktop, 'src/ds/ime.ts')).href);
 check("9. a failed page is the app's to answer, never WebView2's error page (rule 21)", () => {
   const rust = read('src-tauri/src/native_feel.rs');
@@ -399,15 +399,37 @@ check('15. the reminder takes no file drops and every webview refuses frame, his
   assert.match(history, /\.NavigationKind\(&mut kind\)/, 'steps_through_history must read NavigationKind');
   assert.match(history, /Ok\(\(\)\) => kind == COREWEBVIEW2_NAVIGATION_KIND_BACK_OR_FORWARD,/, 'steps_through_history must compare with BACK_OR_FORWARD');
   // A link or script that asks for a window of its own goes to the browser; the main window never gets one.
-  assert.match(read('src-tauri/src/main.rs'), /\.on_new_window\(native_feel::new_window_guard\(\)\)/, 'main.rs: the main window must be built with .on_new_window(native_feel::new_window_guard())');
-  const newWindow = rustItem(read('src-tauri/src/native_feel.rs'), 'pub fn new_window_guard<');
-  assert.ok(newWindow.includes('shell_rules::opens_outside(') && newWindow.includes('NewWindowResponse::Deny'), 'new_window_guard must open only what opens_outside accepts, and deny');
+  assert.match(read('src-tauri/src/main.rs'), /\.on_new_window\(native_feel::new_window_guard\(app\.handle\(\)\)\)/, 'main.rs: the main window must be built with .on_new_window(native_feel::new_window_guard(app.handle()))');
+  const newWindow = rustItem(read('src-tauri/src/native_feel.rs'), 'pub fn new_window_guard(');
+  assert.ok(newWindow.includes('shell_rules::opens_from_new_window(') && newWindow.includes('NewWindowResponse::Deny'), 'new_window_guard must open only what opens_from_new_window accepts, and deny');
   assert.ok(!/NewWindowResponse::(Allow|Create)/.test(newWindow), 'new_window_guard must never allow a window');
   assert.match(
     hardenHandler('PermissionRequested'),
     /state != COREWEBVIEW2_PERMISSION_STATE_DEFAULT \{\s*return Ok\(\(\)\);\s*\}[\s\S]*\bargs\.SetState\(COREWEBVIEW2_PERMISSION_STATE_DENY\)\s*\}\)\);\s*core$/,
     'a permission no handler answered must be denied, as the last thing its handler does',
   );
+});
+
+check('16. a link in a message opens only an absolute web or mail address, or scrolls to a part of the message (rule 23)', () => {
+  assert.equal(externalAddress('https://example.com/x'), 'https://example.com/x');
+  // What the URL parser drops around an address, and nothing more.
+  assert.equal(externalAddress(' \t https://example.com/x\n '), 'https://example.com/x');
+  assert.equal(externalAddress('HTTP://Example.com/a b'), 'http://example.com/a%20b');
+  assert.equal(externalAddress('mailto:someone@example.com?subject=Hi'), 'mailto:someone@example.com?subject=Hi');
+  // A no-break space, a BOM or an ideographic space is not dropped: the address is relative, and
+  // resolved against the app's own it would reach the browser as http://tauri.localhost/%C2%A0https://…
+  // A scheme without "//" resolves against the app's address too (http:foo is http://tauri.localhost/foo).
+  const refused = [
+    '\u00a0https://example.com/x', '\ufeffhttps://example.com/x', '\u3000https://example.com/x', '\u2003https://example.com/x',
+    'http:foo', 'HTTP:/foo', 'https:/example.com', 'https:\\\\example.com', 'https:\\example.com', 'mailto', '//example.com/x', '/x', 'x.html', '',
+    'https://', 'javascript:alert(1)', 'data:text/html,x', 'file:///C:/x', 'tel:123', '#x',
+  ];
+  for (const written of refused) assert.equal(externalAddress(written), null, JSON.stringify(written));
+  assert.equal(fragmentOf('#part2'), 'part2');
+  assert.equal(fragmentOf(' #part2 '), 'part2');
+  assert.equal(fragmentOf('#'), '');
+  assert.equal(fragmentOf('#a%20b'), 'a%20b');
+  for (const written of ['', 'part2', 'https://example.com/#x', '\u00a0#x', '/#x']) assert.equal(fragmentOf(written), null, JSON.stringify(written));
 });
 
 if (failures.length) {

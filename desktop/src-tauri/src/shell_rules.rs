@@ -244,6 +244,13 @@ pub fn opens_outside(url: &str) -> bool {
         && !url.contains(['\r', '\n', '\0'])
 }
 
+/// A window the page asks for (`target="_blank"`, `window.open`) opens in the browser when it is a web or
+/// mail address, and never when it is the app's own page: only a relative link, which resolves against
+/// the app's address, gets there, and it is no link of a message.
+pub fn opens_from_new_window(url: &str, dev_origin: Option<&str>) -> bool {
+    opens_outside(url) && !is_app_page(url, dev_origin)
+}
+
 /// Whether a frame of the app's pages may load `uri`: the message document, which `MessageHtml.tsx`
 /// gives its frame as `srcdoc`, or an empty frame. A link in a message opens in the browser, never in
 /// its frame, and no frame loads the app page (a second app inside the first) or the web. A link to a
@@ -396,6 +403,20 @@ mod tests {
         assert!(!opens_outside("file:///C:/Windows/System32/calc.exe"));
         assert!(!opens_outside("javascript:alert(1)"));
         assert!(!opens_outside("https://example.com/\r\nx"));
+    }
+
+    #[test]
+    fn a_new_window_never_sends_the_apps_own_page_to_the_browser() {
+        assert!(opens_from_new_window("https://example.com/a", None));
+        assert!(opens_from_new_window("mailto:someone@example.com", Some("http://127.0.0.1:1420")));
+        // A relative link of a message resolves against the app's own address.
+        assert!(!opens_from_new_window("http://tauri.localhost/foo", None));
+        assert!(!opens_from_new_window("HTTP://TAURI.LOCALHOST/%C2%A0https://example.com/x", None));
+        assert!(!opens_from_new_window("http://127.0.0.1:1420/foo", Some("http://127.0.0.1:1420")));
+        // Without a dev server that address is just a web address.
+        assert!(opens_from_new_window("http://127.0.0.1:1420/foo", None));
+        assert!(!opens_from_new_window("file:///C:/x", None));
+        assert!(!opens_from_new_window("https://example.com/\r\nx", None));
     }
 
     #[test]

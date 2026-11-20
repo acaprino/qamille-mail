@@ -57,6 +57,10 @@ try {
   assert.ok(newsletter.body_html.includes('</div></body>'));
   const gif = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
   const links = `<a name="legacy"></a><p><a id="jump" href="#part2">Jump to part 2</a></p>
+    <p><a id="spaced" href=" https://example.com/spaced ">Spaced</a> <a id="nbsp" href="&nbsp;https://example.com/x">No-break space</a>
+    <a id="bom" href="&#xFEFF;https://example.com/x">BOM</a> <a id="ideographic" href="&#x3000;https://example.com/x">Ideographic space</a>
+    <a id="nohost" href="http:foo">No slashes</a> <a id="oneslash" href="HTTP:/foo">One slash</a> <a id="relative" href="/relative">Relative</a>
+    <a id="data" href="data:text/html,x">Data</a></p>
     <map name="zones"><area shape="rect" coords="0,0,100,100" href="https://example.com/a" alt="Zone"></map>
     <img usemap="#zones" src="${gif}" width="100" height="100" alt="">
     <svg width="120" height="40" xmlns:xlink="http://www.w3.org/1999/xlink"><a xlink:href="https://example.com/b"><rect width="120" height="40" fill="#c00"/></a></svg>
@@ -155,6 +159,22 @@ try {
   assert.equal(await kept(), true, 'A link to a part of the message must not navigate the frame');
   assert.deepEqual(frameAddress(), address, 'The frame keeps its address');
   assert.equal(await page.evaluate(() => window.openedLinks.length), 3, 'A link to a part of the message opens nothing');
+
+  // The system browser gets an absolute web or mail address the message wrote, never an address that only
+  // resolves against the app's own (http://tauri.localhost/...): a relative link, a scheme without `//`
+  // (http:foo, HTTP:/foo) or a leading no-break space, BOM or ideographic space (DOMPurify trims those from
+  // an attribute; externalAddress itself is checked in native-feel.mjs) must not reach open_link as one.
+  for (const id of ['spaced', 'nbsp', 'bom', 'ideographic', 'nohost', 'oneslash', 'relative', 'data']) {
+    await frame.locator(`#${id}`).click();
+    assert.equal(await kept(), true, `#${id} must not navigate the frame`);
+  }
+  // Each click is handled before the next one: a link that did open something has shown by now.
+  await page.waitForTimeout(300);
+  const opened = await page.evaluate(() => window.openedLinks.slice(3));
+  assert.equal(opened[0], 'https://example.com/spaced', 'A leading space is dropped, as the URL parser does');
+  assert.ok(opened.every(link => /^https:\/\/example\.com\//.test(link)), `Only absolute addresses of the message open: ${opened}`);
+  assert.ok(!opened.some(link => link.startsWith(url)), 'No address of the app itself reaches the browser');
+  assert.deepEqual(frameAddress(), address, 'The frame keeps its address');
 
   // Keys pressed in the message body reach the app's shortcuts; the reading keys stay in the frame.
   await frame.locator('h1').click();

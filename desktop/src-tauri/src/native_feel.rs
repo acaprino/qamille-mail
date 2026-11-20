@@ -10,7 +10,7 @@
 
 use std::collections::BTreeSet;
 use tauri::webview::{NewWindowFeatures, NewWindowResponse};
-use tauri::{AppHandle, Manager, Runtime, Url, WebviewWindow, window::Color};
+use tauri::{AppHandle, Manager, Url, WebviewWindow, Wry, window::Color};
 
 /// `--ground` of the dark theme in `desktop/src/ds/tokens/theme.css`: the colour
 /// `html`, `body` and `.app-shell` paint, so a resize never shows a strip of
@@ -32,9 +32,7 @@ pub fn show_main_window(window: &WebviewWindow) {
 /// it. A web or mail link the page tries to open there goes to the browser
 /// (`open_outside`, the main window) or nowhere (the reminder chip).
 pub fn navigation_guard(app: &AppHandle, open_outside: bool) -> impl Fn(&Url) -> bool + Send + 'static {
-    let dev_origin = tauri::is_dev()
-        .then(|| app.config().build.dev_url.as_ref().map(|url| url.origin().ascii_serialization()))
-        .flatten();
+    let dev_origin = dev_origin(app);
     move |url| {
         let address = url.as_str();
         if crate::shell_rules::is_app_page(address, dev_origin.as_deref()) {
@@ -49,15 +47,23 @@ pub fn navigation_guard(app: &AppHandle, open_outside: bool) -> impl Fn(&Url) ->
 
 /// The `on_new_window` hook of the main window, which never gets a window of its own: a link with
 /// `target="_blank"`, a script's `window.open`. wry would deny it and the link would do nothing, so a
-/// web or mail address (`shell_rules::opens_outside`, the kinds `open_link` accepts) goes to the
-/// system browser instead. The answer is always Deny.
-pub fn new_window_guard<R: Runtime>() -> impl Fn(Url, NewWindowFeatures) -> NewWindowResponse<R> + Send + 'static {
-    |url, _features| {
-        if crate::shell_rules::opens_outside(url.as_str()) {
+/// web or mail address (`shell_rules::opens_from_new_window`: the kinds `open_link` accepts, never the
+/// app's own page) goes to the system browser instead. The answer is always Deny.
+pub fn new_window_guard(app: &AppHandle) -> impl Fn(Url, NewWindowFeatures) -> NewWindowResponse<Wry> + Send + 'static {
+    let dev_origin = dev_origin(app);
+    move |url, _features| {
+        if crate::shell_rules::opens_from_new_window(url.as_str(), dev_origin.as_deref()) {
             open_in_browser(url.to_string());
         }
         NewWindowResponse::Deny
     }
+}
+
+/// The dev server's origin in a dev build, which is the app's own page there (`shell_rules::is_app_page`).
+fn dev_origin(app: &AppHandle) -> Option<String> {
+    tauri::is_dev()
+        .then(|| app.config().build.dev_url.as_ref().map(|url| url.origin().ascii_serialization()))
+        .flatten()
 }
 
 /// The system browser, as `open_link` opens it (`open::that`); off the calling thread, since the

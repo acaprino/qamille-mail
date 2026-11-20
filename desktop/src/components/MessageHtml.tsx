@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { tr } from '../lib/i18n';
 import { messageDocument } from '../lib/message-html';
-import { installBrowserGuards, linkHref, linkTarget } from '../lib/browser-guards';
+import { externalAddress, fragmentOf, installBrowserGuards, linkHref } from '../lib/browser-guards';
 import { openExternal } from '../lib/external-link';
 import './MessageHtml.css';
 
@@ -51,16 +51,17 @@ export default function MessageHtml({ html, notify, dark }: MessageHtmlProps) {
     if (!target || href === null) return;
     // The frame never navigates, whatever kind of link was clicked (`a`, an image map's `area`, an
     // SVG link). A link to a part of the message scrolls to it: left to the frame it would resolve
-    // against the app's own address, and the frame would end in the browser's error page. A web or
-    // mail link opens in the system browser; any other address, and a relative one, does nothing.
+    // against the app's own address, and the frame would end in the browser's error page. An absolute
+    // web or mail address opens in the system browser; anything else does nothing, a relative address
+    // included: it would only resolve against the app's own.
     event.preventDefault();
-    const written = href.trim();
-    if (written.startsWith('#')) {
-      scrollToFragment(target.ownerDocument, written.slice(1));
+    const fragment = fragmentOf(href);
+    if (fragment !== null) {
+      scrollToFragment(target.ownerDocument, fragment);
       return;
     }
-    const address = linkTarget(target);
-    if (address === null || !/^(https?:|mailto:)/i.test(written)) return;
+    const address = externalAddress(href);
+    if (address === null) return;
     void openExternal({ preventDefault: () => event.preventDefault(), currentTarget: { href: address } }, (message) =>
       notifyRef.current(message, true),
     );

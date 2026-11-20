@@ -9,7 +9,8 @@
 //! `desktop/tests/native-feel.mjs` checks that every window calls it.
 
 use std::collections::BTreeSet;
-use tauri::{AppHandle, Manager, Url, WebviewWindow, window::Color};
+use tauri::webview::{NewWindowFeatures, NewWindowResponse};
+use tauri::{AppHandle, Manager, Runtime, Url, WebviewWindow, window::Color};
 
 /// `--ground` of the dark theme in `desktop/src/ds/tokens/theme.css`: the colour
 /// `html`, `body` and `.app-shell` paint, so a resize never shows a strip of
@@ -40,13 +41,31 @@ pub fn navigation_guard(app: &AppHandle, open_outside: bool) -> impl Fn(&Url) ->
             return true;
         }
         if open_outside && crate::shell_rules::opens_outside(address) {
-            let address = address.to_owned();
-            std::thread::spawn(move || {
-                let _ = open::that(address);
-            });
+            open_in_browser(address.to_owned());
         }
         false
     }
+}
+
+/// The `on_new_window` hook of the main window, which never gets a window of its own: a link with
+/// `target="_blank"`, a script's `window.open`. wry would deny it and the link would do nothing, so a
+/// web or mail address (`shell_rules::opens_outside`, the kinds `open_link` accepts) goes to the
+/// system browser instead. The answer is always Deny.
+pub fn new_window_guard<R: Runtime>() -> impl Fn(Url, NewWindowFeatures) -> NewWindowResponse<R> + Send + 'static {
+    |url, _features| {
+        if crate::shell_rules::opens_outside(url.as_str()) {
+            open_in_browser(url.to_string());
+        }
+        NewWindowResponse::Deny
+    }
+}
+
+/// The system browser, as `open_link` opens it (`open::that`); off the calling thread, since the
+/// webview waits for the hook that asked. A failure has nobody to tell: the link just does not open.
+fn open_in_browser(address: String) {
+    std::thread::spawn(move || {
+        let _ = open::that(address);
+    });
 }
 
 /// The address Tauri loads for `WebviewUrl::App(page)`, as tauri 2.12's
@@ -244,8 +263,10 @@ mod webview2 {
 
             // Back and Forward load nothing: the page stops the mouse's buttons (`browser-guards.ts`),
             // but a blank or crashed page runs no script, and Back would load the app again. wry's
-            // handler (`navigation_guard`) sets Cancel for every navigation; WebView2 calls handlers in
-            // the order they were added, so this one, added later, has the last word.
+            // handler (`navigation_guard`) sets Cancel for every navigation; this one, added later,
+            // has the last word, if WebView2 calls the handlers in the order they were added. That is
+            // an assumption, not something Microsoft documents: item 19 of "Verifica nell'app vera"
+            // (docs/aspetto-nativo.md) checks it on the exe (Back on a reader must not step back).
             let handler = NavigationStartingEventHandler::create(Box::new(|_, args| {
                 let Some(args) = args else { return Ok(()) };
                 if steps_through_history(&args) {

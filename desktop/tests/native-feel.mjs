@@ -398,6 +398,11 @@ check('15. the reminder takes no file drops and every webview refuses frame, his
   const history = rustItem(read('src-tauri/src/native_feel.rs'), 'unsafe fn steps_through_history(');
   assert.match(history, /\.NavigationKind\(&mut kind\)/, 'steps_through_history must read NavigationKind');
   assert.match(history, /Ok\(\(\)\) => kind == COREWEBVIEW2_NAVIGATION_KIND_BACK_OR_FORWARD,/, 'steps_through_history must compare with BACK_OR_FORWARD');
+  // A link or script that asks for a window of its own goes to the browser; the main window never gets one.
+  assert.match(read('src-tauri/src/main.rs'), /\.on_new_window\(native_feel::new_window_guard\(\)\)/, 'main.rs: the main window must be built with .on_new_window(native_feel::new_window_guard())');
+  const newWindow = rustItem(read('src-tauri/src/native_feel.rs'), 'pub fn new_window_guard<');
+  assert.ok(newWindow.includes('shell_rules::opens_outside(') && newWindow.includes('NewWindowResponse::Deny'), 'new_window_guard must open only what opens_outside accepts, and deny');
+  assert.ok(!/NewWindowResponse::(Allow|Create)/.test(newWindow), 'new_window_guard must never allow a window');
   assert.match(
     hardenHandler('PermissionRequested'),
     /state != COREWEBVIEW2_PERMISSION_STATE_DEFAULT \{\s*return Ok\(\(\)\);\s*\}[\s\S]*\bargs\.SetState\(COREWEBVIEW2_PERMISSION_STATE_DENY\)\s*\}\)\);\s*core$/,

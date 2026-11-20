@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Button from '../ds/primitives/Button';
 import Switch from '../ds/primitives/Switch';
 import { call, errorText } from '../lib/api';
+import { openExternal } from '../lib/external-link';
 import { backendText, tr } from '../lib/i18n';
 import { regionalLocale } from '../lib/regional';
 import {
@@ -169,7 +170,18 @@ export default function MailboxSync({ accounts, changed, notify }: MailboxSyncPr
 }
 
 /** What `sync_revoke_all` did, for the «Dispositivi» section. */
-export function RevokeReport({ results, onRetry, busy }: { results: MailboxRevoke[]; onRetry: () => void; busy: boolean }) {
+export function RevokeReport({
+  results,
+  onRetry,
+  onError,
+  busy,
+}: {
+  results: MailboxRevoke[];
+  onRetry: () => void;
+  /** The link to the Google account could not be opened. */
+  onError: (message: string) => void;
+  busy: boolean;
+}) {
   if (results.length === 0) return null;
   return (
     <div className="mailbox-sync-notice" role="status">
@@ -182,7 +194,7 @@ export function RevokeReport({ results, onRetry, busy }: { results: MailboxRevok
           <Button variant="secondary" disabled={busy} onClick={onRetry}>
             {tr('Riprova', 'Try again')}
           </Button>
-          <a href={GOOGLE_PERMISSIONS_URL} target="_blank" rel="noreferrer">
+          <a href={GOOGLE_PERMISSIONS_URL} target="_blank" rel="noreferrer" onClick={(event) => void openExternal(event, onError)}>
             {tr('Permessi del tuo account Google', 'Permissions of your Google account')}
           </a>
         </div>

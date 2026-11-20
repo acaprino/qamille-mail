@@ -247,7 +247,10 @@ pub fn opens_outside(url: &str) -> bool {
 /// Whether a frame of the app's pages may load `uri`: the message document, which `MessageHtml.tsx`
 /// gives its frame as `srcdoc`, or an empty frame. A link in a message opens in the browser, never in
 /// its frame, and no frame loads the app page (a second app inside the first) or the web. A link to a
-/// part of the message (`#…`) scrolls the same document and starts no navigation.
+/// part of the message (`#…`) is no exception: a `srcdoc` frame has no address of its own, so the
+/// browser resolves it against the app's (`http://tauri.localhost/#…`) and would start a navigation to
+/// it, which this refuses. `MessageHtml.tsx` cancels the click and scrolls to the part itself, so the
+/// frame never asks.
 pub fn frame_may_navigate(uri: &str) -> bool {
     matches!(uri, "about:srcdoc" | "about:blank")
 }

@@ -27,6 +27,29 @@ const closest = (target: EventTarget | null, selector: string) =>
   (target as Element | null)?.closest?.(selector) ?? null;
 const FIELD = 'input, textarea, [contenteditable]:not([contenteditable="false"])';
 
+// What a click on a link follows: `a`, an image map's `area`, and an SVG `a`, which has `href` or the
+// older `xlink:href` (the HTML parser puts that one in the XLink namespace; `*|href` takes both).
+const LINK = 'a[*|href], area[*|href]';
+const XLINK = 'http://www.w3.org/1999/xlink';
+
+/** The link `element` is, or is inside, as written (`href`, else `xlink:href`); null outside a link. */
+export function linkHref(element: Element): string | null {
+  const link = closest(element, LINK);
+  return link && (link.getAttribute('href') ?? link.getAttributeNS(XLINK, 'href'));
+}
+
+/** The address of the link `element` is, or is inside, resolved against its document: `a[href]`,
+ *  `area[href]`, an SVG `a`. Null outside a link, or when the address is not one. */
+export function linkTarget(element: Element): string | null {
+  const href = linkHref(element);
+  if (href === null) return null;
+  try {
+    return new URL(href, element.ownerDocument.baseURI).href;
+  } catch {
+    return null;
+  }
+}
+
 /** `target`: the page's window, or the message frame's (MessageHtml.tsx), which the page's own
  *  listeners never see. */
 export function installBrowserGuards(target: Window = window): () => void {
@@ -34,7 +57,8 @@ export function installBrowserGuards(target: Window = window): () => void {
     if (isHistoryButton(event.button)) event.preventDefault();
   };
   const link = (event: MouseEvent) => {
-    if (opensLinkElsewhere(event, closest(event.target, 'a[href]') !== null)) event.preventDefault();
+    const onLink = linkTarget(event.target as Element) !== null;
+    if (opensLinkElsewhere(event, onLink)) event.preventDefault();
   };
   // Drop zones (mail rows, attachments) take their drops first and mark them handled.
   const drop = (event: DragEvent) => {

@@ -310,6 +310,8 @@ fn setup_app(
         // The app suggests recipients itself; browser "Suggestions" would cover them.
         .general_autofill_enabled(false)
         .on_navigation(native_feel::navigation_guard(app.handle(), true))
+        // A link that asks for a window of its own opens in the system browser; the app never gets one.
+        .on_new_window(native_feel::new_window_guard())
         // Every page that starts loading must draw within 15 s, a reload the page starts too.
         .on_page_load(recovery::page_load)
         .build()?;

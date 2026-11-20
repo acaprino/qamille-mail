@@ -9,6 +9,10 @@
 //!   webview is gone, ask to restart Qamille.
 //! - The app's page does not load (a dev build without its dev server): ask to
 //!   retry, with the reason.
+//! - The page loads but App does not draw within `STARTUP_WAIT` (its script fails or
+//!   never runs, its first render throws), or its root fails later (`frontend_failed`,
+//!   from React's `onUncaughtError`): offer to reload it. The watch starts again at every
+//!   reload, and Esc reloads too: an empty window never stays empty.
 //! - "Ricarica la finestra" in the system menu: the page saves what it can,
 //!   as at sign-out, then reloads. If something was not saved, or the page
 //!   does not answer within `RELOAD_WAIT`, ask: never discard by itself.
@@ -52,13 +56,16 @@ const CLOSE_ANSWER: Duration = Duration::from_secs(3);
 /// may be stuck in a guard (a save that never ends): offer the way out.
 const CLOSE_STUCK: Duration = Duration::from_secs(10);
 
-/// The page draws within this after the window shows, or the app offers a reload.
+/// The page draws within this after the window shows or reloads, or the app offers a reload.
 const STARTUP_WAIT: Duration = Duration::from_secs(15);
 /// The longest an exit waits for a recording to be stopped and saved (normally well under
 /// a second): a way out of a broken window must stay a way out.
 const EXIT_SAVE_WAIT: Duration = Duration::from_secs(20);
 
+/// The main page now loading has drawn (`frontend_ready`); reset at every load it watches.
 static FRONTEND_READY: AtomicBool = AtomicBool::new(false);
+/// Loads of the main page watched so far: a reload retires the watch of the load before.
+static PAGE_LOADS: AtomicU64 = AtomicU64::new(0);
 static CLOSE_ASKED: AtomicU64 = AtomicU64::new(0);
 static CLOSE_SEEN: AtomicU64 = AtomicU64::new(0);
 static CLOSING_SINCE: Mutex<Option<Instant>> = Mutex::new(None);
@@ -116,6 +123,10 @@ fn later(window: &WebviewWindow, act: impl FnOnce(&WebviewWindow) + Send + 'stat
 }
 
 fn reload(window: &WebviewWindow) {
+    // The new page must draw again within its own `STARTUP_WAIT`.
+    if window.label() == "main" {
+        watch_startup(window);
+    }
     if let Err(error) = window.reload() {
         crate::native_feel::report(&format!("could not reload {}: {error}", window.label()));
     }
@@ -325,39 +336,76 @@ pub fn reload_ready(window: WebviewWindow, token: u64, saved: bool) {
     });
 }
 
-/// Right after the main window shows: a page that loads but never draws (its
-/// script fails, or never runs) would leave an empty window with no message.
+/// Right after the main window shows, and at every reload of its page (`reload`): a
+/// page that loads but never draws (its script fails or never runs, App's first render
+/// throws) would leave an empty window with no message. A newer load retires the watch
+/// of the one before, so a reload gets its whole `STARTUP_WAIT`.
 pub fn watch_startup(window: &WebviewWindow) {
+    FRONTEND_READY.store(false, Ordering::SeqCst);
+    let load = PAGE_LOADS.fetch_add(1, Ordering::SeqCst) + 1;
     let window = window.clone();
     std::thread::spawn(move || {
         std::thread::sleep(STARTUP_WAIT);
-        if FRONTEND_READY.load(Ordering::SeqCst) || window.app_handle().get_webview_window("main").is_none() {
+        if PAGE_LOADS.load(Ordering::SeqCst) != load
+            || FRONTEND_READY.load(Ordering::SeqCst)
+            || window.app_handle().get_webview_window("main").is_none()
+        {
             return;
         }
-        ask_once(&window, |window| {
-            let answer = ask(
-                window,
-                words("Qamille non si è aperto", "Qamille did not open"),
-                words(
-                    "La finestra di Qamille non ha finito di aprirsi. La posta e le bozze salvate sono al sicuro.",
-                    "Qamille's window did not finish opening. Your mail and saved drafts are safe.",
-                ),
-                words("Ricarica la finestra", "Reload the window"),
-                words("Chiudi Qamille", "Close Qamille"),
-            );
-            match answer {
-                Some(true) => reload(window),
-                Some(false) => exit_app(window.app_handle()),
-                None => {}
-            }
-        });
+        ask_once(&window, |window| offer_reload(window, false));
     });
 }
 
-/// The page's first frame is drawn (`src/main.tsx`).
+/// The main window is empty: its page never drew (`watch_startup`), or its root failed
+/// (`frontend_failed`), after it had drawn when `opened`. Esc and the X reload too: here
+/// that is the harmless choice, since any other would leave the window empty.
+fn offer_reload(window: &WebviewWindow, opened: bool) {
+    let (title, text) = if opened {
+        (
+            words("La finestra di Qamille è vuota", "Qamille's window is empty"),
+            words(
+                "Un errore ha lasciato vuota la finestra di Qamille. La posta e le bozze salvate sono al sicuro.",
+                "An error left Qamille's window empty. Your mail and saved drafts are safe.",
+            ),
+        )
+    } else {
+        (
+            words("Qamille non si è aperto", "Qamille did not open"),
+            words(
+                "La finestra di Qamille non ha finito di aprirsi. La posta e le bozze salvate sono al sicuro.",
+                "Qamille's window did not finish opening. Your mail and saved drafts are safe.",
+            ),
+        )
+    };
+    let close = ask(
+        window,
+        title,
+        text,
+        words("Ricarica la finestra", "Reload the window"),
+        words("Chiudi Qamille", "Close Qamille"),
+    ) == Some(false);
+    if close { exit_app(window.app_handle()) } else { reload(window) }
+}
+
+/// App's first effect ran (`src/App.tsx`): the page rendered and drew its first frame.
 #[tauri::command]
 pub fn frontend_ready() {
     FRONTEND_READY.store(true, Ordering::SeqCst);
+}
+
+/// The main page's root failed (React's `onUncaughtError`, `src/main.tsx`): with no error
+/// boundary React removes the whole tree, so the window is empty. Logged, then the same
+/// choice as a page that never drew.
+#[tauri::command]
+pub fn frontend_failed(window: WebviewWindow, message: String) {
+    // One bounded line: the page's text goes into `native.log`.
+    let message: String = message.chars().map(|c| if c.is_control() { ' ' } else { c }).take(500).collect();
+    crate::native_feel::report(&format!("the page of {} failed: {message}", window.label()));
+    if window.label() != "main" {
+        return;
+    }
+    let opened = FRONTEND_READY.load(Ordering::SeqCst);
+    ask_once(&window, move |window| offer_reload(window, opened));
 }
 
 /// Main's `CloseRequested` (X, Alt+F4, the taskbar, the system menu). The

@@ -265,6 +265,13 @@ export default function App() {
   const content = useRef<HTMLDivElement>(null);
   const reduceMotion = useReducedMotion();
 
+  // The page has drawn: without this, src-tauri/src/recovery.rs offers to reload after 15 s. App's
+  // first effect, not a frame after render() in main.tsx: a render that throws never commits, so an
+  // empty window never passes for a ready one.
+  useEffect(() => {
+    if (desktop) void call('frontend_ready').catch(() => {});
+  }, []);
+
   // Every function below reads the state through `s` and `v`, never a value of one render, so a
   // listener or timer that holds an older copy of a function still sees the current state.
   const dark = () => resolvedAppearance(s.appearance, s.systemDark);

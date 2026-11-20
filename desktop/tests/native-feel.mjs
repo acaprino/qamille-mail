@@ -230,6 +230,53 @@ check('11. browser mouse gestures and the IME Enter stay away from the app (rule
   }
 });
 
+check('12. a failed start and a blank page reach a message (rule 21, audit Q2 Q15)', () => {
+  const main = read('src-tauri/src/main.rs');
+  // Tauri 2.12 turns an Err returned from `.setup` into a panic: a release build (no console) would
+  // end without a word. The closure says the failure itself.
+  assert.match(
+    main,
+    /\.setup\(move \|app\| \{\s*if let Err\(error\) = setup_app\(app[,)][^{]*\{\s*startup_failed\(/,
+    '.setup must run setup_app and handle its Err with startup_failed',
+  );
+  const failed = main.match(/\nfn startup_failed\([^)]*\)[^{]*\{([\s\S]*?)\n\}/);
+  assert.ok(failed, 'main.rs must define startup_failed');
+  for (const [part, why] of [
+    ['native_feel::report(', 'writes the failure to native.log'],
+    ['shell_rules::startup_failure_text(', 'shows the reason (and for WebView2, where to get it)'],
+    ['rfd::MessageLevel::Error', 'shows an error message'],
+    ['std::process::exit(1)', 'exits with 1'],
+  ]) {
+    assert.ok(failed[1].includes(part), `startup_failed ${why}: no ${part}`);
+  }
+  assert.match(main, /\.run\(context\);[\s\S]*?if let Err\(error\) = started \{\s*startup_failed\(/, 'a failed Builder::build says it too');
+  const setup = main.match(/\nfn setup_app\([\s\S]*?\n\}/);
+  assert.ok(setup, 'main.rs must define setup_app');
+  const lookup = setup[0].indexOf('tauri::webview_version()');
+  assert.ok(lookup >= 0 && lookup < setup[0].indexOf('.build()?'), 'a missing WebView2 Runtime is found before the window is built');
+  assert.match(main, /generate_handler!\[[^\]]*recovery::frontend_failed/, 'frontend_failed must be a command');
+  assert.match(read('src-tauri/permissions/main-window.toml'), /"allow-frontend-failed"/, 'the main window may call frontend_failed');
+  assert.ok(!JSON.parse(read('src-tauri/capabilities/reminder.json')).permissions.includes('allow-frontend-failed'), 'the reminder chip may not');
+  // A render error with no error boundary empties the window: React reports it, the native side asks.
+  const entry = read('src/main.tsx');
+  assert.match(entry, /createRoot\(document\.getElementById\('app'\)!,\s*\{[^}]*onUncaughtError/, 'main.tsx must pass onUncaughtError to createRoot');
+  assert.match(entry, /call\('frontend_failed'/, 'onUncaughtError must reach frontend_failed');
+  // `frontend_ready` after render() fires whatever App does; from App's first effect, a render that
+  // throws never reports ready.
+  assert.ok(!/call\(\s*'frontend_ready'/.test(entry), 'frontend_ready must not be called from main.tsx');
+  assert.match(read('src/App.tsx'), /useEffect\(\(\) => \{\s*if \(desktop\) void call\('frontend_ready'\)[^\n]*\n\s*\}, \[\]\);/, 'an effect of App.tsx reports the first frame');
+  const recovery = read('src-tauri/src/recovery.rs');
+  assert.match(recovery, /#\[tauri::command\]\s*pub fn frontend_failed\(window: WebviewWindow, message: String\)/, 'recovery.rs must define the frontend_failed command');
+  const reload = recovery.match(/\nfn reload\(window: &WebviewWindow\) \{([\s\S]*?)\n\}/);
+  assert.ok(reload && /watch_startup\(window\)/.test(reload[1]), 'every reload of the main page starts the 15 s watch again');
+  const offer = recovery.match(/\nfn offer_reload\([^)]*\) \{([\s\S]*?)\n\}/);
+  assert.ok(offer, 'recovery.rs must define offer_reload, the dialog of an empty page');
+  // Esc and the X reload: only "Chiudi Qamille" leaves, and nothing leaves the window blank.
+  assert.match(offer[1], /== Some\(false\);\s*if close \{\s*exit_app\(window\.app_handle\(\)\)\s*\} else \{\s*reload\(window\)\s*\}/, 'Esc on the dialog of an empty page reloads');
+  assert.match(recovery, /pub fn watch_startup[\s\S]*?offer_reload\(/, 'the 15 s watch asks with offer_reload');
+  assert.match(recovery, /pub fn frontend_failed[\s\S]*?offer_reload\(/, 'frontend_failed asks with offer_reload');
+});
+
 if (failures.length) {
   console.error(`\n${failures.length} native-feel check(s) failed. See docs/aspetto-nativo.md.`);
   process.exit(1);

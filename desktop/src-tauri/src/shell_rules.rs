@@ -244,6 +244,26 @@ pub fn opens_outside(url: &str) -> bool {
         && !url.contains(['\r', '\n', '\0'])
 }
 
+/// Microsoft's download of the WebView2 Runtime (Evergreen bootstrapper).
+pub const WEBVIEW2_DOWNLOAD: &str = "https://go.microsoft.com/fwlink/p/?LinkId=2124703";
+
+/// The message of a start that failed (`startup_failed` in `main.rs`): the reason, or, when the
+/// WebView2 Runtime is missing, what that is and where to get it (its lookup error names nothing
+/// a person could act on; `native.log` keeps it).
+pub fn startup_failure_text(error: &str, italian: bool, webview_missing: bool) -> String {
+    let headline = if italian { "Qamille non è riuscito ad avviarsi." } else { "Qamille could not start." };
+    if !webview_missing {
+        return format!("{headline}\n\n{error}");
+    }
+    let advice = if italian {
+        "Manca il componente di Windows che disegna le finestre (Microsoft Edge WebView2 Runtime). Installalo da"
+    } else {
+        "The Windows component that draws the windows (Microsoft Edge WebView2 Runtime) is missing. Install it from"
+    };
+    let again = if italian { "e riapri Qamille." } else { "and open Qamille again." };
+    format!("{headline}\n\n{advice} {WEBVIEW2_DOWNLOAD} {again}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -366,5 +386,25 @@ mod tests {
         // Already ended, saved or interrupted: nothing left to stop.
         assert!(!must_stop_capture(CapturePhase::Saved));
         assert!(!must_stop_capture(CapturePhase::Interrupted));
+    }
+
+    #[test]
+    fn startup_failure_names_the_reason_and_the_runtime() {
+        let busy = "Questa cartella è già aperta in un'altra interfaccia Qamille.";
+        let italian = startup_failure_text(busy, true, false);
+        assert!(italian.starts_with("Qamille non è riuscito ad avviarsi."), "{italian}");
+        assert!(italian.contains(busy), "the reason must be said: {italian}");
+        let english = startup_failure_text("file is not a database", false, false);
+        assert!(english.starts_with("Qamille could not start."), "{english}");
+        assert!(english.contains("file is not a database"), "the reason must be said: {english}");
+        // The runtime's own error names no component: the text must say what is missing and where to get it.
+        let lookup = "The system cannot find the file specified. (0x80070002)";
+        for italian in [true, false] {
+            let missing = startup_failure_text(lookup, italian, true);
+            assert!(missing.contains("WebView2"), "{missing}");
+            assert!(missing.contains("https://go.microsoft.com/fwlink/p/?LinkId=2124703"), "{missing}");
+        }
+        assert!(startup_failure_text(lookup, true, true).starts_with("Qamille non è riuscito ad avviarsi."));
+        assert!(startup_failure_text(lookup, false, true).starts_with("Qamille could not start."));
     }
 }

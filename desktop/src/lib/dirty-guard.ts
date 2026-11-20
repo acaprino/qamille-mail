@@ -11,7 +11,8 @@ type Register = (id: string, guard: CloseGuard, options: CloseGuardOptions) => (
  *  - Closing the window: `onVeto` tells the person what is open, and the close is vetoed. Nothing
  *    is saved behind their back.
  *  - Windows ends the session or the window reloads: nobody can answer, so `saveNow` runs and its
- *    answer is the step's. `false` (an invalid form) or a throw is "not saved". */
+ *    answer is the step's. `false` or a throw is "not saved": an invalid form, or an editor whose
+ *    save must be confirmed by the person (the calendar sheet) and so answers `false` without saving. */
 export function createDirtyGuard(register: Register) {
   return (
     id: string,

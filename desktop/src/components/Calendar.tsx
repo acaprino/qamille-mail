@@ -717,7 +717,7 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
   }
 
   // True when the event was saved; false when nothing was sent (invalid times, read-only, a save
-  // already running) or the save failed. The window-close guard below needs the answer.
+  // already running) or the save failed.
   async function save(): Promise<boolean> {
     const { timeError, readOnly, formCalendar } = derive();
     if (s.busy || timeError || readOnly) return false;
@@ -802,9 +802,10 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
       s.busy = false;
     }
   }
-  // Closing the window over typed event details asks first (focus returns to the sheet); at session
-  // end or on a reload the event is saved. Session end asks twice (Windows asks, then ends), so the
-  // step looks at the live state: a sheet that was just saved and closed has nothing left to save.
+  // Closing the window over typed event details asks first (focus returns to the sheet). Unlike the
+  // contact form, the sheet never saves at session end or on a reload: that would create an event
+  // (or send invitations to its guests) nobody confirmed. It answers `false` without any call, so
+  // "Ricarica la finestra" asks and a sign-out neither creates nor sends anything.
   useDirtyCloseGuard(
     'calendar-event',
     Boolean(D.dirty),
@@ -812,7 +813,7 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
       busyEditing();
       titleInput.current?.focus();
     },
-    async () => (derive().dirty ? save() : true),
+    async () => false,
   );
 
   async function remove() {

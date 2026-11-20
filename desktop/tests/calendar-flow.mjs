@@ -198,9 +198,24 @@ try {
     window.fakeEvents.push({ id: 'disposable', summary: 'Disposable', revision: '1', start: { dateTime: `${day}T11:00:00+01:00` }, end: { dateTime: `${day}T11:30:00+01:00` } });
   });
   const disposable = page.locator('.calendar-event', { hasText: 'Disposable' }).first();
+  // A second event opened with the keyboard while the sheet shows the first is a new opening: Esc goes
+  // back to the second event, not to the one that opened the sheet.
+  const doomed = page.getByRole('dialog', { name: 'Edit event' });
+  // The calendar reads again by itself every 2 seconds, but not while a sheet is open.
+  await expect(disposable).toBeVisible();
+  await page.locator('.calendar-event', { hasText: 'Standup' }).first().focus();
+  await page.keyboard.press('Enter');
+  await expect(doomed.getByLabel('Title')).toHaveValue('Standup');
   await disposable.focus();
   await page.keyboard.press('Enter');
-  const doomed = page.getByRole('dialog', { name: 'Edit event' });
+  await expect(doomed.getByLabel('Title')).toHaveValue('Disposable');
+  await doomed.getByLabel('Title').focus();
+  await page.keyboard.press('Escape');
+  await expect(doomed).toBeHidden();
+  await expect(disposable).toBeFocused();
+  console.log('PASS Esc after opening a second event with the sheet open puts the focus on the second event');
+  await page.keyboard.press('Enter');
+  await expect(doomed.getByLabel('Title')).toHaveValue('Disposable');
   await doomed.getByRole('button', { name: 'Delete', exact: true }).click();
   await doomed.getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(doomed).toBeHidden();

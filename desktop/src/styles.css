@@ -2741,9 +2741,11 @@
 .mail-list:has(.mail-checkbox:checked) .unread-dot {
   visibility: hidden;
 }
-/* The heading that takes the focus when no row is selected (restoreListFocus) shows it like any control; a
-   mouse click on it, which `:focus-visible` ignores, shows nothing. */
-.list-heading h1:focus-visible {
+/* The heading that takes the focus when no row is selected (restoreListFocus), or the Drafts page's when the
+   draft that was open is gone, shows it like any control; a mouse click on it, which `:focus-visible`
+   ignores, shows nothing. */
+.list-heading h1:focus-visible,
+.drafts-page h1:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }

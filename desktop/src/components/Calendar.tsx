@@ -1272,6 +1272,9 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
 
       {s.form && (
         <SidePanel
+          // Another event opened by keyboard while the sheet shows one is a new opening: Esc goes back to
+          // that event, not to the first one.
+          key={s.selected ? eventKey(s.selected) : 'new'}
           narrow
           className="event-sheet"
           aria-labelledby="event-editor-title"

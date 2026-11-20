@@ -256,6 +256,9 @@ export default function App() {
       // The control that had the focus when each composer opened (by draft id): the place to go back to
       // when the composer closes and nothing in the list is selected.
       composerOpeners: new Map<number, HTMLElement>(),
+      // The last workspace reload that a composer asked for (it saved or queued something): the lists it
+      // rebuilds settle when this is done.
+      workspaceSettling: Promise.resolve(),
       searchTimer: undefined as ReturnType<typeof setTimeout> | undefined,
       prefetchTimer: undefined as ReturnType<typeof setTimeout> | undefined,
       // Rows the events named, read together (see wantRows). `rowsLatest` remembers which read asked
@@ -1280,16 +1283,26 @@ export default function App() {
   }
   // A composer that closes (sent, saved, discarded) fades out with the focus still in it, or leaves it on
   // <body> when its tab was what had it. The focus goes to the row on show in the list, else to the control
-  // that opened the composer, else to the list's heading; a focus that is already somewhere else stays.
+  // that opened the composer, else to the heading of the list or of the Drafts page; a focus that is
+  // already somewhere else stays.
   async function restoreComposerFocus(id: number, opener: HTMLElement | undefined) {
     await tick();
+    const placed = placeFocusAfterComposer(id, opener);
+    // The reload the same action started can take away what was just focused (a draft that was sent
+    // leaves the Drafts list): once it has landed, a focus that fell to <body> goes to the next place.
+    await v.workspaceSettling;
+    await tick();
+    if (placed && !placed.isConnected && document.activeElement === document.body) placeFocusAfterComposer(id, opener);
+  }
+  function placeFocusAfterComposer(id: number, opener: HTMLElement | undefined) {
     const active = document.activeElement;
-    if (active && active !== document.body && !document.getElementById(`compose-panel-${id}`)?.contains(active)) return;
-    (
+    if (active && active !== document.body && !document.getElementById(`compose-panel-${id}`)?.contains(active)) return null;
+    const target =
       selectedRowButton() ||
       (opener?.isConnected ? opener : null) ||
-      document.querySelector<HTMLElement>('.mail-list h1')
-    )?.focus();
+      document.querySelector<HTMLElement>('.mail-list h1, .drafts-page h1');
+    target?.focus();
+    return target;
   }
   async function sync() {
     if (syncing()) return;
@@ -1879,7 +1892,7 @@ export default function App() {
                   <div className="page-heading">
                     <div>
                       <span className="page-kicker">{tr('Riprendi da dove avevi lasciato', 'Pick up where you left off')}</span>
-                      <h1>{folderLabel('Drafts')}</h1>
+                      <h1 tabIndex={-1}>{folderLabel('Drafts')}</h1>
                       <p>
                         {workspace.drafts.length}{' '}
                         {workspace.drafts.length === 1
@@ -1941,7 +1954,9 @@ export default function App() {
                   workspace={workspace}
                   close={closeComposer}
                   compose={() => void compose()}
-                  changed={() => void loadWorkspace().catch((e) => notify(errorText(e), true))}
+                  changed={() => {
+                    v.workspaceSettling = loadWorkspace().catch((e) => notify(errorText(e), true));
+                  }}
                   notify={notify}
                   queued={queued}
                   copied={(id, saved) => {

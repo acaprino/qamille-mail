@@ -253,6 +253,9 @@ export default function App() {
       earlyMarks: new Map<number, number>(),
       // Workspace snapshots in flight: a patch from an event makes them stale (see onAppEvent).
       snapshotsRunning: 0,
+      // The control that had the focus when each composer opened (by draft id): the place to go back to
+      // when the composer closes and nothing in the list is selected.
+      composerOpeners: new Map<number, HTMLElement>(),
       searchTimer: undefined as ReturnType<typeof setTimeout> | undefined,
       prefetchTimer: undefined as ReturnType<typeof setTimeout> | undefined,
       // Rows the events named, read together (see wantRows). `rowsLatest` remembers which read asked
@@ -1188,11 +1191,14 @@ export default function App() {
       !active.closest('.reader')
     )
       return;
-    const target =
+    (selectedRowButton() || document.querySelector<HTMLElement>('.mail-list h1'))?.focus();
+  }
+  // The open button of the row on show in the list, a conversation's main row or one of its replies.
+  function selectedRowButton() {
+    return (
       document.querySelector<HTMLElement>('.mail-row.selected .mail-open') ||
-      document.querySelector<HTMLElement>('.reply-row.selected .reply-open') ||
-      document.querySelector<HTMLElement>('.mail-list h1');
-    target?.focus();
+      document.querySelector<HTMLElement>('.reply-row.selected .reply-open')
+    );
   }
   function queued(pending: UndoAction) {
     ++v.workspaceRequest;
@@ -1228,6 +1234,8 @@ export default function App() {
     }
   }
   async function compose(replyTo: number | null = null, forward = false, everyone = false) {
+    // The control that asked for the composer, before the draft is made: that wait can move the focus.
+    const opener = document.activeElement;
     try {
       let draft = await call<Draft>('create_draft', { accountId: s.accountId, replyTo, forward });
       const selected = s.selected;
@@ -1238,7 +1246,7 @@ export default function App() {
           importLeaseIds: [],
         });
       }
-      openComposer(draft);
+      openComposer(draft, opener);
       await loadWorkspace();
     } catch (e) {
       notify(errorText(e), true);
@@ -1254,15 +1262,34 @@ export default function App() {
     const next = position - 1 + delta;
     if (position > 0 && next >= 0 && next < s.visibleOrder.length) void open(s.visibleOrder[next]);
   }
-  function openComposer(draft: Draft) {
+  function openComposer(draft: Draft, opener: Element | null = document.activeElement) {
+    if (opener instanceof HTMLElement && opener !== document.body && !opener.closest('.composer-panel'))
+      v.composerOpeners.set(draft.id, opener);
     if (!s.composers.some((item) => item.id === draft.id)) {
       s.composers = [...s.composers, structuredClone(draft)];
     }
     s.activeComposerId = draft.id;
   }
-  function closeComposer(id: number) {
+  // `returnFocus` is false when another composer takes the place of this one (a copy of the draft).
+  function closeComposer(id: number, returnFocus = true) {
     s.composers = s.composers.filter((draft) => draft.id !== id);
     if (s.activeComposerId === id) s.activeComposerId = null;
+    const opener = v.composerOpeners.get(id);
+    v.composerOpeners.delete(id);
+    if (returnFocus) void restoreComposerFocus(id, opener);
+  }
+  // A composer that closes (sent, saved, discarded) fades out with the focus still in it, or leaves it on
+  // <body> when its tab was what had it. The focus goes to the row on show in the list, else to the control
+  // that opened the composer, else to the list's heading; a focus that is already somewhere else stays.
+  async function restoreComposerFocus(id: number, opener: HTMLElement | undefined) {
+    await tick();
+    const active = document.activeElement;
+    if (active && active !== document.body && !document.getElementById(`compose-panel-${id}`)?.contains(active)) return;
+    (
+      selectedRowButton() ||
+      (opener?.isConnected ? opener : null) ||
+      document.querySelector<HTMLElement>('.mail-list h1')
+    )?.focus();
   }
   async function sync() {
     if (syncing()) return;
@@ -1918,7 +1945,7 @@ export default function App() {
                   notify={notify}
                   queued={queued}
                   copied={(id, saved) => {
-                    closeComposer(id);
+                    closeComposer(id, false);
                     openComposer(saved);
                   }}
                 />

@@ -37,6 +37,7 @@ import {
   regionalTimeZone,
 } from '../lib/regional';
 import { useReactive } from '../lib/store';
+import { tick } from '../lib/tick';
 import { useDirtyCloseGuard } from '../lib/use-dirty-close-guard';
 import { cn } from '../lib/utils';
 import './Calendar.css';
@@ -200,6 +201,7 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
   const creationKey = useRef('');
   const editGeneration = useRef(0);
   const titleInput = useRef<HTMLInputElement>(null);
+  const newEventButton = useRef<HTMLButtonElement>(null);
 
   const formValues = (): CalendarForm => ({
     title: s.title,
@@ -845,6 +847,10 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
       } else await call('delete_event', { id: Number(event.id) });
       closeEditor();
       await load();
+      // The sheet gave the focus back to the event it came from, which is gone now: take it to the
+      // calendar's own action instead of <body>.
+      await tick();
+      if (document.activeElement === document.body) newEventButton.current?.focus();
       say(tr('Evento eliminato', 'Event deleted'));
     } catch (e) {
       s.sheetError = errorText(e);
@@ -1097,7 +1103,7 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
                   <Icon name="refresh" size={17} />
                 </Button>
               )}
-              <Button variant="primary" onClick={newEvent}>
+              <Button variant="primary" ref={newEventButton} onClick={newEvent}>
                 <Icon name="plus" size={17} />
                 {tr('Nuovo evento', 'New event')}
               </Button>

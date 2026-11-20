@@ -57,6 +57,11 @@ async function step(name, work) {
   results.push(name);
   console.log(`PASS ${name}`);
 }
+// A window that goes away leaves the focus on the page, never on <body> or in the window that is sinking.
+const focusIsOnPage = () =>
+  page.evaluate(
+    () => document.activeElement !== document.body && !document.activeElement?.closest('.composer-panel'),
+  );
 try {
   await step('Two drafts keep separate recipients, formatting and text', async () => {
     await create(titleA, 'First draft content.');
@@ -72,6 +77,34 @@ try {
     await expect
       .poll(async () => (await snapshot()).drafts.find((draft) => draft.subject === titleA)?.body)
       .toContain('First draft content.');
+  });
+  await step('The editor toolbar is one Tab stop and moves with the arrows, Home and End', async () => {
+    const toolbar = panel.getByRole('toolbar', { name: 'Text formatting' });
+    const stops = toolbar.locator('button[tabindex="0"]');
+    const focusedName = () => page.evaluate(() => document.activeElement?.getAttribute('aria-label'));
+    await expect(stops).toHaveCount(1);
+    await body().focus();
+    await page.keyboard.press('Shift+Tab');
+    assert.equal(await focusedName(), 'Bold', 'Shift+Tab from the text lands on the toolbar, on its first button');
+    await page.keyboard.press('ArrowRight');
+    assert.equal(await focusedName(), 'Italic', 'the right arrow moves to the next button');
+    await expect(stops).toHaveCount(1);
+    assert.equal(await stops.getAttribute('aria-label'), 'Italic', 'the one Tab stop follows the focus');
+    await page.keyboard.press('End');
+    // Redo is off with nothing to redo: the end of the toolbar is the last button that works.
+    const last = await toolbar.locator('button:not(:disabled)').last().getAttribute('aria-label');
+    assert.equal(await focusedName(), last, 'End goes to the last button');
+    await page.keyboard.press('Home');
+    assert.equal(await focusedName(), 'Bold', 'Home goes to the first button');
+    await page.keyboard.press('ArrowLeft');
+    assert.equal(await focusedName(), last, 'the left arrow from the first button wraps to the last');
+    await page.keyboard.press('Home');
+    await page.keyboard.press('Tab');
+    await expect(body()).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    assert.equal(await focusedName(), 'Bold', 'Tab leaves the toolbar for the text, Shift+Tab comes back to where it was');
+    await expect(stops).toHaveCount(1);
+    await body().focus();
   });
   await step('Collapsed tabs survive navigation and reopen without losing edits', async () => {
     await panel.getByRole('button', { name: 'Minimize draft' }).click();
@@ -109,6 +142,7 @@ try {
         .poll(async () => (await snapshot()).drafts.find((draft) => draft.subject === titleA)?.body)
         .toContain('Latest A edit');
       await panel.getByRole('button', { name: 'Save and close draft' }).click();
+      await expect.poll(focusIsOnPage).toBe(true);
       await page.getByRole('button', { name: /^Drafts\s*\d*$/ }).click();
       await page
         .locator('.drafts-list')
@@ -134,6 +168,15 @@ try {
     await expect(tab(titleB)).toHaveCount(1);
     await page.getByRole('button', { name: /^Undo: Draft discarded/ }).click();
     await expect(subject()).toHaveValue(titleA);
+    await expect(tabs.getByRole('tab')).toHaveCount(2);
+  });
+  await step('Send and Discard leave the focus on the page, not on the window that closes', async () => {
+    for (const name of ['Send', 'Discard draft']) {
+      await create(`Focus after ${name}`, 'Some text.');
+      await panel.getByRole('button', { name, exact: true }).click();
+      await expect(tab(`Focus after ${name}`)).toHaveCount(0);
+      await expect.poll(focusIsOnPage).toBe(true);
+    }
     await expect(tabs.getByRole('tab')).toHaveCount(2);
   });
   await step('Keyboard tab navigation and overflow work at the minimum window size', async () => {

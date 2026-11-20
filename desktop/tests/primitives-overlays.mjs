@@ -155,6 +155,19 @@ try {
     await expect(panel).toBeVisible();
     assert.equal(await width(panel), '420px', 'narrow panel');
     console.log('PASS SidePanel: 760px wide, 420px with narrow');
+
+    // Closed with the focus inside it, the panel gives the focus back to the button that opened it; a focus
+    // that has moved to the page on its own stays where it is.
+    await page.keyboard.press('Escape');
+    await expect(panel).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Open narrow', exact: true })).toBeFocused();
+    await page.getByRole('button', { name: 'Open wide', exact: true }).click();
+    await expect(panel).toBeVisible();
+    await after.focus();
+    await page.keyboard.press('Escape');
+    await expect(panel).toHaveCount(0);
+    await expect(after).toBeFocused();
+    console.log('PASS SidePanel: the focus returns to the opener on close, unless it had moved to the page');
     await page.close();
   }
 

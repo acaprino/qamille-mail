@@ -16,7 +16,7 @@ import { tick } from '../lib/tick';
 import type { Draft, UndoAction, Workspace } from '../lib/types';
 import { cn } from '../lib/utils';
 import RecipientInput, { splitRecipients } from './contacts/RecipientInput';
-import RichEditor from './RichEditor';
+import RichEditor, { type RichEditorHandle } from './RichEditor';
 import { imeComposing } from '../ds/ime';
 import './Composer.css';
 
@@ -106,6 +106,7 @@ export default function Composer(props: ComposerProps) {
   }).current;
   const panel = useRef<HTMLDivElement>(null);
   const recipientInput = useRef<HTMLInputElement>(null);
+  const editor = useRef<RichEditorHandle>(null);
 
   const draft = s.draft;
   const fullOf = () => ({
@@ -180,14 +181,12 @@ export default function Composer(props: ComposerProps) {
   useEffect(() => {
     if (!(active && s.ready)) return;
     void tick().then(() => {
-      if (p.current.active && !isLocked()) {
-        const last = m.lastFocus;
-        (last?.isConnected && panel.current?.contains(last) ? last : recipientInput.current)?.focus(
-          {
-            preventScroll: true,
-          },
-        );
-      }
+      if (!p.current.active || isLocked()) return;
+      const last = m.lastFocus;
+      if (last?.isConnected && panel.current?.contains(last)) last.focus({ preventScroll: true });
+      // A reply already has its recipients: it starts in the text. A new message or a forward starts in To.
+      else if (s.draft.reply_to !== null && s.draft.to.trim()) editor.current?.focus();
+      else recipientInput.current?.focus({ preventScroll: true });
     });
   }, [active, s.ready]);
 
@@ -613,6 +612,7 @@ export default function Composer(props: ComposerProps) {
       <div className="composer-body">
         {s.ready ? (
           <RichEditor
+            ref={editor}
             html={s.editorHtml}
             disabled={locked}
             onchange={(html) => {

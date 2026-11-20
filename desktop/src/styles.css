@@ -1886,8 +1886,12 @@
   padding: 12px 0;
   font-size: var(--text-md);
   line-height: 1.65;
-  outline: none;
   overflow-wrap: anywhere;
+}
+/* The same ring as every field (ds/styles/system.css); the body is a contenteditable, so it shows it on click too. */
+.rich-content:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 .rich-content p {
   margin: 0 0 10px;
@@ -2737,8 +2741,11 @@
 .mail-list:has(.mail-checkbox:checked) .unread-dot {
   visibility: hidden;
 }
-.list-heading h1:focus {
-  outline: none;
+/* The heading that takes the focus when no row is selected (restoreListFocus) shows it like any control; a
+   mouse click on it, which `:focus-visible` ignores, shows nothing. */
+.list-heading h1:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 .reader-toolbar .toolbar-cluster {
   flex-shrink: 0;

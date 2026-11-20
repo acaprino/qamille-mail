@@ -24,6 +24,7 @@ await page.addInitScript(() => {
     { id: 'standup', summary: 'Standup', revision: '1', start: { dateTime: `${day(0)}T09:00:00+01:00` }, end: { dateTime: `${day(0)}T09:30:00+01:00` } },
     { id: 'offsite', summary: 'Offsite', revision: '1', start: { date: day(0) }, end: { date: day(1) } },
   ];
+  window.fakeEvents = events;
   window.__TAURI_INTERNALS__ = {
     async invoke(command, args = {}) {
       if (command === 'workspace_snapshot')
@@ -50,6 +51,11 @@ await page.addInitScript(() => {
       }
       if (action === 'list_events') return { items: events };
       if (action === 'sync_calendar') return { status: 'complete' };
+      if (action === 'delete_event') {
+        const at = events.findIndex((event) => event.id === args.args.id);
+        if (at >= 0) events.splice(at, 1);
+        return { status: 'deleted' };
+      }
       if (action === 'create_event') {
         if (args.args.title === 'Fail') throw { message: 'Calendar quota exceeded', code: 'external' };
         return { id: 'new', revision: '1' };
@@ -159,6 +165,48 @@ try {
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'New event' })).toBeHidden();
   console.log('PASS all-day row and keyboard close');
+
+  // The focus goes back where it was. An event reached with Tab and opened with Enter has it again after
+  // Esc; a new event saved from the editor hands it back to the button that opened it.
+  const newEventButton = page.getByRole('button', { name: 'New event', exact: true });
+  await newEventButton.focus();
+  let reached = false;
+  for (let i = 0; i < 80 && !reached; i++) {
+    await page.keyboard.press('Tab');
+    reached = await page.evaluate(() => document.activeElement?.classList.contains('calendar-event'));
+  }
+  assert.ok(reached, 'Tab reaches an event');
+  await page.evaluate(() => (window.openedEvent = document.activeElement));
+  await page.keyboard.press('Enter');
+  const edit = page.getByRole('dialog', { name: 'Edit event' });
+  await expect(edit).toBeVisible();
+  await expect(edit.getByLabel('Title')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(edit).toBeHidden();
+  await expect.poll(() => page.evaluate(() => document.activeElement === window.openedEvent)).toBe(true);
+  console.log('PASS Esc on an event opened with the keyboard puts the focus back on that event');
+  await newEventButton.click();
+  const focusSheet = page.getByRole('dialog', { name: 'New event' });
+  await focusSheet.getByLabel('Title').fill('Focus check');
+  await focusSheet.getByRole('button', { name: 'Save' }).click();
+  await expect(focusSheet).toBeHidden();
+  await expect(newEventButton).toBeFocused();
+  console.log('PASS saving a new event puts the focus back on the button that opened it');
+  // Deleting the event the sheet came from leaves nothing to go back to: the focus goes to New event.
+  await page.evaluate(() => {
+    const day = new Date().toISOString().slice(0, 10);
+    window.fakeEvents.push({ id: 'disposable', summary: 'Disposable', revision: '1', start: { dateTime: `${day}T11:00:00+01:00` }, end: { dateTime: `${day}T11:30:00+01:00` } });
+  });
+  const disposable = page.locator('.calendar-event', { hasText: 'Disposable' }).first();
+  await disposable.focus();
+  await page.keyboard.press('Enter');
+  const doomed = page.getByRole('dialog', { name: 'Edit event' });
+  await doomed.getByRole('button', { name: 'Delete', exact: true }).click();
+  await doomed.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(doomed).toBeHidden();
+  await expect(page.locator('.calendar-event', { hasText: 'Disposable' })).toHaveCount(0);
+  await expect(newEventButton).toBeFocused();
+  console.log('PASS deleting the event puts the focus on New event, not on <body>');
 
   // A line marks the current time in today's column, on the matching hour row.
   await expect(page.locator('.now-line')).toHaveCount(1);

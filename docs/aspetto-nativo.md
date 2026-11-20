@@ -6,8 +6,9 @@ finestra bianca all'avvio col tema scuro). Questa guida elenca le regole che lo
 fanno sembrare un'app Windows e come non romperle.
 
 Origine: [8 tips for creating a native look and feel in Tauri applications](https://dev.to/akr/8-tips-for-creating-a-native-look-and-feel-in-tauri-applications-3loe),
-adattato a Tauri 2 su Windows. I consigli solo macOS (beep sui tasti, rimbalzo dello
-scroll) non si applicano.
+adattato a Tauri 2 su Windows. Il consiglio solo macOS sul beep dei tasti non si applica;
+lo scorrimento oltre il bordo sì: un touchpad di precisione o un touchscreen lo fanno anche
+su Windows (regola 4).
 
 **Controllo automatico:** `node tests/native-feel.mjs` (da `desktop/`, o
 `npm run test:native-feel`). Gira in meno di un secondo, senza build. Va lanciato
@@ -20,7 +21,7 @@ dopo ogni modifica a CSS globali, tema, finestre o `src-tauri/src/`.
 | 1 | Il testo dell'interfaccia non si seleziona e mostra la freccia, non la barra a I | `body` in `desktop/src/ds/styles/system.css` e `desktop/src/reminder/reminder.css` | test 1 |
 | 2 | Campi, editor e contenuti da leggere restano selezionabili, con cursore di testo; così anche ciò che si copia altrove (configurazioni e percorsi in `pre`/`code`, errori con `role="alert"`, URL e utente del server, stato dell'abbonamento) | regola `input, textarea, [contenteditable], .selectable, .reader-scroll, pre, code, [role='alert']…` subito sotto `body` in `ds/styles/system.css` | test 2 |
 | 3 | Pulsanti, link e controlli con la freccia, mai la mano né il divieto: Microsoft chiede la freccia su ogni elemento cliccabile e l'effetto hover al posto della mano. Chromium mette la mano su ogni `a[href]`, quindi anche i link delle guide la tolgono. La mano resta solo sui link dentro i messaggi, che sono documento (nell'iframe del messaggio, con il suo stile) | `button, a { cursor: default }` in `ds/styles/system.css`; nessun `cursor: pointer`/`not-allowed` né `cursor-pointer`/`cursor-not-allowed` in `src/` | test 2 |
-| 4 | Scorrono solo i pannelli, mai la finestra intera | `.app-shell { overflow: hidden }`, ogni pannello ha il suo `overflow: auto` | a vista |
+| 4 | La radice di ogni WebView non scorre e non scivola oltre il bordo: un touchpad di precisione o un touchscreen non possono spostare tutta la vista e scoprire lo sfondo della finestra. Scorrono solo i pannelli, ciascuno nel suo contenitore con `overscroll-behavior: contain`, così la rotella a fine corsa non passa alla radice. Una schermata più alta della finestra (accesso, avvio, tutto a 200 %) è essa stessa il contenitore che scorre, e il suo centro sicuro (`safe center`) non taglia mai la parte alta. L'iframe del messaggio resta senza `overscroll-behavior`: non scorre in verticale e passa la rotella al lettore | `html, body { height: 100%; overflow: hidden; overscroll-behavior: none }` in `ds/styles/system.css` e (senza `height`) in `reminder/reminder.css`; `.app-shell { overflow: hidden }`; `.onboarding` (`components/Onboarding.css`) e `.startup-state` (`styles.css`): `height: 100vh; overflow: auto; overscroll-behavior: contain`; `contain` anche su liste e corpi che scorrono (`ds/styles/ark/select.css`, `recipients.css`, `dialog.css`) | test 14 + `tests/root-lock.mjs` |
 | 5 | Il tema all'avvio è già quello giusto, anche con "Sistema" | `desktop/public/theme-boot.js` (stessa logica di `resolvedAppearance()` in `src/lib/appearance.ts`) | test 3 |
 | 6 | Lo sfondo della finestra nativa è il `--ground` del tema (quello di `html`, `body` e `.app-shell`), mai bianco su tema scuro: ridimensionando non compare una striscia di un altro colore | chiaro: `backgroundColor` in `tauri.conf.json`; scuro: `DARK_GROUND` in `src-tauri/src/native_feel.rs`; durante l'uso: `paintWindowBackground()` in `src/lib/native-window.ts`, chiamata dall'effetto del tema in `App.tsx` | test 4, 6, 7 |
 | 7 | La finestra principale nasce nascosta e si mostra già nell'aspetto scelto in Impostazioni (Chiaro, Scuro o Sistema) e con lo zoom salvato. Se parte scura, la WebView nasce già con `DARK_GROUND` (WebView2 prende il colore alla creazione, prima di qualsiasi pagina). Barra del titolo, menu contestuale e controlli di WebView2 seguono lo stesso aspetto | `window_config.visible = false`; `window_shell::starts_dark()` (Impostazioni, oppure `AppsUseLightTheme` di Windows) → `background_color` in `main.rs`; `native_feel::show_main_window()` → `window_shell::apply_startup_preferences()`, che legge `window-preferences.json` nella cartella dati; lo scrive il comando `window_appearance`, chiamato dall'effetto del tema in `App.tsx` | test 5, 10 |
@@ -72,7 +73,9 @@ l'attributo.
 attiva, interruttore): aggiungi il selettore a `ds/styles/forced-colors.css` con un bordo o un
 contorno in un colore di sistema, e un caso a `tests/forced-colors.mjs`.
 
-**Nuova finestra Tauri**: subito dopo `.build()?` chiama
+**Nuova finestra Tauri**: blocca la radice del suo foglio di stile (regola 4): `html, body { overflow: hidden;
+overscroll-behavior: none }`, e `overscroll-behavior: contain` su ogni suo contenitore che scorre; poi aggiungi
+il foglio al controllo 14 di `tests/native-feel.mjs`. Subito dopo `.build()?` chiama
 `crate::native_feel::harden_webview(&window, "pagina.html")`, con la pagina del builder: la ricarica dopo le impostazioni, che WebView2 applica dalla navigazione successiva (scorciatoie, menu, pagina d'errore e
 ripristino, regola 21) e aggiungi al builder `.general_autofill_enabled(false)` e
 `.on_navigation(crate::native_feel::navigation_guard(app, false))` (`true` solo se la finestra
@@ -133,3 +136,6 @@ l'anteprima browser (`desktop` falso).
     una cartella vuota, `ui.lock` tenuto da un altro processo. Ogni volta compare un messaggio con
     il motivo (per WebView2, l'indirizzo da cui installarlo), una riga va in `native.log` e il
     processo esce con 1.
+17. Touchpad di precisione e touchscreen: trascina con due dita (o il dito) oltre ogni bordo, in Posta,
+    nel lettore con un messaggio lungo, in Impostazioni, nella schermata d'accesso e d'avvio (anche a
+    200 % in una finestra piccola) e sul promemoria: niente scivola e non compare lo sfondo della finestra.

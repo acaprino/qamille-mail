@@ -4,7 +4,11 @@
 .onboarding {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  /* The root never scrolls (docs/aspetto-nativo.md rule 4): in a short window, at 200 % zoom, the screen
+     scrolls inside itself. */
+  height: 100vh;
+  overflow: auto;
+  overscroll-behavior: contain;
   background: var(--ground, var(--bg));
 }
 .onboarding-main {

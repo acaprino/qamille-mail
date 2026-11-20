@@ -25,6 +25,15 @@
 html {
   background: var(--ground);
 }
+/* Native feel (docs/aspetto-nativo.md rule 4): the root of the WebView never scrolls and never slides past
+   its edge, so a precision touchpad or a touchscreen cannot move the whole view and uncover the window
+   background. Each screen scrolls inside its own container, with `overscroll-behavior: contain`. */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
 body {
   margin: 0;
   font-family: var(--font-text);

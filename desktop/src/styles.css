@@ -2438,8 +2438,13 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  min-height: 100vh;
+  /* `safe`: when the window is shorter than the content, the top stays reachable instead of being cut off. */
+  justify-content: safe center;
+  /* The root never scrolls (docs/aspetto-nativo.md rule 4): in a short window, at 200 % zoom, the screen
+     scrolls inside itself. */
+  height: 100vh;
+  overflow: auto;
+  overscroll-behavior: contain;
   text-align: center;
   gap: 20px;
   padding: 50px;

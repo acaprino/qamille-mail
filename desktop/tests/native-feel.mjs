@@ -316,6 +316,39 @@ check('13. the first window fits the work area (audit Q4)', () => {
   assert.equal(main.preventOverflow, true, 'main window needs preventOverflow: true (it never opens past the work area)');
 });
 
+check('14. every WebView locks its root against overscroll (rule 4, audit Q5)', () => {
+  // The declarations of every rule whose selector list names `selector`: the lock may sit on `html`
+  // alone or on `html, body`.
+  const bodiesOf = (css, selector) =>
+    [...stripComments(css).matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .filter(([, selectors]) => selectors.split(',').map((s) => s.trim()).includes(selector))
+      .map(([, , body]) => body);
+  const locked = (css, selector, declaration, why) =>
+    assert.ok(bodiesOf(css, selector).some((body) => declaration.test(body)), why);
+  const system = read('src/ds/styles/system.css');
+  const reminder = read('src/reminder/reminder.css');
+  // A precision touchpad or a touchscreen must never slide the whole view and uncover the window
+  // background: on html (the scroller of the viewport) and on the document, in the main window and the chip.
+  locked(system, 'html', /overscroll-behavior:\s*none/, 'system.css: html needs overscroll-behavior: none');
+  locked(reminder, 'html', /overscroll-behavior:\s*none/, 'reminder.css: html needs overscroll-behavior: none');
+  for (const [name, css] of [['system.css', system], ['reminder.css', reminder]]) {
+    for (const selector of ['html', 'body']) locked(css, selector, /overflow:\s*hidden/, `${name}: ${selector} must not scroll (overflow: hidden)`);
+  }
+  // A screen taller than the window scrolls inside its own container, which hands nothing to the root.
+  const scrollers = [
+    ['src/components/Onboarding.css', '.onboarding'],
+    ['src/styles.css', '.startup-state'],
+  ];
+  for (const [file, selector] of scrollers) {
+    const css = read(file);
+    locked(css, selector, /(?<![-\w])overflow:\s*auto/, `${file}: ${selector} must scroll inside itself (overflow: auto)`);
+    locked(css, selector, /overscroll-behavior:\s*contain/, `${file}: ${selector} must contain its overscroll`);
+    locked(css, selector, /(?<![-\w])height:\s*100vh/, `${file}: ${selector} must be exactly one window tall (height: 100vh)`);
+  }
+  // The message frame stays free of the lock: it never scrolls vertically and hands the wheel to the reader.
+  assert.ok(!/overscroll-behavior/.test(read('src/lib/message-html.ts')), 'the message frame must not set overscroll-behavior');
+});
+
 if (failures.length) {
   console.error(`\n${failures.length} native-feel check(s) failed. See docs/aspetto-nativo.md.`);
   process.exit(1);

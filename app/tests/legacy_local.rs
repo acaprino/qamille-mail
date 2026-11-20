@@ -147,12 +147,39 @@ fn a_discovery_file_and_models_show_the_notice_once() {
     let _ = std::fs::remove_dir_all(&data);
 }
 
+/// Not a test: the body of the stand-in server ([`server_sleeper`]), run by a copy of this test
+/// program named like the server.
+#[test]
+#[ignore = "only the stand-in server process runs it"]
+fn stand_in_server_process() {
+    std::thread::sleep(Duration::from_secs(60));
+}
+
+/// A process whose program is called `qamille-server`, as the old local server was: only such a
+/// process is ever stopped (a recycled pid of another program never is). It is a copy of this
+/// test program that runs [`stand_in_server_process`]; the folder holding the copy comes back too.
+fn server_sleeper(name: &str) -> (Child, PathBuf) {
+    let folder = data_dir(name);
+    let program = folder.join(if cfg!(windows) { "qamille-server.exe" } else { "qamille-server" });
+    std::fs::copy(std::env::current_exe().unwrap(), &program).unwrap();
+    let child = Command::new(&program)
+        .args(["stand_in_server_process", "--exact", "--ignored"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+    (child, folder)
+}
+
+// The program of a process is read on Windows and Linux only: elsewhere nothing is ever stopped.
+#[cfg(any(windows, target_os = "linux"))]
 #[test]
 fn a_server_that_answers_with_the_recorded_token_is_stopped() {
     let data = data_dir("stopped");
     let token = "t".repeat(64);
     let port = fake_server(Box::leak(token.clone().into_boxed_str()));
-    let mut child = sleeper();
+    let (mut child, folder) = server_sleeper("stopped-program");
     assert!(process_alive(child.id()));
     write_record(&data, child.id(), port, &token);
     service(&data).startup().unwrap();
@@ -162,7 +189,27 @@ fn a_server_that_answers_with_the_recorded_token_is_stopped() {
     }
     let exited = child.try_wait().unwrap().is_some();
     let _ = child.kill();
+    let _ = child.wait();
+    let _ = std::fs::remove_dir_all(&folder);
     assert!(exited, "the recorded server was stopped");
+    assert!(!data.join("compute-server.json").exists());
+    let _ = std::fs::remove_dir_all(&data);
+}
+
+#[test]
+fn another_program_with_the_recorded_pid_is_never_stopped() {
+    // The pid was recycled by another program, and something answers with the recorded token:
+    // still not the server, so it keeps running.
+    let data = data_dir("recycled");
+    let token = "r".repeat(64);
+    let port = fake_server(Box::leak(token.clone().into_boxed_str()));
+    let mut child = sleeper();
+    write_record(&data, child.id(), port, &token);
+    service(&data).startup().unwrap();
+    std::thread::sleep(Duration::from_millis(500));
+    let alive = child.try_wait().unwrap().is_none() && process_alive(child.id());
+    let _ = child.kill();
+    assert!(alive, "another program: not stopped");
     assert!(!data.join("compute-server.json").exists());
     let _ = std::fs::remove_dir_all(&data);
 }

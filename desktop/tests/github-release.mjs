@@ -202,6 +202,31 @@ test('a package whose SHA-256 differs leaves no copy', async () => {
   }
 });
 
+test('a manifest package whose file is not a plain file name is refused before anything is written', async () => {
+  // Each name is a real asset of the fake release, so only the check on the name stops it. Joined to the staging
+  // folder, the first would land next to the release's folder, the second inside it but in a folder of its own.
+  const names = ['../evil.tgz', 'sub/evil.tgz', '..', '.', ...(process.platform === 'win32' ? ['..\\evil.tgz'] : [])];
+  for (const file of names) {
+    const github = await fakeGitHub({ repo: REPO, tag: 'v1.2.3', packages: [pack(file, { 'hello.txt': 'hello\n' })] });
+    const cache = join(fresh('cache'), 'inner');
+    mkdirSync(cache, { recursive: true });
+    const log = lines();
+    const { calls, unpack } = unpacker();
+    try {
+      const found = await latestMainRelease({ repo: REPO, cache, label: 'thing', unpack, log: log.log, api: github.api });
+      assert.equal(found, null, file);
+      assert.deepEqual([...log], [`thing: v1.2.3 could not be downloaded (the manifest of v1.2.3 lists ${JSON.stringify(file)}, which is not a plain file name)`], file);
+      assert.equal(calls.length, 0, file);
+      // Only the manifest was fetched, and nothing was written in the cache or beside it.
+      assert.deepEqual(github.requests().slice(2), ['asset:manifest.json'], file);
+      assert.deepEqual(readdirSync(cache), [], file);
+      assert.deepEqual(readdirSync(dirname(cache)), ['inner'], file);
+    } finally {
+      await github.close();
+    }
+  }
+});
+
 test('a package that cannot be unpacked leaves no copy', async () => {
   const github = await fakeGitHub({ repo: REPO, tag: 'v1.2.3', packages: [thingPackage()] });
   const cache = fresh('cache');

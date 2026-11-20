@@ -14,11 +14,24 @@
 
 - Qamille usa sempre la versione più recente di `artcraft-web`, senza pin assoluti: `npm run
   artcraft:sync` scarica l'ultima GitHub Release di `acaprino/artcraft-web` (repo pubblica, senza
-  login; `desktop/scripts/artcraft-github.mjs`), controlla gli SHA-256 del
+  login; il download è in `desktop/scripts/github-release.mjs`, in comune con il toolkit, e
+  `desktop/scripts/artcraft-github.mjs` sceglie i motori), controlla gli SHA-256 del
   manifest e i file contro `provenance.json`. Solo il ramo `main` di
   artcraft-web: l'ultima release disponibile, usata solo se il suo tag è in `main`. Senza rete resta la copia
   già presente; `ARTCRAFT_WEB_DIR` forza un checkout locale (motori non ancora rilasciati). Non fissare versioni o commit di artcraft-web in Qamille.
 - Una nuova versione dei motori arriva con una release di artcraft-web (un merge di `develop` in `main` lì).
+
+## Toolkit
+
+- Qamille usa sempre l'ultima release del `main` di `acaprino/toolkit`, senza pin: `npm run toolkit:sync`
+  (in `desktop/`) scarica l'ultima GitHub Release (repo pubblica, senza login;
+  `desktop/scripts/github-release.mjs`, come per ArtCraft), controlla gli SHA-256 del manifest e ogni file
+  contro `provenance.json`, e sostituisce `desktop/vendor/toolkit/` (generata, ignorata da git). Usata solo se il
+  suo tag è in `main`; senza rete resta la copia già presente. Non fissare versioni o commit del toolkit in Qamille.
+- `TOOLKIT_DIR` forza un checkout locale del toolkit (modifiche non ancora rilasciate): lo script esegue lì
+  `npm run release -- --skip-test` e prende il pacchetto da `release/`.
+- L'unica fonte è il repository ufficiale `acaprino/toolkit`: niente fork, copie a mano o pacchetti di altra
+  origine in `desktop/vendor/toolkit/`.
 
 ## Build Release dell'app desktop
 

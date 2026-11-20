@@ -10,7 +10,7 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 const sha256 = (data) => createHash('sha256').update(data).digest('hex');
 // Windows' own tar (bsdtar) reads D:\ paths; Git's GNU tar would take "D:" for a remote host.
@@ -26,6 +26,10 @@ async function get(url, accept) {
   if (!response.ok) throw new Error(`${response.status} ${response.statusText} for ${url}`);
   return response;
 }
+
+// A manifest names its packages by file: only a plain file name is trusted, never a path (nothing is then written
+// outside the staging folder) and never "." or "..".
+export const isPlainFileName = (name) => typeof name === 'string' && name !== '' && name !== '.' && name !== '..' && basename(name) === name;
 
 // Unpacks a release package (an npm-style .tgz: one top folder) into `into`, without that folder; `into` is
 // created when it is missing.
@@ -70,6 +74,9 @@ export async function latestMainRelease({ repo, cache, label, unpack, select = (
       const manifest = JSON.parse((await download('manifest.json')).toString('utf8'));
       const packages = select(manifest, tag);
       if (!Array.isArray(packages) || packages.length === 0) throw new Error(`the manifest of ${tag} lists no package`);
+      for (const pkg of packages) {
+        if (!isPlainFileName(pkg?.file)) throw new Error(`the manifest of ${tag} lists ${JSON.stringify(pkg?.file)}, which is not a plain file name`);
+      }
       for (const pkg of packages) {
         const data = await download(pkg.file);
         if (sha256(data) !== pkg.sha256) throw new Error(`${pkg.file}: SHA-256 differs from the manifest`);

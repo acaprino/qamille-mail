@@ -52,7 +52,8 @@ jobs:
         with:
           workspaces: app
       - name: App tests
-        run: cargo test --manifest-path app/Cargo.toml --no-default-features --features test-support --jobs 2 --locked
+        # Every test file runs even after one fails: a failure must not hide the ones after it.
+        run: cargo test --manifest-path app/Cargo.toml --no-default-features --features test-support --jobs 2 --locked --no-fail-fast
 
   desktop:
     runs-on: windows-latest

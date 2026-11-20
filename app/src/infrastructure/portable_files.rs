@@ -89,8 +89,11 @@ pub fn resolve_path(value: &str, root: &Path) -> AppResult<String> {
                 "A portable file reference leaves the data directory",
             ));
         }
+        // Saved with `/`: rebuilt with this system's separator, so the path in memory is the one
+        // the file was saved under (on Windows `attachments\x`, never `attachments/x`) and
+        // compares equal to it.
         return Ok(std::path::absolute(root)?
-            .join(relative)
+            .join(relative.iter().collect::<PathBuf>())
             .to_string_lossy()
             .into_owned());
     }
@@ -376,6 +379,18 @@ pub fn release_draft_attachment_imports(root: &Path, ids: &[String]) -> AppResul
 #[cfg(test)]
 mod staging_tests {
     use super::*;
+
+    #[test]
+    fn a_path_saved_and_read_back_is_the_same_text() {
+        let root = std::env::temp_dir().join("qamille-portable-roundtrip");
+        let file = std::path::absolute(root.join("attachments").join("gmail-kept.bin"))
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+        let saved = persistent_path(&file, &root).unwrap();
+        assert_eq!(saved, "workspace:/attachments/gmail-kept.bin");
+        assert_eq!(resolve_path(&saved, &root).unwrap(), file);
+    }
 
     #[test]
     fn live_editor_survives_lease_expiry_but_crashed_import_is_collected() {

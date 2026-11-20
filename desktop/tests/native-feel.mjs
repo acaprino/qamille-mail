@@ -306,6 +306,16 @@ check('12. a failed start and a blank page reach a message (rule 21, audit Q2 Q1
   assert.match(item(recovery, 'pub fn frontend_failed('), /offer_reload\(/, 'frontend_failed asks with offer_reload');
 });
 
+check('13. the first window fits the work area (audit Q4)', () => {
+  // Tauri applies `center` and `preventOverflow` from the window config: on a small or scaled screen
+  // the first window would otherwise open with its title-bar buttons off the work area.
+  const conf = JSON.parse(read('src-tauri/tauri.conf.json'));
+  const main = conf.app.windows.find((w) => w.label === 'main');
+  assert.ok(main, 'tauri.conf.json must declare the main window');
+  assert.equal(main.center, true, 'main window needs center: true (it opens in the middle of the work area)');
+  assert.equal(main.preventOverflow, true, 'main window needs preventOverflow: true (it never opens past the work area)');
+});
+
 if (failures.length) {
   console.error(`\n${failures.length} native-feel check(s) failed. See docs/aspetto-nativo.md.`);
   process.exit(1);

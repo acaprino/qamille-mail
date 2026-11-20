@@ -264,6 +264,18 @@ pub fn startup_failure_text(error: &str, italian: bool, webview_missing: bool) -
     format!("{headline}\n\n{advice} {WEBVIEW2_DOWNLOAD} {again}")
 }
 
+/// The text a panic carries (`panic!` gives a `&str` or a `String`), so a start that panicked
+/// can say why like one that failed.
+pub fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(text) = payload.downcast_ref::<&str>() {
+        (*text).to_owned()
+    } else if let Some(text) = payload.downcast_ref::<String>() {
+        text.clone()
+    } else {
+        "no message".to_owned()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -406,5 +418,16 @@ mod tests {
         }
         assert!(startup_failure_text(lookup, true, true).starts_with("Qamille non è riuscito ad avviarsi."));
         assert!(startup_failure_text(lookup, false, true).starts_with("Qamille could not start."));
+    }
+
+    #[test]
+    fn a_panic_at_startup_keeps_its_message() {
+        fn payload(start: fn()) -> Box<dyn std::any::Any + Send> {
+            std::panic::catch_unwind(start).expect_err("the start must panic")
+        }
+        // `panic!` with a literal carries a `&str`, with arguments a `String`.
+        assert_eq!(panic_message(&*payload(|| panic!("store missing"))), "store missing");
+        assert_eq!(panic_message(&*payload(|| panic!("{} rows unreadable", 3))), "3 rows unreadable");
+        assert_eq!(panic_message(&*payload(|| std::panic::panic_any(7_u8))), "no message");
     }
 }

@@ -80,13 +80,19 @@ fn main() {
                 let _ = window.set_focus();
             }
         }))
-        // Tauri 2.12 turns an `Err` returned from `.setup` into a panic, which a release build (no
-        // console) ends without a word: the failure is said here instead (audit Q2).
+        // Tauri 2.12 turns an `Err` returned from `.setup` into a panic, and a panic there ends the
+        // process (exit code 101): a release build (no console) would end without a word. Both are
+        // said here instead (audit Q2).
         .setup(move |app| {
-            if let Err(error) = setup_app(app, demo, window_config, webview_dir) {
-                startup_failed(&*error);
-            }
-            Ok(())
+            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                setup_app(app, demo, window_config, webview_dir)
+            }));
+            let error: Box<dyn std::error::Error> = match outcome {
+                Ok(Ok(())) => return Ok(()),
+                Ok(Err(error)) => error,
+                Err(panic) => format!("unexpected error: {}", shell_rules::panic_message(&*panic)).into(),
+            };
+            startup_failed(Some(app.handle()), &*error)
         })
         .on_window_event(|window, event| {
             if window.label() != "main" {
@@ -245,21 +251,33 @@ fn main() {
     // process did not exit in time; a damaged store; no WebView2 Runtime) never returns here:
     // `startup_failed` has already said it and exited.
     if let Err(error) = started {
-        startup_failed(&error);
+        startup_failed(None, &error);
     }
 }
 
 /// A start that failed: the reason in a Windows message and in `native.log`, then exit code 1,
 /// never the silent end of a process without a window (audit Q2, T21). Whatever failed, a
-/// missing WebView2 Runtime is said as such: no window can open without it.
-fn startup_failed(error: &dyn std::error::Error) -> ! {
+/// missing WebView2 Runtime is said as such: no window can open without it. `app`: when the
+/// failure came from `setup_app`, which may already have built and shown the main window.
+fn startup_failed(app: Option<&tauri::AppHandle>, error: &dyn std::error::Error) -> ! {
     native_feel::report(&format!("could not start: {error}"));
+    // A failure after `build()`: the window is on screen, and its page would stay usable
+    // behind a message that has no owner, and could still open a recovery dialog over it.
+    recovery::stop_asking();
+    if let Some(window) = app.and_then(|app| app.get_webview_window("main")) {
+        let _ = window.hide();
+    }
     let webview_missing = tauri::webview_version().is_err();
     rfd::MessageDialog::new()
         .set_title("Qamille")
         .set_description(shell_rules::startup_failure_text(&error.to_string(), window_shell::italian(), webview_missing))
         .set_level(rfd::MessageLevel::Error)
         .show();
+    // As every exit without the page: what the state may have started (a meeting job) is
+    // stopped first. Without the state this does nothing.
+    if let Some(app) = app {
+        recovery::finish_meetings_before_exit(app);
+    }
     std::process::exit(1)
 }
 
@@ -292,6 +310,8 @@ fn setup_app(
         // The app suggests recipients itself; browser "Suggestions" would cover them.
         .general_autofill_enabled(false)
         .on_navigation(native_feel::navigation_guard(app.handle(), true))
+        // Every page that starts loading must draw within 15 s, a reload the page starts too.
+        .on_page_load(recovery::page_load)
         .build()?;
     native_feel::harden_webview(&main_window, "index.html");
     window_shell::attach_main(&main_window);

@@ -1446,12 +1446,14 @@ export default function App() {
         },
         {
           last: true,
-          // Session end: the notes first; the recording only once the session really ends.
+          // Session end: the notes first; the recording only once the session really ends. Unsaved
+          // notes answer false; a stop or cancel that fails throws, and endSession counts that too.
           sessionEnd: async (last) => {
-            await flushMeetingDrafts();
-            if (!last) return;
+            const saved = await flushMeetingDrafts();
+            if (!last) return saved;
             if (captureActive(await meetingCall<CaptureSnapshot>('meeting_capture_status'))) await meetingCall('meeting_stop');
             await call('meeting_cancel_all_jobs');
+            return saved;
           },
         },
       ),
@@ -1469,8 +1471,12 @@ export default function App() {
           v.leaveAccount = null;
           return false;
         },
-        // Session end: nobody can answer "Vuoi salvare?", so the changes are saved.
-        { sessionEnd: async () => s.view === 'Settings' && s.settingsDirty && settingsPanel.current?.save() },
+        // Session end: nobody can answer "Vuoi salvare?", so the changes are saved. Nothing to save
+        // counts as saved; a save that fails answers false.
+        {
+          sessionEnd: async () =>
+            s.view !== 'Settings' || !s.settingsDirty || (await settingsPanel.current?.save()) !== false,
+        },
       ),
     );
     // `workspace-changed` and its preview twin carry no content: until the backend stops sending

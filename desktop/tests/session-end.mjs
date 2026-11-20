@@ -43,6 +43,25 @@ test('session end runs every step, in the close order, with no veto and no dialo
   ]);
 });
 
+test('a step that answers false counts as not saved', async () => {
+  const guards = createCloseGuards();
+  let ran = 0;
+  // A save that fails without throwing (a draft, the settings, the meeting notes) answers false.
+  guards.register('drafts', async () => true, { sessionEnd: async () => (ran++, false) });
+  guards.register('settings', async () => true, { sessionEnd: async () => (ran++, true) });
+  assert.equal(await guards.endSession(false), false);
+  // The step after the failed one still ran.
+  assert.equal(ran, 2);
+});
+
+test('a step that answers nothing or true counts as saved', async () => {
+  const guards = createCloseGuards();
+  guards.register('drafts', async () => true, { sessionEnd: async () => {} });
+  guards.register('settings', async () => true, { sessionEnd: async () => true });
+  assert.equal(await guards.endSession(false), true);
+  assert.equal(await guards.endSession(true), true);
+});
+
 test('an unregistered guard takes its session step with it', async () => {
   const guards = createCloseGuards();
   let ran = 0;

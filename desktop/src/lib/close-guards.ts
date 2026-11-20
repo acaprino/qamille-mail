@@ -7,7 +7,9 @@ export type CloseGuard = () => Promise<boolean>;
 // is no one to answer a dialog and no veto (audit F2): each editor saves what it can, without
 // asking. `last: false` when Windows asks whether it may end the session, which another app can
 // still cancel: save, change nothing irreversible. `last: true` when it does: also stop for good.
-export type SessionEndStep = (last: boolean) => Promise<unknown>;
+// A step that throws or answers exactly `false` did not save; `true` or nothing means it saved (or
+// had nothing to save).
+export type SessionEndStep = (last: boolean) => Promise<boolean | void>;
 export interface CloseGuardOptions {
   last?: boolean;
   sessionEnd?: SessionEndStep;
@@ -16,7 +18,7 @@ export interface CloseGuards {
   register(id: string, guard: CloseGuard, options?: CloseGuardOptions): () => void;
   /** Runs the guards, the ones registered `last` after all the others; stops at the first veto. True: the window may close. */
   run(): Promise<boolean>;
-  /** Runs every session-end step in the same order, each to the end: a failing one never stops the others. False: one failed. */
+  /** Runs every session-end step in the same order, each to the end: a failing one never stops the others. False: one threw or answered `false`. */
   endSession(last: boolean): Promise<boolean>;
 }
 
@@ -42,7 +44,7 @@ export function createCloseGuards(): CloseGuards {
       let saved = true;
       for (const { sessionEnd } of ordered()) {
         try {
-          await sessionEnd?.(last);
+          if ((await sessionEnd?.(last)) === false) saved = false;
         } catch {
           // The next step still saves its part; the caller learns that something was not saved.
           saved = false;

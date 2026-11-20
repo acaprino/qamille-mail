@@ -7,7 +7,13 @@ import Sidebar from './components/Sidebar';
 import WindowControls from './components/WindowControls';
 import MailList from './components/MailList';
 import { imeComposing } from './ds/ime';
-import { shortcutCoveredByLayer, shortcutIgnored, zoomKey } from './lib/shortcut-guard';
+import {
+  arrowsMoveMail,
+  isAppChord,
+  shortcutCoveredByLayer,
+  shortcutIgnored,
+  zoomKey,
+} from './lib/shortcut-guard';
 import { syncErrors, type MailSyncStatus } from './lib/mail-sync';
 import SearchBar from './components/SearchBar';
 import Reader from './components/Reader';
@@ -1298,7 +1304,9 @@ export default function App() {
     if (s.printPreview || shortcutCoveredByLayer(e.target)) return;
     const inComposer = e.target instanceof HTMLElement && e.target.closest('.composer-panel,.composer-dock');
     const editing = shortcutIgnored(e.target);
-    if (!inComposer && !editing && (e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+    // AltGr is Ctrl+Alt on Windows: a typed character, never a chord (Ctrl+AltGr+K, Ctrl+AltGr+Z).
+    const chord = isAppChord(e);
+    if (!inComposer && !editing && chord && !e.shiftKey && e.key.toLowerCase() === 'z') {
       const workspace = s.workspace;
       const latest =
         workspace &&
@@ -1309,7 +1317,7 @@ export default function App() {
       }
       return;
     }
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+    if (chord && e.key.toLowerCase() === 'k') {
       e.preventDefault();
       if (!isMailView()) navigate('Inbox');
       void tick().then(() => searchElement.current?.focus());
@@ -1344,7 +1352,14 @@ export default function App() {
       e.preventDefault();
       void action(selected.id, 'archive');
     }
-    if (isMailView() && ['ArrowUp', 'ArrowDown'].includes(e.key) && s.visibleOrder.length) {
+    // The arrows step through the messages only from the page, the list or the reader: in the
+    // sidebar, on a top-bar button or in the activity panel they belong to that control.
+    if (
+      isMailView() &&
+      ['ArrowUp', 'ArrowDown'].includes(e.key) &&
+      arrowsMoveMail(e.target) &&
+      s.visibleOrder.length
+    ) {
       e.preventDefault();
       const listed = selectedListId();
       const at = listed === null ? -1 : s.visibleOrder.indexOf(listed);
@@ -1629,13 +1644,22 @@ export default function App() {
                       find();
                     }}
                     onKeyDown={(event) => {
-                      // The Enter that picks an IME candidate is not a search (aspetto-nativo.md, rule 24).
+                      // The Enter that picks an IME candidate is not a search, and the Escape that drops
+                      // one is not a clear (aspetto-nativo.md, rule 24).
                       if (event.key === 'Enter' && !imeComposing(event.nativeEvent)) {
                         event.preventDefault();
                         find(true);
+                      } else if (event.key === 'Escape' && !imeComposing(event.nativeEvent)) {
+                        // Esc empties a field that has text, and the list goes back to the whole view;
+                        // on an empty field it does what it did before: nothing.
+                        if (s.searchInput) {
+                          event.preventDefault();
+                          applySearch('');
+                        }
                       }
                     }}
                     aria-label={tr('Cerca email', 'Search mail')}
+                    aria-keyshortcuts="Control+K"
                     placeholder={tr('Cerca una persona, una parola o una data', 'Search a person, a word or a date')}
                   />
                   <kbd>Ctrl K</kbd>

@@ -258,6 +258,7 @@ export default function ComposerDock(props: ComposerDockProps) {
           aria-label={tr('Nuova scheda bozza', 'New draft tab')}
           tip={tr('Nuovo messaggio', 'New message')}
           shortcut="N"
+          aria-keyshortcuts="N"
           onClick={compose}
         >
           <Icon name="plus" size={17} />

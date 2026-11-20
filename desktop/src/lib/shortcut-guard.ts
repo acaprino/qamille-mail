@@ -21,6 +21,21 @@ export function shortcutCoveredByLayer(target: EventTarget | null, doc: Document
   return doc.querySelector(OPEN_MODAL) !== null;
 }
 
+// The up and down arrows step through the messages only from the page itself, the mail list or the
+// reader. In the sidebar, on a top-bar button or in the activity panel they belong to that control's
+// own navigation: they must not open the next message, which also marks it read.
+const MAIL_AREAS = '.mail-list,.reader';
+
+export function arrowsMoveMail(target: EventTarget | null): boolean {
+  return target instanceof Element && (target.localName === 'body' || target.closest(MAIL_AREAS) !== null);
+}
+
+// A chord of the app (Ctrl+K, Ctrl+Z) is Ctrl or Meta without Alt. AltGr, the key that types @ [ ] {
+// and # on an Italian layout, reaches the page as Ctrl+Alt on Windows: it is a character, not a command.
+export function isAppChord(event: { ctrlKey: boolean; metaKey: boolean; altKey: boolean }): boolean {
+  return (event.ctrlKey || event.metaKey) && !event.altKey;
+}
+
 // Zoom is the app's, not the browser's (WebView2's own shortcuts are off, docs/aspetto-nativo.md
 // rule 8): Ctrl with = or + zooms in, Ctrl with - zooms out, Ctrl+0 goes back to the default. Main
 // keys and numeric keypad, with or without Shift (on an Italian keyboard + is a key of its own).

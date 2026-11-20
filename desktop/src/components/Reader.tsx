@@ -194,6 +194,7 @@ export default function Reader({
                 className="reader-reply"
                 tip={tr('Rispondi', 'Reply')}
                 shortcut="R"
+                aria-keyshortcuts="R"
                 onClick={() => reply(email.id)}
               >
                 <Icon name="reply" size={16} />
@@ -226,6 +227,7 @@ export default function Reader({
                 variant="icon"
                 tip={lockTip(tr('Archivia', 'Archive'))}
                 shortcut="E"
+                aria-keyshortcuts="E"
                 title={whyLocked || undefined}
                 aria-label={tr('Archivia messaggio', 'Archive message')}
                 disabled={locked}
@@ -356,6 +358,7 @@ export default function Reader({
                   variant="icon"
                   tip={tr('Messaggio precedente', 'Previous message')}
                   shortcut="↑"
+                  aria-keyshortcuts="ArrowUp"
                   aria-label={tr('Messaggio precedente', 'Previous message')}
                   disabled={position <= 1}
                   onClick={() => step(-1)}
@@ -368,6 +371,7 @@ export default function Reader({
                   variant="icon"
                   tip={tr('Messaggio successivo', 'Next message')}
                   shortcut="↓"
+                  aria-keyshortcuts="ArrowDown"
                   aria-label={tr('Messaggio successivo', 'Next message')}
                   disabled={position >= total}
                   onClick={() => step(1)}

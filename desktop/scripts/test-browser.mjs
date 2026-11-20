@@ -15,7 +15,7 @@ const tests = path.join(desktop, 'tests');
 
 // These are written for node --test (activity also drives the preview); the rest are plain scripts.
 const NODE_TEST = new Set([
-  'activity', 'assistant-server', 'backend-text', 'calendar-gate', 'close-guards', 'calendar-series', 'conversation-rows', 'events',
+  'activity', 'assistant-server', 'backend-text', 'calendar-gate', 'close-guards', 'calendar-series', 'conversation-rows', 'events', 'github-release',
   'meetings-follow', 'meetings-highlight', 'meetings-preview', 'meetings-view', 'people', 'preview-search', 'regional', 'reply-all', 'shortcut-guard', 'thread-tree',
   'undo-notices',
 ]);

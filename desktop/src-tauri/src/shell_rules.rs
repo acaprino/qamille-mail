@@ -244,6 +244,14 @@ pub fn opens_outside(url: &str) -> bool {
         && !url.contains(['\r', '\n', '\0'])
 }
 
+/// Whether a frame of the app's pages may load `uri`: the message document, which `MessageHtml.tsx`
+/// gives its frame as `srcdoc`, or an empty frame. A link in a message opens in the browser, never in
+/// its frame, and no frame loads the app page (a second app inside the first) or the web. A link to a
+/// part of the message (`#…`) scrolls the same document and starts no navigation.
+pub fn frame_may_navigate(uri: &str) -> bool {
+    matches!(uri, "about:srcdoc" | "about:blank")
+}
+
 /// Microsoft's download of the WebView2 Runtime (Evergreen bootstrapper).
 pub const WEBVIEW2_DOWNLOAD: &str = "https://go.microsoft.com/fwlink/p/?LinkId=2124703";
 
@@ -385,6 +393,30 @@ mod tests {
         assert!(!opens_outside("file:///C:/Windows/System32/calc.exe"));
         assert!(!opens_outside("javascript:alert(1)"));
         assert!(!opens_outside("https://example.com/\r\nx"));
+    }
+
+    #[test]
+    fn only_the_message_document_may_load_in_a_frame() {
+        assert!(frame_may_navigate("about:srcdoc"));
+        assert!(frame_may_navigate("about:blank"));
+        assert!(!frame_may_navigate("https://x.it/"));
+        assert!(!frame_may_navigate("http://tauri.localhost/index.html"));
+        // Chromium's mark for a navigation it blocked: refused, the frame keeps its message.
+        assert!(!frame_may_navigate("about:blank#blocked"));
+        for refused in [
+            "",
+            "about:",
+            "about:srcdocs",
+            "about://blank",
+            "data:text/html,<p>x</p>",
+            "javascript:alert(1)",
+            "blob:http://tauri.localhost/4f1c",
+            "file:///C:/x.html",
+            "mailto:a@x.it",
+            "http://127.0.0.1:1420/",
+        ] {
+            assert!(!frame_may_navigate(refused), "{refused}");
+        }
     }
 
     #[test]

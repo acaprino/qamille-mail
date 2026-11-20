@@ -41,6 +41,26 @@ const hex = (value) => {
   const h = value.trim().replace(/^#/, '').toLowerCase();
   return h.length === 3 ? [...h].map((c) => c + c).join('') : h.slice(0, 6);
 };
+// A Rust item from its `head` to the closing brace at the indentation of its first line, without
+// `//` comments: an assertion on one function is met neither by the next one nor by a comment.
+function rustItem(text, head) {
+  const start = text.indexOf(head);
+  assert.ok(start >= 0, `no ${head}`);
+  const indent = text.slice(text.lastIndexOf('\n', start) + 1, start).match(/^\s*/)[0];
+  const end = text.indexOf(`\n${indent}}`, start);
+  assert.ok(end >= 0, `${head} has no closing brace`);
+  return text.slice(start, end + indent.length + 2).replace(/(^|\s)\/\/.*$/gm, '$1');
+}
+// The handler a registration in `native_feel::webview2::harden` adds: the code between the
+// registration before it and this one, which must come before the page is loaded again.
+function hardenHandler(event) {
+  const harden = rustItem(read('src-tauri/src/native_feel.rs'), 'pub unsafe fn harden(');
+  const reload = harden.indexOf('core.Navigate(');
+  assert.ok(reload >= 0, 'harden must load the page again once the handlers are in');
+  const at = harden.indexOf(`.add_${event}(`);
+  assert.ok(at >= 0 && at < reload, `harden must register ${event} before it loads the page again`);
+  return harden.slice(harden.lastIndexOf('.add_', at - 1) + 1, at);
+}
 
 check('1. interface text is not selectable and keeps the arrow cursor', () => {
   const body = rule(read('src/ds/styles/system.css'), 'body');
@@ -136,6 +156,15 @@ check('5. every window gets the WebView2 hardening', () => {
   const rust = read('src-tauri/src/native_feel.rs');
   assert.match(rust, /SetAreBrowserAcceleratorKeysEnabled\(false\)/, 'browser shortcuts must stay off');
   assert.match(rust, /add_ContextMenuRequested/, 'the right-click menu must stay filtered');
+  // A filter that fails shows no menu, never the browser's whole one, and says why (rule 9).
+  assert.match(
+    hardenHandler('ContextMenuRequested'),
+    /if let Err\(error\) = trim_menu\(&args\) \{\s*report\([\s\S]*?\);\s*args\.SetHandled\(true\)\?;\s*\}/,
+    'a COM error in the menu filter must hide the menu (SetHandled(true)) and go to report',
+  );
+  // Microsoft does not document the entry names: the ones the filter takes out go to native.log.
+  const trim = rustItem(rust, 'unsafe fn trim_menu(');
+  assert.match(trim, /names_to_log\(&entries, &removals,[\s\S]*?report\(/, 'trim_menu must write the names it takes out to native.log');
 });
 
 check('6. the page keeps the native window background in step', () => {
@@ -347,6 +376,33 @@ check('14. every WebView locks its root against overscroll (rule 4, audit Q5)', 
   }
   // The message frame stays free of the lock: it never scrolls vertically and hands the wheel to the reader.
   assert.ok(!/overscroll-behavior/.test(read('src/lib/message-html.ts')), 'the message frame must not set overscroll-behavior');
+});
+
+check('15. the reminder takes no file drops and every webview refuses frame, history and permission requests', () => {
+  // wry's own drop handler would take a file dragged onto the chip, with the copy cursor, for a drop
+  // nothing reads; without it the page refuses the drop (rule 23). The main window leaves drops to its page.
+  const show = rustItem(read('src-tauri/src/reminders.rs'), 'fn show(');
+  const opened = show.indexOf('WebviewWindowBuilder::new(');
+  const built = show.indexOf('.build()?', opened);
+  assert.ok(opened >= 0 && built > opened, 'reminders.rs: show() must build the chip with WebviewWindowBuilder::new(…)…build()?');
+  assert.ok(show.slice(opened, built).includes('.disable_drag_drop_handler()'), 'reminders.rs: the chip must be built with .disable_drag_drop_handler()');
+  const main = JSON.parse(read('src-tauri/tauri.conf.json')).app.windows.find((w) => w.label === 'main');
+  assert.equal(main?.dragDropEnabled, false, 'tauri.conf.json: the main window needs dragDropEnabled: false');
+  // Each guard is in before harden loads the page again, so it holds for the first document shown.
+  assert.match(
+    hardenHandler('FrameNavigationStarting'),
+    /let refused = [^;]*\|\| !crate::shell_rules::frame_may_navigate\(&take_pwstr\(uri\)\);\s*if refused \|\| steps_through_history\(&args\) \{\s*args\.SetCancel\(true\)\?;/,
+    'FrameNavigationStarting must refuse what shell_rules::frame_may_navigate does not allow, and Back and Forward',
+  );
+  assert.match(hardenHandler('NavigationStarting'), /if steps_through_history\(&args\) \{\s*args\.SetCancel\(true\)\?;/, 'NavigationStarting must refuse Back and Forward');
+  const history = rustItem(read('src-tauri/src/native_feel.rs'), 'unsafe fn steps_through_history(');
+  assert.match(history, /\.NavigationKind\(&mut kind\)/, 'steps_through_history must read NavigationKind');
+  assert.match(history, /Ok\(\(\)\) => kind == COREWEBVIEW2_NAVIGATION_KIND_BACK_OR_FORWARD,/, 'steps_through_history must compare with BACK_OR_FORWARD');
+  assert.match(
+    hardenHandler('PermissionRequested'),
+    /state != COREWEBVIEW2_PERMISSION_STATE_DEFAULT \{\s*return Ok\(\(\)\);\s*\}[\s\S]*\bargs\.SetState\(COREWEBVIEW2_PERMISSION_STATE_DENY\)\s*\}\)\);\s*core$/,
+    'a permission no handler answered must be denied, as the last thing its handler does',
+  );
 });
 
 if (failures.length) {

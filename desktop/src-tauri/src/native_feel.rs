@@ -2,12 +2,13 @@
 //!
 //! A native Windows app does not reload, print, zoom or offer "Back" when the
 //! user presses F5, Ctrl+P or right-clicks a label, and never shows a browser
-//! error page. WebView2 does all of that by default; this module turns it off
+//! error page or permission prompt. WebView2 does all of that by default; this module turns it off
 //! for every window the app opens, and hands the failures WebView2 would answer
 //! with its error page to `recovery.rs`. (WebView2's password autosave is off
 //! by default and wry leaves it so: nothing to do here.)
 //! `desktop/tests/native-feel.mjs` checks that every window calls it.
 
+use std::collections::BTreeSet;
 use tauri::{AppHandle, Manager, Url, WebviewWindow, window::Color};
 
 /// `--ground` of the dark theme in `desktop/src/ds/tokens/theme.css`: the colour
@@ -77,8 +78,9 @@ pub fn report(line: &str) {
 
 /// Turns off WebView2's browser shortcuts, browser entries in the right-click
 /// menu and its error page, and lets `recovery.rs` answer a failed page
-/// instead. Editing and copy shortcuts (Ctrl+C, Ctrl+V, Ctrl+A,
-/// Ctrl+Z) keep working, and the page still receives every key as `keydown`.
+/// instead. Refuses Back and Forward, any frame but the message document and
+/// every permission the page asks for. Editing and copy shortcuts (Ctrl+C,
+/// Ctrl+V, Ctrl+A, Ctrl+Z) keep working, and the page still receives every key as `keydown`.
 /// `page` is the app page the window was built with: it is loaded again once
 /// the settings are in, because WebView2 applies them from the next navigation.
 pub fn harden_webview(window: &WebviewWindow, page: &str) {
@@ -155,20 +157,41 @@ pub fn menu_removals(entries: &[MenuEntry]) -> Vec<usize> {
     (0..entries.len()).rev().filter(|&i| !keep[i]).collect()
 }
 
+/// The names of the entries `removals` takes out that `logged` does not hold yet, in menu order,
+/// added to it. Microsoft does not document the names, so the ones the filter removes are written to
+/// `native.log` once each, to check `MENU_ITEMS_KEPT` against a real runtime. Separators are not named.
+pub fn names_to_log(entries: &[MenuEntry], removals: &[usize], logged: &mut BTreeSet<String>) -> Vec<String> {
+    removals
+        .iter()
+        .rev()
+        .map(|&i| &entries[i])
+        .filter(|entry| !entry.separator && logged.insert(entry.name.clone()))
+        .map(|entry| entry.name.clone())
+        .collect()
+}
+
 #[cfg(windows)]
 mod webview2 {
-    use super::{MenuEntry, menu_removals};
+    use super::{MenuEntry, menu_removals, names_to_log, report};
+    use std::collections::BTreeSet;
+    use std::sync::{Mutex, Once, PoisonError};
     use tauri::WebviewWindow;
     use webview2_com::Microsoft::Web::WebView2::Win32::{
         COREWEBVIEW2_CONTEXT_MENU_ITEM_KIND, COREWEBVIEW2_CONTEXT_MENU_ITEM_KIND_SEPARATOR,
-        COREWEBVIEW2_PROCESS_FAILED_KIND, COREWEBVIEW2_WEB_ERROR_STATUS,
-        COREWEBVIEW2_WEB_ERROR_STATUS_OPERATION_CANCELED, ICoreWebView2_11,
-        ICoreWebView2ContextMenuRequestedEventArgs, ICoreWebView2Controller, ICoreWebView2Settings3,
+        COREWEBVIEW2_NAVIGATION_KIND, COREWEBVIEW2_NAVIGATION_KIND_BACK_OR_FORWARD, COREWEBVIEW2_PERMISSION_STATE,
+        COREWEBVIEW2_PERMISSION_STATE_DEFAULT, COREWEBVIEW2_PERMISSION_STATE_DENY, COREWEBVIEW2_PROCESS_FAILED_KIND,
+        COREWEBVIEW2_WEB_ERROR_STATUS, COREWEBVIEW2_WEB_ERROR_STATUS_OPERATION_CANCELED, ICoreWebView2_11,
+        ICoreWebView2ContextMenuRequestedEventArgs, ICoreWebView2Controller, ICoreWebView2NavigationStartingEventArgs,
+        ICoreWebView2NavigationStartingEventArgs3, ICoreWebView2PermissionRequestedEventArgs3, ICoreWebView2Settings3,
     };
     use webview2_com::{
-        ContextMenuRequestedEventHandler, NavigationCompletedEventHandler, ProcessFailedEventHandler, take_pwstr,
+        ContextMenuRequestedEventHandler, NavigationCompletedEventHandler, NavigationStartingEventHandler,
+        PermissionRequestedEventHandler, ProcessFailedEventHandler, take_pwstr,
     };
     use windows_core::{BOOL, Interface, PWSTR};
+
+    /// The menu entry names already in `native.log` from this run (`names_to_log`).
+    static LOGGED_NAMES: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
 
     pub unsafe fn harden(controller: &ICoreWebView2Controller, window: WebviewWindow, page: Option<tauri::Url>) -> windows_core::Result<()> {
         unsafe {
@@ -178,10 +201,14 @@ mod webview2 {
             // shortcut: no rollback or tokens kept; the handlers that did register work on their
             // own, and a webview is never rebuilt in place (a reload keeps it, the chip is destroyed).
             let handler = ContextMenuRequestedEventHandler::create(Box::new(|_, args| {
-                match args {
-                    Some(args) => trim_menu(&args),
-                    None => Ok(()),
+                let Some(args) = args else { return Ok(()) };
+                // Closed on failure: a menu the filter could not read or finish trimming would
+                // show the browser's entries.
+                if let Err(error) = trim_menu(&args) {
+                    report(&format!("context menu not shown, its filter failed: {error}"));
+                    args.SetHandled(true)?;
                 }
+                Ok(())
             }));
             let mut token = 0i64;
             core.cast::<ICoreWebView2_11>()?.add_ContextMenuRequested(&handler, &mut token)?;
@@ -214,6 +241,53 @@ mod webview2 {
                 Ok(())
             }));
             core.add_NavigationCompleted(&handler, &mut token)?;
+
+            // Back and Forward load nothing: the page stops the mouse's buttons (`browser-guards.ts`),
+            // but a blank or crashed page runs no script, and Back would load the app again. wry's
+            // handler (`navigation_guard`) sets Cancel for every navigation; WebView2 calls handlers in
+            // the order they were added, so this one, added later, has the last word.
+            let handler = NavigationStartingEventHandler::create(Box::new(|_, args| {
+                let Some(args) = args else { return Ok(()) };
+                if steps_through_history(&args) {
+                    args.SetCancel(true)?;
+                }
+                Ok(())
+            }));
+            core.add_NavigationStarting(&handler, &mut token)?;
+
+            // A frame shows only `shell_rules::frame_may_navigate`'s documents, and never steps back
+            // to an earlier message (each one the reader shows is a history entry of its frame).
+            let handler = NavigationStartingEventHandler::create(Box::new(|_, args| {
+                let Some(args) = args else { return Ok(()) };
+                let mut uri = PWSTR::null();
+                // An address that cannot be read is not the message document.
+                let refused = args.Uri(&mut uri).is_err() || !crate::shell_rules::frame_may_navigate(&take_pwstr(uri));
+                if refused || steps_through_history(&args) {
+                    args.SetCancel(true)?;
+                }
+                Ok(())
+            }));
+            core.add_FrameNavigationStarting(&handler, &mut token)?;
+
+            // Microphone, camera, location, notifications, reading the clipboard: the app asks for none,
+            // and a browser's "tauri.localhost wants to…" prompt does not belong in a Windows app. Denied
+            // without asking, unless a handler added earlier (wry's, for a permission Tauri was told to
+            // allow) has answered.
+            let handler = PermissionRequestedEventHandler::create(Box::new(|_, args| {
+                let Some(args) = args else { return Ok(()) };
+                let mut state = COREWEBVIEW2_PERMISSION_STATE::default();
+                if args.State(&mut state).is_ok() && state != COREWEBVIEW2_PERMISSION_STATE_DEFAULT {
+                    return Ok(());
+                }
+                // Not kept in the profile, where it would outlive a later version that allows it. Best
+                // effort: a denial kept there is still a denial.
+                if let Ok(args) = args.cast::<ICoreWebView2PermissionRequestedEventArgs3>() {
+                    let _ = args.SetSavesInProfile(false);
+                }
+                args.SetState(COREWEBVIEW2_PERMISSION_STATE_DENY)
+            }));
+            core.add_PermissionRequested(&handler, &mut token)?;
+
             let settings = core.Settings()?;
             // F5/Ctrl+R reload, Ctrl+P print, Ctrl+F find, Ctrl+±/wheel zoom, F12.
             settings.cast::<ICoreWebView2Settings3>()?.SetAreBrowserAcceleratorKeysEnabled(false)?;
@@ -249,6 +323,10 @@ mod webview2 {
                 });
             }
             let removals = menu_removals(&entries);
+            let names = names_to_log(&entries, &removals, &mut LOGGED_NAMES.lock().unwrap_or_else(PoisonError::into_inner));
+            if !names.is_empty() {
+                report(&format!("context menu entries removed: {}", names.join(", ")));
+            }
             for &index in &removals {
                 items.RemoveValueAtIndex(index as u32)?;
             }
@@ -257,6 +335,22 @@ mod webview2 {
                 args.SetHandled(true)?;
             }
             Ok(())
+        }
+    }
+
+    /// Whether a navigation steps through the history: Back or Forward. A runtime that cannot tell
+    /// lets it through, said once in `native.log`: refusing every navigation would refuse the app's page.
+    unsafe fn steps_through_history(args: &ICoreWebView2NavigationStartingEventArgs) -> bool {
+        unsafe {
+            let mut kind = COREWEBVIEW2_NAVIGATION_KIND::default();
+            match args.cast::<ICoreWebView2NavigationStartingEventArgs3>().and_then(|args| args.NavigationKind(&mut kind)) {
+                Ok(()) => kind == COREWEBVIEW2_NAVIGATION_KIND_BACK_OR_FORWARD,
+                Err(error) => {
+                    static SAID: Once = Once::new();
+                    SAID.call_once(|| report(&format!("Back and Forward refused only by the page: no navigation kind ({error})")));
+                    false
+                }
+            }
         }
     }
 }
@@ -309,5 +403,17 @@ mod tests {
     #[test]
     fn inspect_only_in_debug_builds() {
         assert_eq!(after(&["copy", "-", "inspectElement"]).len() == 3, cfg!(debug_assertions));
+    }
+
+    #[test]
+    fn each_name_the_filter_takes_out_is_logged_once() {
+        let mut logged = BTreeSet::new();
+        let entries = menu(&["back", "copy", "-", "print", "-", "back"]);
+        assert_eq!(names_to_log(&entries, &menu_removals(&entries), &mut logged), ["back", "print"]);
+        // A later menu adds only the names not written yet; kept entries and separators never appear.
+        let entries = menu(&["back", "saveAs", "-", "copy"]);
+        assert_eq!(names_to_log(&entries, &menu_removals(&entries), &mut logged), ["saveAs"]);
+        assert!(names_to_log(&entries, &menu_removals(&entries), &mut logged).is_empty());
+        assert!(!logged.contains("copy") && !logged.contains("-"));
     }
 }

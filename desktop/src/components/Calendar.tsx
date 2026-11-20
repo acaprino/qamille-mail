@@ -37,6 +37,7 @@ import {
   regionalTimeZone,
 } from '../lib/regional';
 import { useReactive } from '../lib/store';
+import { useDirtyCloseGuard } from '../lib/use-dirty-close-guard';
 import { cn } from '../lib/utils';
 import './Calendar.css';
 
@@ -715,9 +716,11 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
     }
   }
 
-  async function save() {
+  // True when the event was saved; false when nothing was sent (invalid times, read-only, a save
+  // already running) or the save failed. The window-close guard below needs the answer.
+  async function save(): Promise<boolean> {
     const { timeError, readOnly, formCalendar } = derive();
-    if (s.busy || timeError || readOnly) return;
+    if (s.busy || timeError || readOnly) return false;
     const generation = editGeneration.current;
     const event = s.selected;
     const edited = formValues();
@@ -791,12 +794,27 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
       if (!event && s.hidden.includes(calendarKey(calendar))) s.hidden = s.hidden.filter((k) => k !== calendarKey(calendar));
       else await load();
       say(tr('Evento salvato', 'Event saved'));
+      return true;
     } catch (e) {
       s.sheetError = errorText(e);
+      return false;
     } finally {
       s.busy = false;
     }
   }
+  // Closing the window over typed event details asks first (focus returns to the sheet); at session
+  // end or on a reload the event is saved. Session end asks twice (Windows asks, then ends), so the
+  // step looks at the live state: a sheet that was just saved and closed has nothing left to save.
+  useDirtyCloseGuard(
+    'calendar-event',
+    Boolean(D.dirty),
+    () => {
+      busyEditing();
+      titleInput.current?.focus();
+    },
+    async () => (derive().dirty ? save() : true),
+  );
+
   async function remove() {
     const event = s.selected;
     if (!event || s.busy) return;

@@ -4,7 +4,8 @@ import { createCloseGuards, type CloseGuard, type CloseGuardOptions } from './cl
 // One close listener owns destruction. Each editor can veto until its data is saved.
 const guards = createCloseGuards();
 /** `last`: the guard acts for good (stops a recording), so it runs after every guard that can veto.
- *  `sessionEnd`: what it saves, without asking, when Windows ends the session (no guard runs then). */
+ *  `sessionEnd`: what it saves, without asking, when Windows ends the session (no guard runs then).
+ *  A `sessionEnd` step that answers `false`, or throws, means "not saved": the reload then asks. */
 export function registerCloseGuard(id: string, guard: CloseGuard, options?: CloseGuardOptions) {
   return guards.register(id, guard, options);
 }

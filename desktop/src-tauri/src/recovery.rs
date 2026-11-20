@@ -18,11 +18,17 @@
 //!   running after `CLOSE_STUCK` when the person asks again, gets a choice here:
 //!   wait, or close Qamille without the page.
 //!
+//! Every way out that leaves without the page (`exit_app`, `restart_app`, the forced
+//! close) first stops and saves a running recording (`finish_meetings_before_exit`),
+//! as the page's close guard would: otherwise it is found "interrupted" at the next start.
+//!
 //! WebView2 reports these from its own callbacks, which must not run a dialog's
 //! modal loop: every dialog and reload here runs on a thread of its own, and
 //! one dialog at a time covers a failure reported by several windows.
 
-use crate::shell_rules::{self, Failure};
+use crate::runtime::DesktopState;
+use crate::shell_rules::{self, CapturePhase, Failure};
+use qamille::domain::meeting::CaptureState;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -48,6 +54,9 @@ const CLOSE_STUCK: Duration = Duration::from_secs(10);
 
 /// The page draws within this after the window shows, or the app offers a reload.
 const STARTUP_WAIT: Duration = Duration::from_secs(15);
+/// The longest an exit waits for a recording to be stopped and saved (normally well under
+/// a second): a way out of a broken window must stay a way out.
+const EXIT_SAVE_WAIT: Duration = Duration::from_secs(20);
 
 static FRONTEND_READY: AtomicBool = AtomicBool::new(false);
 static CLOSE_ASKED: AtomicU64 = AtomicU64::new(0);
@@ -131,7 +140,7 @@ pub fn process_failed(window: &WebviewWindow, kind: i32) {
                         words("Ricarica la finestra", "Reload the window"),
                         words("Chiudi Qamille", "Close Qamille"),
                     ) == Some(false);
-                    if close { window.app_handle().exit(0) } else { reload(window) }
+                    if close { exit_app(window.app_handle()) } else { reload(window) }
                 });
             } else {
                 // The reminder chip, out of automatic reloads: closed until `chip_may_open`.
@@ -179,7 +188,7 @@ pub fn process_failed(window: &WebviewWindow, kind: i32) {
                     words("Riavvia Qamille", "Restart Qamille"),
                     words("Chiudi Qamille", "Close Qamille"),
                 ) == Some(false);
-                if close { window.app_handle().exit(0) } else { restart_app(window.app_handle()) }
+                if close { exit_app(window.app_handle()) } else { restart_app(window.app_handle()) }
             });
         }
         failure => crate::native_feel::report(&format!("a WebView2 process of {} failed ({failure:?}, kind {kind})", window.label())),
@@ -252,7 +261,7 @@ pub fn page_not_loaded(window: &WebviewWindow, status: i32) {
             words("Riprova", "Try again"),
             words("Chiudi Qamille", "Close Qamille"),
         ) == Some(false);
-        if close { window.app_handle().exit(0) } else { reload(window) }
+        if close { exit_app(window.app_handle()) } else { reload(window) }
     });
 }
 
@@ -338,7 +347,7 @@ pub fn watch_startup(window: &WebviewWindow) {
             );
             match answer {
                 Some(true) => reload(window),
-                Some(false) => window.app_handle().exit(0),
+                Some(false) => exit_app(window.app_handle()),
                 None => {}
             }
         });
@@ -378,6 +387,7 @@ pub fn close_requested(app: &AppHandle) {
                 words("Chiudi Qamille", "Close Qamille"),
             ) == Some(false);
             if close {
+                finish_meetings_before_exit(window.app_handle());
                 let _ = window.destroy();
             }
         });
@@ -396,10 +406,72 @@ pub fn close_settled() {
     *CLOSING_SINCE.lock().unwrap_or_else(|e| e.into_inner()) = None;
 }
 
+/// Quits Qamille without the page: its recording is stopped and saved first.
+fn exit_app(app: &AppHandle) {
+    finish_meetings_before_exit(app);
+    app.exit(0);
+}
+
 fn restart_app(app: &AppHandle) {
+    finish_meetings_before_exit(app);
     // SAFETY: the variable is only read by the next process, at its start.
     unsafe { std::env::set_var(RESTART_AFTER, std::process::id().to_string()) };
     app.request_restart();
+}
+
+/// Before the app leaves without its page: stops and saves a running recording, then
+/// stops the meeting jobs for the app closing, as the page's meetings close guard does
+/// (`App.tsx`). Blocks until that is done, at most `EXIT_SAVE_WAIT`: call it from a thread
+/// of its own, never from a WebView2 callback. Failures go to `native.log` and never
+/// stop the exit.
+fn finish_meetings_before_exit(app: &AppHandle) {
+    let (done, finished) = std::sync::mpsc::channel();
+    let handle = app.clone();
+    let spawned = std::thread::Builder::new().name("qamille-exit-meetings".into()).spawn(move || {
+        stop_recording_and_jobs(&handle);
+        let _ = done.send(());
+    });
+    match spawned {
+        Ok(_) => {
+            if let Err(error) = finished.recv_timeout(EXIT_SAVE_WAIT) {
+                crate::native_feel::report(&format!("the recording was not confirmed saved before exit: {error}"));
+            }
+        }
+        Err(error) => crate::native_feel::report(&format!("could not stop the recording before exit: {error}")),
+    }
+}
+
+fn stop_recording_and_jobs(app: &AppHandle) {
+    let Some(state) = app.try_state::<DesktopState>() else { return };
+    // `capture_state` reads the recorder alone, so unlike `capture_status` it cannot fail on
+    // the repository while the recorder is live. If even that fails, stop anyway: stopping
+    // a recorder that is not recording changes nothing.
+    let live = match state.meetings.capture_state() {
+        Ok(capture) => shell_rules::must_stop_capture(capture_phase(&capture)),
+        Err(error) => {
+            crate::native_feel::report(&format!("could not read the recorder before exit: {}", error.message));
+            true
+        }
+    };
+    if live {
+        if let Err(error) = state.meetings.stop() {
+            crate::native_feel::report(&format!("could not stop the recording before exit: {}", error.message));
+        }
+    }
+    state.meetings.cancel_all_jobs();
+}
+
+/// No wildcard: a new recorder state must be sorted here.
+fn capture_phase(state: &CaptureState) -> CapturePhase {
+    match state {
+        CaptureState::Idle => CapturePhase::Idle,
+        CaptureState::Preparing => CapturePhase::Preparing,
+        CaptureState::Recording => CapturePhase::Recording,
+        CaptureState::Paused => CapturePhase::Paused,
+        CaptureState::Saving => CapturePhase::Saving,
+        CaptureState::Saved => CapturePhase::Saved,
+        CaptureState::Interrupted => CapturePhase::Interrupted,
+    }
 }
 
 /// First thing in `main`: after a restart, wait (at most 10 s) for the process

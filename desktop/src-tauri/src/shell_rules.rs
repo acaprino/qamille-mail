@@ -199,6 +199,26 @@ pub fn failure_of(kind: i32) -> Failure {
     }
 }
 
+/// The meeting recorder's state, mirrored here (as `domain::meeting::CaptureState`)
+/// so this file stays free of dependencies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CapturePhase {
+    Idle,
+    Preparing,
+    Recording,
+    Paused,
+    Saving,
+    Saved,
+    Interrupted,
+}
+
+/// Whether leaving the app must stop the recorder first: the same states the page's
+/// close guard stops (`captureActive` in `lib/meetings.ts`). Exiting under any of them
+/// would cut the audio, and the meeting would be found "interrupted" at the next start.
+pub fn must_stop_capture(phase: CapturePhase) -> bool {
+    matches!(phase, CapturePhase::Preparing | CapturePhase::Recording | CapturePhase::Paused | CapturePhase::Saving)
+}
+
 /// Whether `url` is the app's own page, the only one its windows may show:
 /// Tauri's local origin (`http://tauri.localhost` on Windows, or `https` with
 /// `useHttpsScheme`) or, in a dev build, the dev server's origin.
@@ -333,5 +353,18 @@ mod tests {
         assert!(!opens_outside("file:///C:/Windows/System32/calc.exe"));
         assert!(!opens_outside("javascript:alert(1)"));
         assert!(!opens_outside("https://example.com/\r\nx"));
+    }
+
+    #[test]
+    fn only_an_active_or_paused_capture_is_stopped_before_exit() {
+        assert!(!must_stop_capture(CapturePhase::Idle));
+        assert!(must_stop_capture(CapturePhase::Recording));
+        assert!(must_stop_capture(CapturePhase::Paused));
+        // Starting and saving are live too: the page's close guard stops them (`captureActive`).
+        assert!(must_stop_capture(CapturePhase::Preparing));
+        assert!(must_stop_capture(CapturePhase::Saving));
+        // Already ended, saved or interrupted: nothing left to stop.
+        assert!(!must_stop_capture(CapturePhase::Saved));
+        assert!(!must_stop_capture(CapturePhase::Interrupted));
     }
 }

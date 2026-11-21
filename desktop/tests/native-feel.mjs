@@ -520,6 +520,20 @@ check("18. the calendar sheet's end-of-session step never calls the provider (ru
   assert.ok(!/\b(save|calendarCall)\b/.test(guard), "the calendar sheet's guard must not reach save() or calendarCall");
 });
 
+// phase 3, Task 1: checks 19-20
+
+// phase 3, Task 2: check 21
+
+// phase 3, Task 5: check 22
+
+// phase 3, Task 6: check 23
+
+// phase 3, Task 3: checks 24-25
+
+// phase 3, Task 4: check 26
+
+// phase 3, Task 8: check 27
+
 if (failures.length) {
   console.error(`\n${failures.length} native-feel check(s) failed. See docs/aspetto-nativo.md.`);
   process.exit(1);

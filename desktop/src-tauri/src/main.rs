@@ -7,6 +7,21 @@ mod runtime;
 mod shell_rules;
 mod window_shell;
 mod zone;
+
+// phase 3, Task 1: modules
+
+// phase 3, Task 2: modules
+
+// phase 3, Task 3: modules
+
+// phase 3, Task 4: modules
+
+// phase 3, Task 5: modules
+
+// phase 3, Task 6: modules
+
+// phase 3, Task 8: modules
+
 use commands::{accounts::*, activity::*, assistant::*, document_preview::*, drafts::*, mail::*, undo::*, workspace::*};
 use tauri::{Emitter, Manager};
 use commands::meetings::*;

@@ -688,6 +688,20 @@ check('22. a saved file is opened or shown only through its token (rule 31)', ()
 });
 
 // phase 3, Task 6: check 23
+check('23. the mail rows get a native menu built by an app command (rule 33)', () => {
+  // Rust builds and shows the menu; the page only says which entries (lib/row-menu.ts) and gets
+  // back the chosen one. The page has no menu permission of its own.
+  const menu = read('src-tauri/src/row_menu.rs');
+  assert.match(rustItem(menu, 'pub async fn show_row_menu('), /\.popup_menu_at\(/, 'show_row_menu opens the menu with popup_menu_at, under the pointer');
+  assert.match(read('src-tauri/src/main.rs'), /row_menu::show_row_menu/, 'show_row_menu must be an app command');
+  const capability = JSON.parse(read('src-tauri/capabilities/main.json'));
+  assert.ok(!capability.permissions.some((p) => /menu/.test(p)), 'no core:menu in main.json: the menu is built in Rust');
+  // The row stops the event: no WebView2 menu on the rows, and the system menu stays shut.
+  const list = read('src/components/MailList.tsx');
+  assert.match(list, /onContextMenu: \(event: MouseEvent<HTMLElement>\) => openRowMenu\(event, email\)/, 'the mail row must handle contextmenu');
+  assert.match(rustItem(list, 'function openRowMenu('), /event\.preventDefault\(\)/, 'the row menu handler must call preventDefault');
+  assert.match(read('src/lib/window-shell.ts'), /if \(event\.defaultPrevented/, 'installWindowShell must leave a stopped contextmenu alone');
+});
 
 // phase 3, Task 3: checks 24-25
 

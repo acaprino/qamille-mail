@@ -22,6 +22,7 @@ mod background_rules;
 mod saved_files;
 
 // phase 3, Task 6: modules
+mod row_menu;
 
 // phase 3, Task 8: modules
 
@@ -210,6 +211,7 @@ fn main() {
             print_mail,
             mail_action,
             queue_mail_action,
+            row_menu::show_row_menu,
             queue_draft_action,
             undo_action,
             dismiss_action,

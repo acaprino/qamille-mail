@@ -22,6 +22,7 @@ import HistoryUnreadDialog from './components/HistoryUnreadDialog';
 import Onboarding from './components/Onboarding';
 import LegacyLocalNotice from './components/LegacyLocalNotice';
 import VaultNotice from './components/VaultNotice';
+import UpdateNotice from './components/UpdateNotice';
 import type { AppEdition } from './components/ComputeSettings';
 import Settings, { type SettingsHandle } from './components/Settings';
 import UnsavedDialog from './components/UnsavedDialog';
@@ -2126,6 +2127,7 @@ export default function App() {
       {s.printPreview && (
         <PrintPreview emails={s.printPreview.emails} title={s.printPreview.title} close={() => (s.printPreview = null)} />
       )}
+      <UpdateNotice onerror={(message) => notify(message, true)} />
       <Toaster label={tr('Notifiche', 'Notifications')} closeLabel={tr('Chiudi la notifica', 'Dismiss notification')} />
     </>
   );

@@ -161,6 +161,7 @@ fn main() {
             legacy_local_status,
             legacy_local_free_space,
             legacy_local_dismiss,
+            commands::vault::vault_status, commands::vault::vault_set_transfer_passphrase, commands::vault::vault_remove_transfer_passphrase, commands::vault::vault_unlock, commands::vault::vault_start_over,
             server_probe,
             server_record_consent,
             server_record_llm_consent,

@@ -464,7 +464,8 @@ fn indexing_search_model_identity_and_mcp_with_a_remote_server() {
     // MCP with the session revoked (last: the MCP process may move the store to its database):
     // lexical results and the words of A11; the vault is only read.
     server.revoke_all();
-    let vault_file = root.join("credentials.key");
+    // The vault key, wrapped by Windows for this user (phase 3, Task 7).
+    let vault_file = root.join(if cfg!(windows) { "credentials.key.dpapi" } else { "credentials.key" });
     qamille::infrastructure::secret::set("server-session", &session(&server.url, KEY)).unwrap();
     let answer = mcp(&root, "Cefalù");
     let result = &answer["result"]["structuredContent"];

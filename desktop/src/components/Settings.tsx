@@ -25,6 +25,7 @@ import MeetingSettings from './MeetingSettings';
 import ContactsSettings from './contacts/ContactsSettings';
 import ComputeSettings from './ComputeSettings';
 import DesktopSettings from './DesktopSettings';
+import VaultSettings from './VaultSettings';
 import './Settings.css';
 
 export type SettingsHandle = {
@@ -632,6 +633,7 @@ export default function Settings({
                     {tr('Collega account', 'Connect account')}
                   </Button>
                 </details>
+                <VaultSettings notify={notify} changed={changed} />
               </>
             ) : section === 'Local storage' ? (
               <AccountStorage accounts={workspace.accounts} changed={changed} notify={notify} />

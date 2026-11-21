@@ -886,6 +886,13 @@ export async function previewCommand(
     case 'legacy_local_dismiss':
       if (window.__previewLegacy) window.__previewLegacy.dismissed = true;
       return;
+    // phase 3, Task 7: the key of the credentials
+    case 'vault_status':
+    case 'vault_set_transfer_passphrase':
+    case 'vault_remove_transfer_passphrase':
+    case 'vault_unlock':
+    case 'vault_start_over':
+      return (await import('./preview-vault')).previewVault(command, args);
     case 'search_model_status':
       return { installed: false, running: false, done_bytes: 0, total_bytes: 0, error: null };
     case 'indexing_status': {

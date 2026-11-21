@@ -62,8 +62,10 @@ impl WorkspaceService {
             }
         }
         counts.insert("Drafts".into(), store.drafts.len());
-        let has_ai_key = !self.context.secrets.get(AI_KEY)?.is_empty();
-        let has_google_secret = !self.context.secrets.get(GOOGLE_SECRET)?.is_empty();
+        // Credentials that do not open here (a data folder from another Windows user or computer)
+        // must not hide the mail and settings: those keys are simply not usable.
+        let has_ai_key = self.context.secrets.get(AI_KEY).is_ok_and(|key| !key.is_empty());
+        let has_google_secret = self.context.secrets.get(GOOGLE_SECRET).is_ok_and(|secret| !secret.is_empty());
         Ok(WorkspaceSnapshot {
             regional: self.context.clock.regional(&store.settings),
             labels: store.all_labels(),

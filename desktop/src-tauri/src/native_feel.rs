@@ -69,7 +69,7 @@ pub fn navigation_guard(app: &AppHandle, open_outside: bool) -> impl Fn(&Url) ->
             return true;
         }
         if open_outside && crate::shell_rules::opens_outside(address) {
-            if crate::launch_args::is_mail_link(address) {
+            if crate::launch_args::has_mail_scheme(address) {
                 crate::launch_args::from_navigation(&app, address.to_owned());
             } else {
                 open_in_browser(address.to_owned());
@@ -89,7 +89,7 @@ pub fn new_window_guard(app: &AppHandle) -> impl Fn(Url, NewWindowFeatures) -> N
     let app = app.clone();
     move |url, _features| {
         if crate::shell_rules::opens_from_new_window(url.as_str(), dev_origin.as_deref()) {
-            if crate::launch_args::is_mail_link(url.as_str()) {
+            if crate::launch_args::has_mail_scheme(url.as_str()) {
                 crate::launch_args::from_navigation(&app, url.to_string());
             } else {
                 open_in_browser(url.to_string());

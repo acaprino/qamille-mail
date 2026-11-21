@@ -1310,7 +1310,14 @@ export default function App() {
     const opener = document.activeElement;
     try {
       const created = await call<Draft>('create_draft', { accountId: s.accountId, replyTo: null, forward: false });
-      const draft = await call<Draft>('save_draft', { draft: { ...created, ...mailtoDraft(fields) }, importLeaseIds: [] });
+      let draft: Draft;
+      try {
+        draft = await call<Draft>('save_draft', { draft: { ...created, ...mailtoDraft(fields) }, importLeaseIds: [] });
+      } catch (e) {
+        // Without the link's fields the new draft is empty: it does not stay in Drafts.
+        await call('discard_draft', { id: created.id }).catch(() => {});
+        throw e;
+      }
       openComposer(draft, opener);
       await loadWorkspace();
     } catch (e) {

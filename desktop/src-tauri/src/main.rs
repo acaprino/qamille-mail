@@ -39,15 +39,18 @@ use commands::sync::*;
 use commands::legacy_local::*;
 
 fn main() {
-    if matches!(std::env::args().nth(1).as_deref(), Some("--skill" | "skill")) {
+    // A start for a mail link has the link first and nothing after it counts: a link passed unquoted
+    // (`mailto:x" --worker "`) never picks one of these modes.
+    let args = launch_args::effective(std::env::args().collect());
+    if matches!(args.get(1).map(String::as_str), Some("--skill" | "skill")) {
         print!("{}", qamille::infrastructure::assistant_packages::skill_text());
         return;
     }
-    if std::env::args().any(|a| a == "--mcp") {
+    if args.iter().any(|a| a == "--mcp") {
         qamille::mcp::serve();
         return;
     }
-    if std::env::args().any(|a| a == "--worker") {
+    if args.iter().any(|a| a == "--worker") {
         qamille::mcp::server::worker();
         return;
     }
@@ -362,7 +365,7 @@ fn setup_app(
     background::install(app)?;
     // Started by Windows at sign-in: ready in the tray, and shown by the first restore. A restart
     // comes back as the window was.
-    let args: Vec<String> = std::env::args().collect();
+    let args: Vec<String> = launch_args::effective(std::env::args().collect());
     if background_rules::stays_hidden(&args, background::restarted_hidden()) {
         native_feel::prepare_main_window(&main_window);
         native_feel::set_webview_visible(&main_window, false);

@@ -44,6 +44,7 @@ try {
     await route.fulfill({ response, body: source.replace('export async function previewCommand(', 'async function originalPreviewCommand(') + `
       export async function previewCommand(command, args = {}) {
         if (command === 'open_link') { window.openedLinks.push(args.url); return; }
+        if (command === 'save_draft' && window.failNextSave) { window.failNextSave = false; throw new Error('The disk is full.'); }
         return originalPreviewCommand(command, args);
       }
     ` });
@@ -131,8 +132,17 @@ try {
 
   // A mail link of a message opens Qamille's composer with the link's fields, never another mail
   // program: nothing reaches open_link, and the frame keeps its document (rule 32, audit Q10).
+  // A draft whose fields could not be saved is not left empty in Drafts: the failure is said, and no
+  // composer opens.
+  const draftCount = () => page.evaluate(async () => (await (await import('/src/lib/api.ts')).call('list_drafts')).length);
+  const draftsBefore = await draftCount();
+  await page.evaluate(() => { window.failNextSave = true; });
   await frame.locator('#mail').click();
+  await expect(page.getByText('The disk is full.')).toBeVisible();
+  await expect.poll(draftCount).toBe(draftsBefore);
   const composer = page.getByRole('tabpanel');
+  await expect(composer).toHaveCount(0);
+  await frame.locator('#mail').click();
   await expect(composer.getByRole('textbox', { name: 'Subject', exact: true })).toHaveValue('x');
   await expect(composer.getByRole('button', { name: 'Remove a@b.it', exact: true })).toBeVisible();
   await expect(composer.locator('[data-scope="tags-input"][data-part="item"]')).toHaveCount(1);

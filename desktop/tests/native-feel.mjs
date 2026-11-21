@@ -721,26 +721,45 @@ check("26. a mailto link opens Qamille's composer, and the installer registers e
   assert.ok(isMailto(externalAddress('MAILTO:a@b.it')) && !isMailto(externalAddress('https://example.com/mailto:a@b.it')), 'isMailto reads the scheme');
   assert.deepEqual(parseMailto(externalAddress('mailto:a@b.it?subject=x%0D%0ABcc:c@d.it')).bcc, [], 'a line break adds no recipient');
   // The navigation hooks of the main window send a mail link to the page as compose-mailto, a web link
-  // to the browser; the reminder chip (open_outside false) opens neither.
+  // to the browser; the reminder chip (open_outside false) opens neither. A mail address that is not a
+  // whole link (over 8 KB) is dropped there, never handed to the browser.
   const feel = read('src-tauri/src/native_feel.rs');
   for (const head of ['pub fn navigation_guard(', 'pub fn new_window_guard(']) {
     assert.match(
       rustItem(feel, head),
-      /if crate::launch_args::is_mail_link\((?:[^()]|\(\))*\) \{\s*crate::launch_args::from_navigation\(&app, [^;]+\);\s*\} else \{\s*open_in_browser\([^;]+\);\s*\}/,
-      `${head.slice(7, -1)}: a mailto: address goes to launch_args::from_navigation, only a web one to open_in_browser`,
+      /if crate::launch_args::has_mail_scheme\((?:[^()]|\(\))*\) \{\s*crate::launch_args::from_navigation\(&app, [^;]+\);\s*\} else \{\s*open_in_browser\([^;]+\);\s*\}/,
+      `${head.slice(7, -1)}: every mailto: address goes to launch_args::from_navigation, only a web one to open_in_browser`,
     );
   }
   const launch = read('src-tauri/src/launch_args.rs');
-  assert.match(rustItem(launch, 'pub fn from_navigation('), /\bdeliver\(/, 'from_navigation hands the link to deliver');
+  assert.match(
+    rustItem(launch, 'pub fn from_navigation('),
+    /if !is_mail_link\(&link\) \{\s*return;\s*\}[\s\S]*\bdeliver\(/,
+    'from_navigation drops a mail address that is not a whole link, and hands the others to deliver',
+  );
   assert.match(rustItem(launch, 'fn deliver('), /\.emit_to\("main", "compose-mailto", \w+\)/, 'deliver emits compose-mailto to the main window');
+  // A page that loads again (a reload, a crash) has no listener until it asks: the links wait for it.
+  assert.match(
+    rustItem(read('src-tauri/src/recovery.rs'), 'pub fn page_load('),
+    /if payload\.event\(\) == PageLoadEvent::Started \{[^}]*crate::launch_args::page_started\(\);/,
+    'a page that starts loading in the main window makes the links wait for its take_launch_mailto',
+  );
   // Another program's link: at a cold start it waits for the page (not after a restart, which keeps the
   // first start's arguments); a second start's comes after background::restore.
-  const setup = rustItem(read('src-tauri/src/main.rs'), 'fn setup_app(');
+  const mainRs = read('src-tauri/src/main.rs');
+  const setup = rustItem(mainRs, 'fn setup_app(');
   assert.match(
     setup,
     /if background::restarted_hidden\(\)\.is_none\(\) \{\s*launch_args::route\(app\.handle\(\), &args\);\s*\}/,
     'setup_app routes the mailto: argument of a start that is not a restart',
   );
+  assert.match(setup, /let args: Vec<String> = launch_args::effective\(std::env::args\(\)\.collect\(\)\);/, 'setup_app reads the arguments as launch_args::effective gives them');
+  // A link Windows passed first takes no option after it: a caller that did not quote it
+  // (`mailto:x" --worker "`) cannot start a worker or an MCP server instead of the composer.
+  const start = rustItem(mainRs, 'fn main(');
+  const effective = start.indexOf('let args = launch_args::effective(std::env::args().collect());');
+  assert.ok(effective >= 0 && effective < start.indexOf('"--skill"'), 'main reads launch_args::effective before the --skill, --mcp and --worker branches');
+  assert.ok(!/std::env::args(?:_os)?\(\)\.(?:nth|any)\(/.test(start), 'main picks its mode from launch_args::effective, never from the raw arguments');
   const second = rustItem(read('src-tauri/src/background.rs'), 'pub fn second_instance(');
   assert.ok(/\brestore\(app\);\s*crate::launch_args::route\(app, &args\);/.test(second), 'a second start restores the window, then routes its mailto: argument');
   assert.match(rustItem(launch, 'pub fn take_launch_mailto('), /\.take\(\)/, 'the page takes the waiting link');

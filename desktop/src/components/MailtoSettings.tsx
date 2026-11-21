@@ -19,7 +19,12 @@ export default function MailtoSettings() {
     let current = true;
     const read = () =>
       void call<MailHandlerStatus>('mail_handler_status')
-        .then((status) => current && (state.status = status))
+        .then((status) => {
+          if (!current) return;
+          // A first reading that failed is over once one succeeds.
+          if (!state.status) state.error = '';
+          state.status = status;
+        })
         .catch((error) => current && (state.error = errorText(error)));
     read();
     window.addEventListener('focus', read);
@@ -44,10 +49,24 @@ export default function MailtoSettings() {
   }
 
   const status = state.status;
-  if (!status?.supported) return null;
+  const title = <strong>{tr('Link mailto degli altri programmi', 'Mailto links in other programs')}</strong>;
+  const error = state.error && (
+    <p className="field-help" role="alert">
+      {state.error}
+    </p>
+  );
+  // The first reading failed: what Windows has is unknown, but the reason is said, never a missing row.
+  if (!status)
+    return error ? (
+      <div className="setting-row">
+        {title}
+        {error}
+      </div>
+    ) : null;
+  if (!status.supported) return null;
   return (
     <div className="setting-row">
-      <strong>{tr('Link mailto degli altri programmi', 'Mailto links in other programs')}</strong>
+      {title}
       <p>
         {status.chosen
           ? tr(`Windows apre i link mailto con ${status.name}: diventano un nuovo messaggio, da rileggere e inviare.`, `Windows opens mailto links with ${status.name}: each becomes a new message, to read and send.`)
@@ -57,11 +76,7 @@ export default function MailtoSettings() {
         {status.registered && !status.installed &&
           tr(' «Smetti» toglie Qamille da quelle app; se era la scelta, Windows chiederà quale usare.', ' “Stop” removes Qamille from those apps; if it was the one chosen, Windows will ask which to use.')}
       </p>
-      {state.error && (
-        <p className="field-help" role="alert">
-          {state.error}
-        </p>
-      )}
+      {error}
       <div className="mailto-actions">
         <Button variant="secondary" disabled={state.busy} onClick={() => void run('mail_handler_register')}>
           {status.registered ? tr('Apri le app predefinite di Windows', 'Open Windows Default apps') : tr('Usa Qamille per i link mailto', 'Use Qamille for mailto links')}

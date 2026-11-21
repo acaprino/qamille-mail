@@ -154,6 +154,81 @@ try {
       }
       if (shots) await page.screenshot({ path: `${shots}/forced-colors-settings-${colorScheme}.png` });
     });
+
+    // The calendar list: a shown calendar is a filled dot and a hidden one an empty dot, both only
+    // backgrounds and a tinted border, which the theme flattens into the same ring.
+    await step(`${colorScheme}: the calendar list tells a shown calendar from a hidden one`, async () => {
+      await page.locator('.sidebar nav').getByRole('button', { name: /Calendar/ }).click();
+      const row = page.locator('.cal-row').first();
+      await row.waitFor();
+      const dot = row.locator('.cal-dot');
+      // The dot eases between the two states: read it once it has settled.
+      const settled = async (checked) => {
+        await expect(row).toHaveAttribute('aria-checked', checked);
+        let last = '';
+        await expect
+          .poll(async () => {
+            const now = JSON.stringify(await style(dot, 'background-color', 'border-top-color'));
+            const same = now === last;
+            last = now;
+            return same;
+          })
+          .toBe(true);
+        return style(dot, 'background-color', 'border-top-style', 'border-top-width', 'border-top-color');
+      };
+      const shown = await settled('true');
+      await row.click();
+      const hidden = await settled('false');
+      await row.click();
+      await settled('true');
+      const palette = {};
+      for (const keyword of ['Highlight', 'Canvas', 'ButtonText', 'CanvasText']) palette[keyword] = await systemColor(keyword);
+      assert.equal(shown['background-color'], palette.Highlight, `a shown calendar's dot is filled with Highlight: ${JSON.stringify(shown)}`);
+      assert.notEqual(hidden['background-color'], palette.Highlight, `a hidden calendar's dot is not filled: ${JSON.stringify(hidden)}`);
+      assert.ok(
+        visibleLine(hidden['border-top-width'], hidden['border-top-style']) &&
+          [palette.ButtonText, palette.CanvasText].includes(hidden['border-top-color']),
+        `a hidden calendar keeps an empty ring in a system colour: ${JSON.stringify(hidden)}`,
+      );
+      assert.notDeepEqual(shown, hidden, 'shown and hidden dots differ');
+      await page.locator('.sidebar nav').getByRole('button', { name: /Inbox/ }).first().click();
+      await page.locator('.mail-row').first().waitFor();
+    });
+
+    // The sidebar's own thin scrollbar: a thumb tinted with the muted text colour over nothing, which the
+    // theme turns into the page colour on the page colour.
+    await step(`${colorScheme}: the sidebar's scrollbar thumb is a system colour that stands out from the column`, async () => {
+      const heightBefore = page.viewportSize().height;
+      await page.setViewportSize({ width: 1280, height: 520 });
+      const body = page.locator('.sidebar-body');
+      await expect.poll(() => body.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+      const sidebar = await style(page.locator('.sidebar'), 'background-color');
+      const palette = {};
+      for (const keyword of ['Highlight', 'ButtonText', 'CanvasText']) palette[keyword] = await systemColor(keyword);
+      const thumb = () =>
+        body.evaluate((el) => {
+          const computed = getComputedStyle(el, '::-webkit-scrollbar-thumb');
+          return { 'background-color': computed.backgroundColor, 'border-top-color': computed.borderTopColor };
+        });
+      // The column draws the thumb stronger when the pointer is over the sidebar (outside the column, so
+      // this is not the thumb's own hover) and when the focus is in it.
+      const states = {
+        'at rest': async () => page.mouse.move(900, 400),
+        'with the pointer over the sidebar': async () => page.locator('.sidebar .profile').hover(),
+        'with the focus in the column': async () => {
+          await page.mouse.move(900, 400);
+          await page.locator('.sidebar-body button').first().focus();
+        },
+        'under the pointer': async () => page.locator('.sidebar-body button').first().hover(),
+      };
+      for (const [how, enter] of Object.entries(states)) {
+        await enter();
+        const t = await thumb();
+        assert.ok(Object.values(palette).includes(t['background-color']), `${how}: the thumb is drawn in a system colour: ${JSON.stringify(t)}`);
+        assert.notEqual(t['background-color'], sidebar['background-color'], `${how}: the thumb differs from the column: ${JSON.stringify({ t, sidebar })}`);
+      }
+      await page.setViewportSize({ width: 1280, height: heightBefore });
+    });
   }
   assert.deepEqual(errors, [], `page errors: ${errors.join('\n')}`);
   console.log(`\nforced colors: ${results.length} checks pass`);

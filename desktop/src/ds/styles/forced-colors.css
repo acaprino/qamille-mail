@@ -54,6 +54,31 @@
     background: CanvasText;
   }
 
+  /* The calendar list: shown or hidden is only the dot's fill, a background in the calendar's own
+     colour, and the theme flattens it into the same ring. A shown calendar's dot is filled with
+     Highlight (as a checked box is), a hidden one stays an empty ring. */
+  section.calendar-page .cal-row .cal-dot {
+    border-color: ButtonText;
+  }
+  section.calendar-page .cal-row.active .cal-dot {
+    forced-color-adjust: none;
+    background: Highlight;
+    border-color: Highlight;
+  }
+
+  /* The sidebar's own thin scrollbar: its thumb is the muted text colour at a fraction of its
+     strength over nothing, which the theme turns into the column's colour. A solid thumb in the
+     text colour, Highlight under the pointer; the border is the gap the app leaves round it. */
+  .sidebar .sidebar-body::-webkit-scrollbar-thumb,
+  .sidebar:hover .sidebar-body::-webkit-scrollbar-thumb {
+    border-color: Canvas;
+    background: CanvasText padding-box;
+  }
+  .sidebar .sidebar-body::-webkit-scrollbar-thumb:hover,
+  .sidebar .sidebar-body::-webkit-scrollbar-thumb:active {
+    background-color: Highlight;
+  }
+
   /* Chips, tags and counts are tinted pills: a border keeps their shape. */
   .tag,
   .origin-chip,

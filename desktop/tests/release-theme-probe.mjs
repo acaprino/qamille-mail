@@ -1,7 +1,7 @@
 // Probe: the packaged Release executable ships the automatic appearance feature.
 // Launches release/Qamille.exe in a disposable workspace and checks the
 // Settings → Appearance select and the system-theme follow behaviour, then opens a Select, a Modal, a
-// Popover, a Tooltip and a DateField in the real executable and FAILS on any Content Security Policy
+// Menu, a Tooltip and a DateField in the real executable and FAILS on any Content Security Policy
 // violation (console messages, `securitypolicyviolation` events, the webview Log domain).
 // Safety: the same as the native tests: synthetic Sample workspace only (src/lib/sample.json), every
 // outgoing HTTP(S) request pointed at a dead local proxy, a folder under checks/.
@@ -194,15 +194,15 @@ try {
   await page.keyboard.press('Escape');
   console.log('PASS Modal opens');
 
-  // Mail view again: Popover and Tooltip live in the reader, the DateField in the search filters.
+  // Mail view again: Menu and Tooltip live in the reader, the DateField in the search filters.
   await page.reload();
   await page.locator('.mail-row').first().waitFor();
   await page.locator('.mail-row').first().locator('button.mail-open').click();
   await page.locator('.message-title').waitFor();
   await page.getByRole('button', { name: either('More message actions', 'Altre azioni sul messaggio') }).first().click();
-  await shown(page.locator('[data-scope="popover"][data-part="content"]'), 'The Popover');
+  await shown(page.locator('[data-scope="menu"][data-part="content"]'), 'The Menu');
   await page.keyboard.press('Escape');
-  console.log('PASS Popover opens');
+  console.log('PASS Menu opens');
 
   const tip = page.locator('[data-scope="tooltip"][data-part="content"]');
   const icons = page.locator('section.reader button.icon-button');
@@ -238,7 +238,7 @@ try {
   const events = await violationsSoFar();
   for (const event of events) cspProblems.push(`securitypolicyviolation: ${event}`);
   if (cspProblems.length) throw new Error(`Content Security Policy violations:\n  ${cspProblems.join('\n  ')}`);
-  console.log('PASS no Content Security Policy violation while opening Select, Modal, Popover, Tooltip and DateField');
+  console.log('PASS no Content Security Policy violation while opening Select, Modal, Menu, Tooltip and DateField');
   await browser.close();
 } catch (error) {
   console.error(`PROBE FAIL: ${error.message}\npage errors: ${JSON.stringify(pageErrors ?? [])}\napp output:\n${out}`);

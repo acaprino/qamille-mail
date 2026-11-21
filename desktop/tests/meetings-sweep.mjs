@@ -87,7 +87,7 @@ try {
     await openPage();
     await openMeeting('Sweep named');
     await pane.getByRole('button', { name: 'More actions', exact: true }).click();
-    await page.getByRole('button', { name: 'Rename', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Rename', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Rename meeting' });
     await expect(dialog.getByRole('textbox', { name: 'Name' })).toHaveValue('Sweep named');
     await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
@@ -100,7 +100,7 @@ try {
     await openPage();
     await openUntitled();
     await pane.getByRole('button', { name: 'More actions', exact: true }).click();
-    await page.getByRole('button', { name: 'Rename', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Rename', exact: true }).click();
     const name = dialog.getByRole('textbox', { name: 'Name' });
     await expect(name).toHaveValue('');
     await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
@@ -115,7 +115,7 @@ try {
     await openPage();
     await openUntitled();
     await pane.getByRole('button', { name: 'More actions', exact: true }).click();
-    await page.getByRole('button', { name: 'Delete', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Delete', exact: true }).click();
     await expect(page.getByRole('dialog', { name: 'Delete meeting' })).toContainText('Delete “Untitled meeting”?');
     await page.getByRole('dialog', { name: 'Delete meeting' }).getByRole('button', { name: 'Cancel', exact: true }).click();
   });

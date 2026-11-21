@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'r
 import ConnectMailbox from './ConnectMailbox';
 import Button from '../ds/primitives/Button';
 import Icon from '../ds/primitives/Icon';
-import Popover from '../ds/primitives/Popover';
+import Menu, { type MenuItem } from '../ds/primitives/Menu';
 import MessageHtml from './MessageHtml';
 import AttachmentPanel from './AttachmentPanel';
 import AddFromMail from './contacts/AddFromMail';
@@ -139,9 +139,57 @@ export default function Reader({
   useLayoutEffect(() => {
     if (scroller.current) scroller.current.scrollTop = 0;
   }, [email?.id]);
-  function closeMenuThen(work: () => void) {
-    setMenu(false);
-    work();
+  // The commands behind "More actions": the message's output, then what can change for it. Only what
+  // can change is offered: nothing to move back from the Inbox, no snooze to remove on a message that
+  // is not snoozed. Set aside is a switch and shows its state.
+  function messageCommands(shown: Email): MenuItem[] {
+    const commands: MenuItem[] = [
+      {
+        value: 'print',
+        label: tr('Stampa email', 'Print email'),
+        icon: 'print',
+        disabled: outputBusy,
+        onSelect: () => printEmail(shown.id, false),
+      },
+    ];
+    if (conversation.length !== 1)
+      commands.push({
+        value: 'print-thread',
+        label: tr('Stampa conversazione', 'Print thread'),
+        icon: 'print',
+        disabled: outputBusy,
+        onSelect: () => printEmail(shown.id, true),
+      });
+    commands.push({
+      value: 'eml',
+      label: tr('Scarica .eml', 'Download .eml'),
+      icon: 'download',
+      disabled: outputBusy,
+      onSelect: () => exportEmail(shown.id),
+    });
+    const state = { group: 'state', disabled: !inView, title: whyLocked || undefined };
+    if (shown.folder !== 'Inbox')
+      commands.push({
+        ...state,
+        value: 'inbox',
+        label: tr('Sposta in Posta in arrivo', 'Move to inbox'),
+        onSelect: () => action(shown.id, 'moveToInbox'),
+      });
+    if (shown.snoozed_until != null)
+      commands.push({
+        ...state,
+        value: 'unsnooze',
+        label: tr('Annulla posticipo', 'Remove snooze'),
+        onSelect: () => action(shown.id, 'unsnooze'),
+      });
+    commands.push({
+      ...state,
+      value: 'set-aside',
+      label: tr('Metti da parte', 'Set aside'),
+      checked: shown.set_aside,
+      onSelect: () => action(shown.id, 'setAside'),
+    });
+    return commands;
   }
   async function summarize() {
     if (!email) return;
@@ -291,7 +339,7 @@ export default function Reader({
                 <Icon name="mail" size={18} />
               </Button>{' '}
               <div className="more-actions">
-                <Popover
+                <Menu
                   open={menu}
                   onOpenChange={setMenu}
                   label={tr('Azioni sul messaggio', 'Message actions')}
@@ -301,52 +349,8 @@ export default function Reader({
                       <Icon name="more" size={18} />
                     </Button>
                   }
-                >
-                  <button disabled={outputBusy} onClick={() => closeMenuThen(() => printEmail(email.id, false))}>
-                    <Icon name="print" size={15} />
-                    {tr('Stampa email', 'Print email')}
-                  </button>
-                  {conversation.length !== 1 && (
-                    <button disabled={outputBusy} onClick={() => closeMenuThen(() => printEmail(email.id, true))}>
-                      <Icon name="print" size={15} />
-                      {tr('Stampa conversazione', 'Print thread')}
-                    </button>
-                  )}
-                  <button disabled={outputBusy} onClick={() => closeMenuThen(() => exportEmail(email.id))}>
-                    <Icon name="download" size={15} />
-                    {tr('Scarica .eml', 'Download .eml')}
-                  </button>{' '}
-                  <span className="popover-divider"></span>{' '}
-                  {/* Only what can change for this message: nothing to move back from the Inbox, no snooze
-                      to remove on a message that is not snoozed. Set aside is a switch and shows its state. */}
-                  {email.folder !== 'Inbox' && (
-                    <button
-                      disabled={!inView}
-                      title={whyLocked}
-                      onClick={() => closeMenuThen(() => action(email.id, 'moveToInbox'))}
-                    >
-                      {tr('Sposta in Posta in arrivo', 'Move to inbox')}
-                    </button>
-                  )}
-                  {email.snoozed_until != null && (
-                    <button
-                      disabled={!inView}
-                      title={whyLocked}
-                      onClick={() => closeMenuThen(() => action(email.id, 'unsnooze'))}
-                    >
-                      {tr('Annulla posticipo', 'Remove snooze')}
-                    </button>
-                  )}
-                  <button
-                    disabled={!inView}
-                    title={whyLocked}
-                    aria-pressed={email.set_aside}
-                    onClick={() => closeMenuThen(() => action(email.id, 'setAside'))}
-                  >
-                    {email.set_aside && <Icon name="check" size={15} />}
-                    {tr('Metti da parte', 'Set aside')}
-                  </button>
-                </Popover>
+                  items={messageCommands(email)}
+                />
               </div>
             </div>{' '}
             {total > 0 && position > 0 && (

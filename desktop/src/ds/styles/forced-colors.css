@@ -39,12 +39,19 @@
     outline: 2px solid Highlight;
     outline-offset: -2px;
   }
-  /* The item the arrow keys are on in a list box. */
+  /* The item the arrow keys are on in a list box, and the current item of a menu (the keys' or the
+     pointer's: its tint and its ring both go in a Contrast theme). */
   [data-scope='select'][data-part='item'][data-highlighted],
   [data-scope='combobox'][data-part='item'][data-highlighted],
-  [data-scope='tags-input'][data-part='item-preview'][data-highlighted] {
+  [data-scope='tags-input'][data-part='item-preview'][data-highlighted],
+  [data-scope='menu'][data-part='item'][data-highlighted] {
     outline: 1px dashed Highlight;
     outline-offset: -1px;
+  }
+  /* The line between the groups of a menu is a background alone. */
+  [data-scope='menu'][data-part='separator'] {
+    forced-color-adjust: none;
+    background: CanvasText;
   }
 
   /* Chips, tags and counts are tinted pills: a border keeps their shape. */
@@ -100,6 +107,7 @@
   /* A dialog and a panel float over the page with a shadow: an edge separates them. */
   [data-scope='dialog'][data-part='content'],
   [data-scope='popover'][data-part='content'],
+  [data-scope='menu'][data-part='content'],
   [data-scope='tooltip'][data-part='content'],
   [data-scope='toast'][data-part='root'] {
     border: 1px solid CanvasText;
@@ -109,5 +117,8 @@
   button:disabled {
     color: GrayText;
     border-color: GrayText;
+  }
+  [data-scope='menu'][data-part='item'][data-disabled] {
+    color: GrayText;
   }
 }

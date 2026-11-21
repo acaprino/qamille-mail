@@ -1,8 +1,9 @@
 // The visual system has one home (ADR-0011). Outside desktop/src/ds, markup goes through the
 // primitives and never writes their classes or a <dialog> by hand (INV-002) nor a native <select>,
 // checkbox or hand-made tablist (INV-003), and never imports @ark-ui (INV-007: only the module does);
-// inside it, nothing reaches into the app (INV-001). The .tsx files are read with TypeScript's own
-// parser, so a comment or a string outside a className that mentions a class is not a violation.
+// a command menu is a Menu, never a Popover whose children are all buttons; inside the module,
+// nothing reaches into the app (INV-001). The .tsx files are read with TypeScript's own parser, so a
+// comment or a string outside a className that mentions a class is not a violation.
 //   node tests/ds-usage.mjs
 import fs from 'node:fs';
 import path from 'node:path';
@@ -53,6 +54,53 @@ function strings(node, out = []) {
   return out;
 }
 
+/**
+ * What a JSX child list is made of, one word per child: 'button' for a <button> or a Button, 'divider' for a
+ * span.popover-divider, the tag name for any other element, 'other' for text or an expression it cannot
+ * follow. Whitespace and {' '} count for nothing; `on && <x/>`, `on ? <x/> : <y/>`, a fragment and
+ * `list.map((i) => <x/>)` count for the elements they give.
+ */
+function childKinds(tree, nodes, out = []) {
+  for (const node of nodes) kindsOf(tree, node, out);
+  return out;
+}
+function kindsOf(tree, node, out) {
+  if (!node) return out;
+  if (ts.isParenthesizedExpression(node)) return kindsOf(tree, node.expression, out);
+  if (ts.isJsxText(node)) {
+    if (node.text.trim()) out.push('other');
+    return out;
+  }
+  if (ts.isJsxExpression(node)) {
+    const inner = node.expression;
+    if (!inner || ((ts.isStringLiteral(inner) || ts.isNoSubstitutionTemplateLiteral(inner)) && !inner.text.trim())) return out;
+    return kindsOf(tree, inner, out);
+  }
+  if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) return kindsOf(tree, node.right, out);
+  if (ts.isConditionalExpression(node)) {
+    kindsOf(tree, node.whenTrue, out);
+    return kindsOf(tree, node.whenFalse, out);
+  }
+  if (ts.isJsxFragment(node)) return childKinds(tree, node.children, out);
+  if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'map') {
+    const callback = node.arguments[0];
+    if (callback && (ts.isArrowFunction(callback) || ts.isFunctionExpression(callback)) && !ts.isBlock(callback.body)) return kindsOf(tree, callback.body, out);
+    out.push('other');
+    return out;
+  }
+  const element = ts.isJsxElement(node) ? node.openingElement : ts.isJsxSelfClosingElement(node) ? node : null;
+  if (!element) {
+    out.push('other');
+    return out;
+  }
+  const name = element.tagName.getText(tree);
+  if (name === 'button' || name === 'Button') out.push('button');
+  else if (name === 'span' && element.attributes.properties.some((a) => ts.isJsxAttribute(a) && a.name.getText(tree) === 'className' && a.initializer && strings(a.initializer).join(' ').split(/\s+/).includes('popover-divider')))
+    out.push('divider');
+  else out.push(name);
+  return out;
+}
+
 // INV-002 and INV-003: markup outside the module.
 for (const file of words(root, /\.tsx$/)) {
   if (file.startsWith(`${DS}${path.sep}`)) continue;
@@ -60,6 +108,15 @@ for (const file of words(root, /\.tsx$/)) {
   const source = fs.readFileSync(file, 'utf8');
   const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const visit = (node) => {
+    // A command menu is a Menu (role menu, arrows, Home and End, typeahead), not a Popover of buttons:
+    // Popover stays for what is not a menu (a filter, a picker, a small form).
+    if (ts.isJsxElement(node) && node.openingElement.tagName.getText(tree) === 'Popover') {
+      const kinds = childKinds(tree, node.children).filter((kind) => kind !== 'divider');
+      if (kinds.length && kinds.every((kind) => kind === 'button')) {
+        const line = tree.getLineAndCharacterOfPosition(node.getStart(tree)).line + 1;
+        problems.push(`${rel}:${line}  <Popover> whose children are all buttons is a command menu: use Menu`);
+      }
+    }
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
       const name = node.tagName.getText(tree);
       if (/^[a-z]/.test(name)) {

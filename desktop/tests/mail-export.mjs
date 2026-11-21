@@ -48,7 +48,7 @@ try {
   await page.goto(process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:1420');
   await page.locator('.mail-open', { hasText: `${anchor.subject}` }).click();
   await page.getByRole('button', { name: 'More message actions' }).click();
-  await page.getByRole('button', { name: 'Print email', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Print email', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Email print preview' })).toBeVisible();
   await expect(page.locator('.print-message')).toHaveCount(1);
   await expect(page.locator('.print-message')).toContainText(anchor.body);
@@ -58,7 +58,7 @@ try {
   console.log('PASS single message preview and print dialog');
 
   await page.getByRole('button', { name: 'More message actions' }).click();
-  await page.getByRole('button', { name: 'Print thread', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Print thread', exact: true }).click();
   await expect(page.locator('.print-message')).toHaveCount(2);
   await expect(page.locator('.print-message').nth(1)).toContainText(reply.body);
   assert.equal(await page.evaluate(() => window.compromised), undefined);
@@ -87,7 +87,7 @@ try {
 
   const emlDownload = page.waitForEvent('download');
   await page.getByRole('button', { name: 'More message actions' }).click();
-  await page.getByRole('button', { name: 'Download .eml', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Download .eml', exact: true }).click();
   const eml = await emlDownload;
   assert.ok(eml.suggestedFilename().endsWith('.eml'));
   await eml.saveAs('../checks/email-export.eml');

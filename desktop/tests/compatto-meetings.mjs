@@ -119,7 +119,7 @@ try {
     assert.equal(await css(copy, 'box-shadow'), 'none');
     assert.equal((await box(more)).height, 32, 'the menu button is 32px high');
     assert.equal(await radius(more), '6px');
-    assert.equal(await more.getAttribute('aria-haspopup'), 'dialog');
+    assert.equal(await more.getAttribute('aria-haspopup'), 'menu');
 
     // The action is an Ark Checkbox; there is no native select, checkbox or tab list drawn by hand.
     const action = pane.getByRole('checkbox', { name: 'Preparare la revisione del progetto.' });
@@ -138,14 +138,16 @@ try {
     await expect(action).not.toBeChecked();
   });
 
-  await step('Menu and dialogs are Ark: a popover, a labelled modal with a 32px field, Esc gives the focus back', async () => {
+  await step('Menu and dialogs are Ark: a menu, a labelled modal with a 32px field, Esc gives the focus back', async () => {
     const more = pane.getByRole('button', { name: 'More actions', exact: true });
     await more.click();
-    const menu = page.getByRole('dialog', { name: 'Meeting actions' });
+    const menu = page.getByRole('menu', { name: 'Meeting actions' });
     await expect(menu).toBeVisible();
-    assert.equal(await menu.evaluate((node) => node.dataset.scope), 'popover', 'the menu is an Ark Popover');
-    await expect(menu.getByRole('button')).toHaveText(['Rename', 'Delete']);
-    await menu.getByRole('button', { name: 'Rename' }).click();
+    assert.equal(await menu.evaluate((node) => node.dataset.scope), 'menu', 'the menu is an Ark Menu');
+    await expect(menu.getByRole('menuitem')).toHaveText(['Rename', 'Delete']);
+    // Delete is destructive: last, after a separator.
+    assert.deepEqual(await menu.evaluate((node) => [...node.children].map((child) => child.getAttribute('role'))), ['menuitem', 'separator', 'menuitem']);
+    await menu.getByRole('menuitem', { name: 'Rename' }).click();
 
     const dialog = page.getByRole('dialog', { name: 'Rename meeting' });
     await expect(dialog).toBeVisible();
@@ -169,7 +171,7 @@ try {
 
     // Delete asks in a small Ark dialog; Cancel leaves the meeting where it was.
     await more.click();
-    await page.getByRole('dialog', { name: 'Meeting actions' }).getByRole('button', { name: 'Delete' }).click();
+    await page.getByRole('menu', { name: 'Meeting actions' }).getByRole('menuitem', { name: 'Delete' }).click();
     const confirm = page.getByRole('dialog', { name: 'Delete meeting' });
     await expect(confirm).toContainText('Delete “Compact check”? The recording and the text are removed. This cannot be undone.');
     assert.equal(await confirm.evaluate((node) => node.dataset.size), 'sm');

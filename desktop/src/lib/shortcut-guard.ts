@@ -23,11 +23,14 @@ export function shortcutCoveredByLayer(target: EventTarget | null, doc: Document
 
 // The up and down arrows step through the messages only from the page itself, the mail list or the
 // reader. In the sidebar, on a top-bar button or in the activity panel they belong to that control's
-// own navigation: they must not open the next message, which also marks it read.
+// own navigation: they must not open the next message, which also marks it read. On a menu button
+// (the reader's "More actions") they open its menu, as on every menu button.
 const MAIL_AREAS = '.mail-list,.reader';
+const MENU_BUTTON = '[aria-haspopup="menu"]';
 
 export function arrowsMoveMail(target: EventTarget | null): boolean {
-  return target instanceof Element && (target.localName === 'body' || target.closest(MAIL_AREAS) !== null);
+  if (!(target instanceof Element) || target.closest(MENU_BUTTON)) return false;
+  return target.localName === 'body' || target.closest(MAIL_AREAS) !== null;
 }
 
 // A chord of the app (Ctrl+K, Ctrl+Z) is Ctrl or Meta without Alt. AltGr, the key that types @ [ ] {

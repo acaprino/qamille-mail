@@ -92,6 +92,34 @@ try {
       assert.ok(visibleLine(s['border-left-width'], s['border-left-style']), `priority edge: ${JSON.stringify(s)}`);
     });
 
+    await step(`${colorScheme}: a menu keeps its edge, its separator, and an outline on the current item`, async () => {
+      await page.getByRole('button', { name: 'More message actions', exact: true }).click();
+      const menu = page.getByRole('menu', { name: 'Message actions' });
+      await expect(menu).toBeVisible();
+      const edge = await style(menu, 'border-top-style', 'border-top-width');
+      assert.ok(visibleLine(edge['border-top-width'], edge['border-top-style']), `menu edge: ${JSON.stringify(edge)}`);
+      const line = await style(menu.getByRole('separator').first(), 'background-color');
+      assert.equal(line['background-color'], await systemColor('CanvasText'), 'the separator is drawn in CanvasText');
+      // The current item, from the keys and then under the pointer: its ring and its tint are gone, the
+      // outline stays.
+      const current = menu.locator('[data-highlighted]');
+      // Ark moves the focus into the menu on the next frame: the arrow waits for it.
+      await expect.poll(() => menu.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+      await page.keyboard.press('ArrowDown');
+      await expect(current).toHaveCount(1);
+      for (const how of ['keys', 'pointer']) {
+        if (how === 'pointer') {
+          await menu.getByRole('menuitem').nth(1).hover();
+          await expect(current).toHaveAccessibleName(await menu.getByRole('menuitem').nth(1).textContent());
+        }
+        const s = await style(current, 'outline-style', 'outline-width', 'outline-color');
+        assert.ok(visibleLine(s['outline-width'], s['outline-style']), `${how}: current item outline: ${JSON.stringify(s)}`);
+        assert.equal(s['outline-color'], highlight, `${how}: the outline is Highlight`);
+      }
+      await page.keyboard.press('Escape');
+      await expect(menu).toHaveCount(0);
+    });
+
     await step(`${colorScheme}: a switch shows its track and whether it is on`, async () => {
       await page.locator('.sidebar .profile').click();
       await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();

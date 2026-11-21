@@ -115,6 +115,9 @@ test('arrowsMoveMail: only the page, the list and the reader move the open messa
         listItself: at('<div class="mail-list" id="t"></div>'),
         reader: at('<section class="reader"><div class="reader-toolbar"><button id="t">x</button></div></section>'),
         readerFrame: at('<section class="reader"><div class="message-body"><iframe id="t"></iframe></div></section>'),
+        // A popover's button in the reader keeps the arrows for the messages; a menu button opens its menu.
+        readerPopoverButton: at('<section class="reader"><div class="reader-toolbar"><button id="t" aria-haspopup="dialog">x</button></div></section>'),
+        readerMenuButton: at('<section class="reader"><div class="reader-toolbar"><button id="t" aria-haspopup="menu" aria-expanded="false">x</button></div></section>'),
         body: arrowsMoveMail(document.body),
         sidebar: at('<aside class="sidebar"><nav><button id="t">x</button></nav></aside>'),
         sidebarFootRegion: at('<aside class="sidebar"><div role="region" aria-label="Activity"><button id="t">x</button></div></aside>'),
@@ -127,8 +130,8 @@ test('arrowsMoveMail: only the page, the list and the reader move the open messa
         null: arrowsMoveMail(null),
       };
     });
-    for (const name of ['listRow', 'listItself', 'reader', 'readerFrame', 'body']) assert.equal(result[name], true, `${name} must move the message`);
-    for (const name of ['sidebar', 'sidebarFootRegion', 'topbar', 'activityRegion', 'searchBar', 'plainDiv', 'document', 'window', 'null']) {
+    for (const name of ['listRow', 'listItself', 'reader', 'readerFrame', 'readerPopoverButton', 'body']) assert.equal(result[name], true, `${name} must move the message`);
+    for (const name of ['readerMenuButton', 'sidebar', 'sidebarFootRegion', 'topbar', 'activityRegion', 'searchBar', 'plainDiv', 'document', 'window', 'null']) {
       assert.equal(result[name], false, `${name} must not move the message`);
     }
   } finally {

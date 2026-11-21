@@ -210,9 +210,10 @@ try {
   await expect(toolbar.getByRole('button', { name: 'Reply', exact: true })).toBeEnabled();
   await expect(toolbar.getByRole('button', { name: 'Forward', exact: true })).toBeEnabled();
   await toolbar.getByRole('button', { name: 'More message actions' }).click();
-  for (const name of ['Move to inbox', 'Set aside']) await expect(page.getByRole('button', { name, exact: true })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Remove snooze', exact: true }), 'no snooze to remove on a message that is not snoozed').toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Print email', exact: true })).toBeEnabled();
+  await expect(page.getByRole('menuitem', { name: 'Move to inbox', exact: true })).toBeDisabled();
+  await expect(page.getByRole('menuitemcheckbox', { name: 'Set aside', exact: true })).toBeDisabled();
+  await expect(page.getByRole('menuitem', { name: 'Remove snooze', exact: true }), 'no snooze to remove on a message that is not snoozed').toHaveCount(0);
+  await expect(page.getByRole('menuitem', { name: 'Print email', exact: true })).toBeEnabled();
   await page.keyboard.press('Escape');
   const calls = await changes();
   await page.locator('.reply-row.selected .reply-open').focus();

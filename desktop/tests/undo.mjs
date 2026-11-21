@@ -170,7 +170,7 @@ try {
     await expect(message).toBeVisible();
     await message.click();
     await page.getByRole('button', { name: 'More message actions' }).click();
-    await page.getByRole('button', { name: 'Move to inbox', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Move to inbox', exact: true }).click();
     await expect(notices.getByRole('button', { name: /^Undo:/ })).toBeVisible();
     await advance(5500);
     await expect(notices).toHaveCount(0);

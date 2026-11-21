@@ -1,7 +1,8 @@
-// A small menu or filter anchored to its trigger (ADR-0008), on Ark UI Popover. `trigger` is the one
-// button element (Ark merges its props into it); `label` is the accessible name of the surface. Esc, a
-// press outside and the focus leaving close it, and the focus goes back to the trigger. `open` and
-// `onOpenChange` make it controlled: a menu item that does its job calls onOpenChange(false).
+// A filter, a picker or a small form anchored to its trigger (ADR-0008), on Ark UI Popover: a dialog,
+// not a menu (a command menu is a Menu, Menu.tsx). `trigger` is the one button element (Ark merges its
+// props into it); `label` is the accessible name of the surface. Esc, a press outside and the focus
+// leaving close it, and the focus goes back to the trigger. `open` and `onOpenChange` make it
+// controlled: an action that has done its job calls onOpenChange(false).
 // The surface exists only while open, in a Portal on --z-popover. The look is in ds/styles/ark/popover.css.
 // `tip` gives an icon-only trigger its hint: the Tooltip wraps Ark's trigger, so both merge their props
 // into the one button (a trigger made with Button's own `tip` would hide it from the popover).

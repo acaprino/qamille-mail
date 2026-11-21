@@ -296,7 +296,14 @@ check('12. a failed start and a blank page reach a message (rule 21, audit Q2 Q1
   assert.ok(at('recovery::stop_asking()') < dialog, 'no recovery dialog opens over the message of a failed start');
   assert.ok(dialog < at('recovery::finish_meetings_before_exit(app)'), 'startup_failed stops the meetings as every exit does');
   assert.ok(at('recovery::finish_meetings_before_exit(app)') < at('std::process::exit(1)'), 'startup_failed exits with 1, last');
-  assert.match(main, /\.run\(context\);[\s\S]*?if let Err\(error\) = started \{\s*startup_failed\(None, &error\)/, 'a failed Builder::build says it too');
+  // Built, then run (the run's events go to updates.rs): an Err of Builder::build (a plugin or the
+  // runtime could not start) is said as every failed start.
+  assert.match(
+    main,
+    /\.build\(context\);[\s\S]*?match built \{\s*Ok\(app\) => app\.run\(\|app, event\| updates::run_event\(app, &event\)\),\s*Err\(error\) => startup_failed\(None, &error\),?\s*\}/,
+    'a failed Builder::build says it too',
+  );
+  assert.ok(!/\.run\(context\)/.test(main), 'the app is built with .build(context) and then run, never .run(context)');
   const setup = item(main, 'fn setup_app(');
   const lookup = setup.indexOf('tauri::webview_version()');
   const build = setup.indexOf('.build()?');
@@ -852,6 +859,88 @@ check("26. a mailto link opens Qamille's composer, and the installer registers e
 });
 
 // phase 3, Task 8: check 27
+check('27. the updater runs only in an installed Professional built with its key, and installs through the close guards', () => {
+  const rust = read('src-tauri/src/updates.rs');
+  // The code without its tests and comments: an assertion on what it does is met by neither.
+  const code = rust.slice(0, rust.indexOf('#[cfg(test)]')).replace(/(^|\s)\/\/.*$/gm, '$1');
+  assert.ok(code.length > 0 && rust.includes('#[cfg(test)]'), 'updates.rs keeps its tests in a test module');
+  // Used from Rust only: the page gets no permission and no package of the plugin.
+  for (const file of ['capabilities/main.json', 'capabilities/reminder.json']) {
+    assert.ok(!JSON.parse(read(`src-tauri/${file}`)).permissions.some((p) => /^updater:/.test(p)), `${file}: no updater permission for the page`);
+  }
+  assert.ok(!/@tauri-apps\/plugin-updater/.test(read('package.json')), 'no updater package for the page');
+  // Off unless the key and the address are compiled in, the edition is the Professional and it is installed.
+  assert.match(code, /const PUBKEY: Option<&str> = option_env!\("QAMILLE_UPDATER_PUBKEY"\);/, 'the public key comes from the build (QAMILLE_UPDATER_PUBKEY)');
+  assert.match(code, /const ENDPOINT: Option<&str> = option_env!\("QAMILLE_UPDATER_ENDPOINT"\);/, 'the address comes from the build (QAMILLE_UPDATER_ENDPOINT)');
+  const plugin = rustItem(code, 'pub fn plugin(');
+  assert.match(
+    plugin,
+    /if !rules::updater_on\(PUBKEY, ENDPOINT, qamille::edition::edition\(\)\.preset\(\)\.is_some\(\), background::installed\(\)\) \{\s*return None;\s*\}/,
+    'plugin() is None unless updater_on(key, address, Professional, installed)',
+  );
+  assert.ok(!JSON.parse(read('src-tauri/tauri.conf.json')).plugins?.updater, "tauri.conf.json has no plugins.updater: the key and the address are the build's");
+  const main = read('src-tauri/src/main.rs');
+  assert.match(main, /if let Some\(updater\) = updates::plugin\(context\.config_mut\(\)\) \{\s*builder = builder\.plugin\(updater\);\s*\}/, 'main.rs registers the plugin only when updates::plugin gives it');
+  assert.ok(!/tauri_plugin_updater/.test(main), 'main.rs never builds the updater plugin itself');
+  // «Riavvia e aggiorna» quits as «Esci» does: the page's close guards and the undo queue decide.
+  const command = rustItem(code, 'pub fn update_install(');
+  assert.match(command, /background::quit\(&app\)/, 'update_install quits through background::quit');
+  assert.ok(!/\.install\(/.test(command), 'update_install installs nothing itself');
+  assert.match(rustItem(code, 'fn watch_quit('), /quit_settled\(background::is_quitting\(\), /, 'a guard that keeps the window ends the request');
+  // One place installs: at the end of the run, once the main window was closed while quitting.
+  assert.equal((code.match(/\.install\(/g) ?? []).length, 1, 'only install_if_armed installs');
+  const run = rustItem(code, 'pub fn run_event(');
+  assert.match(run, /WindowEvent::Destroyed[\s\S]*?window_destroyed\(background::is_quitting\(\)\)/, 'only the main window closed while quitting arms the install');
+  assert.match(run, /RunEvent::Exit => install_if_armed\(app\)/, 'the install runs at the end of the run');
+  const install = rustItem(code, 'fn install_if_armed(');
+  const at = (part) => {
+    const index = install.indexOf(part);
+    assert.ok(index >= 0, `install_if_armed: no ${part}`);
+    return index;
+  };
+  assert.ok(at('installs_on_exit()') < at('.install('), 'it installs only once armed');
+  assert.ok(at('background::before_restart(app)') < at('.install('), 'it says how the window was before the installer starts Qamille again');
+  assert.match(
+    rustItem(code, 'fn check('),
+    /\.restart_after_install\(false\)[\s\S]*?\.installer_args\(rules::RESTART_ARGS\)/,
+    'the installer starts Qamille again without the arguments of its first start',
+  );
+  // The updater artifacts: never from the Professional's configuration, only with the signing key.
+  assert.ok(!/createUpdaterArtifacts/.test(read('src-tauri/tauri.professional.conf.json')), 'tauri.professional.conf.json does not ask for the updater artifacts');
+  const updaterConf = JSON.parse(read('src-tauri/tauri.updater.conf.json'));
+  delete updaterConf.$schema;
+  assert.deepEqual(updaterConf, { bundle: { createUpdaterArtifacts: true } }, 'tauri.updater.conf.json only asks for the updater artifacts');
+  // build-release.bat: without TAURI_SIGNING_PRIVATE_KEY the installer's command is today's, byte for byte.
+  const bat = read('../build-release.bat');
+  const build = bat.slice(bat.indexOf('\n:build\n'), bat.indexOf('\n:assemble\n'));
+  const commands = build.split('\n').filter((line) => line.includes('npm run tauri build'));
+  assert.equal(commands.length, 1, 'build-release.bat builds the installer with one command');
+  const [line] = commands;
+  const assignments = [...build.slice(0, build.indexOf(line)).matchAll(/^(?:if defined (\w+) )?set "UPDATER_CONFIG=([^"]*)"$/gm)];
+  assert.deepEqual(
+    assignments.map(([, when, value]) => [when ?? null, value]),
+    [[null, ''], ['TAURI_SIGNING_PRIVATE_KEY', ' --config src-tauri/tauri.updater.conf.json']],
+    'UPDATER_CONFIG is cleared, then set only with TAURI_SIGNING_PRIVATE_KEY',
+  );
+  assert.ok(!/%(?!UPDATER_CONFIG%)\w+%/.test(line), 'the command expands no other variable');
+  const expanded = (environment) => {
+    let value = '';
+    for (const [, when, set] of assignments) if (!when || environment[when]) value = set;
+    return line.replace('%UPDATER_CONFIG%', value);
+  };
+  const today = 'call npm run tauri build -- --bundles nsis --config src-tauri/tauri.professional.conf.json --features custom-protocol';
+  assert.equal(expanded({}), today, 'without the signing key the command is the one of before the updater');
+  assert.equal(
+    expanded({ TAURI_SIGNING_PRIVATE_KEY: 'key' }),
+    'call npm run tauri build -- --bundles nsis --config src-tauri/tauri.professional.conf.json --config src-tauri/tauri.updater.conf.json --features custom-protocol',
+    'with the key the updater configuration comes after the Professional one',
+  );
+  // The notice stays until the person acts: a notice of its own, not a toast that goes away by itself.
+  const notice = read('src/components/UpdateNotice.tsx');
+  assert.ok(!/\bnotify\(|Toaster/.test(notice), 'UpdateNotice is a notice of its own, not a toast');
+  assert.match(notice, /call\('update_install'\)/, 'its button calls update_install');
+  assert.match(read('src/App.tsx'), /<UpdateNotice [^\n]*\/>\n\s*<Toaster /, 'App.tsx shows it beside the Toaster');
+});
 
 if (failures.length) {
   console.error(`\n${failures.length} native-feel check(s) failed. See docs/aspetto-nativo.md.`);

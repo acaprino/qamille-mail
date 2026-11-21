@@ -68,6 +68,34 @@ L'installatore è per utente e tiene i dati accanto al programma, in `<cartella 
 
 La prova con l'installatore vero (installare, accendere l'avvio all'accesso, disinstallare con la casella spuntata: la cartella non c'è più, in Gestione attività non resta nessuna voce di Qamille e all'accesso dopo non parte niente) richiede una build con `QAMILLE_SERVER`; finché non è fatta, è da fare.
 
+## Firma e aggiornamenti
+
+**Stato:** preparati nell'app e nel workflow di release di `qamille-enterprise`, spenti finché il proprietario non dà le chiavi e un indirizzo pubblico (elenco in fondo). Nessun effetto sull'open source né sulle copie portatili.
+
+**Aggiornamenti nell'app** (`desktop/src-tauri/src/updates.rs`, `desktop/src/components/UpdateNotice.tsx`). Il plugin ufficiale `tauri-plugin-updater` si registra solo se valgono tutte e quattro: l'exe è costruito con le due variabili qui sotto, l'edizione è la Professional e Qamille è installato dal suo installatore (accanto all'exe c'è `uninstall.exe`). Se ne manca una il plugin non si registra e niente controlla aggiornamenti.
+
+| Variabile, alla build | Che cosa |
+| --- | --- |
+| `QAMILLE_UPDATER_PUBKEY` | la chiave pubblica dell'updater (minisign), quella che stampa `npx tauri signer generate` |
+| `QAMILLE_UPDATER_ENDPOINT` | l'indirizzo `https://` di `latest.json` (un indirizzo `http://` spegne l'updater) |
+
+La chiave e l'indirizzo arrivano al plugin da Rust, mai da `tauri.conf.json`; la pagina non ha permessi del plugin (`capabilities/main.json` non cambia), solo i comandi `update_status` e `update_install`. Un minuto dopo l'avvio, poi ogni 24 ore (un'ora dopo un controllo non riuscito, che va in `native.log`), Qamille legge `latest.json`: una versione più nuova si scarica subito, in background, e se ne verifica la firma con la chiave. A pacchetto pronto compare in basso a destra un avviso che resta finché non si sceglie, con «Riavvia e aggiorna». Il clic chiude Qamille come Esci, attraverso le guardie (bozze non salvate, registrazione, coda di Annulla invio): se una guardia tiene aperta la finestra non succede niente e l'avviso resta; altrimenti, all'uscita, parte l'installatore (modalità passiva, nessuna domanda), che riapre Qamille aggiornato e sullo schermo, senza gli argomenti del primo avvio (né `--autostart` né un link `mailto:` già aperto).
+
+**Artefatti dell'updater.** `tauri.professional.conf.json` non li chiede. `build-release.bat`, con `QAMILLE_SERVER` e `TAURI_SIGNING_PRIVATE_KEY` impostate (più `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` se la chiave ne ha una), aggiunge `--config src-tauri/tauri.updater.conf.json` (`bundle.createUpdaterArtifacts: true`) e Tauri scrive accanto all'installatore la sua firma per l'updater, `app\target\release\bundle\nsis\<installatore>.exe.sig`. Senza la chiave il comando dell'installatore è quello di prima, byte per byte (controllo 27 di `desktop/tests/native-feel.mjs`).
+
+**Firma del codice (Authenticode).** Nel workflow di release di `qamille-enterprise` (`.github/workflows/release.yml`), uno step dopo «Professional app» firma con `signtool sign /fd SHA256 /tr <timestamp> /td SHA256` `Qamille.exe` dentro lo zip portable di `build\` e, se c'è, l'installatore, poi controlla le firme con `signtool verify /pa`. Il certificato viene dai segreti `WINDOWS_CERTIFICATE` (il PFX in base64) e `WINDOWS_CERTIFICATE_PASSWORD`; senza, lo step scrive un avviso e non firma, e la release esce come prima. Due limiti, da sapere prima di accendere gli aggiornamenti:
+
+- il programma che l'installatore mette su disco non è firmato da quello step, perché sta dentro un installatore già costruito: per firmarlo la firma deve avvenire nella build di Tauri (`bundle.windows.signCommand`), una decisione ancora da prendere;
+- firmare l'installatore ne cambia i byte, e la firma dell'updater (`.sig`) fatta prima non vale più: va rifatta sull'installatore firmato con `npx tauri signer sign` (lo step commentato del workflow lo fa).
+
+**Che cosa manca al proprietario:**
+
+1. I segreti di GitHub di `qamille-enterprise`: `WINDOWS_CERTIFICATE` e `WINDOWS_CERTIFICATE_PASSWORD` per la firma del codice; `TAURI_SIGNING_PRIVATE_KEY` e `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` per l'updater, con la chiave pubblica della stessa coppia come `QAMILLE_UPDATER_PUBKEY`. La coppia si genera una volta sola: una chiave privata nuova fa rifiutare ogni aggiornamento alle copie già installate.
+2. Un indirizzo **pubblico** per `latest.json` e per l'installatore (`QAMILLE_UPDATER_ENDPOINT`): gli asset delle release di un repository privato non si scaricano senza token.
+3. Pubblicare di nuovo l'installatore: l'updater di Windows installa l'installatore NSIS, mentre oggi la release pubblica solo lo zip, per scelta del proprietario.
+
+Finché 2 e 3 non sono decisi, lo step che scrive `latest.json` nel workflow resta commentato, con la spiegazione di che cosa farà.
+
 ## Avviare i due server
 
 **Open source self-hosted** (core): `server/compose.yaml`, come in [server/README.md](../server/README.md), «Distribuzione con Docker Compose»; immagine `qamille-server:local`. Gli utenti li crea l'amministratore: `docker compose exec server qamille-server user create <nome>`.

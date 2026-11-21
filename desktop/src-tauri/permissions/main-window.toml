@@ -64,6 +64,8 @@ permissions = [
   "allow-set-include-spam-trash",
   "allow-mark-old-unread-read",
   "allow-app-edition",
+  "allow-update-status",
+  "allow-update-install",
   "allow-server-status",
   "allow-legacy-local-status",
   "allow-legacy-local-free-space",

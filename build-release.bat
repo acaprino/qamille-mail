@@ -224,8 +224,14 @@ cargo build --manifest-path desktop\src-tauri\Cargo.toml --release --features cu
 if not defined QAMILLE_SERVER exit /b 0
 echo     per-user NSIS installer of the Professional edition
 if exist "%CARGO_TARGET_DIR%\release\bundle\nsis\" del /q "%CARGO_TARGET_DIR%\release\bundle\nsis\*.exe" 2>nul
+rem With the updater's signing key (TAURI_SIGNING_PRIVATE_KEY, and its _PASSWORD) Tauri also signs the
+rem installer for the updater (<installer>.sig beside it, docs/edizioni.md). Without it the command is the
+rem same as before, byte for byte (native-feel check 27).
+set "UPDATER_CONFIG="
+if defined TAURI_SIGNING_PRIVATE_KEY set "UPDATER_CONFIG= --config src-tauri/tauri.updater.conf.json"
+if defined TAURI_SIGNING_PRIVATE_KEY echo     updater artifacts ^(TAURI_SIGNING_PRIVATE_KEY^)
 pushd "desktop" || goto :sub_fail
-call npm run tauri build -- --bundles nsis --config src-tauri/tauri.professional.conf.json --features custom-protocol
+call npm run tauri build -- --bundles nsis --config src-tauri/tauri.professional.conf.json%UPDATER_CONFIG% --features custom-protocol
 set "RC=%ERRORLEVEL%"
 popd
 if not "%RC%"=="0" goto :sub_fail

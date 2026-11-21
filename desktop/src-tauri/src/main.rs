@@ -27,6 +27,7 @@ mod saved_files;
 mod row_menu;
 
 // phase 3, Task 8: modules
+mod updates;
 
 use commands::{accounts::*, activity::*, assistant::*, document_preview::*, drafts::*, mail::*, undo::*, workspace::*};
 use tauri::{Emitter, Manager};
@@ -99,9 +100,14 @@ fn main() {
         window_config.background_color = Some(native_feel::DARK_GROUND);
     }
     context.config_mut().app.windows[0].create = false;
-    let started = tauri::Builder::default()
+    let mut builder = tauri::Builder::default()
         // Started again while it runs (also hidden in the tray or minimized): the window comes back.
-        .plugin(tauri_plugin_single_instance::init(background::second_instance))
+        .plugin(tauri_plugin_single_instance::init(background::second_instance));
+    // Updates: only in an installed Professional built with the updater's key and address (updates.rs).
+    if let Some(updater) = updates::plugin(context.config_mut()) {
+        builder = builder.plugin(updater);
+    }
+    let built = builder
         // Tauri 2.12 turns an `Err` returned from `.setup` into a panic, and a panic there ends the
         // process (exit code 101): a release build (no console) would end without a word. Both are
         // said here instead (audit Q2).
@@ -162,6 +168,7 @@ fn main() {
             set_include_spam_trash,
             mark_old_unread_read,
             app_edition,
+            updates::update_status, updates::update_install,
             server_status,
             legacy_local_status,
             legacy_local_free_space,
@@ -282,13 +289,15 @@ fn main() {
             contacts_authorize, contacts_resolve_conflict, contacts_promote_other,
             contacts_flush, contacts_settings, contacts_save_settings
         ])
-        .run(context);
+        .build(context);
     // Only `Builder::build` fails here (a plugin or the runtime could not start). A failure inside
     // `.setup` (the workspace already open in another Qamille, also after a restart whose old
     // process did not exit in time; a damaged store; no WebView2 Runtime) never returns here:
-    // `startup_failed` has already said it and exited.
-    if let Err(error) = started {
-        startup_failed(None, &error);
+    // `startup_failed` has already said it and exited. The run's events go to the updates: the
+    // checks start when the app is ready, and an update asked for installs at the end.
+    match built {
+        Ok(app) => app.run(|app, event| updates::run_event(app, &event)),
+        Err(error) => startup_failed(None, &error),
     }
 }
 

@@ -1072,41 +1072,101 @@ check('27. the updater runs only in an installed Professional built with its key
   };
   assert.ok(at('installs_on_exit()') < at('.install('), 'it installs only once armed');
   assert.ok(at('background::before_restart(app)') < at('.install('), 'it says how the window was before the installer starts Qamille again');
+  const checking = rustItem(code, 'fn check(');
   assert.match(
-    rustItem(code, 'fn check('),
+    checking,
     /\.restart_after_install\(false\)[\s\S]*?\.installer_args\(rules::RESTART_ARGS\)/,
     'the installer starts Qamille again without the arguments of its first start',
   );
+  // A connection that stalls ends: the thread of the checks is never stuck for good.
+  assert.match(checking, /\.timeout\(UPDATE_TIMEOUT\)/, 'the checks and the download have a time limit');
+  // The package as well as latest.json over https://, and signed for the version it claims to be.
+  assert.ok(
+    checking.indexOf('rules::download_allowed(update.download_url.scheme())') >= 0 &&
+      checking.indexOf('rules::download_allowed(update.download_url.scheme())') < checking.indexOf('.download('),
+    'a package not served over https:// is refused before it is downloaded',
+  );
+  assert.match(plugin, /config\.plugins\.0\.insert\("updater"\.into\(\), rules::plugin_settings\(key\)\)/, 'the settings come from plugin_settings');
+  assert.match(rustItem(code, 'pub fn plugin_settings('), /"requireSignedVersion": true/, 'the signature must name the version');
   // The updater artifacts: never from the Professional's configuration, only with the signing key.
-  assert.ok(!/createUpdaterArtifacts/.test(read('src-tauri/tauri.professional.conf.json')), 'tauri.professional.conf.json does not ask for the updater artifacts');
+  const professional = read('src-tauri/tauri.professional.conf.json');
+  assert.ok(!/createUpdaterArtifacts/.test(professional), 'tauri.professional.conf.json does not ask for the updater artifacts');
   const updaterConf = JSON.parse(read('src-tauri/tauri.updater.conf.json'));
   delete updaterConf.$schema;
   assert.deepEqual(updaterConf, { bundle: { createUpdaterArtifacts: true } }, 'tauri.updater.conf.json only asks for the updater artifacts');
-  // build-release.bat: without TAURI_SIGNING_PRIVATE_KEY the installer's command is today's, byte for byte.
+  // Authenticode in Tauri's own build: it signs the program it puts in the installer, the uninstaller and
+  // the installer, before the updater signs the installer. The certificate comes from the environment only.
+  assert.ok(!/signCommand|certificateThumbprint/.test(professional), 'tauri.professional.conf.json does not sign');
+  const signingConf = JSON.parse(read('src-tauri/tauri.signing.conf.json'));
+  delete signingConf.$schema;
+  assert.deepEqual(
+    signingConf,
+    { bundle: { windows: { signCommand: { cmd: 'powershell', args: ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', 'windows/sign.ps1', '%1'] } } } },
+    'tauri.signing.conf.json only names the signing script, with the file to sign',
+  );
+  const script = read('src-tauri/windows/sign.ps1');
+  const scriptCode = script.replace(/(^|\s)#.*$/gm, '$1');
+  assert.match(scriptCode, /\$env:QAMILLE_SIGNING_PFX\b/, 'the script reads the PFX path from QAMILLE_SIGNING_PFX');
+  assert.match(scriptCode, /\$env:QAMILLE_SIGNING_PFX_PASSWORD\b/, 'the script reads the password from QAMILLE_SIGNING_PFX_PASSWORD');
+  assert.match(scriptCode, /sign \/s \$store \/sha1 \$signer\.Thumbprint \/fd SHA256 \/tr \$timestamp \/td SHA256 \/d Qamille \$File/, 'signtool signs by thumbprint, SHA-256 and an RFC 3161 timestamp');
+  assert.ok(!/\s\/p\s|\s\/f\s/.test(scriptCode), 'the password never reaches signtool\'s command line (no /f, no /p)');
+  const password = scriptCode.match(/\$env:QAMILLE_SIGNING_PFX_PASSWORD/g) ?? [];
+  assert.equal(password.length, 1, 'the password is read once');
+  assert.ok(!/Write-(Host|Output|Verbose|Information)[^\n]*(password|secure)|echo[^\n]*password/i.test(scriptCode), 'the password is never written out');
+  assert.match(scriptCode, /\$store = "QamilleSigning\$PID"/, 'a store of this one signature, never one holding other certificates');
+  assert.match(
+    scriptCode,
+    /finally \{[\s\S]*?-DeleteKey[\s\S]*?Remove-Item -LiteralPath \$registry -Recurse/,
+    'the certificate, its key and the store of this one signature are removed after it',
+  );
+  assert.match(scriptCode, /\$registry = "HKCU:\\Software\\Microsoft\\SystemCertificates\\\$store"/, 'the store removed is the one of this signature');
+  // build-release.bat: without TAURI_SIGNING_PRIVATE_KEY and QAMILLE_SIGNING_PFX the installer's command is
+  // the one of before, byte for byte.
   const bat = read('../build-release.bat');
   const build = bat.slice(bat.indexOf('\n:build\n'), bat.indexOf('\n:assemble\n'));
   const commands = build.split('\n').filter((line) => line.includes('npm run tauri build'));
   assert.equal(commands.length, 1, 'build-release.bat builds the installer with one command');
   const [line] = commands;
-  const assignments = [...build.slice(0, build.indexOf(line)).matchAll(/^(?:if defined (\w+) )?set "UPDATER_CONFIG=([^"]*)"$/gm)];
+  const before = build.slice(0, build.indexOf(line));
+  const assignments = (name) => [...before.matchAll(new RegExp(`^(?:if defined (\\w+) )?set "${name}=([^"]*)"$`, 'gm'))];
   assert.deepEqual(
-    assignments.map(([, when, value]) => [when ?? null, value]),
+    assignments('UPDATER_CONFIG').map(([, when, value]) => [when ?? null, value]),
     [[null, ''], ['TAURI_SIGNING_PRIVATE_KEY', ' --config src-tauri/tauri.updater.conf.json']],
     'UPDATER_CONFIG is cleared, then set only with TAURI_SIGNING_PRIVATE_KEY',
   );
-  assert.ok(!/%(?!UPDATER_CONFIG%)\w+%/.test(line), 'the command expands no other variable');
-  const expanded = (environment) => {
-    let value = '';
-    for (const [, when, set] of assignments) if (!when || environment[when]) value = set;
-    return line.replace('%UPDATER_CONFIG%', value);
-  };
+  assert.deepEqual(
+    assignments('SIGNING_CONFIG').map(([, when, value]) => [when ?? null, value]),
+    [[null, ''], ['QAMILLE_SIGNING_PFX', ' --config src-tauri/tauri.signing.conf.json']],
+    'SIGNING_CONFIG is cleared, then set only with QAMILLE_SIGNING_PFX',
+  );
+  assert.ok(!/%(?!(?:SIGNING|UPDATER)_CONFIG%)\w+%/.test(line), 'the command expands no other variable');
+  const expanded = (environment) =>
+    line.replace(/%(SIGNING_CONFIG|UPDATER_CONFIG)%/g, (_, name) => {
+      let value = '';
+      for (const [, when, set] of assignments(name)) if (!when || environment[when]) value = set;
+      return value;
+    });
   const today = 'call npm run tauri build -- --bundles nsis --config src-tauri/tauri.professional.conf.json --features custom-protocol';
-  assert.equal(expanded({}), today, 'without the signing key the command is the one of before the updater');
+  assert.equal(expanded({}), today, 'without the keys the command is the one of before the updater and the signing');
   assert.equal(
     expanded({ TAURI_SIGNING_PRIVATE_KEY: 'key' }),
     'call npm run tauri build -- --bundles nsis --config src-tauri/tauri.professional.conf.json --config src-tauri/tauri.updater.conf.json --features custom-protocol',
-    'with the key the updater configuration comes after the Professional one',
+    'with the updater key its configuration comes after the Professional one',
   );
+  assert.equal(
+    expanded({ QAMILLE_SIGNING_PFX: 'C:\\signing.pfx', TAURI_SIGNING_PRIVATE_KEY: 'key' }),
+    'call npm run tauri build -- --bundles nsis --config src-tauri/tauri.professional.conf.json --config src-tauri/tauri.signing.conf.json --config src-tauri/tauri.updater.conf.json --features custom-protocol',
+    'with the certificate the signing configuration comes too',
+  );
+  // Tauri restores the program it built unsigned: the portable copy is signed where it is assembled, with
+  // the same script and only with the certificate.
+  const assemble = bat.slice(bat.indexOf('\n:assemble\n'), bat.indexOf('\n:clean_project\n'));
+  const copied = assemble.indexOf('"%RELEASE%\\Qamille.exe" >nul || goto :sub_fail');
+  const signed = assemble.indexOf(
+    'if defined QAMILLE_SIGNING_PFX powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "desktop\\src-tauri\\windows\\sign.ps1" "%RELEASE%\\Qamille.exe" || goto :sub_fail',
+  );
+  assert.ok(copied >= 0 && signed > copied, 'the portable Qamille.exe is signed after it is copied, only with QAMILLE_SIGNING_PFX');
+  assert.equal((assemble.match(/sign\.ps1/g) ?? []).length, 1, 'nothing else is signed there');
   // The notice stays until the person acts: a notice of its own, not a toast that goes away by itself.
   const notice = read('src/components/UpdateNotice.tsx');
   assert.ok(!/\bnotify\(|Toaster/.test(notice), 'UpdateNotice is a notice of its own, not a toast');

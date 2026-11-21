@@ -35,6 +35,8 @@ const CHECK_EVERY: Duration = Duration::from_secs(24 * 60 * 60);
 const RETRY_AFTER: Duration = Duration::from_secs(60 * 60);
 /// How often the wait looks at the wall clock: a sleep does not count the time the PC was asleep.
 const LOOK_EVERY: Duration = Duration::from_secs(10 * 60);
+/// The longest a check or a download may take (the plugin has no limit of its own).
+const UPDATE_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 /// How often the end of a quit started by «Riavvia e aggiorna» is looked for (`watch_quit`).
 const QUIT_LOOK: Duration = Duration::from_millis(100);
 
@@ -71,11 +73,7 @@ pub fn plugin(config: &mut tauri::Config) -> Option<TauriPlugin<Wry, tauri_plugi
         return None;
     }
     let key = PUBKEY.unwrap_or_default().trim();
-    config.plugins.0.insert(
-        "updater".into(),
-        // Passive: the installer shows its progress, asks nothing, and can start Qamille again (`/R`).
-        serde_json::json!({ "pubkey": key, "windows": { "installMode": "passive" } }),
-    );
+    config.plugins.0.insert("updater".into(), rules::plugin_settings(key));
     ON.store(true, Ordering::SeqCst);
     Some(tauri_plugin_updater::Builder::new().pubkey(key).build())
 }
@@ -143,11 +141,16 @@ fn check(app: &AppHandle) -> Result<(), String> {
         // screen) nor a mail link already opened.
         .restart_after_install(false)
         .installer_args(rules::RESTART_ARGS)
+        // For the check and the download: a connection that stalls ends, and the next check comes.
+        .timeout(UPDATE_TIMEOUT)
         .build()
         .map_err(|e| e.to_string())?;
     let Some(update) = tauri::async_runtime::block_on(updater.check()).map_err(|e| e.to_string())? else {
         return Ok(());
     };
+    if !rules::download_allowed(update.download_url.scheme()) {
+        return Err(format!("the package of {} is not served over https://: {}", update.version, update.download_url));
+    }
     let ready = READY.lock().unwrap_or_else(|e| e.into_inner()).as_ref().map(|ready| ready.info.version.clone());
     if !rules::needs_download(ready.as_deref(), &update.version) {
         return Ok(());
@@ -297,6 +300,19 @@ pub mod rules {
     /// What the installer gets after its own options: start Qamille again (`/R`) with what follows
     /// `/ARGS`, that is nothing.
     pub const RESTART_ARGS: [&str; 2] = ["/R", "/ARGS"];
+
+    /// The plugin's settings (`plugins.updater`): the key; a signature that names the version it was
+    /// made for (Tauri's build signs with it), so an older signed package cannot pass for a newer one;
+    /// the passive installer, which shows its progress, asks nothing and can start Qamille again (`/R`).
+    pub fn plugin_settings(key: &str) -> serde_json::Value {
+        serde_json::json!({ "pubkey": key, "requireSignedVersion": true, "windows": { "installMode": "passive" } })
+    }
+
+    /// Whether the package named by `latest.json` may be downloaded: only over https://, as
+    /// `latest.json` itself (the plugin only warns).
+    pub fn download_allowed(scheme: &str) -> bool {
+        scheme.eq_ignore_ascii_case("https")
+    }
 }
 
 #[cfg(test)]
@@ -383,6 +399,23 @@ mod tests {
         assert!(rules::needs_download(None, "1.2.0"));
         assert!(!rules::needs_download(Some("1.2.0"), "1.2.0"));
         assert!(rules::needs_download(Some("1.2.0"), "1.3.0"));
+    }
+
+    #[test]
+    fn updates_take_only_a_package_signed_for_its_version_over_https() {
+        // The plugin's settings: the key, the passive installer, and a signature that names the version
+        // it was made for (Tauri's build signs with it), so an older signed package cannot be sent as a
+        // newer one.
+        assert_eq!(
+            rules::plugin_settings(KEY),
+            serde_json::json!({ "pubkey": KEY, "requireSignedVersion": true, "windows": { "installMode": "passive" } })
+        );
+        // latest.json must be https:// (`updater_on`), and so must the package it names.
+        assert!(rules::download_allowed("https"));
+        assert!(rules::download_allowed("HTTPS"));
+        for scheme in ["http", "file", "ftp", ""] {
+            assert!(!rules::download_allowed(scheme), "{scheme:?}");
+        }
     }
 
     #[test]

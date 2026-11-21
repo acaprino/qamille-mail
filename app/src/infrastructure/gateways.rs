@@ -130,12 +130,22 @@ mod outgoing_snapshot_tests {
 }
 
 pub struct KeyringSecrets;
+/// A vault message with its code (`vault_codes`), for the interface to word it.
+pub fn vault_error(message: String) -> AppError {
+    AppError::new(secret::error_code(&message), message)
+}
 impl SecretStore for KeyringSecrets {
     fn get(&self, key: &str) -> AppResult<String> {
-        secret::get_result(key).map_err(AppError::external)
+        secret::get_result(key).map_err(vault_error)
     }
     fn set(&self, key: &str, value: &str) -> AppResult<()> {
-        secret::set(key, value).map_err(AppError::external)
+        secret::set(key, value).map_err(vault_error)
+    }
+    fn check_writable(&self) -> AppResult<()> {
+        secret::check_writable().map_err(vault_error)
+    }
+    fn set_aside_notice(&self) -> Option<String> {
+        secret::set_aside_notice()
     }
 }
 

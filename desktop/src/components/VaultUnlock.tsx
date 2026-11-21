@@ -1,17 +1,19 @@
 // Credentials that do not open on this Windows user (phase 3, Task 7): the transfer passphrase
 // chosen on the other computer opens them, or the person signs in to the accounts again. Starting
 // over sets the old files aside in the data folder (never deletes them) and always asks first.
-// Shown by the start-up notice and by Settings → Accounts.
+// When Windows cannot open the key right now (`retryable`), only «Try again» is offered.
+// Shown by the start-up notice and by Settings → Accounts. Errors come from the vault with a
+// `vault_*` code; errorText words them in the interface language (lib/vault.ts).
 import { useState, type ReactNode } from 'react';
 import Button from '../ds/primitives/Button';
 import Field from '../ds/primitives/Field';
 import { call, errorText } from '../lib/api';
 import { backendText, tr } from '../lib/i18n';
-import type { VaultStatus } from '../lib/vault';
+import { retryable, type VaultStatus } from '../lib/vault';
 
 type Props = {
   status: Exclude<VaultStatus, { state: 'ready' }>;
-  /** The vault changed: the new status and what to tell the person. */
+  /** The vault changed: the new status and what to tell the person (nothing when empty). */
   done: (next: VaultStatus, message: string) => void;
   error: (message: string) => void;
   /** Extra buttons beside the main ones (the notice's «Later»). */
@@ -53,6 +55,13 @@ export default function VaultUnlock({ status, done, error, children }: Props) {
         ),
       );
     });
+  const retry = () =>
+    run(async () => {
+      const next = await call<VaultStatus>('vault_status');
+      if (next.state === 'ready') done(next, tr('Credenziali aperte.', 'Credentials opened.'));
+      else if (next.state === 'damaged' && retryable(next)) error(backendText(next.message));
+      else done(next, '');
+    });
 
   if (confirming)
     return (
@@ -77,7 +86,14 @@ export default function VaultUnlock({ status, done, error, children }: Props) {
     <div>
       {status.state === 'damaged' ? (
         <>
-          <p>{tr('Le credenziali salvate non si aprono.', 'The saved credentials do not open.')}</p>
+          <p>
+            {retryable(status)
+              ? tr(
+                  'Windows non riesce ad aprire ora la chiave delle credenziali. Non è cambiato niente: riprova tra poco, o dopo aver riavviato il computer.',
+                  'Windows cannot open the credentials key right now. Nothing was changed: try again shortly, or after restarting the computer.',
+                )
+              : tr('Le credenziali salvate non si aprono.', 'The saved credentials do not open.')}
+          </p>
           <p className="field-help">{backendText(status.message)}</p>
         </>
       ) : transfer ? (
@@ -104,10 +120,11 @@ export default function VaultUnlock({ status, done, error, children }: Props) {
         >
           <Field>
             {tr('Frase di trasferimento', 'Transfer passphrase')}
+            {/* new-password: a password manager offers nothing saved for this field. */}
             <input
               type="password"
               value={passphrase}
-              autoComplete="off"
+              autoComplete="new-password"
               spellCheck={false}
               onChange={(e) => setPassphrase(e.currentTarget.value)}
             />
@@ -131,6 +148,13 @@ export default function VaultUnlock({ status, done, error, children }: Props) {
             {children}
           </div>
         </form>
+      ) : retryable(status) ? (
+        <div className="button-row">
+          <Button variant="primary" disabled={busy} onClick={() => void retry()}>
+            {busy ? tr('Attendi…', 'Working…') : tr('Riprova', 'Try again')}
+          </Button>
+          {children}
+        </div>
       ) : (
         <div className="button-row">
           <Button variant="secondary" disabled={busy} onClick={() => setConfirming(true)}>

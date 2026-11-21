@@ -317,11 +317,18 @@ impl ServerAccountService {
 
     /// The session in the vault, if any. An unreadable value counts as none.
     pub fn session(&self) -> AppResult<Option<ServerSession>> {
-        let raw = self.context.secrets.get(SERVER_SESSION)?;
+        Self::parse_session(&self.context.secrets.get(SERVER_SESSION)?)
+    }
+    /// The session for a request made before signing in: a session in the credentials of another
+    /// Windows user or computer (no passphrase opens them) is none, so the sign-in can go on.
+    fn session_for_sign_in(&self) -> AppResult<Option<ServerSession>> {
+        Self::parse_session(&self.context.secrets.get_for_sign_in(SERVER_SESSION)?)
+    }
+    fn parse_session(raw: &str) -> AppResult<Option<ServerSession>> {
         if raw.trim().is_empty() {
             return Ok(None);
         }
-        Ok(serde_json::from_str(&raw).ok())
+        Ok(serde_json::from_str(raw).ok())
     }
     /// The saved CA, only for the address it was saved with.
     fn ca_pem(&self, url: &str) -> AppResult<Option<String>> {
@@ -333,7 +340,7 @@ impl ServerAccountService {
     /// The CA for a request to `url` before a session for it exists: the one written in the
     /// form; the saved one only when no session for another address could be exposed by it.
     fn ca_for(&self, url: &str) -> AppResult<Option<String>> {
-        let session_url = self.session()?.map(|s| s.url);
+        let session_url = self.session_for_sign_in()?.map(|s| s.url);
         Ok(match session_url {
             Some(current) if current != url => self.pending(),
             _ => self.pending().or(self.ca_pem(url)?),
@@ -525,6 +532,8 @@ impl ServerAccountService {
     pub fn connect(&self, url: &str, credentials: &Credentials<'_>) -> AppResult<ConnectOutcome> {
         let address = self.address(url)?;
         self.require_consent(&address)?;
+        // The session is saved in the vault: no login (and no device) when it would be refused.
+        self.context.secrets.check_writable()?;
         let outcome = self.account.login(&address, credentials)?;
         self.finish(&address, outcome, || {})
     }
@@ -542,6 +551,7 @@ impl ServerAccountService {
             return Err(AppError::new("same_server", "This computer is already connected to this server"));
         }
         self.require_consent(&address)?;
+        self.context.secrets.check_writable()?;
         let outcome = self.account.change_temporary_password(&address, credentials, new_password)?;
         let account = self.account.clone();
         self.finish(&address, outcome, move || {
@@ -664,6 +674,7 @@ impl ServerAccountService {
         }
         let address = self.address(url)?;
         self.require_consent(&address)?;
+        self.context.secrets.check_writable()?;
         let grant = self.account.signup_confirm(&address, signup)?;
         self.store_session(&address, grant)
     }
@@ -736,6 +747,7 @@ impl ServerAccountService {
             return Err(AppError::new("same_server", "This computer is already connected to this server"));
         }
         self.require_consent(&address)?;
+        self.context.secrets.check_writable()?;
         *self.pending_browser.lock().unwrap_or_else(|e| e.into_inner()) = None;
         self.browser_cancel.store(false, std::sync::atomic::Ordering::Release);
         let ticket = self.account.browser_sign_in(&address, provider, false, accepted_terms, &self.browser_cancel)?;

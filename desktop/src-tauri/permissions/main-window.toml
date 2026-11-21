@@ -73,6 +73,7 @@ permissions = [
   "allow-vault-remove-transfer-passphrase",
   "allow-vault-unlock",
   "allow-vault-start-over",
+  "allow-vault-dismiss-set-aside",
   "allow-server-probe",
   "allow-server-record-consent",
   "allow-server-record-llm-consent",

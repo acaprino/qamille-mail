@@ -9,7 +9,14 @@ declare global {
      * Test hook: `locked` is a data folder whose key Windows wraps for another user or computer;
      * `passphrase` is the transfer passphrase that opens it; `startedOver` counts the start-overs.
      */
-    __previewVault?: { state?: 'ready' | 'locked' | 'damaged'; transfer?: boolean; passphrase?: string; startedOver?: number };
+    __previewVault?: {
+      state?: 'ready' | 'locked' | 'damaged' | 'unavailable';
+      transfer?: boolean;
+      passphrase?: string;
+      startedOver?: number;
+      /** The folder a sign-in set the old credentials aside in (`credentials_set_aside`). */
+      notice?: string;
+    };
   }
 }
 
@@ -21,20 +28,27 @@ function status(): VaultStatus {
     case 'locked':
       return { state: 'locked', transfer: !!vault.transfer };
     case 'damaged':
-      return { state: 'damaged', message: 'The protected credentials key is damaged. The original files are unchanged.' };
+      return { state: 'damaged', code: 'vault_damaged', message: 'The protected credentials key is damaged. The original files are unchanged.' };
+    case 'unavailable':
+      return {
+        state: 'damaged',
+        code: 'vault_unavailable',
+        message: 'Windows could not open the credentials key right now (error 0x8007000D). Nothing was changed: try again later.',
+      };
     default:
       return { state: 'ready', protected: true, transfer: !!vault.transfer };
   }
 }
 
-export function previewVault(command: string, args: Record<string, unknown>): VaultStatus | string {
+export function previewVault(command: string, args: Record<string, unknown>): VaultStatus | string | void {
   const vault = (window.__previewVault ??= {});
   const ready = status().state === 'ready';
   switch (command) {
     case 'vault_set_transfer_passphrase': {
       if (!ready) throw new Error('Open the credentials on this computer before changing the transfer passphrase.');
       const passphrase = String(args.passphrase ?? '');
-      if ([...passphrase.trim()].length < 8) throw new Error('The transfer passphrase needs at least 8 characters.');
+      if ([...passphrase].filter((c) => !/\s/.test(c)).length < 8)
+        throw new Error('The transfer passphrase needs at least 8 characters that are not spaces.');
       vault.transfer = true;
       vault.passphrase = passphrase;
       return status();
@@ -51,8 +65,13 @@ export function previewVault(command: string, args: Record<string, unknown>): Va
       if (args.passphrase !== vault.passphrase) throw new Error('The transfer passphrase is not correct.');
       vault.state = 'ready';
       return status();
+    case 'vault_dismiss_set_aside':
+      vault.notice = undefined;
+      return;
     case 'vault_start_over':
       if (ready) throw new Error('The credentials open on this computer: there is nothing to start over.');
+      if (vault.state === 'unavailable')
+        throw new Error('Windows could not open the credentials key right now (error 0x8007000D). Nothing was changed: try again later.');
       vault.state = 'ready';
       vault.transfer = false;
       vault.passphrase = undefined;

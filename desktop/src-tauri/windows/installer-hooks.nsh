@@ -70,7 +70,7 @@
     Pop $1
   ${EndIf}
 
-  ; Qamille keeps its data and credentials.key in the folder "data" beside the program
+  ; Qamille keeps its data and its credentials, with their key credentials.key.dpapi, in the folder "data" beside the program
   ; (data_dir() in app/src/infrastructure/legacy_store.rs). The template's "Delete app data" box only
   ; empties the folders named after the bundle identifier under %APPDATA% and %LOCALAPPDATA%, where
   ; Qamille writes nothing, so the box is acted on here. Nothing is removed unless it is ticked, and

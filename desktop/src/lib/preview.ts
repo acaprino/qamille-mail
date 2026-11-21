@@ -461,6 +461,7 @@ export async function previewCommand(
         labels: labels(),
         has_ai_key: false,
         has_google_secret: false,
+        credentials_set_aside: window.__previewVault?.notice ?? null,
         counts: {
           Inbox: view.emails.filter((e) => inbox(e) && !e.read).length,
           Tasks: view.emails.filter((e) => (e.pinned || e.due || e.set_aside) && !e.done).length,
@@ -892,6 +893,7 @@ export async function previewCommand(
     case 'vault_remove_transfer_passphrase':
     case 'vault_unlock':
     case 'vault_start_over':
+    case 'vault_dismiss_set_aside':
       return (await import('./preview-vault')).previewVault(command, args);
     case 'search_model_status':
       return { installed: false, running: false, done_bytes: 0, total_bytes: 0, error: null };

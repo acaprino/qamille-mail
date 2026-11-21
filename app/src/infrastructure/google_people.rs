@@ -249,10 +249,21 @@ pub struct GooglePeopleGateway {
 }
 
 fn credentials(secrets: &dyn SecretStore, account: &Account) -> AppResult<(String, String)> {
+    client_credentials(account, secrets.get(GOOGLE_SECRET)?)
+}
+
+/// For the consent the person gives in the browser: credentials of another Windows user count as
+/// none, and the token saved afterwards sets them aside.
+fn sign_in_credentials(secrets: &dyn SecretStore, account: &Account) -> AppResult<(String, String)> {
+    secrets.check_writable()?;
+    client_credentials(account, secrets.get_for_sign_in(GOOGLE_SECRET)?)
+}
+
+fn client_credentials(account: &Account, saved_secret: String) -> AppResult<(String, String)> {
     if account.oauth_client_id.is_empty() {
         return Err(AppError::new("sign_in_required", "Use Google OAuth sign-in in Settings first"));
     }
-    let secret = super::google_oauth_config::secret_for_client(&account.oauth_client_id, &secrets.get(GOOGLE_SECRET)?);
+    let secret = super::google_oauth_config::secret_for_client(&account.oauth_client_id, &saved_secret);
     Ok((account.oauth_client_id.clone(), secret))
 }
 
@@ -352,7 +363,7 @@ impl ContactGateway for GooglePeopleGateway {
         Ok(person_to_remote(&self.request(account, "POST", &path, &[], Some(&body))?))
     }
     fn authorize(&self, account: &Account, write: bool) -> AppResult<()> {
-        let (client, secret) = credentials(self.secrets.as_ref(), account)?;
+        let (client, secret) = sign_in_credentials(self.secrets.as_ref(), account)?;
         let scope = if write { WRITE_SCOPE } else { READ_SCOPE };
         let (email, tokens) = super::oauth::sign_in_with_scope(&client, &secret, &AtomicBool::new(false), scope, &account.email).map_err(AppError::external)?;
         if !email.eq_ignore_ascii_case(&account.email) {

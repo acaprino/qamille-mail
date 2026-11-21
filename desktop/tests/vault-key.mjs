@@ -1,14 +1,87 @@
-// Phase 3, Task 7: the key of the credentials. A data folder from another Windows user or computer
-// opens with a dialog that asks for the transfer passphrase or offers a new sign-in, which always
-// asks first and sets the old credentials aside; Settings → Accounts → Credentials sets, changes and
-// removes the transfer passphrase. Synthetic data only; the preview plays the vault.
-// Run against the browser preview: QAMILLE_PREVIEW_URL (default http://127.0.0.1:1420).
+// Phase 3, Task 7: the key of the credentials, in English and in Italian.
+//  - Every message of the vault (app/src/infrastructure/secret.rs) has an Italian text (lib/vault.ts),
+//    also inside the sync error of an account.
+//  - A data folder from another Windows user or computer opens with a dialog that asks for the
+//    transfer passphrase or offers a new sign-in, which always asks first and sets the old
+//    credentials aside; damaged credentials get the dialog too; when Windows cannot open the key
+//    right now only «Try again» is offered.
+//  - After a sign-in set the old credentials aside, the folder is named once.
+//  - Settings → Accounts → Credentials sets, changes and removes the transfer passphrase.
+// Synthetic data only; the preview plays the vault. Run against the browser preview:
+// QAMILLE_PREVIEW_URL (default http://127.0.0.1:1420).
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { chromium, expect } from '@playwright/test';
+
+const desktop = path.resolve(import.meta.dirname, '..');
+const { vaultText } = await import(pathToFileURL(path.join(desktop, 'src/lib/vault.ts')).href);
+{
+  const source = fs.readFileSync(path.join(desktop, '../app/src/infrastructure/secret.rs'), 'utf8');
+  // Every message constant: a sentence (a space, a final full stop).
+  const messages = [...source.matchAll(/^const [A-Z_]+: &str = "([^"]+ [^"]+\.)";$/gm)].map((match) => match[1]);
+  assert.ok(messages.length >= 30, `found ${messages.length} messages`);
+  const dynamic = [
+    'Windows could not open the credentials key right now (error 0x8007000D). Nothing was changed: try again later.',
+    'Windows could not protect the credentials key (error 0x80090016).',
+    'Portable credentials storage failed: Access is denied. (os error 5)',
+  ];
+  for (const message of [...messages, ...dynamic]) {
+    const italian = vaultText(message, true);
+    assert.notEqual(italian, message, `no Italian text for: ${message}`);
+    assert.equal(vaultText(message, false), message);
+  }
+  const foreign = messages.find((m) => m.includes('sign in to the accounts again in Settings'));
+  assert.ok(vaultText(`mario@example.test: ${foreign}`, true).startsWith('mario@example.test: La chiave delle credenziali'));
+  assert.equal(vaultText('Another message', true), 'Another message');
+  console.log(`PASS every vault message (${messages.length} + ${dynamic.length}) has its Italian text`);
+}
+
+const TEXT = {
+  'en-US': {
+    sidebar: 'Sidebar', workspace: 'Alex Personal workspace', accounts: 'Accounts', credentials: 'Credentials',
+    fromAnother: 'Credentials from another computer', doNotOpen: 'The credentials do not open',
+    chosenThere: 'the account credentials open with the transfer passphrase chosen there',
+    passphrase: 'Transfer passphrase', open: 'Open the credentials', wrong: 'The transfer passphrase is not correct.',
+    opened: 'Credentials opened: Windows now protects them for this user.',
+    foreign: 'The credentials key belongs to another Windows user or another computer: sign in to the accounts again in Settings. Mail and settings stay.',
+    signInAgain: 'Sign in to the accounts again', notDeleted: 'without being deleted', cancel: 'Cancel', later: 'Later',
+    previous: 'The previous credentials are in data\\credentials-set-aside-20261121-101500', forgotten: 'Forgotten: sign in again',
+    change: 'Change the passphrase', protects: 'encrypted with a key that Windows protects for this user',
+    set: 'Set a transfer passphrase', newPassphrase: 'New transfer passphrase', repeat: 'Repeat the passphrase',
+    save: 'Save the passphrase', differ: 'The two passphrases differ.', saved: 'Transfer passphrase saved.', tag: 'Set',
+    remove: 'Remove the passphrase', removed: 'Transfer passphrase removed.',
+    short: 'The transfer passphrase needs at least 8 characters that are not spaces.',
+    damaged: 'The protected credentials key is damaged. The original files are unchanged.',
+    retry: 'Try again', rightNow: 'Windows cannot open the credentials key right now',
+    unavailable: 'Windows could not open the credentials key right now (error 0x8007000D). Nothing was changed: try again later.',
+    notice: 'The credentials of the other computer are in data\\credentials-set-aside-20261121-101500',
+  },
+  'it-IT': {
+    sidebar: 'Barra laterale', workspace: 'Alex Spazio personale', accounts: 'Account', credentials: 'Credenziali',
+    fromAnother: 'Credenziali di un altro computer', doNotOpen: 'Le credenziali non si aprono',
+    chosenThere: 'le credenziali degli account si aprono con la frase di trasferimento scelta là',
+    passphrase: 'Frase di trasferimento', open: 'Apri le credenziali', wrong: 'La frase di trasferimento non è corretta.',
+    opened: 'Credenziali aperte: ora le protegge Windows per questo utente.',
+    foreign: 'La chiave delle credenziali appartiene a un altro utente di Windows o a un altro computer: accedi di nuovo agli account in Impostazioni. La posta e le impostazioni restano.',
+    signInAgain: 'Accedi di nuovo agli account', notDeleted: 'senza essere cancellate', cancel: 'Annulla', later: 'Più tardi',
+    previous: 'Le credenziali di prima sono in data\\credentials-set-aside-20261121-101500', forgotten: 'Non la ricordo: accedi di nuovo',
+    change: 'Cambia la frase', protects: 'cifrati con una chiave che Windows protegge per questo utente',
+    set: 'Imposta una frase di trasferimento', newPassphrase: 'Nuova frase di trasferimento', repeat: 'Ripeti la frase',
+    save: 'Salva la frase', differ: 'Le due frasi non coincidono.', saved: 'Frase di trasferimento salvata.', tag: 'Impostata',
+    remove: 'Rimuovi la frase', removed: 'Frase di trasferimento rimossa.',
+    short: 'La frase di trasferimento deve avere almeno 8 caratteri che non siano spazi.',
+    damaged: 'La chiave protetta delle credenziali è danneggiata. I file originali non sono stati toccati.',
+    retry: 'Riprova', rightNow: 'Windows non riesce ad aprire ora la chiave delle credenziali',
+    unavailable: 'Windows non riesce ad aprire ora la chiave delle credenziali (errore 0x8007000D). Non è cambiato niente: riprova più tardi.',
+    notice: 'Le credenziali dell’altro computer sono in data\\credentials-set-aside-20261121-101500',
+  },
+};
 
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const errors = [];
-async function open(vault, locale = 'en-US') {
+async function open(vault, locale) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale });
   const page = await context.newPage();
   page.on('pageerror', (error) => errors.push(error.message));
@@ -19,108 +92,144 @@ async function open(vault, locale = 'en-US') {
   return { page, context };
 }
 const vault = (page) => page.evaluate(() => window.__previewVault);
-const toast = (page) => page.locator('[data-scope="toast"][data-part="root"]');
-async function credentials(page) {
-  await page.getByRole('complementary', { name: 'Sidebar' }).getByRole('button', { name: 'Alex Personal workspace' }).click();
-  await page.locator('.settings-nav').getByRole('button', { name: 'Accounts', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Credentials', exact: true })).toBeVisible();
+const toast = (page, text) => page.locator('[data-scope="toast"][data-part="root"]').filter({ hasText: text });
+async function credentials(page, t) {
+  await page.getByRole('complementary', { name: t.sidebar }).getByRole('button', { name: t.workspace }).click();
+  await page.locator('.settings-nav').getByRole('button', { name: t.accounts, exact: true }).click();
+  await expect(page.getByRole('heading', { name: t.credentials, exact: true })).toBeVisible();
 }
 
 try {
-  {
-    const { page, context } = await open({ state: 'locked', transfer: true, passphrase: 'correct horse battery' });
-    const dialog = page.getByRole('dialog', { name: 'Credentials from another computer' });
-    await expect(dialog).toBeVisible();
-    await expect(dialog).toContainText('the account credentials open with the transfer passphrase chosen there');
-    const field = dialog.getByLabel('Transfer passphrase');
-    await expect(dialog.getByRole('button', { name: 'Open the credentials' })).toBeDisabled();
-    await field.fill('wrong horse battery');
-    await field.press('Enter');
-    await expect(toast(page).filter({ hasText: 'The transfer passphrase is not correct.' })).toBeVisible();
-    await expect(dialog).toBeVisible();
-    assert.equal((await vault(page)).state, 'locked', 'a wrong passphrase changes nothing');
-    await field.fill('correct horse battery');
-    await dialog.getByRole('button', { name: 'Open the credentials' }).click();
-    await expect(dialog).toHaveCount(0);
-    await expect(toast(page).filter({ hasText: 'Credentials opened: Windows now protects them for this user.' })).toBeVisible();
-    assert.equal((await vault(page)).state, 'ready');
-    assert.equal((await vault(page)).startedOver, undefined, 'opening with the passphrase sets nothing aside');
-    console.log('PASS a folder from another computer asks for the transfer passphrase; a wrong one changes nothing');
-    await context.close();
+  for (const [locale, t] of Object.entries(TEXT)) {
+    {
+      const { page, context } = await open({ state: 'locked', transfer: true, passphrase: 'correct horse battery' }, locale);
+      const dialog = page.getByRole('dialog', { name: t.fromAnother });
+      await expect(dialog).toBeVisible();
+      await expect(dialog).toContainText(t.chosenThere);
+      const field = dialog.getByLabel(t.passphrase);
+      assert.equal(await field.getAttribute('autocomplete'), 'new-password', 'nothing saved is offered');
+      await expect(dialog.getByRole('button', { name: t.open })).toBeDisabled();
+      await field.fill('wrong horse battery');
+      await field.press('Enter');
+      await expect(toast(page, t.wrong)).toBeVisible();
+      await expect(dialog).toBeVisible();
+      assert.equal((await vault(page)).state, 'locked', 'a wrong passphrase changes nothing');
+      await field.fill('correct horse battery');
+      await dialog.getByRole('button', { name: t.open }).click();
+      await expect(dialog).toHaveCount(0);
+      await expect(toast(page, t.opened)).toBeVisible();
+      assert.equal((await vault(page)).state, 'ready');
+      assert.equal((await vault(page)).startedOver, undefined, 'opening with the passphrase sets nothing aside');
+      console.log(`PASS [${locale}] a folder from another computer asks for the transfer passphrase; a wrong one changes nothing`);
+      await context.close();
+    }
+    {
+      const { page, context } = await open({ state: 'locked', transfer: false }, locale);
+      const dialog = page.getByRole('dialog', { name: t.fromAnother });
+      await expect(dialog).toContainText(t.foreign);
+      await expect(dialog.getByLabel(t.passphrase)).toHaveCount(0);
+      await dialog.getByRole('button', { name: t.signInAgain }).click();
+      await expect(dialog).toContainText(t.notDeleted);
+      await dialog.getByRole('button', { name: t.cancel, exact: true }).click();
+      assert.equal((await vault(page)).startedOver, undefined, 'cancel sets nothing aside');
+      await dialog.getByRole('button', { name: t.signInAgain }).click();
+      await dialog.getByRole('button', { name: t.signInAgain }).click();
+      await expect(dialog).toHaveCount(0);
+      await expect(toast(page, t.previous)).toBeVisible();
+      assert.equal((await vault(page)).startedOver, 1);
+      console.log(`PASS [${locale}] without a passphrase the dialog says to sign in again, and starting over asks first`);
+      await context.close();
+    }
+    {
+      const { page, context } = await open({ state: 'damaged' }, locale);
+      const dialog = page.getByRole('dialog', { name: t.doNotOpen });
+      await expect(dialog).toContainText(t.damaged);
+      await expect(dialog.getByRole('button', { name: t.signInAgain })).toBeVisible();
+      await dialog.getByRole('button', { name: t.later, exact: true }).click();
+      await expect(dialog).toHaveCount(0);
+      console.log(`PASS [${locale}] damaged credentials get the dialog too`);
+      await context.close();
+    }
+    {
+      const { page, context } = await open({ state: 'unavailable' }, locale);
+      const dialog = page.getByRole('dialog', { name: t.doNotOpen });
+      await expect(dialog).toContainText(t.rightNow);
+      await expect(dialog).toContainText(t.unavailable);
+      await expect(dialog.getByRole('button', { name: t.signInAgain })).toHaveCount(0);
+      await dialog.getByRole('button', { name: t.retry, exact: true }).click();
+      await expect(toast(page, t.unavailable)).toBeVisible();
+      await expect(dialog).toBeVisible();
+      assert.equal((await vault(page)).startedOver, undefined);
+      await page.evaluate(() => (window.__previewVault.state = 'ready'));
+      await dialog.getByRole('button', { name: t.retry, exact: true }).click();
+      await expect(dialog).toHaveCount(0);
+      console.log(`PASS [${locale}] when Windows cannot open the key right now, only «Try again» is offered`);
+      await context.close();
+    }
+    {
+      const { page, context } = await open({ notice: 'credentials-set-aside-20261121-101500' }, locale);
+      await expect(toast(page, t.notice)).toBeVisible();
+      await expect.poll(async () => (await vault(page)).notice ?? null).toBe(null);
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      console.log(`PASS [${locale}] after a sign-in set the old credentials aside, the folder is named once`);
+      await context.close();
+    }
+    {
+      const { page, context } = await open({ state: 'locked', transfer: true, passphrase: 'correct horse battery' }, locale);
+      const dialog = page.getByRole('dialog', { name: t.fromAnother });
+      await dialog.getByRole('button', { name: t.later, exact: true }).click();
+      await expect(dialog).toHaveCount(0);
+      // Settings shows the same controls; the mail is there meanwhile.
+      await credentials(page, t);
+      await expect(page.getByLabel(t.passphrase)).toBeVisible();
+      await page.getByRole('button', { name: t.forgotten }).click();
+      await expect(page.getByText(t.notDeleted)).toBeVisible();
+      await page.getByRole('button', { name: t.cancel, exact: true }).click();
+      await page.getByLabel(t.passphrase).fill('correct horse battery');
+      await page.getByRole('button', { name: t.open }).click();
+      await expect(page.getByRole('button', { name: t.change })).toBeVisible();
+      assert.equal((await vault(page)).state, 'ready');
+      console.log(`PASS [${locale}] «Later» closes the dialog; Settings → Accounts opens the credentials too`);
+      await context.close();
+    }
+    {
+      const { page, context } = await open({}, locale);
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await credentials(page, t);
+      await expect(page.getByText(t.protects)).toBeVisible();
+      await page.getByRole('button', { name: t.set }).click();
+      const save = page.getByRole('button', { name: t.save });
+      await page.getByLabel(t.newPassphrase).fill('a b c d e f g');
+      await page.getByLabel(t.repeat).fill('a b c d e f g');
+      await expect(save).toBeDisabled();
+      await page.getByLabel(t.newPassphrase).fill('a passphrase for the move');
+      await page.getByLabel(t.repeat).fill('a passphrase for the mvoe');
+      await save.click();
+      await expect(page.getByRole('alert').filter({ hasText: t.differ })).toBeVisible();
+      assert.equal((await vault(page)).transfer, undefined, 'two different passphrases save nothing');
+      await page.getByLabel(t.repeat).fill('a passphrase for the move');
+      await page.getByLabel(t.repeat).press('Enter');
+      await expect(toast(page, t.saved)).toBeVisible();
+      assert.equal((await vault(page)).passphrase, 'a passphrase for the move');
+      await expect(page.getByLabel(t.newPassphrase)).toHaveCount(0);
+      await expect(page.locator('.tag').filter({ hasText: new RegExp(`^${t.tag}$`) })).toBeVisible();
+      await page.getByRole('button', { name: t.remove }).click();
+      await expect(toast(page, t.removed)).toBeVisible();
+      await expect(page.getByRole('button', { name: t.set })).toBeVisible();
+      assert.equal((await vault(page)).transfer, false);
+      console.log(`PASS [${locale}] Settings sets the transfer passphrase (twice, 8 characters that are not spaces) and removes it`);
+      await context.close();
+    }
   }
   {
-    const { page, context } = await open({ state: 'locked', transfer: false });
-    const dialog = page.getByRole('dialog', { name: 'Credentials from another computer' });
-    await expect(dialog).toContainText(
-      'The credentials key belongs to another Windows user or another computer: sign in to the accounts again in Settings. Mail and settings stay.',
-    );
-    await expect(dialog.getByLabel('Transfer passphrase')).toHaveCount(0);
-    await dialog.getByRole('button', { name: 'Sign in to the accounts again' }).click();
-    await expect(dialog).toContainText('without being deleted');
-    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
-    assert.equal((await vault(page)).startedOver, undefined, 'cancel sets nothing aside');
-    await dialog.getByRole('button', { name: 'Sign in to the accounts again' }).click();
-    await dialog.getByRole('button', { name: 'Sign in to the accounts again' }).click();
-    await expect(dialog).toHaveCount(0);
-    await expect(toast(page).filter({ hasText: 'The previous credentials are in data\\credentials-set-aside-20261121-101500' })).toBeVisible();
-    assert.equal((await vault(page)).startedOver, 1);
-    console.log('PASS without a passphrase the dialog says to sign in again, and starting over asks first');
-    await context.close();
-  }
-  {
-    const { page, context } = await open({ state: 'locked', transfer: true, passphrase: 'correct horse battery' });
-    const dialog = page.getByRole('dialog', { name: 'Credentials from another computer' });
-    await dialog.getByRole('button', { name: 'Later', exact: true }).click();
-    await expect(dialog).toHaveCount(0);
-    // Settings shows the same controls; the mail is there meanwhile.
-    await credentials(page);
-    await expect(page.getByLabel('Transfer passphrase')).toBeVisible();
-    await page.getByRole('button', { name: 'Forgotten: sign in again' }).click();
-    await expect(page.getByText('without being deleted')).toBeVisible();
-    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-    await page.getByLabel('Transfer passphrase').fill('correct horse battery');
-    await page.getByRole('button', { name: 'Open the credentials' }).click();
-    await expect(page.getByRole('button', { name: 'Change the passphrase' })).toBeVisible();
-    assert.equal((await vault(page)).state, 'ready');
-    console.log('PASS «Later» closes the dialog; Settings → Accounts opens the credentials too');
-    await context.close();
-  }
-  {
-    const { page, context } = await open({});
-    await expect(page.getByRole('dialog')).toHaveCount(0);
-    await credentials(page);
-    await expect(page.getByText('encrypted with a key that Windows protects for this user')).toBeVisible();
-    await page.getByRole('button', { name: 'Set a transfer passphrase' }).click();
-    const save = page.getByRole('button', { name: 'Save the passphrase' });
-    await page.getByLabel('New transfer passphrase').fill('short');
-    await page.getByLabel('Repeat the passphrase').fill('short');
-    await expect(save).toBeDisabled();
-    await page.getByLabel('New transfer passphrase').fill('a passphrase for the move');
-    await page.getByLabel('Repeat the passphrase').fill('a passphrase for the mvoe');
-    await save.click();
-    await expect(page.getByRole('alert').filter({ hasText: 'The two passphrases differ.' })).toBeVisible();
-    assert.equal((await vault(page)).transfer, undefined, 'two different passphrases save nothing');
-    await page.getByLabel('Repeat the passphrase').fill('a passphrase for the move');
-    await page.getByLabel('Repeat the passphrase').press('Enter');
-    await expect(toast(page).filter({ hasText: 'Transfer passphrase saved.' })).toBeVisible();
-    assert.equal((await vault(page)).passphrase, 'a passphrase for the move');
-    await expect(page.getByLabel('New transfer passphrase')).toHaveCount(0);
-    await expect(page.locator('.tag').filter({ hasText: /^Set$/ })).toBeVisible();
-    await page.getByRole('button', { name: 'Remove the passphrase' }).click();
-    await expect(toast(page).filter({ hasText: 'Transfer passphrase removed.' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Set a transfer passphrase' })).toBeVisible();
-    assert.equal((await vault(page)).transfer, false);
-    console.log('PASS Settings sets the transfer passphrase (twice, at least 8 characters) and removes it');
-    await context.close();
-  }
-  {
-    const { page, context } = await open({ state: 'locked', transfer: false }, 'it-IT');
-    const dialog = page.getByRole('dialog', { name: 'Credenziali di un altro computer' });
-    await expect(dialog).toContainText(
-      'La chiave delle credenziali appartiene a un altro utente di Windows o a un altro computer: accedi di nuovo agli account in Impostazioni.',
-    );
-    await expect(dialog.getByRole('button', { name: 'Più tardi', exact: true })).toBeVisible();
-    console.log('PASS the dialog speaks Italian');
+    // A vault error from the backend, shown by the page in the interface language.
+    const { page, context } = await open({}, 'it-IT');
+    const shown = await page.evaluate(async (message) => {
+      const { errorText, CommandError } = await import('/src/lib/api.ts');
+      return errorText(new CommandError(message, 'vault_passphrase'));
+    }, TEXT['en-US'].short);
+    assert.equal(shown, TEXT['it-IT'].short);
+    console.log('PASS a vault error from a command is worded in Italian');
     await context.close();
   }
   assert.deepEqual(errors, []);

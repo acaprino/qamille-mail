@@ -63,6 +63,24 @@ degli account, ma Windows non apre la chiave delle credenziali:
   frase da provare; «Non la ricordo: accedi di nuovo» mette da parte le
   credenziali nello stesso modo, e poi si accede di nuovo agli account.
 
+Se Windows non riesce ad aprire la chiave per un altro motivo (un profilo non
+caricato, un file rovinato), Qamille lo dice con il codice d'errore di Windows e
+non mette da parte niente, nemmeno a un nuovo accesso: si riprova più tardi.
+
+**Una cartella usata a turno su due computer** (per esempio su una chiavetta):
+ogni volta che passa all'altro computer, Qamille chiede la frase di trasferimento,
+riapre le credenziali e le fa proteggere da Windows per quel computer. Tornata sul
+primo, la chiede di nuovo. Senza frase, ogni passaggio mette da parte le
+credenziali dell'altro computer al primo nuovo accesso.
+
+**Rimettere a posto una cartella messa da parte**: chiudi Qamille con **Esci**,
+sposta i file della cartella data/credentials-set-aside-<data e ora>
+(credentials.json, credentials.key.dpapi e, se c'è, credentials.key.transfer) di
+nuovo in data, al posto di quelli che ci sono, e riapri Qamille con l'utente di
+Windows e sul computer dove erano stati creati. Altrove si aprono solo con la loro
+frase di trasferimento. Le credenziali salvate dopo la messa da parte (quelle dei
+nuovi accessi) si perdono: conserva prima, da qualche parte, i file che sostituisci.
+
 ## Collegamento a un server Qamille
 
 Se hai collegato Qamille a un server (Impostazioni → Calcolo), il collegamento

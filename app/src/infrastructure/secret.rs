@@ -25,6 +25,7 @@ use std::{
 };
 use unicode_normalization::UnicodeNormalization;
 use zeroize::{Zeroize, Zeroizing};
+use crate::application::error::vault_codes;
 
 const VERSION: u32 = 1;
 const AUTHENTICATED_FORMAT: &[u8] = b"Qamille portable credentials v1 AES-256-GCM";
@@ -42,6 +43,10 @@ const PROTECTED_KEY_TEMPORARY: &str = "credentials.key.dpapi.tmp";
 const TRANSFER_KEY_FILE: &str = "credentials.key.transfer";
 /// Names the folder of a start-over until every file is in it (see `set_aside`).
 const SET_ASIDE_MARKER: &str = "credentials.set-aside";
+/// Names the folder of a start-over that a sign-in made, until the interface has told the person.
+const SET_ASIDE_NOTICE: &str = "credentials.set-aside.notice";
+/// A wrapped key that opens nothing here, moved out of the way so the plain key can be wrapped.
+const UNUSED_PROTECTED_KEY_PREFIX: &str = "credentials.key.dpapi.unused-";
 const SET_ASIDE_PREFIX: &str = "credentials-set-aside-";
 /// What a start-over moves, credentials first. Mail, settings and everything else stay.
 const SET_ASIDE_FILES: [&str; 5] =
@@ -57,9 +62,9 @@ const ARGON2_VERSION: u32 = 0x13;
 /// 4 lanes). Each copy stores the parameters it was written with.
 const TRANSFER_KDF: KdfParams = KdfParams { memory_kib: 64 * 1024, iterations: 3, parallelism: 4 };
 /// Bounds for the parameters read from a transfer copy: a damaged file must not make an unlock
-/// allocate gigabytes or run for hours.
-const MAX_MEMORY_KIB: u32 = 1024 * 1024;
-const MAX_ITERATIONS: u32 = 64;
+/// allocate more than 256 MiB or run for more than a few seconds.
+const MAX_MEMORY_KIB: u32 = 256 * 1024;
+const MAX_ITERATIONS: u32 = 10;
 const MAX_PARALLELISM: u32 = 16;
 pub const MIN_TRANSFER_PASSPHRASE_CHARS: usize = 8;
 const MAX_TRANSFER_PASSPHRASE_BYTES: usize = 1024;
@@ -76,10 +81,51 @@ const TRANSFER_MISMATCH: &str = "The transfer passphrase opens a key that does n
 const NO_TRANSFER: &str = "No transfer passphrase was set for these credentials: sign in to the accounts again in Settings.";
 const NEEDS_UNLOCKED: &str = "Open the credentials on this computer before changing the transfer passphrase.";
 const TRANSFER_NEEDS_DPAPI: &str = "A transfer passphrase is used only when Windows protects the credentials key.";
-const SHORT_PASSPHRASE: &str = "The transfer passphrase needs at least 8 characters.";
+const SHORT_PASSPHRASE: &str = "The transfer passphrase needs at least 8 characters that are not spaces.";
 const LONG_PASSPHRASE: &str = "The transfer passphrase is too long.";
 const NOTHING_TO_START_OVER: &str = "The credentials open on this computer: there is nothing to start over.";
 const DAMAGED_SET_ASIDE_MARKER: &str = "The note of an interrupted start-over (credentials.set-aside) is damaged. The original files are unchanged.";
+const NO_MEMORY_FOR_TRANSFER: &str = "There is not enough memory to open the transfer copy of the credentials key. Close other programs and try again.";
+const DERIVATION_FAILED: &str = "The transfer passphrase could not be turned into a key. The original files are unchanged.";
+const PORTABLE_KEY_MISSING: &str = "The portable credentials key is missing. Restore credentials.key together with credentials.json.";
+const VAULT_UNREADABLE: &str = "Portable credentials cannot be read. The original files are unchanged.";
+const VAULT_UNSUPPORTED: &str = "The portable credentials format is unsupported. The original files are unchanged.";
+const PLAIN_KEY_DAMAGED: &str = "The portable credentials key is damaged. The original files are unchanged.";
+const PLAIN_KEY_UNSUPPORTED: &str = "The portable credentials key format is unsupported. The original files are unchanged.";
+const VAULT_NOT_AUTHENTIC: &str = "Portable credentials failed authentication. Restore the matching credentials.key and credentials.json files.";
+const VAULT_CONTENT_INVALID: &str = "Decrypted portable credentials are invalid. The original files are unchanged.";
+const NO_RANDOMNESS: &str = "Secure randomness for portable credentials is unavailable.";
+const INVALID_KEY: &str = "The portable credentials encryption key is invalid.";
+const SEALING_FAILED: &str = "Portable credentials encryption failed.";
+const INVALID_PATH: &str = "Portable credentials path is invalid.";
+const NO_DPAPI: &str = "Windows key protection is not available on this system.";
+/// DPAPI failed for another reason than a key of another user: a sign-in never sets it aside.
+const UNAVAILABLE_PREFIX: &str = "Windows could not open the credentials key right now";
+/// `{STORAGE_FAILED} {the system's error}`.
+const STORAGE_FAILED: &str = "Portable credentials storage failed:";
+
+fn unavailable_message(code: u32) -> String {
+    format!("{UNAVAILABLE_PREFIX} (error 0x{code:08X}). Nothing was changed: try again later.")
+}
+
+/// The code the interface words a vault message by (`vault_codes`); every message of this
+/// module has one.
+pub fn error_code(message: &str) -> &'static str {
+    match message {
+        FOREIGN_KEY => vault_codes::FOREIGN,
+        LOCKED_WITH_TRANSFER => vault_codes::LOCKED,
+        WRONG_PASSPHRASE => vault_codes::WRONG_PASSPHRASE,
+        NO_TRANSFER => vault_codes::NO_TRANSFER,
+        NEEDS_UNLOCKED => vault_codes::NEEDS_UNLOCK,
+        SHORT_PASSPHRASE | LONG_PASSPHRASE => vault_codes::PASSPHRASE,
+        NOTHING_TO_START_OVER => vault_codes::NOTHING_TO_START_OVER,
+        TRANSFER_NEEDS_DPAPI | NO_DPAPI => vault_codes::NEEDS_DPAPI,
+        NO_MEMORY_FOR_TRANSFER => vault_codes::UNAVAILABLE,
+        message if message.starts_with(UNAVAILABLE_PREFIX) => vault_codes::UNAVAILABLE,
+        message if message.starts_with(STORAGE_FAILED) => vault_codes::STORAGE,
+        _ => vault_codes::DAMAGED,
+    }
+}
 
 pub fn get_result(name: &str) -> Result<String, String> {
     workspace_vault().get(name)
@@ -134,6 +180,22 @@ pub fn start_over() -> Result<String, String> {
     workspace_vault().start_over()
 }
 
+/// Before a sign-in that will save a credential: an error when the save would be refused (a
+/// transfer passphrase to enter first, damaged files), so no login and no device is made for
+/// nothing. Credentials of another user without a passphrase pass: the save sets them aside.
+pub fn check_writable() -> Result<(), String> {
+    workspace_vault().check_writable()
+}
+
+/// The folder a sign-in set the old credentials aside in, until `dismiss_set_aside_notice`.
+pub fn set_aside_notice() -> Option<String> {
+    workspace_vault().set_aside_notice()
+}
+
+pub fn dismiss_set_aside_notice() -> Result<(), String> {
+    workspace_vault().dismiss_set_aside_notice()
+}
+
 fn workspace_vault() -> Vault {
     Vault::with_key_store(crate::model::Store::data_dir(), KeyStore::of_this_system())
 }
@@ -164,8 +226,10 @@ pub enum VaultStatus {
     /// Windows cannot unwrap the key here: the data folder comes from another Windows user or
     /// computer. `transfer`: the transfer passphrase can open it.
     Locked { transfer: bool },
-    /// No key opens the saved credentials, or one of their files is damaged. Nothing changed.
-    Damaged { message: String },
+    /// No key opens the saved credentials, one of their files is damaged, or Windows cannot open
+    /// the key right now (`code` `vault_unavailable` or `vault_storage`: try again, never start
+    /// over). Nothing changed. `code` is one of `vault_codes`.
+    Damaged { code: &'static str, message: String },
 }
 
 type Key = Zeroizing<[u8; 32]>;
@@ -215,6 +279,23 @@ struct TransferKeyDocument {
     ciphertext: Vec<u8>,
 }
 
+impl TransferKeyDocument {
+    fn clone_document(&self) -> Self {
+        Self {
+            version: self.version,
+            check: self.check.clone(),
+            kdf: self.kdf.clone(),
+            argon2_version: self.argon2_version,
+            memory_kib: self.memory_kib,
+            iterations: self.iterations,
+            parallelism: self.parallelism,
+            salt: self.salt,
+            nonce: self.nonce,
+            ciphertext: self.ciphertext.clone(),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct KdfParams {
     memory_kib: u32,
@@ -249,9 +330,28 @@ enum Protected {
     Absent,
     /// Not a wrapped key: corrupt or unsupported file, not a DPAPI refusal.
     Damaged(&'static str),
-    /// A well-formed file that Windows does not unwrap for this user on this computer.
+    /// A well-formed file whose master key is not this user's: another user or computer.
     Refused { check: String },
+    /// Windows did not unwrap it for another reason (damaged blob, profile not loaded): the code.
+    Unavailable { code: u32 },
     Key(Key),
+}
+
+/// What `credentials.key.transfer` holds.
+enum TransferCopy {
+    Absent,
+    /// A file that is not a transfer copy: reported, never a reason to set anything aside.
+    Damaged,
+    Copy(TransferKeyDocument),
+}
+
+impl TransferCopy {
+    fn of(&self, check: &str) -> Option<&TransferKeyDocument> {
+        match self {
+            Self::Copy(copy) if copy.check == check => Some(copy),
+            _ => None,
+        }
+    }
 }
 
 impl Vault {
@@ -288,7 +388,7 @@ impl Vault {
                 let key = read_plain_key(&self.path(PLAIN_KEY_FILE))?;
                 let values = match (&vault, &key) {
                     (None, _) => BTreeMap::new(),
-                    (Some(_), None) => return Err("The portable credentials key is missing. Restore credentials.key together with credentials.json.".into()),
+                    (Some(_), None) => return Err(PORTABLE_KEY_MISSING.into()),
                     (Some(vault), Some(key)) => unseal(vault, key)?,
                 };
                 Ok(Loaded::Open(Contents { key, values, protected: false, transfer: false }))
@@ -299,17 +399,24 @@ impl Vault {
 
     /// Picks the key that opens the credentials, in this order: the wrapped key, the plain key
     /// of an earlier version (wrapped now, then removed), a wrapped key left in the temporary
-    /// file. A file is rewritten only with the same key, and a key file is removed only when
-    /// the wrapped copy of the same key reads back and opens the credentials.
+    /// file. A file is rewritten only with the same key, a wrapped key that opens nothing here is
+    /// moved out of the way (never deleted), and a key file is removed only when the wrapped copy
+    /// of the same key reads back and opens the credentials.
     fn load_protected(&self, vault: Option<EncryptedDocument>) -> Result<Loaded, String> {
         let opens = |key: &Key| vault.as_ref().map_or_else(|| Ok(BTreeMap::new()), |vault| unseal(vault, key));
         // A file that cannot be read now (held by another program) stops the load: only a file
         // read and found unusable may count as no key, since that can let a sign-in start over.
         let plain = parse_plain_key(read_optional(&self.path(PLAIN_KEY_FILE))?);
         let transfer = self.read_transfer()?;
-        let matches = |key: &Key| transfer.as_ref().is_some_and(|copy| copy.check == key_check(key));
+        let matches = |key: &Key| transfer.of(&key_check(key)).is_some();
         let plain_key = plain.as_ref().ok().and_then(Option::as_ref);
         let plain_opening = plain_key.and_then(|key| opens(key).ok().map(|values| (key.clone(), values)));
+        // The plain key opens, and the wrapped file beside it opens nothing here.
+        let instead_of_stray = |(key, values): (Key, BTreeMap<String, String>)| {
+            let protected = self.replace_stray_protected_key(&key, vault.as_ref());
+            let transfer = matches(&key);
+            Ok(Loaded::Open(Contents { key: Some(key), values, protected, transfer }))
+        };
 
         match read_protected_key(&self.path(PROTECTED_KEY_FILE))? {
             Protected::Key(key) => match opens(&key) {
@@ -322,32 +429,33 @@ impl Vault {
                     let transfer = matches(&key);
                     return Ok(Loaded::Open(Contents { key: Some(key), values, protected: true, transfer }));
                 }
-                // The wrapped key does not open these credentials: a plain key that does is used
-                // as it is, and nothing is rewritten.
-                Err(error) => {
-                    let (key, values) = plain_opening.ok_or(error)?;
-                    let transfer = matches(&key);
-                    return Ok(Loaded::Open(Contents { key: Some(key), values, protected: false, transfer }));
-                }
+                Err(error) => return instead_of_stray(plain_opening.ok_or(error)?),
             },
             Protected::Refused { check } => {
                 if let Some((key, values)) = plain_opening {
+                    if key_check(&key) != check {
+                        return instead_of_stray((key, values));
+                    }
                     // Copied from another user or computer in the middle of a migration: the plain
                     // key still opens. Wrapping it here replaces only a copy of the same key.
-                    let protected = key_check(&key) == check
-                        && self.protect_plain_key(&key, true, vault.as_ref()).is_ok();
+                    let protected = self.protect_plain_key(&key, true, vault.as_ref()).is_ok();
                     let transfer = matches(&key);
                     return Ok(Loaded::Open(Contents { key: Some(key), values, protected, transfer }));
                 }
-                let transfer = transfer.filter(|copy| copy.check == check);
-                return Ok(Loaded::Locked { transfer });
+                return match &transfer {
+                    // A damaged transfer copy is not «no passphrase»: nothing is set aside for it.
+                    TransferCopy::Damaged => Err(DAMAGED_TRANSFER.into()),
+                    copy => Ok(Loaded::Locked { transfer: copy.of(&check).map(TransferKeyDocument::clone_document) }),
+                };
             }
-            Protected::Damaged(message) => {
-                // A damaged wrapped key is left as it is: only a plain key that opens is used.
-                let (key, values) = plain_opening.ok_or(message)?;
+            Protected::Unavailable { code } => {
+                // Maybe only for now: the wrapped file is left alone, and a plain key that opens
+                // is used as it is until Windows opens the wrapped one again.
+                let Some((key, values)) = plain_opening else { return Err(unavailable_message(code)) };
                 let transfer = matches(&key);
                 return Ok(Loaded::Open(Contents { key: Some(key), values, protected: false, transfer }));
             }
+            Protected::Damaged(message) => return instead_of_stray(plain_opening.ok_or(message)?),
             Protected::Absent => {}
         }
         match plain {
@@ -368,12 +476,29 @@ impl Vault {
             let transfer = matches(&key);
             return Ok(Loaded::Open(Contents { key: Some(key), values, protected: true, transfer }));
         }
-        match vault {
-            None => Ok(Loaded::Open(self.empty())),
+        match (&vault, transfer) {
+            (None, _) => Ok(Loaded::Open(self.empty())),
             // The wrapped key was removed, but the transfer copy can open the credentials.
-            Some(_) if transfer.is_some() => Ok(Loaded::Locked { transfer }),
-            Some(_) => Err(MISSING_PROTECTED_KEY.into()),
+            (Some(_), TransferCopy::Copy(copy)) => Ok(Loaded::Locked { transfer: Some(copy) }),
+            (Some(_), TransferCopy::Damaged) => Err(DAMAGED_TRANSFER.into()),
+            (Some(_), TransferCopy::Absent) => Err(MISSING_PROTECTED_KEY.into()),
         }
+    }
+
+    /// The wrapped file opens nothing here (damaged, another vault's key, or another user's key
+    /// of another vault) while the plain key opens the credentials: the file is renamed
+    /// `credentials.key.dpapi.unused-<time>`, kept as it is, and the plain key is wrapped. A
+    /// crash between the two leaves the plain key, which the next load wraps.
+    fn replace_stray_protected_key(&self, key: &Key, vault: Option<&EncryptedDocument>) -> bool {
+        let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S").to_string();
+        let mut name = format!("{UNUSED_PROTECTED_KEY_PREFIX}{stamp}");
+        let mut next = 2;
+        while fs::symlink_metadata(self.path(&name)).is_ok() {
+            name = format!("{UNUSED_PROTECTED_KEY_PREFIX}{stamp}-{next}");
+            next += 1;
+        }
+        publish_file(&self.path(PROTECTED_KEY_FILE), &self.path(&name), false).is_ok()
+            && self.protect_plain_key(key, false, vault).is_ok()
     }
 
     /// Wraps a plain key and removes it once the wrapped copy reads back and opens the
@@ -410,12 +535,12 @@ impl Vault {
         Ok(Some(key))
     }
 
-    /// The transfer copy, if there is a usable one. A damaged copy counts as none.
-    fn read_transfer(&self) -> Result<Option<TransferKeyDocument>, String> {
-        let Some(bytes) = read_optional(&self.path(TRANSFER_KEY_FILE))? else { return Ok(None) };
+    fn read_transfer(&self) -> Result<TransferCopy, String> {
+        let Some(bytes) = read_optional(&self.path(TRANSFER_KEY_FILE))? else { return Ok(TransferCopy::Absent) };
         Ok(serde_json::from_slice::<TransferKeyDocument>(&bytes)
             .ok()
-            .filter(|document| document.version == VERSION && document.kdf == ARGON2ID))
+            .filter(|document| document.version == VERSION && document.kdf == ARGON2ID)
+            .map_or(TransferCopy::Damaged, TransferCopy::Copy))
     }
 
     fn create_key(&self) -> Result<Key, String> {
@@ -450,7 +575,10 @@ impl Vault {
             // Owner ruling R1: without a transfer passphrase, the credentials of another user or
             // computer give way when the person signs in again. Set aside, never deleted.
             Loaded::Locked { transfer: None } => {
-                self.set_aside()?;
+                let folder = self.set_aside()?;
+                // For the interface to tell the person where the old credentials went; losing
+                // this note loses only the notice.
+                let _ = publish(&self.path(SET_ASIDE_NOTICE), folder.as_bytes(), true);
                 self.empty()
             }
         };
@@ -474,7 +602,7 @@ impl Vault {
                 aead::Aad::from(AUTHENTICATED_FORMAT),
                 &mut ciphertext,
             )
-            .map_err(|_| "Portable credentials encryption failed.".to_string())?;
+            .map_err(|_| SEALING_FAILED.to_string())?;
         let document = EncryptedDocument {
             version: VERSION,
             nonce,
@@ -487,12 +615,12 @@ impl Vault {
     pub fn status(&self) -> VaultStatus {
         let _lock = match self.lock() {
             Ok(lock) => lock,
-            Err(message) => return VaultStatus::Damaged { message },
+            Err(message) => return VaultStatus::Damaged { code: error_code(&message), message },
         };
         match self.load() {
             Ok(Loaded::Open(contents)) => VaultStatus::Ready { protected: contents.protected, transfer: contents.transfer },
             Ok(Loaded::Locked { transfer }) => VaultStatus::Locked { transfer: transfer.is_some() },
-            Err(message) => VaultStatus::Damaged { message },
+            Err(message) => VaultStatus::Damaged { code: error_code(&message), message },
         }
     }
 
@@ -565,8 +693,30 @@ impl Vault {
         let _lock = self.lock()?;
         match self.load() {
             Ok(Loaded::Open(_)) => Err(NOTHING_TO_START_OVER.into()),
-            Err(message) if message.starts_with(STORAGE_FAILED) => Err(message),
+            // Unreadable now, or Windows unavailable now: good credentials may be behind it.
+            Err(message) if matches!(error_code(&message), vault_codes::STORAGE | vault_codes::UNAVAILABLE) => Err(message),
             Ok(Loaded::Locked { .. }) | Err(_) => self.set_aside(),
+        }
+    }
+
+    pub fn check_writable(&self) -> Result<(), String> {
+        let _lock = self.lock()?;
+        match self.load()? {
+            Loaded::Open(_) | Loaded::Locked { transfer: None } => Ok(()),
+            Loaded::Locked { transfer: Some(_) } => Err(LOCKED_WITH_TRANSFER.into()),
+        }
+    }
+
+    pub fn set_aside_notice(&self) -> Option<String> {
+        let bytes = read_optional(&self.path(SET_ASIDE_NOTICE)).ok()??;
+        String::from_utf8(bytes).ok().filter(|name| valid_set_aside_name(name))
+    }
+
+    pub fn dismiss_set_aside_notice(&self) -> Result<(), String> {
+        match fs::remove_file(self.path(SET_ASIDE_NOTICE)) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(storage_error(error)),
         }
     }
 
@@ -634,14 +784,9 @@ fn locked_message(transfer: bool) -> &'static str {
 
 fn read_vault(path: &Path) -> Result<Option<EncryptedDocument>, String> {
     let Some(bytes) = read_optional(path)? else { return Ok(None) };
-    let document: EncryptedDocument = serde_json::from_slice(&bytes).map_err(|_| {
-        "Portable credentials cannot be read. The original files are unchanged.".to_string()
-    })?;
+    let document: EncryptedDocument = serde_json::from_slice(&bytes).map_err(|_| VAULT_UNREADABLE.to_string())?;
     if document.version != VERSION {
-        return Err(
-            "The portable credentials format is unsupported. The original files are unchanged."
-                .into(),
-        );
+        return Err(VAULT_UNSUPPORTED.into());
     }
     Ok(Some(document))
 }
@@ -653,11 +798,9 @@ fn read_plain_key(path: &Path) -> Result<Option<Key>, String> {
 fn parse_plain_key(bytes: Option<Vec<u8>>) -> Result<Option<Key>, String> {
     let Some(bytes) = bytes else { return Ok(None) };
     let bytes = Zeroizing::new(bytes);
-    let document: KeyDocument = serde_json::from_slice(&bytes).map_err(|_| {
-        "The portable credentials key is damaged. The original files are unchanged.".to_string()
-    })?;
+    let document: KeyDocument = serde_json::from_slice(&bytes).map_err(|_| PLAIN_KEY_DAMAGED.to_string())?;
     if document.version != VERSION {
-        return Err("The portable credentials key format is unsupported. The original files are unchanged.".into());
+        return Err(PLAIN_KEY_UNSUPPORTED.into());
     }
     Ok(Some(Zeroizing::new(document.key)))
 }
@@ -671,8 +814,14 @@ fn read_protected_key(path: &Path) -> Result<Protected, String> {
     if document.version != VERSION {
         return Ok(Protected::Damaged(UNSUPPORTED_PROTECTED_KEY));
     }
-    let Ok(bytes) = unprotect_bytes(&document.blob) else {
-        return Ok(Protected::Refused { check: document.check });
+    let bytes = match unprotect_bytes(&document.blob) {
+        Ok(bytes) => bytes,
+        Err(refusal) if refusal.foreign => return Ok(Protected::Refused { check: document.check }),
+        Err(refusal) => {
+            // The code only: never key material.
+            eprintln!("credentials key: Windows DPAPI did not open {} (error 0x{:08X})", path.display(), refusal.code);
+            return Ok(Protected::Unavailable { code: refusal.code });
+        }
     };
     // Windows unwrapped it, so these are the bytes that were wrapped: anything but a key with
     // its own check is a damaged file, not another user's.
@@ -701,11 +850,8 @@ fn unseal(document: &EncryptedDocument, key: &[u8; 32]) -> Result<BTreeMap<Strin
                 .ok()
                 .map(|plaintext| plaintext.to_vec())
         })
-        .ok_or_else(|| "Portable credentials failed authentication. Restore the matching credentials.key and credentials.json files.".to_string())?;
-    serde_json::from_slice(&plaintext).map_err(|_| {
-        "Decrypted portable credentials are invalid. The original files are unchanged."
-            .to_string()
-    })
+        .ok_or_else(|| VAULT_NOT_AUTHENTIC.to_string())?;
+    serde_json::from_slice(&plaintext).map_err(|_| VAULT_CONTENT_INVALID.to_string())
 }
 
 fn key_check(key: &[u8; 32]) -> String {
@@ -715,28 +861,36 @@ fn key_check(key: &[u8; 32]) -> String {
     context.finish().as_ref()[..16].iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
-#[cfg(windows)]
-fn protect_bytes(bytes: &[u8]) -> Result<Vec<u8>, String> {
-    super::dpapi::protect(bytes)
+/// Why Windows did not unwrap a key: `foreign` for a key of another user or computer.
+struct Refusal {
+    foreign: bool,
+    code: u32,
 }
 
 #[cfg(windows)]
-fn unprotect_bytes(bytes: &[u8]) -> Result<Zeroizing<Vec<u8>>, String> {
-    super::dpapi::unprotect(bytes).map(Zeroizing::new)
+fn protect_bytes(bytes: &[u8]) -> Result<Vec<u8>, String> {
+    super::dpapi::protect(bytes).map_err(|error| error.to_string())
+}
+
+#[cfg(windows)]
+fn unprotect_bytes(bytes: &[u8]) -> Result<Zeroizing<Vec<u8>>, Refusal> {
+    super::dpapi::unprotect(bytes)
+        .map(Zeroizing::new)
+        .map_err(|error| Refusal { foreign: error.foreign(), code: error.code })
 }
 
 #[cfg(not(windows))]
 fn protect_bytes(_bytes: &[u8]) -> Result<Vec<u8>, String> {
-    Err("Windows key protection is not available on this system.".into())
+    Err(NO_DPAPI.into())
 }
 
 #[cfg(not(windows))]
-fn unprotect_bytes(_bytes: &[u8]) -> Result<Zeroizing<Vec<u8>>, String> {
-    Err("Windows key protection is not available on this system.".into())
+fn unprotect_bytes(_bytes: &[u8]) -> Result<Zeroizing<Vec<u8>>, Refusal> {
+    Err(Refusal { foreign: false, code: 0 })
 }
 
 /// The passphrase in Unicode NFC, so the same words typed on another keyboard give the same
-/// key. A new passphrase needs `MIN_TRANSFER_PASSPHRASE_CHARS` characters besides spaces.
+/// key. A new passphrase needs `MIN_TRANSFER_PASSPHRASE_CHARS` characters that are not spaces.
 fn transfer_passphrase(passphrase: &str, new: bool) -> Result<Zeroizing<String>, String> {
     // Room for the worst NFC growth up front: a reallocation would leave a copy behind.
     let mut normalized = Zeroizing::new(String::with_capacity(passphrase.len() * 3 + 16));
@@ -744,7 +898,7 @@ fn transfer_passphrase(passphrase: &str, new: bool) -> Result<Zeroizing<String>,
     if normalized.len() > MAX_TRANSFER_PASSPHRASE_BYTES {
         return Err(LONG_PASSPHRASE.into());
     }
-    if new && normalized.trim().chars().count() < MIN_TRANSFER_PASSPHRASE_CHARS {
+    if new && normalized.chars().filter(|c| !c.is_whitespace()).count() < MIN_TRANSFER_PASSPHRASE_CHARS {
         return Err(SHORT_PASSPHRASE.into());
     }
     Ok(normalized)
@@ -761,11 +915,14 @@ fn derive_transfer_key(passphrase: &str, salt: &[u8; 16], kdf: KdfParams) -> Res
         .map_err(|_| DAMAGED_TRANSFER.to_string())?;
     let blocks = params.block_count();
     let argon2 = argon2::Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
-    let mut memory = vec![argon2::Block::default(); blocks];
+    // Asked for first: a failed allocation is an error, not the end of the program.
+    let mut memory: Vec<argon2::Block> = Vec::new();
+    memory.try_reserve_exact(blocks).map_err(|_| NO_MEMORY_FOR_TRANSFER.to_string())?;
+    memory.resize(blocks, argon2::Block::default());
     let mut output = Zeroizing::new([0u8; 32]);
     let derived = argon2.hash_password_into_with_memory(passphrase.as_bytes(), salt, &mut output[..], &mut memory);
     memory.zeroize();
-    derived.map_err(|_| DAMAGED_TRANSFER.to_string())?;
+    derived.map_err(|_| DERIVATION_FAILED.to_string())?;
     Ok(output)
 }
 
@@ -776,7 +933,7 @@ fn wrap_transfer(key: &Key, passphrase: &str, kdf: KdfParams) -> Result<Transfer
     let mut ciphertext = key.to_vec();
     encryption_key(&wrapping)?
         .seal_in_place_append_tag(aead::Nonce::assume_unique_for_key(nonce), aead::Aad::from(TRANSFER_FORMAT), &mut ciphertext)
-        .map_err(|_| "Portable credentials encryption failed.".to_string())?;
+        .map_err(|_| SEALING_FAILED.to_string())?;
     Ok(TransferKeyDocument {
         version: VERSION,
         check: key_check(key),
@@ -817,17 +974,15 @@ fn random_bytes<const N: usize>() -> Result<[u8; N], String> {
     let mut bytes = [0; N];
     SystemRandom::new()
         .fill(&mut bytes)
-        .map_err(|_| "Secure randomness for portable credentials is unavailable.".to_string())?;
+        .map_err(|_| NO_RANDOMNESS.to_string())?;
     Ok(bytes)
 }
 
 fn encryption_key(key: &[u8; 32]) -> Result<aead::LessSafeKey, String> {
     aead::UnboundKey::new(&aead::AES_256_GCM, key)
         .map(aead::LessSafeKey::new)
-        .map_err(|_| "The portable credentials encryption key is invalid.".to_string())
+        .map_err(|_| INVALID_KEY.to_string())
 }
-
-const STORAGE_FAILED: &str = "Portable credentials storage failed:";
 
 fn storage_error(error: std::io::Error) -> String {
     format!("{STORAGE_FAILED} {error}")
@@ -852,7 +1007,7 @@ fn publish(path: &Path, bytes: &[u8], replace: bool) -> Result<(), String> {
         .collect();
     let name = path
         .file_name()
-        .ok_or("Portable credentials path is invalid.")?
+        .ok_or(INVALID_PATH)?
         .to_string_lossy();
     let temporary = path.with_file_name(format!(".{name}.{}.{suffix}.tmp", std::process::id()));
     let result = (|| {
@@ -1151,6 +1306,10 @@ mod tests {
             assert_eq!(after[&format!("{}/{name}", folders[0])], before[name], "{name}");
         }
         assert!(!workspace.exists(SET_ASIDE_MARKER));
+        // The interface tells the person where the old ones went, once.
+        assert_eq!(protected.set_aside_notice().as_deref(), Some(folders[0].as_str()));
+        protected.dismiss_set_aside_notice().unwrap();
+        assert_eq!(protected.set_aside_notice(), None);
         // The new credentials are this user's: the next sign-ins add to them, nothing more is set aside.
         protected.set("gmail:second@example.test", "second-token").unwrap();
         protected.set(AI_KEY, "new-ai-key").unwrap();
@@ -1324,6 +1483,8 @@ mod tests {
         protected.set(AI_KEY, "secret").unwrap();
         assert_eq!(protected.set_transfer_passphrase("short").unwrap_err(), SHORT_PASSPHRASE);
         assert_eq!(protected.set_transfer_passphrase("   seven   ").unwrap_err(), SHORT_PASSPHRASE);
+        // Spaces between the words do not count either.
+        assert_eq!(protected.set_transfer_passphrase("a b c d e f g").unwrap_err(), SHORT_PASSPHRASE);
         assert_eq!(protected.set_transfer_passphrase(&"x".repeat(1025)).unwrap_err(), LONG_PASSPHRASE);
         assert!(!workspace.exists(TRANSFER_KEY_FILE));
         // "è" written as one code point here and as e + combining grave on the other keyboard.
@@ -1346,10 +1507,14 @@ mod tests {
         assert_eq!(copy["iterations"], 3);
         assert_eq!(copy["parallelism"], 4);
         assert_eq!(copy["salt"].as_array().unwrap().len(), 16);
-        // A copy naming parameters beyond the bounds is damaged, not tried.
-        let mut document: TransferKeyDocument = serde_json::from_slice(&workspace.read(TRANSFER_KEY_FILE)).unwrap();
-        document.memory_kib = MAX_MEMORY_KIB + 1;
-        assert_eq!(unwrap_transfer(&document, "a passphrase for the move").unwrap_err(), DAMAGED_TRANSFER);
+        // A copy naming parameters beyond 256 MiB or 10 passes is damaged, not tried.
+        assert_eq!((MAX_MEMORY_KIB, MAX_ITERATIONS), (256 * 1024, 10));
+        for (memory_kib, iterations) in [(MAX_MEMORY_KIB + 1, 3), (64 * 1024, MAX_ITERATIONS + 1)] {
+            let mut document: TransferKeyDocument = serde_json::from_slice(&workspace.read(TRANSFER_KEY_FILE)).unwrap();
+            document.memory_kib = memory_kib;
+            document.iterations = iterations;
+            assert_eq!(unwrap_transfer(&document, "a passphrase for the move").unwrap_err(), DAMAGED_TRANSFER);
+        }
     }
 
     #[test]
@@ -1365,6 +1530,7 @@ mod tests {
         let before = workspace.files();
         let folder = protected.start_over().unwrap();
         assert!(folder.starts_with(SET_ASIDE_PREFIX));
+        assert_eq!(protected.set_aside_notice(), None, "the person asked for it and saw the folder");
         let after = workspace.files();
         for name in [VAULT_FILE, PROTECTED_KEY_FILE, TRANSFER_KEY_FILE] {
             assert!(!workspace.exists(name));
@@ -1463,35 +1629,141 @@ mod tests {
         assert_eq!(workspace.files(), before);
     }
 
+    /// A wrapped file that opens nothing here, beside the plain key that opens the credentials:
+    /// it is kept byte for byte under another name, and the plain key is wrapped in its place.
+    fn assert_stray_moved_aside_and_plain_key_wrapped(workspace: &Workspace, stray: &[u8], plain: [u8; 32]) {
+        let protected = workspace.protected();
+        assert_eq!(protected.get(AI_KEY).unwrap(), "old-ai-key");
+        assert_eq!(protected.status(), VaultStatus::Ready { protected: true, transfer: false });
+        let unused: Vec<_> = workspace
+            .files()
+            .into_iter()
+            .filter(|(name, _)| name.starts_with(UNUSED_PROTECTED_KEY_PREFIX))
+            .collect();
+        assert_eq!(unused.len(), 1, "{unused:?}");
+        assert_eq!(unused[0].1, stray, "the stray file is kept as it was");
+        let document = workspace.protected_document();
+        assert_eq!(*Zeroizing::new(super::super::dpapi::unprotect(&document.blob).unwrap()), plain);
+        assert!(!workspace.exists(PLAIN_KEY_FILE));
+        assert_other_data_kept(workspace);
+    }
+
     #[test]
-    fn vault_key_wrapped_for_another_key_falls_back_to_the_plain_key_that_opens() {
+    fn vault_key_wrapped_for_another_vault_is_moved_aside_and_the_plain_key_wrapped() {
         let workspace = Workspace::new();
-        workspace.earlier_install();
+        let plain = workspace.earlier_install();
         // A wrapped key of another vault beside the plain key that opens these credentials.
         let other = Workspace::new();
         other.protected().set(AI_KEY, "other").unwrap();
         fs::copy(other.path(PROTECTED_KEY_FILE), workspace.path(PROTECTED_KEY_FILE)).unwrap();
-        let before = workspace.files();
-        let protected = workspace.protected();
-        assert_eq!(protected.get(AI_KEY).unwrap(), "old-ai-key");
-        assert_eq!(protected.status(), VaultStatus::Ready { protected: false, transfer: false });
-        assert_eq!(workspace.files(), before, "neither key file is rewritten or removed");
+        let stray = workspace.read(PROTECTED_KEY_FILE);
+        assert_stray_moved_aside_and_plain_key_wrapped(&workspace, &stray, plain);
     }
 
     #[test]
-    fn vault_key_of_another_user_for_another_key_is_never_replaced() {
+    fn vault_key_of_another_user_for_another_vault_is_moved_aside_never_replaced() {
         let workspace = Workspace::new();
-        workspace.earlier_install();
+        let plain = workspace.earlier_install();
         // Another user's wrapped key of some other vault, beside the plain key that opens these.
         let other = Workspace::new();
         other.protected().set(AI_KEY, "other").unwrap();
         other.as_if_from_another_user();
         fs::copy(other.path(PROTECTED_KEY_FILE), workspace.path(PROTECTED_KEY_FILE)).unwrap();
-        let before = workspace.files();
+        let stray = workspace.read(PROTECTED_KEY_FILE);
+        assert_stray_moved_aside_and_plain_key_wrapped(&workspace, &stray, plain);
+    }
+
+    #[test]
+    fn vault_key_damaged_wrapped_key_beside_a_plain_key_that_opens_is_moved_aside() {
+        let workspace = Workspace::new();
+        let plain = workspace.earlier_install();
+        fs::write(workspace.path(PROTECTED_KEY_FILE), b"{damaged").unwrap();
+        assert_stray_moved_aside_and_plain_key_wrapped(&workspace, b"{damaged", plain);
+    }
+
+    #[test]
+    fn vault_key_blob_that_windows_cannot_open_now_is_retried_never_set_aside() {
+        let workspace = Workspace::new();
+        workspace.earlier_install();
         let protected = workspace.protected();
-        assert_eq!(protected.get(AI_KEY).unwrap(), "old-ai-key");
-        assert_eq!(protected.status(), VaultStatus::Ready { protected: false, transfer: false });
+        protected.get(AI_KEY).unwrap();
+        // Not another user's master key: a flipped bit of the data (or a profile not loaded).
+        let mut document = workspace.protected_document();
+        let last = document.blob.len() - 1;
+        document.blob[last] ^= 0x01;
+        fs::write(workspace.path(PROTECTED_KEY_FILE), serde_json::to_vec(&document).unwrap()).unwrap();
+        let before = workspace.files();
+        let error = protected.get(AI_KEY).unwrap_err();
+        assert!(error.starts_with(UNAVAILABLE_PREFIX) && error.contains("(error 0x8007000D)"), "{error}");
+        assert_eq!(error_code(&error), vault_codes::UNAVAILABLE);
+        assert!(matches!(protected.status(), VaultStatus::Damaged { code: vault_codes::UNAVAILABLE, .. }));
+        // A sign-in and a start-over are both refused: good credentials may be behind it.
+        assert_eq!(error_code(&protected.set("gmail:new@example.test", "fresh").unwrap_err()), vault_codes::UNAVAILABLE);
+        assert!(protected.check_writable().is_err());
+        assert_eq!(error_code(&protected.start_over().unwrap_err()), vault_codes::UNAVAILABLE);
         assert_eq!(workspace.files(), before);
+        assert!(workspace.set_aside_folders().is_empty());
+    }
+
+    #[test]
+    fn vault_key_damaged_transfer_copy_is_reported_never_taken_for_no_passphrase() {
+        let workspace = Workspace::new();
+        workspace.earlier_install();
+        let protected = workspace.protected();
+        protected.set_transfer_passphrase("a passphrase for the move").unwrap();
+        workspace.as_if_from_another_user();
+        fs::write(workspace.path(TRANSFER_KEY_FILE), b"{damaged").unwrap();
+        let before = workspace.files();
+        assert_eq!(protected.get(AI_KEY).unwrap_err(), DAMAGED_TRANSFER);
+        assert!(matches!(protected.status(), VaultStatus::Damaged { code: vault_codes::DAMAGED, .. }));
+        assert!(protected.set("gmail:new@example.test", "fresh").is_err());
+        assert!(protected.check_writable().is_err());
+        assert_eq!(workspace.files(), before);
+        assert!(workspace.set_aside_folders().is_empty());
+    }
+
+    #[test]
+    fn vault_key_check_before_a_sign_in() {
+        let workspace = Workspace::new();
+        workspace.earlier_install();
+        let protected = workspace.protected();
+        protected.check_writable().unwrap();
+        // Another user's, no passphrase: the sign-in may go on, its save sets the old ones aside.
+        workspace.as_if_from_another_user();
+        let before = workspace.files();
+        protected.check_writable().unwrap();
+        assert_eq!(workspace.files(), before, "the check itself changes nothing");
+        // With a passphrase to enter first, no sign-in is started.
+        let workspace = Workspace::new();
+        workspace.earlier_install();
+        let protected = workspace.protected();
+        protected.set_transfer_passphrase("a passphrase for the move").unwrap();
+        workspace.as_if_from_another_user();
+        let error = protected.check_writable().unwrap_err();
+        assert_eq!((error.as_str(), error_code(&error)), (LOCKED_WITH_TRANSFER, vault_codes::LOCKED));
+    }
+
+    #[test]
+    fn vault_key_every_message_has_its_code() {
+        for (message, code) in [
+            (FOREIGN_KEY, vault_codes::FOREIGN),
+            (LOCKED_WITH_TRANSFER, vault_codes::LOCKED),
+            (WRONG_PASSPHRASE, vault_codes::WRONG_PASSPHRASE),
+            (NO_TRANSFER, vault_codes::NO_TRANSFER),
+            (NEEDS_UNLOCKED, vault_codes::NEEDS_UNLOCK),
+            (SHORT_PASSPHRASE, vault_codes::PASSPHRASE),
+            (LONG_PASSPHRASE, vault_codes::PASSPHRASE),
+            (NOTHING_TO_START_OVER, vault_codes::NOTHING_TO_START_OVER),
+            (TRANSFER_NEEDS_DPAPI, vault_codes::NEEDS_DPAPI),
+            (NO_MEMORY_FOR_TRANSFER, vault_codes::UNAVAILABLE),
+            (DAMAGED_TRANSFER, vault_codes::DAMAGED),
+            (MISSING_PROTECTED_KEY, vault_codes::DAMAGED),
+            (VAULT_NOT_AUTHENTIC, vault_codes::DAMAGED),
+        ] {
+            assert_eq!(error_code(message), code, "{message}");
+        }
+        assert_eq!(error_code(&unavailable_message(0x8007_000D)), vault_codes::UNAVAILABLE);
+        assert_eq!(error_code(&storage_error(std::io::Error::other("held"))), vault_codes::STORAGE);
     }
 
     #[test]

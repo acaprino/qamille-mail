@@ -62,7 +62,7 @@ export default function VaultSettings({ notify, changed }: Props) {
           error={(message) => notify(message, true)}
           done={(next, message) => {
             setStatus(next);
-            notify(message);
+            if (message) notify(message);
             changed();
           }}
         />

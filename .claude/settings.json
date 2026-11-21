@@ -1,0 +1,5 @@
+{
+  "enabledPlugins": {
+    "tauri-app-builder@tauri-app-builder": true
+  }
+}

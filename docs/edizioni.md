@@ -57,6 +57,16 @@ $env:QAMILLE_SERVER = "https://qamille.example.com"
 
 Le due build scrivono in cartelle diverse e non si toccano. Un valore non valido di `/server` ferma la build: un Professional non esce mai per sbaglio come self-hosted. In una pipeline di rilascio le due credenziali della posta e il certificato di firma vengono dai segreti della pipeline, mai dal repository.
 
+### Disinstallare la Professional
+
+L'installatore è per utente e tiene i dati accanto al programma, in `<cartella d'installazione>\data` (account, posta, `credentials.key`), non in `%APPDATA%`. Gli hook sono in `desktop/src-tauri/windows/installer-hooks.nsh` ([regola 25](aspetto-nativo.md)).
+
+- **La casella per eliminare i dati dell'applicazione** (pagina di conferma della disinstallazione) cancella `data` **per sempre**: account, posta e `credentials.key`, senza la quale le credenziali salvate non si leggono più. Non cancella niente se non è spuntata, e mai con `/UPDATE`. Un aggiornamento fatto a mano non passa `/UPDATE`: sulla pagina «Disinstalla prima di installare» la disinstallazione mostra la stessa casella, e spuntarla lì cancella i dati prima della nuova versione.
+- **Il worker** (`Qamille --worker`) avviato dalla cartella d'installazione viene chiuso prima della disinstallazione; le altre copie di Qamille (anche portatili) restano aperte.
+- **Il file d'avvio del worker** (`%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\Qamille-worker.vbs`) è uno per utente, condiviso con le copie portatili. La disinstallazione lo toglie a cose fatte (non con `/UPDATE`, e non se si annulla); l'app lo riscrive da sé a ogni avvio quando l'avvio automatico del worker è acceso (Impostazioni → Accesso agenti) e il file manca o nomina un altro eseguibile, mai quando è spento. Così un aggiornamento a mano non spegne l'avvio automatico, e una cartella spostata si corregge al primo avvio.
+
+La prova con l'installatore vero (installare, avviare il worker, disinstallare con la casella spuntata: la cartella non c'è più e all'accesso dopo non compare nessun errore di Windows Script Host) richiede una build con `QAMILLE_SERVER`; finché non è fatta, è da fare.
+
 ## Avviare i due server
 
 **Open source self-hosted** (core): `server/compose.yaml`, come in [server/README.md](../server/README.md), «Distribuzione con Docker Compose»; immagine `qamille-server:local`. Gli utenti li crea l'amministratore: `docker compose exec server qamille-server user create <nome>`.

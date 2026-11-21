@@ -4,8 +4,8 @@ import Button from '../ds/primitives/Button';
 import Checkbox from '../ds/primitives/Checkbox';
 import Count from '../ds/primitives/Count';
 import Icon from '../ds/primitives/Icon';
+import Menu from '../ds/primitives/Menu';
 import Modal from '../ds/primitives/Modal';
-import Popover from '../ds/primitives/Popover';
 import Select from '../ds/primitives/Select';
 import { call, desktop, errorText, initials } from '../lib/api';
 import { bookLabel, folderLabel, isItalian, tr } from '../lib/i18n';
@@ -73,7 +73,6 @@ export default function Contacts({ notify }: ContactsProps) {
     selectedId: null as string | null,
     duplicates: [] as DuplicateView[],
     panel: false,
-    menu: false,
     lastBook: '',
     busy: false,
     syncing: false,
@@ -385,9 +384,7 @@ export default function Contacts({ notify }: ContactsProps) {
             )}
             {/* The file actions in a menu: the toolbar stays on one row in the side column. */}
             <div className="more-actions">
-              <Popover
-                open={s.menu}
-                onOpenChange={(open) => (s.menu = open)}
+              <Menu
                 label={tr('Azioni sulla rubrica', 'Address book actions')}
                 tip={tr('Altre azioni', 'More actions')}
                 trigger={
@@ -395,26 +392,21 @@ export default function Contacts({ notify }: ContactsProps) {
                     <Icon name="more" size={18} />
                   </Button>
                 }
-              >
-                <button
-                  onClick={() => {
-                    s.menu = false;
-                    fileInput.current?.click();
-                  }}
-                >
-                  <Icon name="upload" size={15} />
-                  {tr('Importa .vcf', 'Import .vcf')}
-                </button>
-                <button
-                  onClick={() => {
-                    s.menu = false;
-                    void exportLocal();
-                  }}
-                >
-                  <Icon name="download" size={15} />
-                  {tr('Esporta .vcf', 'Export .vcf')}
-                </button>
-              </Popover>
+                items={[
+                  {
+                    value: 'import',
+                    label: tr('Importa .vcf', 'Import .vcf'),
+                    icon: 'upload',
+                    onSelect: () => fileInput.current?.click(),
+                  },
+                  {
+                    value: 'export',
+                    label: tr('Esporta .vcf', 'Export .vcf'),
+                    icon: 'download',
+                    onSelect: () => void exportLocal(),
+                  },
+                ]}
+              />
             </div>
             <input
               ref={fileInput}

@@ -30,6 +30,8 @@ body {
   margin: 0;
   background: transparent;
   overflow: hidden;
+  /* The chip never slides past its edge (docs/aspetto-nativo.md rule 4). */
+  overscroll-behavior: none;
 }
 body {
   font-family: var(--font-text);

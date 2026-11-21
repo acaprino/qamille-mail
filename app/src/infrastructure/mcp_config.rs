@@ -44,7 +44,10 @@ pub fn rank(access: Access) -> u8 {
     }
 }
 pub fn load() -> AppResult<Config> {
-    match std::fs::read(Store::data_dir().join("mcp-config.json")) {
+    load_at(&Store::data_dir())
+}
+fn load_at(root: &std::path::Path) -> AppResult<Config> {
+    match std::fs::read(root.join("mcp-config.json")) {
         Ok(bytes) => serde_json::from_slice(&bytes).map_err(|_| {
             AppError::storage("MCP permissions file is invalid; repair it in Settings")
         }),
@@ -212,6 +215,62 @@ fn launcher_content(executable: &std::path::Path) -> Vec<u8> {
     format!("Set shell = CreateObject(\"WScript.Shell\")\r\nshell.Run \"{command}\", 0, False\r\n")
         .into_bytes()
 }
+/// What the startup folder should get when the app starts, or `None` to leave it alone. A launcher that
+/// is missing or names another executable is written again, but only while automatic startup is on:
+/// when it is off nothing is written, and nothing is removed (saving the settings does that).
+#[cfg(windows)]
+fn launcher_refresh(
+    autostart: bool,
+    existing: Option<&[u8]>,
+    executable: &std::path::Path,
+) -> Option<Vec<u8>> {
+    if !autostart {
+        return None;
+    }
+    let wanted = launcher_content(executable);
+    (existing != Some(wanted.as_slice())).then_some(wanted)
+}
+/// `refresh_autostart` on a given data folder, startup file and executable. Returns whether the
+/// launcher was written. With automatic startup off it touches nothing, not even the lock file.
+#[cfg(windows)]
+fn refresh_autostart_at(
+    root: &std::path::Path,
+    launcher: &std::path::Path,
+    executable: &std::path::Path,
+) -> AppResult<bool> {
+    if !load_at(root)?.worker_autostart {
+        return Ok(false);
+    }
+    let lock = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(root.join("mcp-config.lock"))?;
+    lock.lock()?;
+    // Settings may have been saved, and the launcher removed, while this waited for the lock.
+    let autostart = load_at(root)?.worker_autostart;
+    let existing = read_optional(launcher)?;
+    match launcher_refresh(autostart, existing.as_deref(), executable) {
+        Some(bytes) => {
+            write_optional(launcher, Some(&bytes))?;
+            Ok(true)
+        }
+        None => Ok(false),
+    }
+}
+/// Called once when the app starts. The uninstaller that an upgrade runs first removes the startup
+/// launcher, and moving the app's folder leaves it naming the old one: with automatic startup on, put
+/// it back so the worker still starts at the next sign-in. It is never written when startup is off.
+pub fn refresh_autostart() -> AppResult<()> {
+    #[cfg(windows)]
+    refresh_autostart_at(
+        &Store::data_dir(),
+        &startup_launcher()?,
+        &std::env::current_exe()?,
+    )?;
+    Ok(())
+}
 pub fn set_autostart(enabled: bool) -> AppResult<()> {
     #[cfg(windows)]
     {
@@ -295,6 +354,92 @@ mod tests {
                 assert_eq!(read_optional(&launcher).unwrap().as_deref(), previous);
             }
         }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn launcher_refresh_decides_from_the_setting_the_file_and_the_executable() {
+        let here = std::path::Path::new(r"C:\Apps\Qamille\qamille-desktop.exe");
+        let there = std::path::Path::new(r"D:\Portable\Qamille.exe");
+        let mine = launcher_content(here);
+        let theirs = launcher_content(there);
+        let garbage = b"not a launcher".as_slice();
+        let cases: [(bool, Option<&[u8]>, Option<Vec<u8>>); 9] = [
+            // Off: never written, whatever is there.
+            (false, None, None),
+            (false, Some(&mine), None),
+            (false, Some(&theirs), None),
+            (false, Some(garbage), None),
+            // On: written when missing, empty or naming another executable; kept when it is this one's.
+            (true, None, Some(mine.clone())),
+            (true, Some(&mine), None),
+            (true, Some(&theirs), Some(mine.clone())),
+            (true, Some(garbage), Some(mine.clone())),
+            (true, Some(b""), Some(mine.clone())),
+        ];
+        for (autostart, existing, expected) in cases {
+            assert_eq!(
+                launcher_refresh(autostart, existing, here),
+                expected,
+                "autostart={autostart} existing={:?}",
+                existing.map(String::from_utf8_lossy)
+            );
+        }
+        assert!(String::from_utf8(mine).unwrap().contains("--worker"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn refresh_autostart_puts_the_launcher_back_only_while_startup_is_on() {
+        let f = Fixture::new();
+        let data = f.0.join("data");
+        let launcher = f.0.join("startup/worker.vbs");
+        let here = std::path::Path::new(r"C:\Apps\Qamille\qamille-desktop.exe");
+        let moved = std::path::Path::new(r"D:\Moved\qamille-desktop.exe");
+        let save = |autostart| {
+            let config = Config {
+                worker_autostart: autostart,
+                ..Config::default()
+            };
+            save_at(&config, &data, None).unwrap();
+        };
+
+        // No settings file: nothing to restore, and not even the lock file is created.
+        assert!(!refresh_autostart_at(&data, &launcher, here).unwrap());
+        assert!(!launcher.exists());
+        assert!(!data.join("mcp-config.lock").exists());
+
+        // Off: a missing launcher stays missing and a present one is not touched.
+        save(false);
+        assert!(!refresh_autostart_at(&data, &launcher, here).unwrap());
+        assert!(!launcher.exists());
+        write_optional(&launcher, Some(b"left alone")).unwrap();
+        assert!(!refresh_autostart_at(&data, &launcher, here).unwrap());
+        assert_eq!(std::fs::read(&launcher).unwrap(), b"left alone");
+
+        // On: an upgrade removed it, so it is written; the next start finds it right and keeps it;
+        // after the app's folder is moved it is written again for the new executable.
+        save(true);
+        write_optional(&launcher, None).unwrap();
+        assert!(refresh_autostart_at(&data, &launcher, here).unwrap());
+        assert_eq!(std::fs::read(&launcher).unwrap(), launcher_content(here));
+        assert!(!refresh_autostart_at(&data, &launcher, here).unwrap());
+        assert!(refresh_autostart_at(&data, &launcher, moved).unwrap());
+        assert_eq!(std::fs::read(&launcher).unwrap(), launcher_content(moved));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn refresh_autostart_leaves_the_launcher_alone_when_the_settings_are_unreadable() {
+        let f = Fixture::new();
+        let data = f.0.join("data");
+        let launcher = f.0.join("startup/worker.vbs");
+        std::fs::create_dir_all(&data).unwrap();
+        std::fs::write(data.join("mcp-config.json"), b"{ not json").unwrap();
+        write_optional(&launcher, Some(b"previous")).unwrap();
+        let here = std::path::Path::new(r"C:\Apps\Qamille\qamille-desktop.exe");
+        assert!(refresh_autostart_at(&data, &launcher, here).is_err());
+        assert_eq!(std::fs::read(&launcher).unwrap(), b"previous");
     }
 
     #[test]

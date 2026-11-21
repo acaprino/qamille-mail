@@ -756,12 +756,12 @@ try {
     await openRow('Vecchio nome');
     const pane = detailPane();
     const more = pane.getByRole('button', { name: 'Altre azioni', exact: true });
-    const menu = () => page.getByRole('dialog', { name: 'Azioni sulla riunione' });
+    const menu = () => page.getByRole('menu', { name: 'Azioni sulla riunione' });
 
-    // The menu has exactly the two actions.
+    // The menu has exactly the two actions, the destructive one last.
     await more.click();
-    await expect(menu().getByRole('button')).toHaveText(['Rinomina', 'Elimina']);
-    await menu().getByRole('button', { name: 'Rinomina' }).click();
+    await expect(menu().getByRole('menuitem')).toHaveText(['Rinomina', 'Elimina']);
+    await menu().getByRole('menuitem', { name: 'Rinomina' }).click();
     const rename = page.getByRole('dialog', { name: 'Rinomina riunione' });
     const name = rename.getByLabel('Nome', { exact: true });
     await expect(name).toHaveValue('Vecchio nome');
@@ -779,7 +779,7 @@ try {
     // A new name, with Enter. The link to the event and the search flag are sent back as they were.
     const revision = (await readMeeting(id)).revision;
     await more.click();
-    await menu().getByRole('button', { name: 'Rinomina' }).click();
+    await menu().getByRole('menuitem', { name: 'Rinomina' }).click();
     await name.fill('Revisione budget finale');
     await name.press('Enter');
     await expect(rename).toHaveCount(0);
@@ -794,7 +794,7 @@ try {
 
     // Delete asks first; "Annulla" keeps the meeting.
     await more.click();
-    await menu().getByRole('button', { name: 'Elimina' }).click();
+    await menu().getByRole('menuitem', { name: 'Elimina' }).click();
     const confirm = page.getByRole('dialog', { name: 'Elimina riunione' });
     await expect(confirm).toContainText(
       'Eliminare «Revisione budget finale»? La registrazione e il testo vengono rimossi. Non si può annullare.',
@@ -805,7 +805,7 @@ try {
     await expect(pane.getByRole('heading', { name: 'Revisione budget finale', level: 2 })).toBeVisible();
     // "Elimina" removes it: the list loses the row and the right-hand side is empty again.
     await more.click();
-    await menu().getByRole('button', { name: 'Elimina' }).click();
+    await menu().getByRole('menuitem', { name: 'Elimina' }).click();
     await confirm.getByRole('button', { name: 'Elimina', exact: true }).click();
     await expect(confirm).toHaveCount(0);
     await expect(pane).toContainText('Seleziona una riunione');

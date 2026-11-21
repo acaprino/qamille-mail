@@ -262,6 +262,38 @@ try {
   assert.deepEqual(small, [], `the arrows are at least 24x24 px (WCAG 2.2 AA 2.5.8): ${small.join(', ')}`);
   walk.push('', `target sizes: .thread-toggle ${sizes.toggle.join(', ')}  .reply-fold ${sizes.fold.join(', ')}  (WCAG 2.2 AA 2.5.8 wants 24x24 unless spaced)`);
 
+  // ---- the composer: a reply starts in the text, and sending hands the focus back to the list ----
+  await page.reload();
+  await expect(page.locator('.mail-row').first()).toBeVisible();
+  await expect(page.locator('.message-title')).toBeVisible();
+  await page.mouse.move(0, 0);
+  await row(page).locator('.mail-open').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.mail-row.selected')).toHaveCount(1);
+  await expect(page.locator('.message-body').first()).toContainText('I will send the schedule on Monday');
+  await page.keyboard.press('r');
+  const composer = page.getByRole('tabpanel');
+  const text = composer.getByRole('textbox', { name: 'Message body' });
+  await expect(text).toBeFocused();
+  await page.keyboard.type('ciao');
+  await expect(text).toHaveText('ciao');
+  assert.equal(await composer.getByRole('combobox', { name: 'To', exact: true }).inputValue(), '', 'what was typed did not go into the To field');
+  const body = await stop(page, 'composer: the text of a reply');
+  assert.ok(body.shows, 'the text of the message shows its focus');
+  // A caret alone would make the photographs differ: the ring itself is what must be there.
+  const ring = () => page.evaluate(() => { const { outlineStyle, outlineWidth } = getComputedStyle(document.activeElement); return `${outlineStyle} ${outlineWidth}`; });
+  assert.equal(await ring(), 'solid 2px', 'the text of the message has the focus ring of every field');
+  await composer.getByRole('button', { name: 'Send', exact: true }).click();
+  await expect(composer).toHaveCount(0);
+  await expect(page.locator('.mail-row.selected .mail-open')).toBeFocused();
+  console.log('PASS R opens a reply in the text ("ciao" lands there) and Send puts the focus back on the selected row');
+
+  // The list's own heading takes the focus when nothing is selected; it shows where it is.
+  await page.evaluate(() => document.querySelector('.mail-list h1').focus({ focusVisible: true }));
+  const heading = await stop(page, 'list heading (the fallback)');
+  assert.ok(heading.shows, 'the heading that takes the focus when nothing is selected shows its focus');
+  assert.equal(await ring(), 'solid 2px', 'the heading has the focus ring of every control');
+
   await fs.writeFile(path.join(out, 'walk.txt'), walk.join('\n'));
   assert.deepEqual(errors, [], 'no page error');
 } finally {

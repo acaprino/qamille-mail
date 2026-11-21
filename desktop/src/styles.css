@@ -1886,8 +1886,12 @@
   padding: 12px 0;
   font-size: var(--text-md);
   line-height: 1.65;
-  outline: none;
   overflow-wrap: anywhere;
+}
+/* The same ring as every field (ds/styles/system.css); the body is a contenteditable, so it shows it on click too. */
+.rich-content:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 .rich-content p {
   margin: 0 0 10px;
@@ -2437,9 +2441,15 @@
 .startup-state {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
+  /* `safe`: when the window is shorter than the content, or an error is wider than the window (a long
+     unbreakable word at 200 %), the top and the left stay reachable instead of being cut off. */
+  align-items: safe center;
+  justify-content: safe center;
+  /* The root never scrolls (docs/aspetto-nativo.md rule 4): in a short window, at 200 % zoom, the screen
+     scrolls inside itself. */
+  height: 100vh;
+  overflow: auto;
+  overscroll-behavior: contain;
   text-align: center;
   gap: 20px;
   padding: 50px;
@@ -2732,8 +2742,13 @@
 .mail-list:has(.mail-checkbox:checked) .unread-dot {
   visibility: hidden;
 }
-.list-heading h1:focus {
-  outline: none;
+/* The heading that takes the focus when no row is selected (restoreListFocus), or the Drafts page's when the
+   draft that was open is gone, shows it like any control; a mouse click on it, which `:focus-visible`
+   ignores, shows nothing. */
+.list-heading h1:focus-visible,
+.drafts-page h1:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 .reader-toolbar .toolbar-cluster {
   flex-shrink: 0;

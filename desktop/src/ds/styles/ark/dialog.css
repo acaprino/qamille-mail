@@ -27,6 +27,7 @@
   max-height: calc(100vh - 48px);
   padding: 22px;
   overflow: auto;
+  overscroll-behavior: contain;
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -180,6 +181,7 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
 }

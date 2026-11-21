@@ -20,7 +20,8 @@ pub async fn attachment_preview_source(
     Ok(Response::new(frame))
 }
 
-/// Asks where to save the attachment, then writes it. `None` when the dialog is cancelled.
+/// Asks where to save the attachment, then writes it with the Mark-of-the-Web (`zone.rs`). `None` when
+/// the dialog is cancelled.
 #[tauri::command]
 pub async fn attachment_save(
     window: tauri::WebviewWindow,
@@ -48,7 +49,8 @@ pub async fn attachment_save(
     };
     let target = file.path().to_path_buf();
     blocking(move || {
-        std::fs::write(&target, bytes)?;
+        // Marked as coming from the Internet, so Windows warns before a dangerous attachment is opened.
+        crate::zone::save_downloaded(&target, &bytes, None)?;
         Ok(Some(target.to_string_lossy().into_owned()))
     })
     .await

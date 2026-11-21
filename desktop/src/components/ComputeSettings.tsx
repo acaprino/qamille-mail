@@ -346,6 +346,7 @@ export default function ComputeSettings() {
           <RevokeReport
             results={revoked}
             busy={busy}
+            onError={setError}
             onRetry={() =>
               void run(async () => {
                 const again = await Promise.all(

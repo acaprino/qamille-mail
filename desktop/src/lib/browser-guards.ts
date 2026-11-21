@@ -27,6 +27,54 @@ const closest = (target: EventTarget | null, selector: string) =>
   (target as Element | null)?.closest?.(selector) ?? null;
 const FIELD = 'input, textarea, [contenteditable]:not([contenteditable="false"])';
 
+// What a click on a link follows: `a`, an image map's `area`, and an SVG `a`, which has `href` or the
+// older `xlink:href` (the HTML parser puts that one in the XLink namespace; `*|href` takes both).
+const LINK = 'a[*|href], area[*|href]';
+const XLINK = 'http://www.w3.org/1999/xlink';
+
+/** The link `element` is, or is inside, as written (`href`, else `xlink:href`); null outside a link. */
+export function linkHref(element: Element): string | null {
+  const link = closest(element, LINK);
+  return link && (link.getAttribute('href') ?? link.getAttributeNS(XLINK, 'href'));
+}
+
+// What the URL parser drops around an address: C0 controls and the space, and nothing else. JavaScript's
+// `trim` also drops a no-break space, a BOM or an ideographic space, which the parser would keep, making
+// the address a relative one.
+const written = (href: string) => href.replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '');
+
+/** The part of the message a link written as `#…` points at (without the `#`), else null. */
+export function fragmentOf(href: string): string | null {
+  const text = written(href);
+  return text.startsWith('#') ? text.slice(1) : null;
+}
+
+/** The address a link of a message opens in the system browser: the absolute web or mail address it
+ *  wrote, normalized, else null. Decided on the text, never on the address the frame resolves (`linkTarget`),
+ *  which turns a relative link, and a scheme without `//` (`http:foo`), into one of the app's own
+ *  (`http://tauri.localhost/foo`). */
+export function externalAddress(href: string): string | null {
+  const text = written(href);
+  if (!/^(?:https?:\/\/|mailto:)/i.test(text)) return null;
+  try {
+    return new URL(text).href;
+  } catch {
+    return null;
+  }
+}
+
+/** The address of the link `element` is, or is inside, resolved against its document: `a[href]`,
+ *  `area[href]`, an SVG `a`. Null outside a link, or when the address is not one. */
+export function linkTarget(element: Element): string | null {
+  const href = linkHref(element);
+  if (href === null) return null;
+  try {
+    return new URL(href, element.ownerDocument.baseURI).href;
+  } catch {
+    return null;
+  }
+}
+
 /** `target`: the page's window, or the message frame's (MessageHtml.tsx), which the page's own
  *  listeners never see. */
 export function installBrowserGuards(target: Window = window): () => void {
@@ -34,7 +82,8 @@ export function installBrowserGuards(target: Window = window): () => void {
     if (isHistoryButton(event.button)) event.preventDefault();
   };
   const link = (event: MouseEvent) => {
-    if (opensLinkElsewhere(event, closest(event.target, 'a[href]') !== null)) event.preventDefault();
+    const onLink = linkTarget(event.target as Element) !== null;
+    if (opensLinkElsewhere(event, onLink)) event.preventDefault();
   };
   // Drop zones (mail rows, attachments) take their drops first and mark them handled.
   const drop = (event: DragEvent) => {

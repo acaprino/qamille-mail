@@ -1,5 +1,6 @@
-/* Popover (ADR-0008, ADR-0011), on Ark UI Popover: a menu or filter anchored to its button, in a Portal
-   on --z-popover. The buttons inside are the menu items. */
+/* Popover (ADR-0008, ADR-0011), on Ark UI Popover: a filter, a picker or a small form anchored to its
+   button, in a Portal on --z-popover. The buttons inside look like menu items, the popover's first use
+   (a form with real buttons restyles them, as RecordNow.css does); a command menu is a Menu (menu.css). */
 [data-scope='popover'][data-part='positioner'] {
   z-index: var(--z-popover);
 }

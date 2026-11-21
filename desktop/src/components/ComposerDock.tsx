@@ -170,8 +170,12 @@ export default function ComposerDock(props: ComposerDockProps) {
         setWindowClosing(false);
       }
     }, {
-      // Session end: every open draft is written now, not 1.2 s after the last key.
-      sessionEnd: () => Promise.all(latest.current.props.drafts.map((draft) => handles.get(draft.id)?.flush())),
+      // Session end: every open draft is written now, not 1.2 s after the last key. A draft that
+      // fails to save answers false; one with no editor open yet has nothing to save.
+      sessionEnd: async () =>
+        (await Promise.all(latest.current.props.drafts.map((draft) => handles.get(draft.id)?.flush()))).every(
+          (ok) => ok !== false,
+        ),
     });
   }, []);
 
@@ -254,6 +258,7 @@ export default function ComposerDock(props: ComposerDockProps) {
           aria-label={tr('Nuova scheda bozza', 'New draft tab')}
           tip={tr('Nuovo messaggio', 'New message')}
           shortcut="N"
+          aria-keyshortcuts="N"
           onClick={compose}
         >
           <Icon name="plus" size={17} />

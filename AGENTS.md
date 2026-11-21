@@ -55,5 +55,5 @@
 
 - Le regole che fanno sembrare Qamille un'app Windows e non una pagina web (testo non selezionabile, cursori, tema all'avvio, sfondo della finestra, scorciatoie e tasto destro di WebView2) sono in `docs/aspetto-nativo.md`.
 - Dopo ogni modifica a CSS globali, `theme.css`, `theme-boot.js`, finestre Tauri o `desktop/src-tauri/src/`, esegui `node tests/native-feel.mjs` in `desktop/`.
-- Nuova finestra Tauri: chiama `native_feel::harden_webview` e aggiungi `.general_autofill_enabled(false)` e `.on_navigation(native_feel::navigation_guard(..))`; nel suo `main.tsx` chiama `installBrowserGuards()`.
+- Nuova finestra Tauri: chiama `native_feel::harden_webview` e aggiungi `.general_autofill_enabled(false)`, `.disable_drag_drop_handler()` e `.on_navigation(native_feel::navigation_guard(..))`; nel suo `main.tsx` chiama `installBrowserGuards()`.
 - Dopo modifiche al ripristino di WebView2 (`recovery.rs`, `native_feel.rs`) esegui anche `node tests/webview-recovery-native.mjs` in `desktop/`, con Qamille chiuso. Nuovo `--ground`: aggiorna `tauri.conf.json` e `DARK_GROUND` in `native_feel.rs`.

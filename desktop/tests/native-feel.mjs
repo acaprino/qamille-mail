@@ -791,6 +791,91 @@ check('23. the mail rows get a native menu built by an app command (rule 33)', (
 });
 
 // phase 3, Task 3: checks 24-25
+check('24. system notifications come from Rust only, through the registered app identity (rule 28)', () => {
+  // The page has no permission of the plugin and no package of it: it only hears notification-open.
+  for (const file of ['capabilities/main.json', 'capabilities/reminder.json']) {
+    assert.ok(!JSON.parse(read(`src-tauri/${file}`)).permissions.some((p) => /^notification:/.test(p)), `${file}: no notification: permission for the page`);
+  }
+  assert.ok(!/@tauri-apps\/plugin-notification/.test(read('package.json')), 'no notification package for the page');
+  // The toast backend of the official plugin, used directly: the plugin waits for every toast's answer
+  // on a thread of its own, which under Do not disturb stays until Qamille exits.
+  const cargo = read('src-tauri/Cargo.toml');
+  assert.match(cargo, /^tauri-winrt-notification = "0\.8"/m, 'tauri-winrt-notification 0.8 sends the toasts');
+  assert.ok(!/tauri-plugin-notification|notify-rust/.test(cargo + read('src-tauri/Cargo.lock')), 'no notification plugin, no notify-rust');
+  const main = read('src-tauri/src/main.rs');
+  assert.ok(!/tauri_plugin_notification/.test(main), 'no notification plugin in main.rs');
+  assert.match(main, /notifications::notifications_get, notifications::notifications_set,/, 'the switches are app commands');
+  // The identity Windows shows the notifications under: the per-data-folder identifier the toasts go
+  // out with (`app.config().identifier`), registered for the current user, never the process's own
+  // AUMID, which would detach the window from the icons pinned to the taskbar.
+  const notifications = read('src-tauri/src/notifications.rs');
+  // The code without its test module and comments: an assertion on what it does is met by neither.
+  const tests = notifications.indexOf('#[cfg(test)]\nmod tests');
+  assert.ok(tests > 0, 'notifications.rs keeps its tests in a test module');
+  const code = notifications.slice(0, tests).replace(/(^|\s)\/\/.*$/gm, '$1');
+  assert.match(code, /const CLASSES: &str = r"Software\\Classes\\AppUserModelId";/, 'the identity lives under HKCU\\Software\\Classes\\AppUserModelId');
+  assert.match(code, /format!\(r"\{\w+\}\\\{\w+\}"\)/, 'the key is AppUserModelId\\<identifier>');
+  assert.match(rustItem(code, 'fn identifier('), /app\.config\(\)\.identifier/, 'the identifier is the per-data-folder one');
+  // A toast holds its click handler, and nothing of Qamille waits for its answer.
+  const toast = rustItem(code, 'fn toast(');
+  assert.ok(/Toast::new\(aumid\)/.test(toast) && /\.on_activated\(/.test(toast), 'toast() builds the toast with its click handler');
+  const show = rustItem(code, 'fn show(');
+  assert.match(show, /if uses_identity\(\) \{ identifier\(app\) \}/, 'a toast goes out under the registered identity');
+  assert.match(show, /toast\([\s\S]*\)\s*\.show\(\);/, 'show() shows the toast and returns');
+  for (const [name, body] of [['toast', toast], ['show', show]]) {
+    assert.ok(!/thread|spawn|recv|wait_for|on_dismissed|channel/.test(body), `${name}() starts nothing that waits for the toast`);
+  }
+  assert.ok(/HKEY_CURRENT_USER/.test(code) && !/HKEY_LOCAL_MACHINE/.test(code), 'only for the current user');
+  for (const file of fs.readdirSync(path.join(desktop, 'src-tauri/src'), { recursive: true })) {
+    if (!String(file).endsWith('.rs')) continue;
+    assert.ok(!/SetCurrentProcessExplicitAppUserModelID/.test(read(`src-tauri/src/${file}`)), `${file}: never the process's own AUMID`);
+  }
+  // The three facts never reach the page: the sink hands them to notifications.rs first.
+  const sink = rustItem(read('src-tauri/src/runtime.rs'), 'impl EventSink for TauriEventSink {');
+  const observed = sink.indexOf('crate::notifications::observe(');
+  assert.ok(observed >= 0 && observed < sink.indexOf('emit_to('), 'TauriEventSink::emit asks notifications::observe before emit_to');
+  assert.match(sink, /if crate::notifications::observe\(&self\.0, &event\) \{\s*return;\s*\}/, 'what observe takes is not forwarded');
+  const observe = rustItem(code, 'pub fn observe(');
+  for (const variant of ['MailArrived', 'ScheduledSendFailed', 'SignInExpired']) {
+    assert.match(observe, new RegExp(`AppEvent::${variant} \\{`), `observe takes ${variant}`);
+  }
+  assert.match(observe, /=> \{[\s\S]*true\s*\}\s*_ => false/, 'observe answers true for the three and false for the rest');
+  // The Professional's uninstaller takes the identity away: it reads it from the data folder, before
+  // the data may go, and only a Qamille identifier.
+  const file = code.match(/const AUMID_FILE: &str = "([^"]+)";/);
+  assert.ok(file, 'notifications.rs names the file with the registered identifier');
+  const after = nshMacro(read('src-tauri/windows/installer-hooks.nsh'), 'NSIS_HOOK_POSTUNINSTALL');
+  const update = after.slice(after.search(/\$\{If\}\s+\$UpdateMode\s*<>\s*1/));
+  assert.ok(update.length < after.length, 'the hook has the If $UpdateMode <> 1 block');
+  const open = update.search(new RegExp(String.raw`FileOpen\s+\$\d\s+"\$INSTDIR\\data\\${file[1].replace('.', '\\.')}"\s+r`));
+  const prefix = update.search(/StrCpy\s+\$\d\s+\$\d\s+19\s+\$\{If\}\s+\$\d\s+==\s+"com\.qamille\.desktop"/);
+  const remove = update.search(/DeleteRegKey\s+HKCU\s+"Software\\Classes\\AppUserModelId\\\$\d"/);
+  assert.ok(open >= 0 && prefix > open && remove > prefix, 'the hook reads the identifier, checks that it begins with com.qamille.desktop, then removes its key');
+  assert.ok(remove < update.search(/\$DeleteAppDataCheckboxState/), 'the identity goes before the data folder may');
+  assert.match(read('src-tauri/tauri.conf.json'), /"identifier": "com\.qamille\.desktop"/, 'the identifiers still begin with com.qamille.desktop (19 characters)');
+});
+
+check('25. the taskbar shows unread mail and the full indexing (rule 30)', () => {
+  const code = read('src-tauri/src/taskbar.rs').replace(/(^|\s)\/\/.*$/gm, '$1');
+  for (const call of ['set_overlay_icon', 'set_progress_bar']) {
+    assert.ok(code.includes(`.${call}(`), `taskbar.rs calls ${call}`);
+    for (const file of fs.readdirSync(path.join(desktop, 'src-tauri/src'), { recursive: true })) {
+      if (String(file).endsWith('.rs') && !String(file).endsWith('taskbar.rs')) {
+        assert.ok(!read(`src-tauri/src/${file}`).includes(`.${call}(`), `${file}: only taskbar.rs calls ${call}`);
+      }
+    }
+  }
+  assert.ok(/get_webview_window\("main"\)/.test(code) && !/get_webview_window\("(?!main")/.test(code), 'only on the main window');
+  // The number is the sidebar's: Rust counts it with the snapshot's own rule, never the page.
+  assert.match(code, /\.inbox_unread\(\)/, 'the count comes from WorkspaceService::inbox_unread');
+  const workspace = read('../app/src/application/workspace.rs');
+  assert.match(rustItem(workspace, 'pub fn snapshot('), /counts_as_inbox_unread\(/, 'snapshot counts the Inbox with counts_as_inbox_unread');
+  assert.match(rustItem(workspace, 'pub fn inbox_unread('), /counts_as_inbox_unread\(/, 'inbox_unread uses the same rule');
+  assert.match(rustItem(read('src-tauri/src/runtime.rs'), 'impl EventSink for TauriEventSink {'), /crate::taskbar::observe\(&self\.0, &event\);/, 'the sink shows every event to the taskbar');
+  assert.match(rustItem(read('src-tauri/src/commands/assistant.rs'), 'pub async fn search_reindex('), /crate::taskbar::reset_index\(\);/, '«Reindex» shows the bar again');
+  assert.match(code, /badge_rgba\(/, 'the overlay is drawn by taskbar_rules::badge_rgba');
+  assert.match(code, /crate::background::set_tray_tooltip\(/, 'the tray tooltip says how many are unread');
+});
 
 // phase 3, Task 4: check 26
 const { isMailto, parseMailto } = await import(pathToFileURL(path.join(desktop, 'src/lib/mailto.ts')).href);

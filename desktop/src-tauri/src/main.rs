@@ -16,6 +16,10 @@ mod background_rules;
 mod placement;
 
 // phase 3, Task 3: modules
+mod notifications;
+mod notify_rules;
+mod taskbar;
+mod taskbar_rules;
 
 // phase 3, Task 4: modules
 mod launch_args;
@@ -258,6 +262,7 @@ fn main() {
             semantic_search,
             index_mail,
             indexing_status,
+            notifications::notifications_get, notifications::notifications_set,
             configure_indexing,
             search_model_installed,
             search_model_status,

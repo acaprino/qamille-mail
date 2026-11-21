@@ -49,6 +49,25 @@
     ${If} $0 != ""
       Delete "$0\Microsoft\Windows\Start Menu\Programs\Startup\Qamille-worker.vbs"
     ${EndIf}
+    ; The identity of the Windows notifications (desktop/src-tauri/src/notifications.rs): the app
+    ; registered it under HKCU\Software\Classes\AppUserModelId\<identifier> and wrote the identifier in
+    ; data\notification-aumid.txt, read here before the data folder may go below. Only an identifier of
+    ; Qamille (com.qamille.desktop...) is removed. A manual upgrade removes it too; the new version
+    ; registers it again at its first start while notifications are on.
+    Push $1
+    Push $2
+    ClearErrors
+    FileOpen $0 "$INSTDIR\data\notification-aumid.txt" r
+    ${IfNot} ${Errors}
+      FileRead $0 $1
+      FileClose $0
+      StrCpy $2 $1 19
+      ${If} $2 == "com.qamille.desktop"
+        DeleteRegKey HKCU "Software\Classes\AppUserModelId\$1"
+      ${EndIf}
+    ${EndIf}
+    Pop $2
+    Pop $1
   ${EndIf}
 
   ; Qamille keeps its data and credentials.key in the folder "data" beside the program

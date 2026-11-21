@@ -67,7 +67,7 @@ fn token(account: &Account) -> AppResult<String> {
             "Reconnect using Google OAuth to synchronize cloud drafts",
         ));
     }
-    super::oauth::access_token(account).map_err(AppError::external)
+    super::oauth::access_token(account).map_err(super::oauth::provider_error)
 }
 fn path(id: &str) -> AppResult<String> {
     if id.is_empty()

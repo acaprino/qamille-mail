@@ -39,15 +39,28 @@ pub enum AppEvent {
     /// ids are their `seq`. The UI re-reads the few rows it shows, so the same
     /// event serves this process and, through the change feed, the MCP's.
     ActivityChanged { ids: Vec<u64> },
+    // The three facts a Windows notification may announce (docs/aspetto-nativo.md, rule 28). The
+    // desktop sink takes them and never forwards them to the page; MCP and the worker drop them
+    // with `NullSink`.
+    /// New unread mail reached the Inbox with a sync of an account that had already synced in this
+    /// process: never its first sync, never what arrived while Qamille was closed, never older mail
+    /// the sync is still bringing in (`MailService::sync_selected`).
+    MailArrived { account_id: u32, ids: Vec<u64> },
+    /// A scheduled message could not be sent (`SchedulerService::send_due`), once per draft.
+    ScheduledSendFailed { draft_id: u64, subject: String },
+    /// A mail account (`Some`) or the Qamille server (`None`) no longer accepts the sign-in: once,
+    /// until a sync works again.
+    SignInExpired { account_id: Option<u32> },
 }
 impl AppEvent {
-    /// Whether the event announces an empty change: `EmailChanged` or
-    /// `DraftsChanged` without ids (INV-004: no event with an empty payload).
-    /// `ServiceContext::update_with_events` drops these, keeping the order of
-    /// the events that remain.
+    /// Whether the event announces an empty change: `EmailChanged`,
+    /// `DraftsChanged` or `MailArrived` without ids (INV-004: no event with an
+    /// empty payload). `ServiceContext::update_with_events` drops these,
+    /// keeping the order of the events that remain.
     pub fn is_empty_change(&self) -> bool {
         match self {
             Self::EmailChanged { ids, .. }
+            | Self::MailArrived { ids, .. }
             | Self::DraftsChanged { ids }
             | Self::ActivityChanged { ids } => ids.is_empty(),
             _ => false,
@@ -217,6 +230,13 @@ mod tests {
     }
 
     #[test]
+    fn an_arrival_without_ids_is_dropped() {
+        assert!(AppEvent::MailArrived { account_id: 1, ids: vec![] }.is_empty_change());
+        assert!(!AppEvent::MailArrived { account_id: 1, ids: vec![4] }.is_empty_change());
+        assert!(!AppEvent::SignInExpired { account_id: None }.is_empty_change());
+    }
+
+    #[test]
     fn change_events_without_ids_are_dropped_keeping_the_order() {
         let (context, _, recorder) = context();
         context
@@ -348,6 +368,15 @@ mod tests {
             ),
             (AppEvent::Notice { text: "x".into() }, "notice"),
             (AppEvent::ActivityChanged { ids: vec![1] }, "activity-changed"),
+            (AppEvent::MailArrived { account_id: 1, ids: vec![2] }, "mail-arrived"),
+            (
+                AppEvent::ScheduledSendFailed {
+                    draft_id: 3,
+                    subject: "Offerta".into(),
+                },
+                "scheduled-send-failed",
+            ),
+            (AppEvent::SignInExpired { account_id: None }, "sign-in-expired"),
         ];
         for (event, kind) in kinds {
             let json = serde_json::to_value(&event).unwrap();

@@ -1512,7 +1512,7 @@ fn email_row(email: &Email) -> AppResult<Vec<Value>> {
         search_index, id, account_id, folder, thread_id, message_id, local_sent, remote_deleted,
         outgoing_fingerprint, uid, remote_folder, remote_uid_validity, remote_content_hash,
         remote_global_id, remote_locations: _, from_name, from_addr, to, cc, subject, body,
-        body_html: _, remote_only, storage_evicted, date, date_missing, read, starred, pinned,
+        body_html: _, remote_only, storage_evicted, date, date_missing, received_at: _, read, starred, pinned,
         done, muted, set_aside, replied, priority_thread, category, labels: _, snoozed_until,
         reminder_at, due, assigned_to, attachments: _, classified, returned_at, bulk,
         auto_submitted, calendar, in_reply_to,
@@ -1590,6 +1590,8 @@ fn email_from(c: &mut Cur) -> rusqlite::Result<Email> {
         storage_evicted: c.get()?,
         date: c.get()?,
         date_missing: c.get()?,
+        // Only for the sync that downloaded it (`Email::received_at`): never stored.
+        received_at: None,
         read: c.get()?,
         starred: c.get()?,
         pinned: c.get()?,

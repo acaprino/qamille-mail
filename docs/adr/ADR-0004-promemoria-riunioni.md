@@ -2,7 +2,7 @@
 adr_id: ADR-0004
 version: 1
 title: Promemoria riunioni in una finestra Tauri guidata dal motore Rust
-status: Accepted
+status: Superseded
 author: Alfio Caprino
 scope:
   paths:
@@ -24,7 +24,7 @@ last_verified_sha: null
 retired_on: null
 retired_reason: null
 supersedes:
-superseded_by: null
+superseded_by: ADR-0004 v2
 changes:
 ---
 

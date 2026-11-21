@@ -120,6 +120,11 @@ pub struct Email {
     /// their historical fallback timestamps cannot be distinguished reliably.
     #[serde(default)]
     pub date_missing: bool,
+    /// When the provider received the message (IMAP INTERNALDATE), set by a sync download only. It
+    /// decides whether new mail is an arrival (`MailService::sync_selected`), which the Date header
+    /// cannot: a delayed delivery keeps the date it was written. Never stored.
+    #[serde(skip)]
+    pub received_at: Option<i64>,
     pub read: bool,
     pub starred: bool,
     pub pinned: bool,

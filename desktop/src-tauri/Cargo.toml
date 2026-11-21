@@ -24,6 +24,9 @@ open = "5"
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.39"
 windows-core = "0.62"
+# Windows notifications, sent from Rust only (src/notifications.rs): the toast backend of the official
+# notification plugin, used directly so that a click reaches its own handler and no thread waits for it.
+tauri-winrt-notification = "0.8"
 # The version already in Cargo.lock (tao, wry and webview2-com use it), for the
 # title bar, session end and system menu calls of src/window_shell.rs and the
 # Attachment Services call of src/zone.rs.

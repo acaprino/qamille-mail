@@ -10,7 +10,7 @@ declare global {
      * `passphrase` is the transfer passphrase that opens it; `startedOver` counts the start-overs.
      */
     __previewVault?: {
-      state?: 'ready' | 'locked' | 'damaged' | 'unavailable';
+      state?: 'ready' | 'locked' | 'damaged' | 'unavailable' | 'storage';
       transfer?: boolean;
       passphrase?: string;
       startedOver?: number;
@@ -29,6 +29,8 @@ function status(): VaultStatus {
       return { state: 'locked', transfer: !!vault.transfer };
     case 'damaged':
       return { state: 'damaged', code: 'vault_damaged', message: 'The protected credentials key is damaged. The original files are unchanged.' };
+    case 'storage':
+      return { state: 'damaged', code: 'vault_storage', message: 'Portable credentials storage failed: Access is denied. (os error 5)' };
     case 'unavailable':
       return {
         state: 'damaged',

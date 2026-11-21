@@ -58,6 +58,8 @@ const TEXT = {
     unavailable: 'Windows could not open the credentials key right now (error 0x8007000D). Nothing was changed: try again later.',
     notice: 'The credentials of the other computer are in data\\credentials-set-aside-20261121-101500',
     putBack: 'If Windows opens them again later, they can be put back',
+    filesNow: 'The credential files cannot be read right now',
+    storage: 'Portable credentials storage failed: Access is denied. (os error 5)',
   },
   'it-IT': {
     sidebar: 'Barra laterale', workspace: 'Alex Spazio personale', accounts: 'Account', credentials: 'Credenziali',
@@ -78,6 +80,8 @@ const TEXT = {
     unavailable: 'Windows non riesce ad aprire ora la chiave delle credenziali (errore 0x8007000D). Non è cambiato niente: riprova più tardi.',
     notice: 'Le credenziali dell’altro computer sono in data\\credentials-set-aside-20261121-101500',
     putBack: 'Se poi Windows torna ad aprirle, si possono rimettere a posto',
+    filesNow: 'I file delle credenziali non si leggono ora',
+    storage: 'I file delle credenziali non si leggono o non si scrivono ora: Access is denied. (os error 5)',
   },
 };
 
@@ -188,6 +192,21 @@ try {
       await expect(toast(page, t.previous)).toBeVisible();
       assert.equal((await vault(page)).startedOver, 1);
       console.log(`PASS [${locale}] when «Try again» fails, a confirmed new sign-in sets the credentials aside`);
+      await context.close();
+    }
+    {
+      // Files that cannot be read right now: only «Try again», with its own words, never a start-over.
+      const { page, context } = await open({ state: 'storage' }, locale);
+      const dialog = page.getByRole('dialog', { name: t.doNotOpen });
+      await expect(dialog).toContainText(t.filesNow);
+      await expect(dialog).not.toContainText(t.rightNow);
+      await dialog.getByRole('button', { name: t.retry, exact: true }).click();
+      await expect(toast(page, t.storage)).toBeVisible();
+      await dialog.getByRole('button', { name: t.retry, exact: true }).click();
+      await expect(dialog.getByRole('button', { name: t.retry, exact: true })).toBeEnabled();
+      await expect(dialog.getByRole('button', { name: t.signInAgain })).toHaveCount(0);
+      assert.equal((await vault(page)).startedOver, undefined);
+      console.log(`PASS [${locale}] files that cannot be read now get only «Try again», never a start-over`);
       await context.close();
     }
     {

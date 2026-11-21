@@ -28,7 +28,9 @@ export default function VaultUnlock({ status, done, error, children }: Props) {
   // «Try again» did not help: the key may stay unopenable, so the way out is offered.
   const [retried, setRetried] = useState(false);
   const transfer = status.state === 'locked' && status.transfer;
-  const unopenable = retryable(status);
+  // Windows cannot open the key: after a failed «Try again», a confirmed start-over is the way
+  // out. Files that cannot be read now (`vault_storage`) only ever get «Try again».
+  const unopenable = status.state === 'damaged' && status.code === 'vault_unavailable';
 
   async function run(work: () => Promise<void>) {
     setBusy(true);
@@ -98,12 +100,17 @@ export default function VaultUnlock({ status, done, error, children }: Props) {
       {status.state === 'damaged' ? (
         <>
           <p>
-            {retryable(status)
+            {unopenable
               ? tr(
                   'Windows non riesce ad aprire ora la chiave delle credenziali. Non è cambiato niente: riprova tra poco, o dopo aver riavviato il computer.',
                   'Windows cannot open the credentials key right now. Nothing was changed: try again shortly, or after restarting the computer.',
                 )
-              : tr('Le credenziali salvate non si aprono.', 'The saved credentials do not open.')}
+              : retryable(status)
+                ? tr(
+                    'I file delle credenziali non si leggono ora: forse un altro programma li tiene aperti. Non è cambiato niente: riprova tra poco.',
+                    'The credential files cannot be read right now: another program may be holding them. Nothing was changed: try again shortly.',
+                  )
+                : tr('Le credenziali salvate non si aprono.', 'The saved credentials do not open.')}
           </p>
           <p className="field-help">{backendText(status.message)}</p>
         </>
@@ -159,12 +166,12 @@ export default function VaultUnlock({ status, done, error, children }: Props) {
             {children}
           </div>
         </form>
-      ) : unopenable ? (
+      ) : retryable(status) ? (
         <div className="button-row">
           <Button variant="primary" disabled={busy} onClick={() => void retry()}>
             {busy ? tr('Attendi…', 'Working…') : tr('Riprova', 'Try again')}
           </Button>
-          {retried && (
+          {retried && unopenable && (
             <Button variant="secondary" disabled={busy} onClick={() => setConfirming(true)}>
               {tr('Accedi di nuovo agli account', 'Sign in to the accounts again')}
             </Button>

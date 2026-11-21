@@ -524,6 +524,62 @@ check("18. the calendar sheet's end-of-session step never calls the provider (ru
 
 // phase 3, Task 2: check 21
 
+check('21. the saved placement is applied before the first show and only on a connected monitor (rule 29)', () => {
+  const shell = read('src-tauri/src/window_shell.rs');
+  const placement = read('src-tauri/src/placement.rs');
+  // The decisions are pure (std only, tested with `rustc --test`), and the module is declared once.
+  assert.ok(!/^\s*use\s+(tauri|serde|crate)\b/m.test(placement), 'placement.rs must stay free of Tauri, serde and the app');
+  assert.match(read('src-tauri/src/main.rs'), /^mod placement;$/m, 'main.rs declares `mod placement;`');
+  assert.ok(!/\bplacement::/.test(read('src-tauri/src/main.rs')), 'main.rs only declares the module: window_shell.rs does the rest');
+  // The preferences file keeps it, and an older file without it still reads.
+  const preferences = rustItem(shell, 'struct WindowPreferences {');
+  assert.match(preferences, /#\[serde\([^\]]*\bdefault\b[^\]]*\)\]\s*placement:/, 'WindowPreferences.placement needs #[serde(default ...)]');
+  // Applied by the startup preferences, which never show the window themselves.
+  const startup = rustItem(shell, 'pub fn apply_startup_preferences(');
+  assert.match(startup, /\bapply_placement\(window\b/, 'apply_startup_preferences must apply the saved placement');
+  assert.ok(!/\.show\(/.test(startup), 'apply_startup_preferences must not show the window: the caller does, once it is painted');
+  const feel = read('src-tauri/src/native_feel.rs');
+  const preparing = ['prepare_main_window(', 'show_main_window('].find((name) => feel.includes(`pub fn ${name}`));
+  assert.ok(preparing, 'native_feel.rs has no function that prepares the main window');
+  const prepare = rustItem(feel, `pub fn ${preparing}`);
+  assert.match(prepare, /\bapply_startup_preferences\(/, `${preparing.slice(0, -1)} must apply the startup preferences`);
+  if (/\.show\(/.test(prepare)) {
+    assert.ok(prepare.search(/\.show\(/) > prepare.search(/\bapply_startup_preferences\(/), 'the placement must be applied before show()');
+  }
+  // Only on a monitor that is connected now, with the work area (not the taskbar) as the limit.
+  const apply = rustItem(shell, 'fn apply_placement(');
+  assert.match(apply, /\.available_monitors\(\)/, 'apply_placement must ask for the connected monitors');
+  assert.match(apply, /\.work_area\(\)/, 'apply_placement must use the work area of each monitor');
+  assert.match(apply, /\bplacement::restore\(/, 'apply_placement must decide with placement::restore');
+  assert.match(apply, /\bmin_logical_size\(/, 'apply_placement must pass the minimum size of the window config');
+  assert.match(apply, /\.set_position\([\s\S]*\.set_size\(/, 'position first (a move to another scale settles), then size');
+  assert.ok(!/\.show\(|\.maximize\(/.test(apply), 'apply_placement only places: it neither shows nor maximizes');
+  // Maximized: the normal rectangle is applied and remembered, then the window is maximized, still hidden.
+  assert.match(startup, /\bapply_placement\([\s\S]*\bremember_start_rectangle\([\s\S]*\.maximize\(\)/, 'the rectangle is applied and remembered before maximize()');
+  // The saving is the window's own listener, registered from attach_main (no line in main.rs).
+  assert.match(rustItem(shell, 'pub fn attach_main('), /\bwatch_placement\(/, 'attach_main must register the placement saver');
+  const watch = rustItem(shell, 'fn watch_placement(');
+  assert.match(watch, /\.on_window_event\(/, 'watch_placement registers a window event listener');
+  for (const event of ['Moved', 'Resized', 'ScaleFactorChanged', 'CloseRequested', 'Destroyed']) {
+    assert.ok(new RegExp(`WindowEvent::${event}\\b`).test(watch), `the placement saver must listen to ${event}`);
+  }
+  assert.match(watch, /Moved\([^)]*\)\s*\|[\s\S]*?ScaleFactorChanged\b[\s\S]*?=>\s*\{[\s\S]*?save_placement_soon\(\)/, 'a move, a resize and a scale change are saved after a delay');
+  assert.match(watch, /CloseRequested\b[\s\S]*?=>\s*\{[\s\S]*?track_placement\([\s\S]*?\bsave_placement\(\)/, 'a close request saves at once, after taking in where the window is');
+  assert.match(watch, /Destroyed\s*=>\s*save_placement\(\)/, 'a destroyed window saves at once');
+  assert.match(shell, /PLACEMENT_DELAY: Duration = Duration::from_millis\(500\)/, 'moves and resizes are saved 500 ms after the last one');
+  // Never from a minimized or hidden window.
+  const track = rustItem(shell, 'fn track_placement(');
+  assert.match(track, /\.is_minimized\(\)/, 'a minimized window is never saved');
+  assert.match(track, /\.is_visible\(\)/, 'a hidden window is never saved');
+  // A maximize moves the window before tao's flag changes: Windows is asked as well, or the screen-sized rectangle is saved.
+  assert.match(rustItem(shell, 'fn is_maximized('), /\bis_zoomed\b/, 'is_maximized must ask Windows (IsZoomed) as well as tao');
+  // The window config keeps centring it and keeping it in the work area where nothing is applied.
+  const main = JSON.parse(read('src-tauri/tauri.conf.json')).app.windows.find((w) => w.label === 'main');
+  assert.equal(main.center, true, 'main window needs center: true (no saved placement, or a monitor that is gone)');
+  assert.equal(main.preventOverflow, true, 'main window needs preventOverflow: true');
+  assert.ok(main.minWidth > 0 && main.minHeight > 0, 'minWidth and minHeight are the least a saved size may have');
+});
+
 // phase 3, Task 5: check 22
 
 // phase 3, Task 6: check 23

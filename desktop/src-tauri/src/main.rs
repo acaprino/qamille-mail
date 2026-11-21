@@ -11,6 +11,7 @@ mod zone;
 // phase 3, Task 1: modules
 
 // phase 3, Task 2: modules
+mod placement;
 
 // phase 3, Task 3: modules
 

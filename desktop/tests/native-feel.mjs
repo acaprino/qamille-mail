@@ -412,7 +412,7 @@ check('15. the reminder takes no file drops and every webview refuses frame, his
   );
 });
 
-check('16. a link in a message opens only an absolute web or mail address, or scrolls to a part of the message (rule 23)', () => {
+check('16. a link in a message opens only an address written with http://, https:// or mailto:, or scrolls to a part of the message (rule 23)', () => {
   assert.equal(externalAddress('https://example.com/x'), 'https://example.com/x');
   // What the URL parser drops around an address, and nothing more.
   assert.equal(externalAddress(' \t https://example.com/x\n '), 'https://example.com/x');

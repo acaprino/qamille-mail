@@ -306,7 +306,7 @@ release compilato da `ac0b42e` con `--features custom-protocol` (contiene `theme
 `release/Qamille.exe`. Windows 11 26200, WebView2 157, monitor 1920×1200 al 100 %.
 
 Legenda:
-- **automatico**: test che girano senza l'exe, verdi il 2026-11-21: `node tests/native-feel.mjs` (17 controlli),
+- **automatico**: test che girano senza l'exe, verdi il 2026-11-21: `node tests/native-feel.mjs` (18 controlli),
   `rustc --test src-tauri/src/shell_rules.rs` (15 test), `node --test tests/session-end.mjs tests/close-guards.mjs
   tests/shortcut-guard.mjs`, `npm run test:ds`; i test browser elencati (`npm run test:browser -- …`) sono 24 su 25 al
   primo giro (il fallito, `mailbox-sync-ui`, instabile, è poi passato 3 volte su 3: vedi «Test browser» sotto la tabella); i `cargo test` indicati sono quelli eseguiti nei

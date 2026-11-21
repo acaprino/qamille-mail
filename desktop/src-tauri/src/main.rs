@@ -13,10 +13,17 @@ mod background;
 mod background_rules;
 
 // phase 3, Task 2: modules
+mod placement;
 
 // phase 3, Task 3: modules
+mod notifications;
+mod notify_rules;
+mod taskbar;
+mod taskbar_rules;
 
 // phase 3, Task 4: modules
+mod launch_args;
+mod mail_handler;
 
 // phase 3, Task 5: modules
 mod saved_files;
@@ -37,15 +44,18 @@ use commands::sync::*;
 use commands::legacy_local::*;
 
 fn main() {
-    if matches!(std::env::args().nth(1).as_deref(), Some("--skill" | "skill")) {
+    // A start for a mail link has the link first and nothing after it counts: a link passed unquoted
+    // (`mailto:x" --worker "`) never picks one of these modes.
+    let args = launch_args::effective(std::env::args().collect());
+    if matches!(args.get(1).map(String::as_str), Some("--skill" | "skill")) {
         print!("{}", qamille::infrastructure::assistant_packages::skill_text());
         return;
     }
-    if std::env::args().any(|a| a == "--mcp") {
+    if args.iter().any(|a| a == "--mcp") {
         qamille::mcp::serve();
         return;
     }
-    if std::env::args().any(|a| a == "--worker") {
+    if args.iter().any(|a| a == "--worker") {
         qamille::mcp::server::worker();
         return;
     }
@@ -246,12 +256,14 @@ fn main() {
             save_signature,
             delete_signature,
             open_link,
+            launch_args::take_launch_mailto, mail_handler::mail_handler_status, mail_handler::mail_handler_register, mail_handler::mail_handler_unregister,
             summarize_mail,
             suggest_reply,
             ask_assistant,
             semantic_search,
             index_mail,
             indexing_status,
+            notifications::notifications_get, notifications::notifications_set,
             configure_indexing,
             search_model_installed,
             search_model_status,
@@ -360,7 +372,7 @@ fn setup_app(
     background::install(app)?;
     // Started by Windows at sign-in: ready in the tray, and shown by the first restore. A restart
     // comes back as the window was.
-    let args: Vec<String> = std::env::args().collect();
+    let args: Vec<String> = launch_args::effective(std::env::args().collect());
     if background_rules::stays_hidden(&args, background::restarted_hidden()) {
         native_feel::prepare_main_window(&main_window);
         native_feel::set_webview_visible(&main_window, false);
@@ -368,6 +380,11 @@ fn setup_app(
         native_feel::show_main_window(&main_window);
     }
     // phase 3, Task 4: launch arguments
+    // A mailto: link Windows started Qamille with waits for the page (`take_launch_mailto`). A restart
+    // keeps the first start's arguments, whose link was already opened.
+    if background::restarted_hidden().is_none() {
+        launch_args::route(app.handle(), &args);
+    }
     recovery::watch_startup(&main_window);
     reminders::spawn(app.handle().clone(), state.clone())?;
     if demo

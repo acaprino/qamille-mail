@@ -160,7 +160,8 @@ fn tray_notice(app: &AppHandle) {
 pub fn restore(app: &AppHandle) {
     let Some(window) = app.get_webview_window("main") else { return };
     crate::native_feel::set_webview_visible(&window, true);
-    let _ = window.show();
+    // `show_main` opens a maximized saved placement maximized, the first time (rule 29).
+    crate::window_shell::show_main(&window);
     let _ = window.unminimize();
     let _ = window.set_focus();
     // A page that did not draw while the window was hidden asks now, with the window in view.
@@ -175,11 +176,12 @@ pub fn quit(app: &AppHandle) {
     let _ = window.close();
 }
 
-/// Qamille started again while it runs: the window comes back. `args` and `cwd` are the second
-/// start's.
+/// Qamille started again while it runs: the window comes back, then a mailto: link it was started
+/// with goes to the composer (`launch_args`). `args` and `cwd` are the second start's.
 pub fn second_instance(app: &AppHandle, args: Vec<String>, cwd: String) {
-    let _ = (&args, &cwd);
+    let _ = &cwd;
     restore(app);
+    crate::launch_args::route(app, &args);
 }
 
 /// Whether this is the installed Professional: Tauri's NSIS installer writes `uninstall.exe` beside

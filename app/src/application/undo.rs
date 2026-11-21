@@ -1107,9 +1107,11 @@ mod tests {
     mod quitting {
         //! «Esci» with actions still undoable: they are sent before Qamille leaves (audit Q8).
         use super::*;
-        use crate::application::{compute::NoCompute, ports::*};
-        use crate::domain::model::{Account, Attachment};
-        use crate::infrastructure::repository::MemoryRepository;
+        use crate::{
+            application::{compute::NoCompute, ports::*},
+            domain::model::{Account, Attachment},
+            infrastructure::repository::MemoryRepository,
+        };
 
         const NOW: i64 = 1_000_000;
 

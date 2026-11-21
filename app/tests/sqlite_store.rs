@@ -336,6 +336,8 @@ fn full_store(data: &Path) -> Store {
                 storage_evicted: true,
                 date: 1_700_000_000,
                 date_missing: true,
+                // Never stored: the round trip gives it back empty.
+                received_at: None,
                 read: true,
                 starred: true,
                 pinned: true,

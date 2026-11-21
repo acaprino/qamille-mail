@@ -6,11 +6,14 @@
 //! F11, F12). The pure rules live in `shell_rules.rs`, tested without Windows.
 #![cfg_attr(not(windows), allow(dead_code, unused_variables))]
 
+use crate::placement::{self, Placement, SavedPlacement, ShowPath, WorkArea};
 use crate::shell_rules::{self, Appearance, ZoomStep};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::path::PathBuf;
 use std::sync::Mutex;
-use tauri::{AppHandle, Emitter, Theme, WebviewWindow};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::time::Duration;
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Theme, WebviewWindow, WindowEvent};
 
 /// Sent to the main window: `last: false` when Windows asks whether it may end
 /// the session (save, change nothing irreversible), `last: true` when it does
@@ -25,8 +28,9 @@ pub struct SessionEnding {
 }
 
 /// The window preferences Rust must know before the page has loaded: the
-/// appearance (to paint the first frame) and the app zoom. The page keeps its
-/// own copy of the appearance in localStorage for `theme-boot.js`.
+/// appearance (to paint the first frame), the app zoom and where the window was.
+/// The page keeps its own copy of the appearance in localStorage for
+/// `theme-boot.js`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 struct WindowPreferences {
     #[serde(default = "system")]
@@ -37,6 +41,11 @@ struct WindowPreferences {
     /// system menu entry and the recovery dialogs (`recovery.rs`).
     #[serde(default)]
     italian: Option<bool>,
+    /// Where the window was when it last closed (`placement.rs`). A file from an
+    /// older version has none, and one that cannot be read does not cost the
+    /// appearance and the zoom: it reads as none.
+    #[serde(default, deserialize_with = "lenient_placement", skip_serializing_if = "Option::is_none")]
+    placement: Option<StoredPlacement>,
 }
 fn system() -> String {
     "system".into()
@@ -46,8 +55,37 @@ fn unit() -> f64 {
 }
 impl Default for WindowPreferences {
     fn default() -> Self {
-        Self { appearance: system(), zoom: unit(), italian: None }
+        Self { appearance: system(), zoom: unit(), italian: None, placement: None }
     }
+}
+
+/// `placement::SavedPlacement` as it is written in `window-preferences.json`
+/// (`placement.rs` has no dependencies, serde included, so it is tested alone).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+struct StoredPlacement {
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+    scale: f64,
+    #[serde(default)]
+    maximized: bool,
+}
+impl From<SavedPlacement> for StoredPlacement {
+    fn from(saved: SavedPlacement) -> Self {
+        Self { x: saved.x, y: saved.y, width: saved.width, height: saved.height, scale: saved.scale, maximized: saved.maximized }
+    }
+}
+impl From<StoredPlacement> for SavedPlacement {
+    fn from(stored: StoredPlacement) -> Self {
+        Self { x: stored.x, y: stored.y, width: stored.width, height: stored.height, scale: stored.scale, maximized: stored.maximized }
+    }
+}
+
+/// A `placement` of the wrong shape (a hand edit) reads as none instead of failing the whole file.
+fn lenient_placement<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<StoredPlacement>, D::Error> {
+    let value = serde_json::Value::deserialize(deserializer)?;
+    Ok(serde_json::from_value(value).ok())
 }
 
 static PREFERENCES: Mutex<Option<WindowPreferences>> = Mutex::new(None);
@@ -56,28 +94,43 @@ fn preferences_path() -> PathBuf {
     qamille::model::Store::data_dir().join("window-preferences.json")
 }
 
-fn preferences() -> WindowPreferences {
-    let mut cached = PREFERENCES.lock().unwrap_or_else(|e| e.into_inner());
-    cached
-        .get_or_insert_with(|| {
-            std::fs::read_to_string(preferences_path())
-                .ok()
-                .and_then(|text| serde_json::from_str(&text).ok())
-                .unwrap_or_default()
-        })
-        .clone()
+fn load_preferences() -> WindowPreferences {
+    std::fs::read_to_string(preferences_path())
+        .ok()
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .unwrap_or_default()
 }
 
-fn save_preferences(next: WindowPreferences) {
+fn preferences() -> WindowPreferences {
     let mut cached = PREFERENCES.lock().unwrap_or_else(|e| e.into_inner());
-    if cached.as_ref() == Some(&next) {
-        return;
+    cached.get_or_insert_with(load_preferences).clone()
+}
+
+/// Changes the preferences while holding the lock and writes them if they changed. Every change goes
+/// through here, so that the commands (appearance, zoom) and the placement saver, which runs on its
+/// own thread, never write back an older copy of what the other one has just saved.
+fn update_preferences<R>(change: impl FnOnce(&mut WindowPreferences) -> R) -> R {
+    let mut cached = PREFERENCES.lock().unwrap_or_else(|e| e.into_inner());
+    let mut next = cached.clone().unwrap_or_else(load_preferences);
+    let result = change(&mut next);
+    if cached.as_ref() != Some(&next) {
+        write_preferences(&next);
+        *cached = Some(next);
     }
-    // Cosmetic: if the file cannot be written the next start uses the system theme.
-    if let Ok(text) = serde_json::to_string(&next) {
-        let _ = std::fs::write(preferences_path(), text);
+    result
+}
+
+/// Cosmetic: if the file cannot be written the next start uses the system theme
+/// and the default window. It is written beside the file and renamed over it, so
+/// an exit in the middle of a write (the placement is saved as the window closes)
+/// never leaves half a file, which would read as no preferences at all.
+fn write_preferences(next: &WindowPreferences) {
+    let Ok(text) = serde_json::to_string(next) else { return };
+    let path = preferences_path();
+    let partial = path.with_extension("json.tmp");
+    if std::fs::write(&partial, text).and_then(|()| std::fs::rename(&partial, &path)).is_err() {
+        let _ = std::fs::remove_file(&partial);
     }
-    *cached = Some(next);
 }
 
 fn theme_of(appearance: Appearance) -> Option<Theme> {
@@ -89,7 +142,8 @@ fn theme_of(appearance: Appearance) -> Option<Theme> {
 }
 
 /// Before the hidden main window is shown: the appearance chosen in Settings
-/// (title bar, WebView2 colour scheme, first frame) and the zoom.
+/// (title bar, WebView2 colour scheme, first frame), the zoom and where the
+/// window was. The caller shows it afterwards (or restores it from the tray).
 pub fn apply_startup_preferences(window: &WebviewWindow) -> bool {
     let saved = preferences();
     let appearance = shell_rules::parse_appearance(&saved.appearance);
@@ -100,8 +154,88 @@ pub fn apply_startup_preferences(window: &WebviewWindow) -> bool {
     if (zoom - 1.0).abs() > f64::EPSILON {
         let _ = window.set_zoom(zoom);
     }
+    // Not maximized here: tao sets the maximized style of a hidden window without moving it to the
+    // monitor's bounds, and the window then shows at the wrong origin. The first `show_main` opens a
+    // maximized placement.
+    *pending_show() = saved.placement.and_then(|stored| apply_placement(window, &stored.into()));
+    remember_start_rectangle(window);
     let system_dark = matches!(window.theme(), Ok(Theme::Dark));
     shell_rules::starts_dark(appearance, system_dark)
+}
+
+/// The least the main window may measure, in logical pixels: `minWidth` and
+/// `minHeight` of its window config (1000 x 640 in `tauri.conf.json`).
+fn min_logical_size(window: &WebviewWindow) -> (u32, u32) {
+    let config = window.app_handle().config();
+    let main = config.app.windows.iter().find(|candidate| candidate.label == window.label());
+    let least = |value: Option<f64>, fallback: u32| value.filter(|v| v.is_finite() && *v > 0.0).map_or(fallback, |v| v.ceil() as u32);
+    (least(main.and_then(|m| m.min_width), 1000), least(main.and_then(|m| m.min_height), 640))
+}
+
+/// Puts the hidden window where it was, if that is still on a connected monitor
+/// (`placement::restore`; otherwise the window stays where the window config
+/// centred it). Returns what it applied, `None` when it applied nothing.
+fn apply_placement(window: &WebviewWindow, saved: &SavedPlacement) -> Option<Placement> {
+    let Ok(monitors) = window.available_monitors() else { return None };
+    let areas: Vec<WorkArea> = monitors
+        .iter()
+        .map(|monitor| {
+            let area = monitor.work_area();
+            WorkArea {
+                x: area.position.x,
+                y: area.position.y,
+                width: area.size.width,
+                height: area.size.height,
+                scale: monitor.scale_factor(),
+            }
+        })
+        .collect();
+    let target = placement::restore(saved, &areas, min_logical_size(window))?;
+    // The position first, and again after the size: a move to a monitor with another scale is
+    // settled by Windows (WM_DPICHANGED resizes the window) before the size is set, which would
+    // otherwise be scaled once more.
+    let position = PhysicalPosition::new(target.x, target.y);
+    let _ = window.set_position(position);
+    let _ = window.set_size(PhysicalSize::new(target.width, target.height));
+    let _ = window.set_position(position);
+    Some(target)
+}
+
+/// What `apply_placement` applied, until the window is first shown (`show_main`).
+static PENDING_SHOW: Mutex<Option<Placement>> = Mutex::new(None);
+
+fn pending_show() -> std::sync::MutexGuard<'static, Option<Placement>> {
+    PENDING_SHOW.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// Shows the main window, the one place that does (a normal start and `background::restore`, which
+/// the tray, a second start and a notification come through). The first show of a run is the saved
+/// placement's: a maximized one opens maximized on the monitor it was on, in one step, and comes back
+/// to the rectangle applied while hidden (`apply_placement`) when restored. Any later show is a plain
+/// `show()`: the window is as the user left it.
+///
+/// Win32 shows the window (`SetWindowPlacement` with `SW_SHOWMAXIMIZED`: Windows maximizes it on its
+/// monitor, with no frame at the normal size and no jump) and tao is told with `show()` right after,
+/// so its visible flag matches the window. With the flag left behind, tao's next change of a window
+/// flag (the maximize button) would hide the window.
+pub fn show_main(window: &WebviewWindow) {
+    let path = placement::first_show(&mut pending_show());
+    #[cfg(windows)]
+    if path == ShowPath::Maximized && window.hwnd().is_ok_and(win::show_maximized) {
+        let _ = window.show();
+        // Safety net: if tao does not see the window maximized after the Win32 call, maximize it
+        // through tao, so its state and the maximize button stay right.
+        if !window.is_maximized().unwrap_or(true) {
+            let _ = window.maximize();
+        }
+        return;
+    }
+    let _ = window.show();
+    if path == ShowPath::Maximized {
+        // Win32 refused (or this is not Windows): maximize now, shown. A frame at the normal size
+        // first, but a window that is maximized.
+        let _ = window.maximize();
+    }
 }
 
 /// Settings → Appearance or the language changed: the title bar, WebView2's
@@ -111,12 +245,12 @@ pub fn apply_startup_preferences(window: &WebviewWindow) -> bool {
 pub fn window_appearance(window: WebviewWindow, appearance: String, italian: Option<bool>) {
     let parsed = shell_rules::parse_appearance(&appearance);
     let _ = window.set_theme(theme_of(parsed));
-    let mut next = preferences();
-    next.appearance = shell_rules::appearance_name(parsed).into();
-    if italian.is_some() {
-        next.italian = italian;
-    }
-    save_preferences(next);
+    update_preferences(|next| {
+        next.appearance = shell_rules::appearance_name(parsed).into();
+        if italian.is_some() {
+            next.italian = italian;
+        }
+    });
     crate::background::relabel(tauri::Manager::app_handle(&window), italian.unwrap_or_else(self::italian));
     #[cfg(windows)]
     if let Ok(hwnd) = window.hwnd() {
@@ -153,18 +287,17 @@ pub struct ZoomState {
 /// a changed Windows text size. Applies and saves the zoom.
 #[tauri::command]
 pub fn window_zoom(window: WebviewWindow, step: Option<String>) -> tauri::Result<ZoomState> {
-    let mut next = preferences();
+    let current = preferences().zoom;
     let user = match step.as_deref() {
-        Some("in") => shell_rules::next_zoom(next.zoom, ZoomStep::In),
-        Some("out") => shell_rules::next_zoom(next.zoom, ZoomStep::Out),
-        Some("reset") => shell_rules::next_zoom(next.zoom, ZoomStep::Reset),
-        _ => shell_rules::clamp_user_zoom(next.zoom),
+        Some("in") => shell_rules::next_zoom(current, ZoomStep::In),
+        Some("out") => shell_rules::next_zoom(current, ZoomStep::Out),
+        Some("reset") => shell_rules::next_zoom(current, ZoomStep::Reset),
+        _ => shell_rules::clamp_user_zoom(current),
     };
     let text_scale = text_scale_factor();
     let zoom = shell_rules::effective_zoom(user, text_scale);
     window.set_zoom(zoom)?;
-    next.zoom = user;
-    save_preferences(next);
+    update_preferences(|next| next.zoom = user);
     Ok(ZoomState { zoom, user, text_scale })
 }
 
@@ -214,10 +347,134 @@ pub fn window_snap_button(window: WebviewWindow, rect: Option<ButtonRect>) -> ta
 }
 
 /// Main window only, right after it is built: system menu keys and its
-/// "Ricarica la finestra" entry, session end and the maximize button's hit test.
+/// "Ricarica la finestra" entry, session end, the maximize button's hit test
+/// and the saving of where the window is.
 pub fn attach_main(window: &WebviewWindow) {
     #[cfg(windows)]
     win::attach_main(window);
+    watch_placement(window);
+}
+
+/// How long after the last move, resize or scale change the placement is
+/// written to disk (a drag makes dozens of events a second).
+const PLACEMENT_DELAY: Duration = Duration::from_millis(500);
+
+/// What the placement saver knows of the main window.
+#[derive(Clone, Copy)]
+struct Tracked {
+    /// The last normal (not maximized) rectangle the window had: a maximized window reports the
+    /// screen, not the rectangle it comes back to when restored.
+    normal: Option<SavedPlacement>,
+    maximized: bool,
+    /// The window has been on screen in this run. A start in the tray never shows it, and then it
+    /// has nothing to say about where it was.
+    seen: bool,
+}
+
+static TRACKED: Mutex<Tracked> = Mutex::new(Tracked { normal: None, maximized: false, seen: false });
+static PLACEMENT_EVENTS: AtomicU64 = AtomicU64::new(0);
+static PLACEMENT_SAVER: AtomicBool = AtomicBool::new(false);
+
+fn tracker() -> std::sync::MutexGuard<'static, Tracked> {
+    TRACKED.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// Saves where the main window is: 500 ms after a move, resize or scale change,
+/// and at once when it is asked to close and when it is destroyed. Its own
+/// listener, so `main.rs` has nothing to add. Errors are ignored, as for the theme and the zoom:
+/// the window then opens centred.
+fn watch_placement(window: &WebviewWindow) {
+    let watched = window.clone();
+    window.on_window_event(move |event| match event {
+        WindowEvent::Moved(_) | WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => {
+            track_placement(&watched);
+            save_placement_soon();
+        }
+        // Still on screen here, whether the close goes on, is vetoed by the page or hides the window.
+        WindowEvent::CloseRequested { .. } => {
+            track_placement(&watched);
+            save_placement();
+        }
+        // The window is gone: only what was tracked before is left.
+        WindowEvent::Destroyed => save_placement(),
+        _ => {}
+    });
+}
+
+/// The rectangle the window has now, if it is one to come back to (`placement::capture`).
+fn current_rectangle(window: &WebviewWindow) -> Option<SavedPlacement> {
+    let position = window.outer_position().ok()?;
+    let size = window.inner_size().ok()?;
+    placement::capture(position.x, position.y, size.width, size.height, window.scale_factor().ok()?)
+}
+
+/// Whether the window is maximized. Windows is asked as well as tao, whose flag only changes with
+/// WM_SIZE: a maximize moves the window (WM_MOVE) first, and then the screen-sized rectangle
+/// would be taken for the normal one.
+fn is_maximized(window: &WebviewWindow) -> Option<bool> {
+    let maximized = window.is_maximized().ok()?;
+    #[cfg(windows)]
+    let maximized = maximized || window.hwnd().is_ok_and(win::is_zoomed);
+    Some(maximized)
+}
+
+/// What the window was given at startup, which the saver falls back on when the
+/// window is maximized and nothing else has been seen. It does not count as seen.
+fn remember_start_rectangle(window: &WebviewWindow) {
+    if let Some(rectangle) = current_rectangle(window) {
+        tracker().normal = Some(rectangle);
+    }
+}
+
+/// Takes in the window's state after a move, resize or scale change. Never from a
+/// minimized window (Windows parks it off screen) or a hidden one (in the tray):
+/// neither is somewhere to reopen.
+fn track_placement(window: &WebviewWindow) {
+    if window.is_minimized().unwrap_or(true) || !window.is_visible().unwrap_or(false) {
+        return;
+    }
+    let Some(maximized) = is_maximized(window) else { return };
+    let rectangle = if maximized { None } else { current_rectangle(window) };
+    let mut tracked = tracker();
+    tracked.seen = true;
+    tracked.maximized = maximized;
+    if rectangle.is_some() {
+        tracked.normal = rectangle;
+    }
+}
+
+/// Writes the tracked placement into the preferences file.
+fn save_placement() {
+    let current = *tracker();
+    if !current.seen {
+        return;
+    }
+    update_preferences(|saved| {
+        let previous = saved.placement.map(SavedPlacement::from);
+        saved.placement = placement::to_store(current.normal, current.maximized, previous).map(StoredPlacement::from);
+    });
+}
+
+/// `save_placement` once the window has been still for `PLACEMENT_DELAY`.
+fn save_placement_soon() {
+    PLACEMENT_EVENTS.fetch_add(1, Ordering::SeqCst);
+    if PLACEMENT_SAVER.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let spawned = std::thread::Builder::new().name("qamille-placement".into()).spawn(|| {
+        loop {
+            let seen = PLACEMENT_EVENTS.load(Ordering::SeqCst);
+            std::thread::sleep(PLACEMENT_DELAY);
+            if PLACEMENT_EVENTS.load(Ordering::SeqCst) == seen {
+                break;
+            }
+        }
+        PLACEMENT_SAVER.store(false, Ordering::SeqCst);
+        save_placement();
+    });
+    if spawned.is_err() {
+        PLACEMENT_SAVER.store(false, Ordering::SeqCst);
+    }
 }
 
 /// The reminder chip is a tool window: out of Alt+Tab and Win+Tab (F11).
@@ -301,6 +558,26 @@ mod win {
 
     fn hwnd_of(value: isize) -> Option<HWND> {
         (value != 0).then_some(HWND(value as _))
+    }
+
+    pub fn is_zoomed(hwnd: HWND) -> bool {
+        unsafe { IsZoomed(hwnd) }.as_bool()
+    }
+
+    /// Shows the hidden window maximized in one step: its own placement (the rectangle `apply_placement`
+    /// gave it, in the workspace coordinates Windows wants, which a round trip through
+    /// `GetWindowPlacement` keeps right) with the show command `SW_SHOWMAXIMIZED`. Windows maximizes
+    /// it on the monitor the rectangle is on, and un-maximizing returns to that rectangle. Whether it
+    /// worked, or the window is as it was.
+    pub fn show_maximized(hwnd: HWND) -> bool {
+        let mut window_placement = WINDOWPLACEMENT { length: std::mem::size_of::<WINDOWPLACEMENT>() as u32, ..Default::default() };
+        unsafe {
+            if GetWindowPlacement(hwnd, &mut window_placement).is_err() {
+                return false;
+            }
+            window_placement.showCmd = SW_SHOWMAXIMIZED.0 as u32;
+            SetWindowPlacement(hwnd, &window_placement).is_ok()
+        }
     }
 
     pub fn attach_main(window: &WebviewWindow) {
@@ -542,6 +819,9 @@ mod win {
     /// until it answers or `SESSION_WAIT` runs out. Re-entered for the second
     /// window while waiting, it waits for the same answer.
     fn session_end() {
+        // Windows ends the process once the session is over, and the last half second of moving may
+        // still be waiting for its delayed save.
+        super::save_placement();
         session_query();
         let deadline = *SESSION_DEADLINE.get_or_init(|| Instant::now() + SESSION_WAIT);
         if !SESSION_ENDING_SENT.swap(true, Ordering::SeqCst)
@@ -786,6 +1066,49 @@ mod win {
     impl OkOr for HWND {
         fn ok_or<E>(self, error: E) -> Result<HWND, E> {
             if self.is_invalid() { Err(error) } else { Ok(self) }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_preferences_file_from_before_the_placement_still_reads() {
+        let old: WindowPreferences = serde_json::from_str(r#"{"appearance":"dark","zoom":1.25,"italian":false}"#).unwrap();
+        assert_eq!((old.appearance.as_str(), old.zoom, old.italian), ("dark", 1.25, Some(false)));
+        assert_eq!(old.placement, None);
+        // And a file without a placement is written without one.
+        assert!(!serde_json::to_string(&old).unwrap().contains("placement"));
+    }
+
+    #[test]
+    fn the_placement_is_written_and_read_back() {
+        let stored = StoredPlacement { x: -1800, y: 60, width: 1440, height: 900, scale: 1.25, maximized: true };
+        let preferences = WindowPreferences { placement: Some(stored), ..WindowPreferences::default() };
+        let text = serde_json::to_string(&preferences).unwrap();
+        assert_eq!(serde_json::from_str::<WindowPreferences>(&text).unwrap(), preferences);
+        // `maximized` is optional in the file.
+        let text = r#"{"placement":{"x":10,"y":20,"width":1440,"height":900,"scale":1.0}}"#;
+        let read = serde_json::from_str::<WindowPreferences>(text).unwrap().placement.unwrap();
+        assert_eq!((read.x, read.y, read.maximized), (10, 20, false));
+    }
+
+    #[test]
+    fn a_placement_that_cannot_be_read_costs_neither_the_appearance_nor_the_zoom() {
+        for broken in [
+            r#""left""#,
+            "null",
+            "42",
+            r#"{"x":"a","y":0,"width":1,"height":1,"scale":1.0}"#,
+            r#"{"x":0,"y":0,"width":-5,"height":1,"scale":1.0}"#,
+            r#"{"x":0,"y":0,"width":1}"#,
+        ] {
+            let text = format!(r#"{{"appearance":"light","zoom":1.5,"placement":{broken}}}"#);
+            let read: WindowPreferences = serde_json::from_str(&text).unwrap();
+            assert_eq!((read.appearance.as_str(), read.zoom), ("light", 1.5), "{broken}");
+            assert_eq!(read.placement, None, "{broken}");
         }
     }
 }

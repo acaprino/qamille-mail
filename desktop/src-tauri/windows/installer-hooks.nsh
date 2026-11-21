@@ -8,7 +8,8 @@
 ; without /UPDATE ($UpdateMode is empty) and about to be followed by the new version. So
 ; $UpdateMode <> 1 does not mean that Qamille is going away: what an uninstall removes and an upgrade
 ; must keep is also put back by the app at its next start (put_back_after_upgrade in
-; desktop/src-tauri/src/background.rs, for the start at sign-in).
+; desktop/src-tauri/src/background.rs, for the start at sign-in). The keys that let Windows offer Qamille
+; for mailto: links are written again by every install, so an upgrade of either kind ends with them.
 
 !macro NSIS_HOOK_PREUNINSTALL
   Push $0
@@ -48,6 +49,25 @@
     ${If} $0 != ""
       Delete "$0\Microsoft\Windows\Start Menu\Programs\Startup\Qamille-worker.vbs"
     ${EndIf}
+    ; The identity of the Windows notifications (desktop/src-tauri/src/notifications.rs): the app
+    ; registered it under HKCU\Software\Classes\AppUserModelId\<identifier> and wrote the identifier in
+    ; data\notification-aumid.txt, read here before the data folder may go below. Only an identifier of
+    ; Qamille (com.qamille.desktop...) is removed. A manual upgrade removes it too; the new version
+    ; registers it again at its first start while notifications are on.
+    Push $1
+    Push $2
+    ClearErrors
+    FileOpen $0 "$INSTDIR\data\notification-aumid.txt" r
+    ${IfNot} ${Errors}
+      FileRead $0 $1
+      FileClose $0
+      StrCpy $2 $1 19
+      ${If} $2 == "com.qamille.desktop"
+        DeleteRegKey HKCU "Software\Classes\AppUserModelId\$1"
+      ${EndIf}
+    ${EndIf}
+    Pop $2
+    Pop $1
   ${EndIf}
 
   ; Qamille keeps its data and credentials.key in the folder "data" beside the program
@@ -64,5 +84,40 @@
     RMDir "$INSTDIR"
   ${EndIf}
 
+  ; Windows no longer offers Qamille for mailto: links: the RegisteredApplications value, the ProgID and
+  ; the Capabilities that NSIS_HOOK_POSTINSTALL wrote, the names of handler_keys(true, ...) in
+  ; desktop/src-tauri/src/mail_handler.rs. Windows asks which app to use at the next link if Qamille was
+  ; the one chosen (its choice is not Qamille's to write or remove). Qamille's key goes only when nothing
+  ; else is in it. An /UPDATE keeps them; a manual upgrade removes them and its install writes them again.
+  ${If} $UpdateMode <> 1
+    DeleteRegValue HKCU "Software\RegisteredApplications" "Qamille"
+    DeleteRegKey HKCU "Software\Classes\Qamille.Url.mailto"
+    DeleteRegKey HKCU "Software\Qamille\MailLinks\Installed"
+    DeleteRegKey /ifempty HKCU "Software\Qamille\MailLinks"
+    DeleteRegKey /ifempty HKCU "Software\Qamille"
+    System::Call "shell32::SHChangeNotify(i,i,i,i) (0x08000000, 0x1000, 0, 0)"
+  ${EndIf}
+
   Pop $0
+!macroend
+
+!macro NSIS_HOOK_POSTINSTALL
+  ; Windows lets no program make itself the default mail app: the installed Professional only says it
+  ; can open mailto: links, for the current user, and the person chooses it in Settings > Default apps
+  ; (Settings > General > Windows in Qamille opens that page). These are exactly the values entries()
+  ; writes in desktop/src-tauri/src/mail_handler.rs, with the fixed names of handler_keys(true, ...) and
+  ; in the same order (native-feel check 26): the ProgID, whose command is the executable and the link in
+  ; quotes, its Capabilities, then the RegisteredApplications value that points to them. Never the
+  ; mailto key of the scheme itself, nor HKLM.
+  WriteRegStr HKCU "Software\Classes\Qamille.Url.mailto" "" "Qamille"
+  WriteRegStr HKCU "Software\Classes\Qamille.Url.mailto\DefaultIcon" "" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\",0"
+  WriteRegStr HKCU "Software\Classes\Qamille.Url.mailto\shell\open\command" "" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\" $\"%1$\""
+  WriteRegStr HKCU "Software\Qamille\MailLinks\Installed\Capabilities" "ApplicationName" "Qamille"
+  WriteRegStr HKCU "Software\Qamille\MailLinks\Installed\Capabilities" "ApplicationDescription" "Qamille"
+  WriteRegStr HKCU "Software\Qamille\MailLinks\Installed\Capabilities" "ApplicationIcon" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\",0"
+  WriteRegStr HKCU "Software\Qamille\MailLinks\Installed\Capabilities\URLAssociations" "mailto" "Qamille.Url.mailto"
+  WriteRegStr HKCU "Software\RegisteredApplications" "Qamille" "Software\Qamille\MailLinks\Installed\Capabilities"
+  ; SHCNE_ASSOCCHANGED with SHCNF_FLUSH, as the template's UPDATEFILEASSOC: Explorer and Settings read
+  ; the associations again.
+  System::Call "shell32::SHChangeNotify(i,i,i,i) (0x08000000, 0x1000, 0, 0)"
 !macroend

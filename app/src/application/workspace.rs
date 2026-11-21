@@ -28,6 +28,12 @@ pub struct SettingsUpdate {
     pub google_client_secret: Option<String>,
 }
 
+/// A message the Inbox counter counts: in the Inbox, unread, not done and not snoozed now. The one rule
+/// of the sidebar's counter and of the taskbar's (`snapshot`, `inbox_unread`).
+fn counts_as_inbox_unread(e: &crate::domain::model::Email, now: i64) -> bool {
+    e.folder == "Inbox" && !e.read && !e.done && !e.is_snoozed(now)
+}
+
 #[derive(Clone)]
 pub struct WorkspaceService {
     context: Arc<ServiceContext>,
@@ -48,7 +54,7 @@ impl WorkspaceService {
         for e in &store.emails {
             let hidden = matches!(e.folder.as_str(), "Trash" | "Spam");
             match e.folder.as_str() {
-                "Inbox" if !e.read && !e.done && !e.is_snoozed(now) => add("Inbox"),
+                "Inbox" if counts_as_inbox_unread(e, now) => add("Inbox"),
                 "Sent" => add("Sent"),
                 "Archive" => add("Archive"),
                 "Trash" => add("Trash"),
@@ -78,6 +84,20 @@ impl WorkspaceService {
             signatures: store.signatures.clone(),
             drafts: store.drafts.clone(),
         })
+    }
+    /// The unread mail of the Inbox, the number of `counts["Inbox"]` of `snapshot` (the sidebar's): the
+    /// taskbar overlay and the tray tooltip show it (desktop `taskbar.rs`). Same store view, same rule.
+    pub fn inbox_unread(&self) -> AppResult<usize> {
+        let store = crate::domain::undo::project_shared(self.context.read_shared()?);
+        let now = self.context.clock.now();
+        Ok(store.emails.iter().filter(|e| counts_as_inbox_unread(e, now)).count())
+    }
+    /// The accounts whose indexing is under way (`IndexProgress::in_progress`): the taskbar's progress
+    /// bar follows only these, so an account that failed, was switched off or removed below 100 %
+    /// takes its bar away.
+    pub fn indexing_accounts(&self) -> AppResult<Vec<u32>> {
+        let store = self.context.read_shared()?;
+        Ok(store.accounts.iter().filter(|a| a.search_index.in_progress()).map(|a| a.id).collect())
     }
     pub fn save_settings(&self, mut update: SettingsUpdate) -> AppResult<()> {
         if !update.settings.time_zone.is_empty() && update.settings.time_zone.parse::<chrono_tz::Tz>().is_err() {

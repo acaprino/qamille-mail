@@ -34,6 +34,7 @@ import { captureActive, flushMeetingDrafts, meetingCall, requestMeetingOpen, typ
 import { installWindowCloseHandler, registerCloseGuard } from './lib/window-close';
 import { paintWindowBackground } from './lib/native-window';
 import { installWindowShell, windowAppearance, zoomWindow } from './lib/window-shell';
+import { installNotificationOpen } from './lib/notification-open';
 import Icon from './ds/primitives/Icon';
 import UndoStack from './components/UndoStack';
 import { refreshActivity } from './lib/activity-center';
@@ -47,6 +48,7 @@ import { configureRegional, configureRegionalWording, regionalLocale, regionalTi
 import { backendText, folderLabel, isItalian, setLanguageLocale, tr, useLanguage } from './lib/i18n';
 import { personIndex, type PersonIndex } from './lib/people';
 import { replyAllRecipients } from './lib/reply-all';
+import { installMailtoRouting, mailtoDraft, type MailtoFields } from './lib/mailto';
 import { savedFileActions } from './lib/saved-file';
 import { rowMenuAction, rowMenuEntries, showRowMenu } from './lib/row-menu';
 import { patchExtraRead, repliesOf, threadState } from './lib/groups';
@@ -234,6 +236,8 @@ export default function App() {
     return {
       // Account picked while unsaved settings held the user back; applied once they leave.
       leaveAccount: null as { id: number | null } | null,
+      // What runs once that view is there (`navigate`'s `then`): dropped if the user stays.
+      afterLeave: null as (() => void) | null,
       reportedSyncError: '',
       // Accounts whose typed `sync-progress` the UI has seen: a snapshot pulled at startup never
       // overrides them (see seedSyncActivities).
@@ -857,19 +861,25 @@ export default function App() {
       if (request === v.readRequest) s.openingId = null;
     }
   }
-  function navigate(next: Folder, account?: { id: number | null }) {
+  /** Goes to `next` (and `account`). `then` runs once the view is there: at once, or after the
+   *  unsaved-settings question let the user leave; never if they stay. */
+  function navigate(next: Folder, account?: { id: number | null }, then?: () => void) {
     if (s.view === 'Settings' && next !== 'Settings' && s.settingsDirty) {
       s.leaveTarget = next;
       v.leaveAccount = account ?? null;
+      v.afterLeave = then ?? null;
       return;
     }
     if (account) s.accountId = account.id;
     goTo(next);
+    then?.();
   }
   async function finishLeaving(save: boolean) {
     const target = s.leaveTarget;
     const account = v.leaveAccount;
+    const after = v.afterLeave;
     v.leaveAccount = null;
+    v.afterLeave = null;
     if (save && !(await settingsPanel.current?.save())) {
       s.leaveTarget = null;
       return;
@@ -883,6 +893,7 @@ export default function App() {
     } else if (target) {
       if (account) s.accountId = account.id;
       goTo(target);
+      after?.();
     }
   }
   function goTo(next: Folder) {
@@ -1303,6 +1314,27 @@ export default function App() {
       notify(errorText(e), true);
     }
   }
+  // A mailto: link, of a message or of another program (lib/mailto.ts, rule 32): a new message from the
+  // account in view, as «Nuovo messaggio» makes it, filled with the link's fields and opened. Never sent
+  // from here: the person reads it and sends it.
+  async function composeMailto(fields: MailtoFields) {
+    const opener = document.activeElement;
+    try {
+      const created = await call<Draft>('create_draft', { accountId: s.accountId, replyTo: null, forward: false });
+      let draft: Draft;
+      try {
+        draft = await call<Draft>('save_draft', { draft: { ...created, ...mailtoDraft(fields) }, importLeaseIds: [] });
+      } catch (e) {
+        // Without the link's fields the new draft is empty: it does not stay in Drafts.
+        await call('discard_draft', { id: created.id }).catch(() => {});
+        throw e;
+      }
+      openComposer(draft, opener);
+      await loadWorkspace();
+    } catch (e) {
+      notify(errorText(e), true);
+    }
+  }
   // The reader's arrows: the row before or after the one on show, in the order the list shows them.
   function readerPosition() {
     const listed = selectedListId();
@@ -1569,6 +1601,24 @@ export default function App() {
       ),
     );
     unsubscribers.push(installWindowShell());
+    // A click on a Windows notification (lib/notification-open.ts): Rust brought the window back.
+    unsubscribers.push(
+      installNotificationOpen({
+        // The Inbox of the message's account, so the list shows it; a message gone meanwhile (deleted,
+        // moved) leaves the Inbox open without an error.
+        openMail: (id, accountId) =>
+          navigate('Inbox', { id: accountId }, () =>
+            void call<{ folder?: string }[]>('read_rows', { ids: [id] })
+              .then((rows) => {
+                if (rows.some((row) => (row.folder ?? 'Inbox') === 'Inbox')) void open(id);
+              })
+              .catch(() => {}),
+          ),
+        openDrafts: () => navigate('Drafts'),
+        openAccounts: () => (navigate('Settings'), void tick().then(() => settingsPanel.current?.showSection('Accounts'))),
+        openServer: () => (navigate('Settings'), void tick().then(() => settingsPanel.current?.showSection('Compute'))),
+      }),
+    );
     void installWindowCloseHandler(notify)
       .then((unsubscribe) => (disposed ? unsubscribe() : unsubscribers.push(unsubscribe)))
       .catch((error) => notify(errorText(error), true));
@@ -1588,6 +1638,15 @@ export default function App() {
             s.view !== 'Settings' || !s.settingsDirty || (await settingsPanel.current?.save()) !== false,
         },
       ),
+    );
+    // Mail links to the composer: a message's, and in the desktop app those Windows hands to Qamille.
+    unsubscribers.push(
+      installMailtoRouting({
+        compose: (fields) => void composeMailto(fields),
+        refused: () => notify(tr('Questo link di posta non si può aprire.', 'This mail link cannot be opened.'), true),
+        failed: (error) => notify(errorText(error), true),
+        native: desktop ? { listen, call } : undefined,
+      }),
     );
     // `workspace-changed` and its preview twin carry no content: until the backend stops sending
     // them (Task 2.2) they stay as a coalesced full refresh next to the typed `app-event`.
@@ -2038,6 +2097,7 @@ export default function App() {
           discard={() => void finishLeaving(false)}
           stay={() => {
             s.leaveTarget = null;
+            v.afterLeave = null;
           }}
         />
       )}

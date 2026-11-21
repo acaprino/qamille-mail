@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-mail-handler-status"
+description = "Enables the mail_handler_status command without any pre-configured scope."
+commands.allow = ["mail_handler_status"]
+
+[[permission]]
+identifier = "deny-mail-handler-status"
+description = "Denies the mail_handler_status command without any pre-configured scope."
+commands.deny = ["mail_handler_status"]

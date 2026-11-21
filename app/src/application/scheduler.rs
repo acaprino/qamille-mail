@@ -200,6 +200,12 @@ impl SchedulerService {
                     "Scheduled message ‘{}’: {}",
                     draft.subject, e.message
                 ));
+                // Also outside the window (a Windows notification, desktop `notifications.rs`):
+                // once, since the draft is now in `failed` and its claim cleared `send_at`.
+                self.context.events.emit(AppEvent::ScheduledSendFailed {
+                    draft_id: draft.id,
+                    subject: draft.subject.clone(),
+                });
             }
         }
         Ok(notices)

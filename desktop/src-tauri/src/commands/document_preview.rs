@@ -1,4 +1,5 @@
 use crate::runtime::{DesktopState, blocking};
+use crate::saved_files::SavedFile;
 use qamille::application::AppResult;
 use tauri::{State, ipc::Response};
 
@@ -21,7 +22,7 @@ pub async fn attachment_preview_source(
 }
 
 /// Asks where to save the attachment, then writes it with the Mark-of-the-Web (`zone.rs`). `None` when
-/// the dialog is cancelled.
+/// the dialog is cancelled; otherwise where it went and the token that opens it (`saved_files.rs`).
 #[tauri::command]
 pub async fn attachment_save(
     window: tauri::WebviewWindow,
@@ -30,7 +31,7 @@ pub async fn attachment_save(
     attachment_id: u64,
     path: Option<Vec<u32>>,
     italian: Option<bool>,
-) -> AppResult<Option<String>> {
+) -> AppResult<Option<SavedFile>> {
     let previews = state.previews.clone();
     let path = path.unwrap_or_default();
     let (name, bytes) = blocking(move || previews.file_to_save(email_id, attachment_id, &path)).await?;
@@ -51,7 +52,7 @@ pub async fn attachment_save(
     blocking(move || {
         // Marked as coming from the Internet, so Windows warns before a dangerous attachment is opened.
         crate::zone::save_downloaded(&target, &bytes, None)?;
-        Ok(Some(target.to_string_lossy().into_owned()))
+        Ok(Some(SavedFile::remember(target)))
     })
     .await
 }

@@ -48,7 +48,7 @@ dopo ogni modifica a CSS globali, tema, finestre o `src-tauri/src/`.
 | 28 | (fase 3, Task 3: notifiche di sistema) | — | — |
 | 29 | (fase 3, Task 2: posizione della finestra) | — | — |
 | 30 | (fase 3, Task 3: barra delle applicazioni) | — | — |
-| 31 | (fase 3, Task 5: file salvati) | — | — |
+| 31 | Dopo un salvataggio (un allegato, un messaggio esportato) la notifica offre «Apri» e «Mostra nella cartella». La pagina non passa mai un percorso: il salvataggio le dà un `token`, valido solo per i file salvati in questa sessione, e i due comandi prendono solo quello. Un token sconosciuto è un errore e non fa niente; un file spostato o eliminato nel frattempo lo dice la notifica, senza lasciare a Windows un errore suo. «Apri» passa dalla shell (`open::that_detached`), così un allegato col Mark-of-the-Web (regola 17) fa avvisare Windows prima di aprire un tipo pericoloso; «Mostra nella cartella» è `SHOpenFolderAndSelectItems` (Esplora risorse con il file selezionato), mai `explorer /select` con il nome del file in una riga di comando. Le azioni sono una comodità: il file resta raggiungibile da Esplora risorse. Restano come sono `meeting_export` e `contacts_save_vcf` | `src-tauri/src/saved_files.rs` (`remember`, `saved_file_open`, `saved_file_reveal`), che `attachment_save` (`commands/document_preview.rs`) ed `export_mail` (`commands/mail.rs`) chiamano dopo aver scritto il file; `src/lib/saved-file.ts` (`savedFileActions`); le azioni sono pulsanti `ds` dentro il `Toaster` (`notify(messaggio, errore, azioni)`: al massimo due, la notifica resta 10 s) | test 22 di `native-feel.mjs`; `cargo test --locked saved_files`; `tests/toaster-layer.mjs`, `tests/attachment-preview.mjs`, `tests/mail-export.mjs`; sull'exe: salva un allegato, «Mostra nella cartella» apre Esplora risorse con il file selezionato e «Apri» lo apre (un allegato pericoloso: prima Windows avvisa) |
 | 32 | (fase 3, Task 4: link mailto) | — | — |
 | 33 | (fase 3, Task 6: menu delle righe) | — | — |
 
@@ -117,6 +117,12 @@ mai con `std::fs::write`: gli dà il Mark-of-the-Web (zona Internet con `IAttach
 flusso `Zone.Identifier` se COM non riesce). Senza un indirizzo d'origine si passa `None`, che vale
 `about:internet`. Verifica: i test di `zone.rs` (`cargo test --locked zone`) e, sull'exe, lo stream
 `Zone.Identifier` del file salvato con `ZoneId=3`.
+
+Dopo la scrittura il comando restituisce `SavedFile::remember(percorso)` (il percorso, per dirlo
+nella notifica, e il `token`, regola 31); un altro punto che salva un file lo fa allo stesso modo, e
+la pagina mette nella notifica `savedFileActions(token, notify)` di `src/lib/saved-file.ts`. Mai un
+comando che apra o mostri un file da un percorso che arriva dalla pagina. L'anteprima browser non
+salva file: non dà un token, e la notifica non ha azioni.
 
 ## Verifica nell'app vera
 

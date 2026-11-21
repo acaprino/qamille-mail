@@ -525,6 +525,41 @@ check("18. the calendar sheet's end-of-session step never calls the provider (ru
 // phase 3, Task 2: check 21
 
 // phase 3, Task 5: check 22
+check('22. a saved file is opened or shown only through its token (rule 31)', () => {
+  const rust = read('src-tauri/src/saved_files.rs');
+  // The code without its tests and comments: an assertion on what it does is met by neither.
+  const code = rust.slice(0, rust.indexOf('#[cfg(test)]')).replace(/(^|\s)\/\/.*$/gm, '$1');
+  assert.ok(code.length > 0 && rust.includes('#[cfg(test)]'), 'saved_files.rs keeps its tests in a test module');
+  // The page never names a path: each command takes the token, an unsigned number, and nothing else.
+  for (const command of ['saved_file_open', 'saved_file_reveal']) {
+    assert.match(code, new RegExp(String.raw`#\[tauri::command\]\s*pub async fn ${command}\(token: u64\) -> AppResult<\(\)>`), `${command} must take only token: u64`);
+  }
+  const main = read('src-tauri/src/main.rs');
+  assert.match(main, /attachment_save,\s*saved_files::saved_file_open, saved_files::saved_file_reveal,/, 'both commands are registered after attachment_save');
+  // Open goes through the shell, which asks about a file from the Internet zone; Show in folder through
+  // the shell call that selects the file. No process is started with a command line that carries the
+  // file: a name such as /select,… must never be read as an Explorer switch.
+  assert.match(code, /open::that_detached\(path\)/, 'Open must use open::that_detached');
+  assert.match(code, /SHOpenFolderAndSelectItems\(/, 'Show in folder must use SHOpenFolderAndSelectItems');
+  assert.ok(!/explorer/i.test(code), 'saved_files.rs must not start explorer');
+  assert.ok(!/Command::new|\.args?\(|std::process|\/select/.test(code), 'saved_files.rs must not build a command line');
+  // What a save hands out is the token, and a save is the only way to get one.
+  assert.match(code, /pub fn remember\(path: PathBuf\) -> u64/, 'remember(path) -> u64 is the one way in');
+  assert.match(read('src-tauri/src/commands/document_preview.rs'), /pub async fn attachment_save\([^)]*\) -> AppResult<Option<SavedFile>>/, 'attachment_save returns the SavedFile with its token');
+  assert.match(read('src-tauri/src/commands/mail.rs'), /pub struct ExportSaved \{[^}]*token: u64/, 'export_mail returns the token');
+  // The page asks for the commands with the token alone, and from one place.
+  const asking = [];
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(path.join(desktop, dir), { withFileTypes: true })) {
+      const file = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) walk(file);
+      else if (/\.(ts|tsx)$/.test(entry.name) && /saved_file_(open|reveal)/.test(read(file))) asking.push(file);
+    }
+  };
+  walk('src');
+  assert.deepEqual(asking.sort(), ['src/lib/preview.ts', 'src/lib/saved-file.ts'], 'only the helper and the browser preview name the commands');
+  assert.match(read('src/lib/saved-file.ts'), /call\(command, \{ token \}\)/, 'the helper calls the commands with { token } only');
+});
 
 // phase 3, Task 6: check 23
 

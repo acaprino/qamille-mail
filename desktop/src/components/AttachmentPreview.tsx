@@ -7,8 +7,10 @@ import { decodeSourceFrame } from '../lib/embedded-preview/source-frame';
 import { EmbeddedPreviewSession } from '../lib/embedded-preview/session';
 import { humanSize } from '../lib/file-size';
 import { fixedBackendText, isItalian, tr } from '../lib/i18n';
+import { savedFileActions } from '../lib/saved-file';
 import { useReactive } from '../lib/store';
 import { cn } from '../lib/utils';
+import type { NoticeAction } from '../ds/primitives/Toaster';
 import type { Attachment } from '../lib/types';
 import './AttachmentPreview.css';
 
@@ -19,7 +21,7 @@ export type AttachmentPreviewProps = {
   path?: number[];
   /** Rendered inside the attachment panel, which owns the title and close button. */
   embedded?: boolean;
-  notify: (message: string, error?: boolean) => void;
+  notify: (message: string, error?: boolean, actions?: NoticeAction[]) => void;
   close: () => void;
 };
 
@@ -192,13 +194,20 @@ export default function AttachmentPreview({
     if (s.saving) return;
     s.saving = true;
     try {
-      const saved = await call<string | null>('attachment_save', {
+      const saved = await call<{ path: string; token: number } | null>('attachment_save', {
         emailId: props.current.emailId,
         attachmentId: props.current.attachment.id,
         italian: isItalian(),
         ...nested(),
       });
-      if (saved) props.current.notify(tr(`Allegato salvato: ${saved}`, `Attachment saved: ${saved}`));
+      if (saved) {
+        const { notify } = props.current;
+        notify(
+          tr(`Allegato salvato: ${saved.path}`, `Attachment saved: ${saved.path}`),
+          false,
+          savedFileActions(saved.token, notify),
+        );
+      }
     } catch (error) {
       props.current.notify(errorText(error), true);
     } finally {

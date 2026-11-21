@@ -817,6 +817,13 @@ export async function previewCommand(
         message: 'The browser preview cannot save attachments. Open the desktop app.',
         code: 'preview_unsupported',
       };
+    case 'saved_file_open':
+    case 'saved_file_reveal':
+      // A save here is a download and gives no token: only a test that fakes one reaches these.
+      throw {
+        message: 'The browser preview cannot open saved files. Open the desktop app.',
+        code: 'preview_unsupported',
+      };
     case 'attachment_preview_source':
       throw {
         message: 'The browser preview cannot read attachment files. Open the desktop app.',

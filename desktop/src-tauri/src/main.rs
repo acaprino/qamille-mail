@@ -19,6 +19,7 @@ mod background_rules;
 // phase 3, Task 4: modules
 
 // phase 3, Task 5: modules
+mod saved_files;
 
 // phase 3, Task 6: modules
 
@@ -223,6 +224,7 @@ fn main() {
             read_attached_message,
             attachment_preview_source,
             attachment_save,
+            saved_files::saved_file_open, saved_files::saved_file_reveal,
             list_drafts,
             create_draft,
             save_draft,

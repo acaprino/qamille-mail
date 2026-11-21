@@ -132,6 +132,8 @@ permissions = [
   "allow-read-attached-message",
   "allow-attachment-preview-source",
   "allow-attachment-save",
+  "allow-saved-file-open",
+  "allow-saved-file-reveal",
   "allow-list-drafts",
   "allow-create-draft",
   "allow-save-draft",

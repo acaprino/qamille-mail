@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { useReducedMotion } from 'motion/react';
 import Button from './ds/primitives/Button';
-import Toaster, { notify as showNotice } from './ds/primitives/Toaster';
+import Toaster, { notify as showNotice, type NoticeAction } from './ds/primitives/Toaster';
 import { listen } from '@tauri-apps/api/event';
 import Sidebar from './components/Sidebar';
 import WindowControls from './components/WindowControls';
@@ -46,6 +46,7 @@ import { configureRegional, configureRegionalWording, regionalLocale, regionalTi
 import { backendText, folderLabel, isItalian, setLanguageLocale, tr, useLanguage } from './lib/i18n';
 import { personIndex, type PersonIndex } from './lib/people';
 import { replyAllRecipients } from './lib/reply-all';
+import { savedFileActions } from './lib/saved-file';
 import { patchExtraRead, repliesOf, threadState } from './lib/groups';
 import { useStore } from './lib/store';
 import { tick } from './lib/tick';
@@ -346,8 +347,8 @@ export default function App() {
       void call('prefetch_mail', { ids }).catch(() => {});
     }, 120);
   }
-  function notify(message: string, error = false) {
-    showNotice(message, error);
+  function notify(message: string, error = false, actions: NoticeAction[] = []) {
+    showNotice(message, error, actions);
   }
   async function printEmails(ids: number[], thread = false) {
     if (s.outputBusy) return;
@@ -373,7 +374,8 @@ export default function App() {
     if (s.outputBusy) return;
     s.outputBusy = true;
     try {
-      const saved = await call<{ count: number; path: string } | null>('export_mail', {
+      // The browser preview downloads instead of saving a file: it has no token and no actions.
+      const saved = await call<{ count: number; path: string; token?: number } | null>('export_mail', {
         italian: isItalian(),
         ids,
         format,
@@ -386,6 +388,8 @@ export default function App() {
                 `${saved.count} messaggi esportati: ${saved.path}`,
                 `${saved.count} messages exported: ${saved.path}`,
               ),
+          false,
+          savedFileActions(saved.token, notify),
         );
     } catch (error) {
       notify(errorText(error), true);

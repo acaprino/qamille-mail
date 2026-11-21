@@ -2,7 +2,7 @@
 
 Skill applicata: `.claude/skills/tauri-native-desktop/SKILL.md`, passi 1–3 della procedura e consegna d'audit del passo 4. Nessun file del progetto è stato modificato.
 
-**Ultima passata: 2026-11-20, skill 2.1.0** (sezione «Quarta applicazione della skill»). Difetto prioritario oggi: Q1, «Ricarica la finestra» butta via il lavoro non salvato quando un salvataggio fallisce.
+**Ultima passata: 2026-11-20, skill 2.1.0** (sezione «Quarta applicazione della skill»). Difetto prioritario allora: Q1, «Ricarica la finestra» butta via il lavoro non salvato quando un salvataggio fallisce. La fase 2 (2026-11-21) lo ha corretto con Q2–Q7, Q9, Q11–Q18, Q23 e le modifiche standard 4, 6, 7 e 10: commit e prove in «Stato delle correzioni della fase 2».
 
 **Difetto prioritario del primo audit (risolto, F1).** Nessuna delle sei finestre di sistema aperte con `rfd` (salva allegato, esporta email, allega file, importa ed esporta riunione, conferma "Registrazione in corso" alla chiusura) ha un owner. La principale resta attiva sotto il dialogo e può coprirlo. Durante la conferma di chiusura la X e Alt+F4 vengono ignorati in silenzio, perché il dialogo è ancora aperto (vedi F1).
 
@@ -298,6 +298,49 @@ Su questa macchina non c'è un exe di release: **niente è stato osservato**, e 
 - il menu delle funzioni native qui sopra; pulsante Chiudi e avvio all'accesso vanno decisi in ogni caso;
 - Q8, Q10, Q19 (dopo l'osservazione), Q20, Q21, Q22;
 - F5 e T16.
+
+### Stato delle correzioni della fase 2 (2026-11-21)
+
+Piano `docs/superpowers/plans/2026-11-20-nativo-fase-2.md`, ramo `nativo-fase-2` (da `develop` a `34a3a21`). Exe di
+release compilato da `ac0b42e` con `--features custom-protocol` (contiene `theme-boot.js`) e copiato in
+`release/Qamille.exe`. Windows 11 26200, WebView2 157, monitor 1920×1200 al 100 %.
+
+Legenda:
+- **automatico**: test che girano senza l'exe, tutti verdi il 2026-11-21: `node tests/native-feel.mjs` (17 controlli),
+  `rustc --test src-tauri/src/shell_rules.rs` (15 test), `node --test tests/session-end.mjs tests/close-guards.mjs
+  tests/shortcut-guard.mjs`, `npm run test:ds`, e i test browser elencati (`npm run test:browser -- …`); i `cargo test`
+  indicati sono quelli eseguiti nei rispettivi task, non ripetuti qui;
+- **exe**: `webview-recovery-native.mjs` 7/7, `close-supervision-native.mjs` (chiusura con la pagina bloccata),
+  `release-theme-probe.mjs` 9/9 (pagina `http://tauri.localhost/`), `a11y-native.mjs`, tutti verdi su quell'exe;
+- **osservato**: visto sull'exe con uno script (Playwright sulla WebView2, finestre e UI Automation da PowerShell), su
+  una cartella dati usa e getta in `checks/`, mai sui dati del proprietario;
+- **da fare**: resta da vedere a mano, con il motivo.
+
+| # | Correzione | Commit | Automatico | Sull'exe |
+|---|---|---|---|---|
+| Q1 | Un passo di salvataggio che risponde `false` conta come non salvato: «Ricarica la finestra» chiede invece di ricaricare | 16fdf62 | `session-end.mjs` (6) | exe: la ricarica dal menu di sistema dopo il salvataggio (`webview-recovery-native` 2). Da fare: archivio in sola lettura e bozza (verifica 24 di `aspetto-nativo.md`) |
+| Q2 | Un avvio fallito mostra il motivo, lo scrive in `native.log` ed esce con 1, anche per un panic; WebView2 controllato prima di tutto | c5f6345, c81e62e | `shell_rules` (`startup_failure_text`, `panic_message`), controllo 12 | Osservato, tre casi: archivio SQLite rovinato, `WEBVIEW2_BROWSER_EXECUTABLE_FOLDER` su una cartella vuota, `ui.lock` tenuto da un altro processo. Ogni volta un task dialog «Qamille» senza owner e in primo piano, con «Qamille non è riuscito ad avviarsi.» e il motivo (per WebView2 l'indirizzo di Microsoft), la riga `could not start: …` in `native.log`, uscita 1 dopo OK. Il messaggio resta finché non si risponde (6 su 6 e 12 su 12 senza input). Per l'archivio rovinato il motivo è in inglese, come lo scrive il backend. Da fare: un errore dopo `build()`, con la finestra già mostrata e poi nascosta (nessun modo di provocarlo da fuori) |
+| Q3 | Il dialogo della posta vecchia parte da «Lascia così» | 8103de6 | `history-unread.mjs` | Non serve: è solo pagina |
+| Q4 | Prima finestra `center` + `preventOverflow` | e9442c1 | controllo 13 | Osservato al 100 %: cartella nuova, cornice 1442×902 tutta dentro l'area di lavoro 1920×1152, centrata a meno di 8 px (Tauri centra la misura interna, senza i bordi invisibili di ridimensionamento). Da fare: 150 % e 200 % su 1920×1080 (la scala dello schermo del proprietario non si cambia da uno script) |
+| Q5, standard 4 | Radice bloccata in ogni WebView; accesso e avvio scorrono in un contenitore proprio | f01692d | controllo 14, `root-lock.mjs` | Da fare: touchpad di precisione e touch (verifica 17): uno script non guida un touchpad |
+| Q6 | Scheda evento e modulo contatto proteggono la chiusura; l'evento non si salva a fine sessione | 8f935fb, a68c594 | `close-guards.mjs`, `calendar-flow.mjs`, `contacts.mjs` | Da fare: la X con un evento o un contatto aperti (verifica 25) |
+| Q7 | Ogni uscita senza la pagina ferma e salva prima la registrazione (al massimo 20 s) | ee01ed5 | `shell_rules` (`must_stop_capture`) | exe: «Riavvia Qamille» apre ancora un Qamille nuovo (`webview-recovery-native` 6). Da fare con una registrazione vera (verifica 22): registrerebbe il microfono della macchina, e i test nativi non chiamano mai `meeting_start` |
+| Q9 | Allegato salvato con `IAttachmentExecute` (zona Internet), ripiego sul flusso `Zone.Identifier` | 7a409df, 9988d1c | `cargo test zone`, `backend-text.mjs` | Osservato: «Salva l'allegato» con owner la principale, disabilitata sotto; il file salvato ha `ZoneId=3` e `HostUrl=about:internet`. Da fare: un `.docx` aperto in Word in Visualizzazione protetta |
+| Q11, Q12 | Link dei messaggi, aree delle mappe e link SVG al browser di sistema solo se assoluti; `#…` scorre il messaggio; `on_new_window` sempre no | 7b979b2, 862e21b | `mail-html.mjs`, `mailbox-sync-ui.mjs`, controlli 15 e 16 | Osservato in un `.eml` allegato (stesso `MessageHtml` del lettore; l'archivio Sample non tiene l'HTML ricevuto): `#part2` scorre e non chiama niente; link web, area e SVG chiamano `open_link` con l'indirizzo assoluto scritto nel messaggio; il frame resta `about:srcdoc` con il suo documento. `open_link` intercettato nella pagina: nessun browser aperto. Da fare: «Permessi del tuo account Google» (serve una revoca fallita su un account vero) e `window.open` (aprirebbe il browser di sistema) |
+| Q13 | Frecce solo da lista, lettore o pagina; AltGr non è una scorciatoia; Esc svuota la ricerca | 0cde965 | `shortcut-guard.mjs` | Non serve: è solo pagina |
+| Q14, Q17 | Il focus torna dove era (scheda laterale, composer, pagina Bozze); le risposte partono dal corpo; anelli di focus | 9b4ab0f, 37fb707 | `composer-tabs.mjs`, `calendar-flow.mjs`, `a11y-keyboard.mjs` | exe: `a11y-native` verde |
+| Q15 | `frontend_ready` dal primo effetto di App; `onUncaughtError` → `frontend_failed`; il controllo dei 15 s riparte a ogni pagina caricata | c5f6345, c81e62e | controllo 12 | Osservato: una ricarica chiesta dalla pagina (`location.reload()`) arriva pronta e dopo 17 s non c'è nessun dialogo. Una ricarica in cui il render di App lancia (uno snapshot malformato, dato da uno script nella pagina) apre subito «Qamille non si è aperto», con owner la principale e «Ricarica la finestra» / «Chiudi Qamille»; in `native.log` `the page of main failed: TypeError…`; «Ricarica la finestra» riporta la posta senza altri dialoghi |
+| Q16 | I menu dei comandi sono `Menu` di Ark | 174fade | `primitives-overlays.mjs`, `compatto-reader.mjs`, `compatto-meetings.mjs`, `meetings.mjs`, `contacts.mjs` | Osservato: UI Automation dà per «Altre azioni sul messaggio» un `Menu` «Azioni sul messaggio» con voci `MenuItem` («voce di menu»), nessuna finestra di dialogo; Esc chiude e rimette il focus sul pulsante. `release-theme-probe`: il Menu si apre senza violazioni CSP. Da fare: la lettura con l'Assistente vocale (verifica 26) |
+| Q18 | Temi Contrasto: stato dei calendari e barra della sidebar | afa923a | `forced-colors.mjs` (20 controlli) | Da fare: tema «Deserto» (cambierebbe il tema di Windows del proprietario) |
+| Q23 | La disinstallazione chiude il worker, toglie il suo file d'avvio dopo la disinstallazione, e i dati solo se richiesto; l'app riscrive il file d'avvio quando serve | d37d37d, 1eacdd8, ac0b42e (errore del rinnovo anche in `native.log`) | controllo 17, `cargo test --lib mcp_config` | Da fare (verifica 27): l'installatore NSIS non è stato costruito, perché le build da distribuire si fanno in remoto e `QAMILLE_SERVER` non è impostata |
+| Standard 6 | Menu contestuale: lista di voci ammesse; con un errore COM nessun menu e una riga nel log; i nomi tolti in `native.log` | d1e028e | `cargo test native_feel`, controllo 15 | Osservato (tasto destro e Maiusc+F10 via DevTools): su un punto vuoto nessun menu; su testo selezionato, link, immagine e campo un menu che Esc chiude. Tolte: `back, forward, reload, saveAs, print, moreTools`, `copyLinkToHighlight`, `openLinkInNewWindow, saveLinkAs`, `saveImageAs, copyImageLocation`, `other`. Nessuna è in `MENU_ITEMS_KEPT`. Su link e immagine il menu è comparso anche senza quelle voci, quindi è rimasta una voce ammessa: `copyLinkLocation` e `copyImage`, gli unici nomi ammessi per link e immagini, sono quelli veri |
+| Standard 7 | Link, file trascinati e nuove finestre non portano via l'app | d1e028e, 7b979b2, 862e21b | controlli 15 e 16 | Osservato: i link come in Q11/Q12. Da fare: un file trascinato sul promemoria (serve un trascinamento vero e un promemoria in corso) |
+| Standard 10 | Stesso avvio in ogni WebView: radice bloccata e niente rilascio di file nel promemoria; frame, Indietro/Avanti e permessi rifiutati in modo nativo | f01692d, d1e028e | controlli 5, 14 e 15 | Osservato: con la finestra su un'altra pagina dell'app, `history.back()` non la sposta: il gestore aggiunto dopo quello di wry ha l'ultima parola (l'assunzione della regola 23). Posizione, notifiche e microfono chiesti dalla pagina: negati subito, senza domanda. Un link di un frame che sfugge alla pagina (un frame di prova, senza il gestore di `MessageHtml`) non carica mai il web, ma il frame non tiene il suo documento: finisce su `chrome-error://chromewebdata/`, perché la CSP (`frame-src 'none'`) blocca la navigazione con una pagina d'errore. Il documento lo tiene il gestore della pagina (Q11, Q12). Cambiare `srcdoc` non aggiunge voci alla cronologia (resta 1), quindi Indietro in un frame non ha dove andare |
+
+**Test browser** (`npm run test:browser -- …`, i 25 toccati dal piano): 24/25 al primo giro; `mailbox-sync-ui` è
+fallito a `mailbox-sync-ui.mjs:57`, il punto già noto come instabile, e poi è passato 3 volte su 3. Fallimenti già
+presenti su `develop` e fuori da questo piano: compatto-assistant, compatto-dark, embedded-preview, google-sign-in,
+subscription-professional, done-latency; instabili: mail-opening, refresh-coalesce, mailbox-sync-ui.
 
 ## 0. Metodo, fonti e limiti
 

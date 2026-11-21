@@ -8,6 +8,8 @@ pub mod attach;
 pub mod rag;
 pub mod recorder;
 pub mod secret;
+#[cfg(windows)]
+pub mod dpapi;
 pub mod browser_sign_in;
 pub mod server_account;
 pub mod sync_http;

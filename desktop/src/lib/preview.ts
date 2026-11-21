@@ -461,6 +461,7 @@ export async function previewCommand(
         labels: labels(),
         has_ai_key: false,
         has_google_secret: false,
+        credentials_set_aside: window.__previewVault?.notice ?? null,
         counts: {
           Inbox: view.emails.filter((e) => inbox(e) && !e.read).length,
           Tasks: view.emails.filter((e) => (e.pinned || e.due || e.set_aside) && !e.done).length,
@@ -886,6 +887,14 @@ export async function previewCommand(
     case 'legacy_local_dismiss':
       if (window.__previewLegacy) window.__previewLegacy.dismissed = true;
       return;
+    // phase 3, Task 7: the key of the credentials
+    case 'vault_status':
+    case 'vault_set_transfer_passphrase':
+    case 'vault_remove_transfer_passphrase':
+    case 'vault_unlock':
+    case 'vault_start_over':
+    case 'vault_dismiss_set_aside':
+      return (await import('./preview-vault')).previewVault(command, args);
     case 'search_model_status':
       return { installed: false, running: false, done_bytes: 0, total_bytes: 0, error: null };
     case 'indexing_status': {
@@ -1246,6 +1255,13 @@ function previewServer(command: string, args: Record<string, unknown>) {
       return { kind: agreed ? 'ready' : 'consent_needed', label, external };
     }
     case 'server_connect':
+      // Phase 3, Task 7: a vault that the transfer passphrase opens refuses the sign-in first.
+      if (window.__previewVault?.state === 'locked' && window.__previewVault.transfer)
+        throw {
+          code: 'vault_locked',
+          message:
+            'The credentials key belongs to another Windows user or another computer: enter the transfer passphrase in Settings, or sign in to the accounts again.',
+        };
       return connect(args.url);
     case 'server_change_temporary_password':
       return connect(args.url, true);

@@ -545,9 +545,12 @@ fn call_inner(
                 "Use Google OAuth sign-in in Settings first",
             ));
         }
+        // A consent whose token could not be saved is not started; credentials of another
+        // Windows user count as none, and saving the token sets them aside.
+        context.secrets.check_writable()?;
         let (email, tokens) = oauth::sign_in_with_scope(
             &account.oauth_client_id,
-            &crate::infrastructure::google_oauth_config::secret_for_client(&account.oauth_client_id, &context.secrets.get(GOOGLE_SECRET)?),
+            &crate::infrastructure::google_oauth_config::secret_for_client(&account.oauth_client_id, &context.secrets.get_for_sign_in(GOOGLE_SECRET)?),
             &AtomicBool::new(false),
             oauth::CALENDAR_SCOPE,
             &account.email,

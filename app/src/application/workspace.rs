@@ -20,6 +20,9 @@ pub struct WorkspaceSnapshot {
     pub has_google_secret: bool,
     pub signatures: Vec<Signature>,
     pub drafts: Vec<Draft>,
+    /// A sign-in set the credentials of another Windows user or computer aside in this folder of
+    /// the data folder; the interface tells the person once (`vault_dismiss_set_aside`).
+    pub credentials_set_aside: Option<String>,
 }
 #[derive(Deserialize)]
 pub struct SettingsUpdate {
@@ -68,8 +71,10 @@ impl WorkspaceService {
             }
         }
         counts.insert("Drafts".into(), store.drafts.len());
-        let has_ai_key = !self.context.secrets.get(AI_KEY)?.is_empty();
-        let has_google_secret = !self.context.secrets.get(GOOGLE_SECRET)?.is_empty();
+        // Credentials that do not open here (a data folder from another Windows user or computer)
+        // must not hide the mail and settings: those keys are simply not usable.
+        let has_ai_key = self.context.secrets.get(AI_KEY).is_ok_and(|key| !key.is_empty());
+        let has_google_secret = self.context.secrets.get(GOOGLE_SECRET).is_ok_and(|secret| !secret.is_empty());
         Ok(WorkspaceSnapshot {
             regional: self.context.clock.regional(&store.settings),
             labels: store.all_labels(),
@@ -81,6 +86,7 @@ impl WorkspaceService {
             has_google_secret,
             signatures: store.signatures.clone(),
             drafts: store.drafts.clone(),
+            credentials_set_aside: self.context.secrets.set_aside_notice(),
         })
     }
     /// The unread mail of the Inbox, the number of `counts["Inbox"]` of `snapshot` (the sidebar's): the

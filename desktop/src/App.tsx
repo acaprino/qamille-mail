@@ -21,6 +21,7 @@ import PrintPreview from './components/PrintPreview';
 import HistoryUnreadDialog from './components/HistoryUnreadDialog';
 import Onboarding from './components/Onboarding';
 import LegacyLocalNotice from './components/LegacyLocalNotice';
+import VaultNotice from './components/VaultNotice';
 import type { AppEdition } from './components/ComputeSettings';
 import Settings, { type SettingsHandle } from './components/Settings';
 import UnsavedDialog from './components/UnsavedDialog';
@@ -2111,6 +2112,17 @@ export default function App() {
           }}
         />
       )}
+      <VaultNotice
+        notify={notify}
+        setAside={workspace?.credentials_set_aside}
+        changed={() =>
+          void loadWorkspace().then(async () => {
+            // Credentials opened again may hold the server session the onboarding was asking for.
+            if (s.onboarding && (await call<{ connected: boolean }>('server_status').catch(() => null))?.connected)
+              s.onboarding = null;
+          })
+        }
+      />
       {s.printPreview && (
         <PrintPreview emails={s.printPreview.emails} title={s.printPreview.title} close={() => (s.printPreview = null)} />
       )}

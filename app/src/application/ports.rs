@@ -238,6 +238,24 @@ pub trait SecretStore: Send + Sync {
     fn remove(&self, key: &str) -> AppResult<()> {
         self.set(key, "")
     }
+    /// Before a sign-in that ends in `set`: an error when that `set` would be refused (credentials
+    /// that a transfer passphrase opens, damaged files), so no login or device is made for nothing.
+    fn check_writable(&self) -> AppResult<()> {
+        Ok(())
+    }
+    /// A value read for a sign-in the person starts. Credentials of another Windows user or
+    /// computer, with no passphrase to open them, read as empty: the sign-in goes on, and its
+    /// `set` sets the old credentials aside. Every other error stays an error.
+    fn get_for_sign_in(&self, key: &str) -> AppResult<String> {
+        match self.get(key) {
+            Err(error) if error.code == super::error::vault_codes::FOREIGN => Ok(String::new()),
+            result => result,
+        }
+    }
+    /// The folder a sign-in set the old credentials aside in, until the person was told.
+    fn set_aside_notice(&self) -> Option<String> {
+        None
+    }
 }
 
 #[derive(Clone, serde::Serialize)]

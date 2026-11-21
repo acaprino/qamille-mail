@@ -6,6 +6,7 @@ mod reminders;
 mod runtime;
 mod shell_rules;
 mod window_shell;
+mod zone;
 use commands::{accounts::*, activity::*, assistant::*, document_preview::*, drafts::*, mail::*, undo::*, workspace::*};
 use tauri::{Emitter, Manager};
 use commands::meetings::*;

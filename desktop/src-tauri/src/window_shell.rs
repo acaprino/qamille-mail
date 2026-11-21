@@ -223,6 +223,11 @@ pub fn show_main(window: &WebviewWindow) {
     #[cfg(windows)]
     if path == ShowPath::Maximized && window.hwnd().is_ok_and(win::show_maximized) {
         let _ = window.show();
+        // Safety net: if tao does not see the window maximized after the Win32 call, maximize it
+        // through tao, so its state and the maximize button stay right.
+        if !window.is_maximized().unwrap_or(true) {
+            let _ = window.maximize();
+        }
         return;
     }
     let _ = window.show();

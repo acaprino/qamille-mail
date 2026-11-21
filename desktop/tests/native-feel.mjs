@@ -547,18 +547,30 @@ check('19. the close button hides, and one restore path brings the window back (
     assert.ok(index >= 0, `restore: no ${part}`);
     return index;
   };
-  assert.ok(at('set_webview_visible(') < at('.show()') && restore.slice(at('set_webview_visible('), at('.show()')).includes('true'), 'restore makes the webview visible before show');
-  assert.ok(at('.show()') < at('.unminimize()') && at('.unminimize()') < at('.set_focus()'), 'restore: show, then unminimize, then set_focus');
+  // The show is `window_shell::show_main`, the one function that shows the main window (rule 29: a
+  // maximized placement opens maximized from the first show, a normal start's or the tray's).
+  assert.ok(at('set_webview_visible(') < at('show_main(') && restore.slice(at('set_webview_visible('), at('show_main(')).includes('true'), 'restore makes the webview visible before show');
+  assert.ok(at('show_main(') < at('.unminimize()') && at('.unminimize()') < at('.set_focus()'), 'restore: show, then unminimize, then set_focus');
   assert.match(restore, /recovery::offer_reload_if_not_ready\(/, 'the first restore offers the reload the hidden window did not ask for');
   // Nothing else shows the main window: a reload or a dialog never pulls it out of the tray.
-  const allowed = { 'native_feel.rs': 'pub fn show_main_window(', 'background.rs': 'pub fn restore(' };
+  // `window_shell::show_main` is the only `.show()` of a window; native_feel::show_main_window and
+  // background::restore are the only callers of `show_main`.
+  const allowed = { 'window_shell.rs': 'pub fn show_main(' };
+  const callers = { 'native_feel.rs': 'pub fn show_main_window(', 'background.rs': 'pub fn restore(' };
   const shows = (text) => (text.match(/\b[A-Za-z_]\w*\.show\(\)/g) ?? []).length;
+  const calls = (text) => (text.match(/\bshow_main\(/g) ?? []).length;
   for (const file of fs.readdirSync(path.join(desktop, 'src-tauri/src'), { recursive: true }).filter((f) => f.endsWith('.rs'))) {
     const text = read(path.join('src-tauri/src', file)).replace(/(^|\s)\/\/.*$/gm, '$1');
-    if (!shows(text)) continue;
-    const owner = allowed[path.basename(file)];
-    assert.ok(owner, `${file} shows a window (.show()): only native_feel::show_main_window and background::restore may`);
-    assert.equal(shows(rustItem(text, owner)), shows(text), `${file}: .show() outside ${owner}`);
+    if (shows(text)) {
+      const owner = allowed[path.basename(file)];
+      assert.ok(owner, `${file} shows a window (.show()): only window_shell::show_main may`);
+      assert.equal(shows(rustItem(text, owner)), shows(text), `${file}: .show() outside ${owner}`);
+    }
+    if (path.basename(file) !== 'window_shell.rs' && calls(text)) {
+      const owner = callers[path.basename(file)];
+      assert.ok(owner, `${file} calls show_main: only native_feel::show_main_window and background::restore may`);
+      assert.equal(calls(rustItem(text, owner)), calls(text), `${file}: show_main outside ${owner}`);
+    }
   }
   // The tray: Show and Quit, with ids of its own (every menu event reaches every handler, the row menu's
   // too); Quit closes the window through the page's guards, never app.exit.
@@ -660,18 +672,30 @@ check('21. the saved placement is applied before the first show and only on a co
   // The preferences file keeps it, and an older file without it still reads.
   const preferences = rustItem(shell, 'struct WindowPreferences {');
   assert.match(preferences, /#\[serde\([^\]]*\bdefault\b[^\]]*\)\]\s*placement:/, 'WindowPreferences.placement needs #[serde(default ...)]');
-  // Applied by the startup preferences, which never show the window themselves.
+  // Applied by the startup preferences, which never show or maximize the window themselves.
   const startup = rustItem(shell, 'pub fn apply_startup_preferences(');
   assert.match(startup, /\bapply_placement\(window\b/, 'apply_startup_preferences must apply the saved placement');
-  assert.ok(!/\.show\(/.test(startup), 'apply_startup_preferences must not show the window: the caller does, once it is painted');
+  assert.ok(!/\.show\(|\.maximize\(/.test(startup), 'apply_startup_preferences must neither show nor maximize the hidden window: tao sets WS_MAXIMIZE on it without moving it to the monitor');
+  assert.match(startup, /\bpending_show\(\)/, 'apply_startup_preferences leaves what it decided for the first show');
   const feel = read('src-tauri/src/native_feel.rs');
-  const preparing = ['prepare_main_window(', 'show_main_window('].find((name) => feel.includes(`pub fn ${name}`));
-  assert.ok(preparing, 'native_feel.rs has no function that prepares the main window');
-  const prepare = rustItem(feel, `pub fn ${preparing}`);
-  assert.match(prepare, /\bapply_startup_preferences\(/, `${preparing.slice(0, -1)} must apply the startup preferences`);
-  if (/\.show\(/.test(prepare)) {
-    assert.ok(prepare.search(/\.show\(/) > prepare.search(/\bapply_startup_preferences\(/), 'the placement must be applied before show()');
-  }
+  const prepare = rustItem(feel, 'pub fn prepare_main_window(');
+  assert.match(prepare, /\bapply_startup_preferences\(/, 'prepare_main_window must apply the startup preferences');
+  assert.ok(!/\.show\(|\bshow_main\(/.test(prepare), 'prepare_main_window must not show the window (a start in the tray stops here)');
+  // The first show, from a normal start and from background::restore, is one function.
+  const showMain = rustItem(feel, 'pub fn show_main_window(');
+  assert.ok(showMain.search(/\bprepare_main_window\(/) >= 0 && showMain.search(/\bprepare_main_window\(/) < showMain.search(/\bshow_main\(/), 'show_main_window prepares, then shows with window_shell::show_main');
+  assert.match(rustItem(read('src-tauri/src/background.rs'), 'pub fn restore('), /\bwindow_shell::show_main\(/, 'background::restore shows with window_shell::show_main');
+  const show = rustItem(shell, 'pub fn show_main(');
+  assert.match(show, /\bplacement::first_show\(/, 'show_main asks placement::first_show how to show');
+  assert.match(show, /ShowPath::Maximized/, 'show_main has a maximized path');
+  // Maximized: one Win32 step (SetWindowPlacement over the rectangle applied while hidden), then tao is told the window is visible.
+  assert.ok(show.search(/\bshow_maximized\b/) >= 0 && show.search(/\bshow_maximized\b/) < show.search(/\.show\(\)/), 'show_main maximizes through win::show_maximized, and tells tao with show() afterwards');
+  const placementCall = rustItem(shell, 'pub fn show_maximized(');
+  assert.match(placementCall, /GetWindowPlacement\([\s\S]*SW_SHOWMAXIMIZED[\s\S]*SetWindowPlacement\(/, 'show_maximized reads the placement, then sets it with SW_SHOWMAXIMIZED');
+  // The only maximize() of the window is the fallback inside show_main, after show().
+  const code = shell.replace(/(^|\s)\/\/.*$/gm, '$1');
+  assert.equal((code.match(/\.maximize\(\)/g) ?? []).length, (show.match(/\.maximize\(\)/g) ?? []).length, 'maximize() only in show_main');
+  if (/\.maximize\(\)/.test(show)) assert.ok(show.search(/\.show\(\)/) < show.search(/\.maximize\(\)/), 'a maximize() fallback comes after show(), never on a hidden window');
   // Only on a monitor that is connected now, with the work area (not the taskbar) as the limit.
   const apply = rustItem(shell, 'fn apply_placement(');
   assert.match(apply, /\.available_monitors\(\)/, 'apply_placement must ask for the connected monitors');
@@ -680,8 +704,8 @@ check('21. the saved placement is applied before the first show and only on a co
   assert.match(apply, /\bmin_logical_size\(/, 'apply_placement must pass the minimum size of the window config');
   assert.match(apply, /\.set_position\([\s\S]*\.set_size\(/, 'position first (a move to another scale settles), then size');
   assert.ok(!/\.show\(|\.maximize\(/.test(apply), 'apply_placement only places: it neither shows nor maximizes');
-  // Maximized: the normal rectangle is applied and remembered, then the window is maximized, still hidden.
-  assert.match(startup, /\bapply_placement\([\s\S]*\bremember_start_rectangle\([\s\S]*\.maximize\(\)/, 'the rectangle is applied and remembered before maximize()');
+  // The normal rectangle is applied and remembered while hidden; a maximized one is the first show's to open.
+  assert.match(startup, /\bapply_placement\([\s\S]*\bremember_start_rectangle\(/, 'the rectangle is applied and remembered at startup');
   // The saving is the window's own listener, registered from attach_main (no line in main.rs).
   assert.match(rustItem(shell, 'pub fn attach_main('), /\bwatch_placement\(/, 'attach_main must register the placement saver');
   const watch = rustItem(shell, 'fn watch_placement(');
@@ -699,6 +723,13 @@ check('21. the saved placement is applied before the first show and only on a co
   assert.match(track, /\.is_visible\(\)/, 'a hidden window is never saved');
   // A maximize moves the window before tao's flag changes: Windows is asked as well, or the screen-sized rectangle is saved.
   assert.match(rustItem(shell, 'fn is_maximized('), /\bis_zoomed\b/, 'is_maximized must ask Windows (IsZoomed) as well as tao');
+  // The last half second is not lost at the end of the session (Windows kills the process after WM_ENDSESSION).
+  assert.match(rustItem(shell, 'fn session_end('), /\bsave_placement\(\)/, 'session_end must save the placement before it waits for the page');
+  // One thread saving must not undo another's change: every write of the preferences file is a locked update.
+  for (const head of ['pub fn window_appearance(', 'pub fn window_zoom(', 'fn save_placement(']) {
+    const body = rustItem(shell, head);
+    assert.ok(/\bupdate_preferences\(/.test(body) && !/\bsave_preferences\(/.test(body), `${head.slice(head.indexOf('fn ') + 3, -1)} must change the preferences with update_preferences`);
+  }
   // The window config keeps centring it and keeping it in the work area where nothing is applied.
   const main = JSON.parse(read('src-tauri/tauri.conf.json')).app.windows.find((w) => w.label === 'main');
   assert.equal(main.center, true, 'main window needs center: true (no saved placement, or a monitor that is gone)');

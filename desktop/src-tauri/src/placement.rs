@@ -124,6 +124,27 @@ pub fn to_store(
     normal.or(previous).map(|rectangle| SavedPlacement { maximized, ..rectangle })
 }
 
+/// How the main window is shown.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShowPath {
+    /// `show()`: the window appears as it is (normal, or maximized by a previous show of this run).
+    Plain,
+    /// Shown maximized in one step, over the normal rectangle it comes back to when restored.
+    Maximized,
+}
+
+/// The way to show the main window the next time, given what `restore` decided at startup
+/// (`pending`, taken here: only the first show of a run is the saved placement's, a later restore from
+/// the tray shows the window as it was). A maximized placement is shown maximized; anything else, or
+/// no placement (nothing saved, or its monitor is gone), is a plain show. A hidden window is never
+/// maximized: tao would set its maximized style without moving it to the monitor's bounds.
+pub fn first_show(pending: &mut Option<Placement>) -> ShowPath {
+    match pending.take() {
+        Some(placement) if placement.maximized => ShowPath::Maximized,
+        _ => ShowPath::Plain,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -314,5 +335,31 @@ mod tests {
         // With no rectangle known at all there is nothing to save.
         assert_eq!(to_store(None, true, None), None);
         assert_eq!(to_store(None, false, None), None);
+    }
+
+    #[test]
+    fn the_first_show_of_a_maximized_placement_is_maximized() {
+        let mut pending = restore(&saved(120, 80, 1440, 900, 1.0, true), &[primary()], MIN);
+        assert_eq!(first_show(&mut pending), ShowPath::Maximized);
+    }
+
+    #[test]
+    fn the_first_show_of_a_normal_placement_or_none_is_plain() {
+        let mut normal = restore(&saved(120, 80, 1440, 900, 1.0, false), &[primary()], MIN);
+        assert_eq!(first_show(&mut normal), ShowPath::Plain);
+        assert_eq!(first_show(&mut None), ShowPath::Plain);
+        // Maximized on a monitor that is gone: nothing was decided, so the window is shown as it is.
+        let mut gone = restore(&saved(2100, 100, 1440, 900, 1.0, true), &[primary()], MIN);
+        assert_eq!(first_show(&mut gone), ShowPath::Plain);
+    }
+
+    #[test]
+    fn only_the_first_show_is_the_saved_placements() {
+        // A start in the tray, then a restore, then the tray again: the second restore shows the window
+        // as it is (the user may have restored it to its normal size meanwhile).
+        let mut pending = restore(&saved(120, 80, 1440, 900, 1.0, true), &[primary()], MIN);
+        assert_eq!(first_show(&mut pending), ShowPath::Maximized);
+        assert_eq!(pending, None);
+        assert_eq!(first_show(&mut pending), ShowPath::Plain);
     }
 }

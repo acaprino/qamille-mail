@@ -23,7 +23,7 @@ pub const DARK_GROUND: Color = Color(0x12, 0x16, 0x1e, 0xff);
 /// theme's colour before the page has drawn.
 pub fn show_main_window(window: &WebviewWindow) {
     prepare_main_window(window);
-    let _ = window.show();
+    crate::window_shell::show_main(window);
 }
 
 /// Everything `show_main_window` does but showing: theme, zoom, position (`window_shell`) and

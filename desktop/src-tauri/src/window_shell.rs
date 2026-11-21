@@ -6,7 +6,7 @@
 //! F11, F12). The pure rules live in `shell_rules.rs`, tested without Windows.
 #![cfg_attr(not(windows), allow(dead_code, unused_variables))]
 
-use crate::placement::{self, SavedPlacement, WorkArea};
+use crate::placement::{self, Placement, SavedPlacement, ShowPath, WorkArea};
 use crate::shell_rules::{self, Appearance, ZoomStep};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::path::PathBuf;
@@ -106,27 +106,18 @@ fn preferences() -> WindowPreferences {
     cached.get_or_insert_with(load_preferences).clone()
 }
 
-fn save_preferences(next: WindowPreferences) {
-    let mut cached = PREFERENCES.lock().unwrap_or_else(|e| e.into_inner());
-    if cached.as_ref() == Some(&next) {
-        return;
-    }
-    write_preferences(&next);
-    *cached = Some(next);
-}
-
-/// Changes one preference while holding the lock, for what is saved from another
-/// thread than the commands' (the placement saver) and must not undo, or be
-/// undone by, a change made at the same time.
-fn update_preferences(change: impl FnOnce(&mut WindowPreferences)) {
+/// Changes the preferences while holding the lock and writes them if they changed. Every change goes
+/// through here, so that the commands (appearance, zoom) and the placement saver, which runs on its
+/// own thread, never write back an older copy of what the other one has just saved.
+fn update_preferences<R>(change: impl FnOnce(&mut WindowPreferences) -> R) -> R {
     let mut cached = PREFERENCES.lock().unwrap_or_else(|e| e.into_inner());
     let mut next = cached.clone().unwrap_or_else(load_preferences);
-    change(&mut next);
-    if cached.as_ref() == Some(&next) {
-        return;
+    let result = change(&mut next);
+    if cached.as_ref() != Some(&next) {
+        write_preferences(&next);
+        *cached = Some(next);
     }
-    write_preferences(&next);
-    *cached = Some(next);
+    result
 }
 
 /// Cosmetic: if the file cannot be written the next start uses the system theme
@@ -163,13 +154,11 @@ pub fn apply_startup_preferences(window: &WebviewWindow) -> bool {
     if (zoom - 1.0).abs() > f64::EPSILON {
         let _ = window.set_zoom(zoom);
     }
-    let maximize = saved.placement.is_some_and(|stored| apply_placement(window, &stored.into()));
+    // Not maximized here: tao sets the maximized style of a hidden window without moving it to the
+    // monitor's bounds, and the window then shows at the wrong origin. The first `show_main` opens a
+    // maximized placement.
+    *pending_show() = saved.placement.and_then(|stored| apply_placement(window, &stored.into()));
     remember_start_rectangle(window);
-    if maximize {
-        // Hidden: tao does not show a hidden window for it, and the caller's `show` then opens it
-        // maximized, over the rectangle remembered above.
-        let _ = window.maximize();
-    }
     let system_dark = matches!(window.theme(), Ok(Theme::Dark));
     shell_rules::starts_dark(appearance, system_dark)
 }
@@ -185,9 +174,9 @@ fn min_logical_size(window: &WebviewWindow) -> (u32, u32) {
 
 /// Puts the hidden window where it was, if that is still on a connected monitor
 /// (`placement::restore`; otherwise the window stays where the window config
-/// centred it). Returns whether it is to be maximized.
-fn apply_placement(window: &WebviewWindow, saved: &SavedPlacement) -> bool {
-    let Ok(monitors) = window.available_monitors() else { return false };
+/// centred it). Returns what it applied, `None` when it applied nothing.
+fn apply_placement(window: &WebviewWindow, saved: &SavedPlacement) -> Option<Placement> {
+    let Ok(monitors) = window.available_monitors() else { return None };
     let areas: Vec<WorkArea> = monitors
         .iter()
         .map(|monitor| {
@@ -201,7 +190,7 @@ fn apply_placement(window: &WebviewWindow, saved: &SavedPlacement) -> bool {
             }
         })
         .collect();
-    let Some(target) = placement::restore(saved, &areas, min_logical_size(window)) else { return false };
+    let target = placement::restore(saved, &areas, min_logical_size(window))?;
     // The position first, and again after the size: a move to a monitor with another scale is
     // settled by Windows (WM_DPICHANGED resizes the window) before the size is set, which would
     // otherwise be scaled once more.
@@ -209,7 +198,39 @@ fn apply_placement(window: &WebviewWindow, saved: &SavedPlacement) -> bool {
     let _ = window.set_position(position);
     let _ = window.set_size(PhysicalSize::new(target.width, target.height));
     let _ = window.set_position(position);
-    target.maximized
+    Some(target)
+}
+
+/// What `apply_placement` applied, until the window is first shown (`show_main`).
+static PENDING_SHOW: Mutex<Option<Placement>> = Mutex::new(None);
+
+fn pending_show() -> std::sync::MutexGuard<'static, Option<Placement>> {
+    PENDING_SHOW.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// Shows the main window, the one place that does (a normal start and `background::restore`, which
+/// the tray, a second start and a notification come through). The first show of a run is the saved
+/// placement's: a maximized one opens maximized on the monitor it was on, in one step, and comes back
+/// to the rectangle applied while hidden (`apply_placement`) when restored. Any later show is a plain
+/// `show()`: the window is as the user left it.
+///
+/// Win32 shows the window (`SetWindowPlacement` with `SW_SHOWMAXIMIZED`: Windows maximizes it on its
+/// monitor, with no frame at the normal size and no jump) and tao is told with `show()` right after,
+/// so its visible flag matches the window. With the flag left behind, tao's next change of a window
+/// flag (the maximize button) would hide the window.
+pub fn show_main(window: &WebviewWindow) {
+    let path = placement::first_show(&mut pending_show());
+    #[cfg(windows)]
+    if path == ShowPath::Maximized && window.hwnd().is_ok_and(win::show_maximized) {
+        let _ = window.show();
+        return;
+    }
+    let _ = window.show();
+    if path == ShowPath::Maximized {
+        // Win32 refused (or this is not Windows): maximize now, shown. A frame at the normal size
+        // first, but a window that is maximized.
+        let _ = window.maximize();
+    }
 }
 
 /// Settings → Appearance or the language changed: the title bar, WebView2's
@@ -219,12 +240,12 @@ fn apply_placement(window: &WebviewWindow, saved: &SavedPlacement) -> bool {
 pub fn window_appearance(window: WebviewWindow, appearance: String, italian: Option<bool>) {
     let parsed = shell_rules::parse_appearance(&appearance);
     let _ = window.set_theme(theme_of(parsed));
-    let mut next = preferences();
-    next.appearance = shell_rules::appearance_name(parsed).into();
-    if italian.is_some() {
-        next.italian = italian;
-    }
-    save_preferences(next);
+    update_preferences(|next| {
+        next.appearance = shell_rules::appearance_name(parsed).into();
+        if italian.is_some() {
+            next.italian = italian;
+        }
+    });
     crate::background::relabel(tauri::Manager::app_handle(&window), italian.unwrap_or_else(self::italian));
     #[cfg(windows)]
     if let Ok(hwnd) = window.hwnd() {
@@ -261,18 +282,17 @@ pub struct ZoomState {
 /// a changed Windows text size. Applies and saves the zoom.
 #[tauri::command]
 pub fn window_zoom(window: WebviewWindow, step: Option<String>) -> tauri::Result<ZoomState> {
-    let mut next = preferences();
+    let current = preferences().zoom;
     let user = match step.as_deref() {
-        Some("in") => shell_rules::next_zoom(next.zoom, ZoomStep::In),
-        Some("out") => shell_rules::next_zoom(next.zoom, ZoomStep::Out),
-        Some("reset") => shell_rules::next_zoom(next.zoom, ZoomStep::Reset),
-        _ => shell_rules::clamp_user_zoom(next.zoom),
+        Some("in") => shell_rules::next_zoom(current, ZoomStep::In),
+        Some("out") => shell_rules::next_zoom(current, ZoomStep::Out),
+        Some("reset") => shell_rules::next_zoom(current, ZoomStep::Reset),
+        _ => shell_rules::clamp_user_zoom(current),
     };
     let text_scale = text_scale_factor();
     let zoom = shell_rules::effective_zoom(user, text_scale);
     window.set_zoom(zoom)?;
-    next.zoom = user;
-    save_preferences(next);
+    update_preferences(|next| next.zoom = user);
     Ok(ZoomState { zoom, user, text_scale })
 }
 
@@ -539,6 +559,22 @@ mod win {
         unsafe { IsZoomed(hwnd) }.as_bool()
     }
 
+    /// Shows the hidden window maximized in one step: its own placement (the rectangle `apply_placement`
+    /// gave it, in the workspace coordinates Windows wants, which a round trip through
+    /// `GetWindowPlacement` keeps right) with the show command `SW_SHOWMAXIMIZED`. Windows maximizes
+    /// it on the monitor the rectangle is on, and un-maximizing returns to that rectangle. Whether it
+    /// worked, or the window is as it was.
+    pub fn show_maximized(hwnd: HWND) -> bool {
+        let mut window_placement = WINDOWPLACEMENT { length: std::mem::size_of::<WINDOWPLACEMENT>() as u32, ..Default::default() };
+        unsafe {
+            if GetWindowPlacement(hwnd, &mut window_placement).is_err() {
+                return false;
+            }
+            window_placement.showCmd = SW_SHOWMAXIMIZED.0 as u32;
+            SetWindowPlacement(hwnd, &window_placement).is_ok()
+        }
+    }
+
     pub fn attach_main(window: &WebviewWindow) {
         let Ok(hwnd) = window.hwnd() else { return };
         let _ = APP.set(window.app_handle().clone());
@@ -778,6 +814,9 @@ mod win {
     /// until it answers or `SESSION_WAIT` runs out. Re-entered for the second
     /// window while waiting, it waits for the same answer.
     fn session_end() {
+        // Windows ends the process once the session is over, and the last half second of moving may
+        // still be waiting for its delayed save.
+        super::save_placement();
         session_query();
         let deadline = *SESSION_DEADLINE.get_or_init(|| Instant::now() + SESSION_WAIT);
         if !SESSION_ENDING_SENT.swap(true, Ordering::SeqCst)

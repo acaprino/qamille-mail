@@ -305,6 +305,16 @@ fn setup_app(
     // After `compute_factory::configure` (in `DesktopState::new`); never in the demo.
     if !demo {
         let _ = state.legacy_local.startup();
+        // The uninstaller an upgrade runs first removes the worker's startup file, and a moved app
+        // folder leaves it naming the old one: with automatic startup on, write it again. Off the
+        // main thread (it waits for a file lock) and never a reason not to start.
+        let _ = std::thread::Builder::new()
+            .name("qamille-autostart".into())
+            .spawn(|| {
+                if let Err(error) = qamille::infrastructure::mcp_config::refresh_autostart() {
+                    eprintln!("Qamille: the worker's startup file was not refreshed: {}", error.message);
+                }
+            });
     }
     let main_window = tauri::WebviewWindowBuilder::from_config(app, &window_config)?
         .data_directory(webview_dir)

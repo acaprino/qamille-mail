@@ -465,24 +465,39 @@ check("17. the installer removes the worker's startup and, when asked, the data 
   assert.match(before, /\$\$_\.ExecutablePath\s+-eq\s+\$\$env:\w+/, 'a process must be matched on its full executable path');
   assert.match(before, /\$\$_\.CommandLine\s+-match\s+'\(\^\|\\s\)--worker\(\\s\|\$\$\)'/, 'a process must be matched on --worker as a whole argument');
   assert.match(before, /Stop-Process\s+-Id\s+\$\$_\.ProcessId/, 'the matching processes must be stopped');
-  // The startup file goes with the program, but an update keeps it: the worker must still start at the
-  // next sign-in (the template keeps the HKCU Run value on an update the same way).
-  assert.match(before, /ReadEnvStr\s+\$\d\s+APPDATA/, 'the startup folder is found from %APPDATA%, as mcp_config.rs does');
-  assert.match(
-    before,
-    new RegExp(`\\$\\{If\\}\\s+\\$UpdateMode\\s*<>\\s*1[\\s\\S]*Delete\\s+"\\$\\d\\\\${startupFile.replaceAll('\\', '\\\\')}"[\\s\\S]*\\$\\{EndIf\\}`),
-    `${startupFile} must be deleted, and not on an update`,
-  );
+  // Nothing is deleted before the uninstaller's "Qamille is running" step: cancelling there leaves
+  // Qamille installed, and it must keep its startup file and its data.
+  assert.ok(!/\b(Delete|RMDir)\b/i.test(before) && !before.includes(startupFile), 'the hook that runs first must not delete anything');
 
   const after = nshMacro(hooks, 'NSIS_HOOK_POSTUNINSTALL');
+  // The startup file goes only once the uninstall went through, and not on an /UPDATE. The Delete must
+  // sit inside the If $UpdateMode <> 1 block: no ${EndIf} between the two.
+  assert.match(after, /ReadEnvStr\s+\$\d\s+APPDATA/, 'the startup folder is found from %APPDATA%, as mcp_config.rs does');
+  assert.match(
+    after,
+    new RegExp(`\\$\\{If\\}\\s+\\$UpdateMode\\s*<>\\s*1(?:(?!\\$\\{EndIf\\})[\\s\\S])*?Delete\\s+"\\$\\d\\\\${startupFile.replaceAll('\\', '\\\\')}"`),
+    `${startupFile} must be deleted after the uninstall, and not on an /UPDATE`,
+  );
   // The template's "Delete app data" only empties %APPDATA%\<identifier> and %LOCALAPPDATA%\<identifier>,
   // where Qamille keeps nothing: its data and credentials.key sit beside the program.
   assert.match(
     after,
-    /\$\{If\}\s+\$DeleteAppDataCheckboxState\s*=\s*1\s+\$\{AndIf\}\s+\$UpdateMode\s*<>\s*1[\s\S]*RMDir\s+\/r\s+"\$INSTDIR\\data"[\s\S]*\$\{EndIf\}/,
-    'the data folder must go only when the box is ticked, and never on an update',
+    /\$\{If\}\s+\$DeleteAppDataCheckboxState\s*=\s*1\s+\$\{AndIf\}\s+\$UpdateMode\s*<>\s*1\s+\$\{AndIf\}\s+\$INSTDIR\s*!=\s*""\s+RMDir\s+\/r\s+"\$INSTDIR\\data"/,
+    'the data folder must go only when the box is ticked, never on an /UPDATE, and never from an empty $INSTDIR',
   );
   assert.ok(!/RMDir\s+\/r\s+"\$INSTDIR"/.test(after), 'only the data folder is removed recursively, never the install folder');
+
+  // A manual upgrade runs the old uninstaller without /UPDATE, so it removes the startup file too: the
+  // app writes it again when it starts, with automatic startup on, never while it is off.
+  const refresh = rustItem(read('../app/src/infrastructure/mcp_config.rs'), 'pub fn refresh_autostart()');
+  assert.match(refresh, /refresh_autostart_at\(/, 'refresh_autostart must do the work of refresh_autostart_at');
+  const decision = rustItem(read('../app/src/infrastructure/mcp_config.rs'), 'fn launcher_refresh(');
+  assert.match(decision, /if !autostart \{\s*return None;\s*\}/, 'a launcher must never be written while automatic startup is off');
+  assert.match(
+    rustItem(read('src-tauri/src/main.rs'), 'fn setup_app('),
+    /if !demo \{(?:(?!\n    \})[\s\S])*?mcp_config::refresh_autostart\(\)/,
+    'setup_app must refresh the worker startup file when the app starts (not in the demo)',
+  );
 });
 
 if (failures.length) {

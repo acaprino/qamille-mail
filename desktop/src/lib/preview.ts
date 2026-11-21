@@ -658,6 +658,18 @@ export async function previewCommand(
         action: String(args.action),
         value: args.value ? String(args.value) : null,
       });
+    case 'show_row_menu': {
+      // No native menu here: keep what was asked and answer the entry the test prepared
+      // (`__previewRowMenu`, declared in lib/row-menu.ts). Without one, the menu closes unchosen.
+      const menu = (window.__previewRowMenu ??= { calls: [], choice: null });
+      type Shown = (typeof menu.calls)[number];
+      menu.calls.push({
+        items: structuredClone(args.items) as Shown['items'],
+        x: Number(args.x),
+        y: Number(args.y),
+      });
+      return menu.choice;
+    }
     case 'queue_draft_action': {
       const draft_id = Number(args.id);
       if (args.action === 'send') return queue({ kind: 'send_draft', draft_id });
@@ -762,6 +774,20 @@ export async function previewCommand(
       store.settings.meeting_engine = meetingEngine(store.settings.meeting_engine);
       return;
     }
+    // Background presence (src-tauri/src/background.rs): a browser has no tray and no sign-in entry.
+    case 'close_to_tray_get':
+      return true;
+    case 'close_to_tray_set':
+    case 'restore_main_window':
+      return;
+    case 'autostart_status':
+    case 'autostart_set':
+      return { enabled: false, supported: false };
+    // The undo queue at quit (lib/undo-close.ts): the preview sends nothing, so nothing is left.
+    case 'undo_send_now':
+      return { remaining: 0 };
+    case 'undo_quit_anyway':
+      return true;
     case 'list_events':
       return structuredClone(store.events);
     case 'save_event': {
@@ -815,6 +841,13 @@ export async function previewCommand(
     case 'attachment_save':
       throw {
         message: 'The browser preview cannot save attachments. Open the desktop app.',
+        code: 'preview_unsupported',
+      };
+    case 'saved_file_open':
+    case 'saved_file_reveal':
+      // A save here is a download and gives no token: only a test that fakes one reaches these.
+      throw {
+        message: 'The browser preview cannot open saved files. Open the desktop app.',
         code: 'preview_unsupported',
       };
     case 'attachment_preview_source':
@@ -948,6 +981,15 @@ export async function previewCommand(
       return previewServer(command, args);
     case 'configure_indexing':
       throw new Error('Open the desktop app to configure local mail indexing.');
+    // mailto: links from outside the page (src-tauri/src/launch_args.rs, mail_handler.rs): a browser
+    // has no other program to hand one over, and no Windows to offer Qamille to.
+    case 'take_launch_mailto':
+      return null;
+    case 'mail_handler_status':
+      return { registered: false, name: 'Qamille', installed: false, supported: false, chosen: false };
+    case 'mail_handler_register':
+    case 'mail_handler_unregister':
+      throw new Error('Open the desktop app to choose Qamille for mailto links.');
     case 'open_link':
       window.open(String(args.url), '_blank', 'noopener,noreferrer');
       return;

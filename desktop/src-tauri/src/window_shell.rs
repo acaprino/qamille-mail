@@ -225,6 +225,7 @@ pub fn window_appearance(window: WebviewWindow, appearance: String, italian: Opt
         next.italian = italian;
     }
     save_preferences(next);
+    crate::background::relabel(tauri::Manager::app_handle(&window), italian.unwrap_or_else(self::italian));
     #[cfg(windows)]
     if let Ok(hwnd) = window.hwnd() {
         win::label_reload_entry(hwnd, self::italian());
@@ -638,15 +639,21 @@ mod win {
         if italian { w!("Ricarica la finestra") } else { w!("Reload window") }
     }
 
-    /// The app's own entry at the end of the system menu: a reload that works
-    /// from Alt+Space or Maiusc+clic destro on the taskbar button even when the
-    /// page is blank or dead (`recovery::reload_requested`).
+    fn quit_label(italian: bool) -> PCWSTR {
+        if italian { w!("Esci da Qamille") } else { w!("Quit Qamille") }
+    }
+
+    /// The app's own entries at the end of the system menu: «Esci da Qamille» right under «Chiudi»,
+    /// which only hides the window while it goes to the tray (`background::quit`), and a reload that
+    /// works from Alt+Space or Maiusc+clic destro on the taskbar button even when the page is blank
+    /// or dead (`recovery::reload_requested`).
     fn add_reload_entry(hwnd: HWND, italian: bool) {
         unsafe {
             let menu = GetSystemMenu(hwnd, false);
             if menu.is_invalid() || GetMenuState(menu, shell_rules::SC_APP_RELOAD, MF_BYCOMMAND) != u32::MAX {
                 return;
             }
+            let _ = AppendMenuW(menu, MF_STRING, crate::background_rules::SC_APP_QUIT as usize, quit_label(italian));
             let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
             let _ = AppendMenuW(menu, MF_STRING, shell_rules::SC_APP_RELOAD as usize, reload_label(italian));
         }
@@ -658,6 +665,8 @@ mod win {
             if !menu.is_invalid() {
                 let command = shell_rules::SC_APP_RELOAD as usize;
                 let _ = ModifyMenuW(menu, command as u32, MF_BYCOMMAND | MF_STRING, command, reload_label(italian));
+                let command = crate::background_rules::SC_APP_QUIT as usize;
+                let _ = ModifyMenuW(menu, command as u32, MF_BYCOMMAND | MF_STRING, command, quit_label(italian));
             }
         }
     }
@@ -727,6 +736,14 @@ mod win {
                 WM_SYSCOMMAND if (wparam.0 as u32 & 0xFFF0) == shell_rules::SC_APP_RELOAD => {
                     if let Some(app) = APP.get() {
                         crate::recovery::reload_requested(app);
+                    }
+                    LRESULT(0)
+                }
+                // Not from inside this window procedure: the close runs Tauri's window events and
+                // the page's close listener.
+                WM_SYSCOMMAND if (wparam.0 as u32 & 0xFFF0) == crate::background_rules::SC_APP_QUIT => {
+                    if let Some(app) = APP.get().cloned() {
+                        std::thread::spawn(move || crate::background::quit(&app));
                     }
                     LRESULT(0)
                 }

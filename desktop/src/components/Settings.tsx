@@ -6,7 +6,7 @@ import Icon from '../ds/primitives/Icon';
 import GoogleMark from '../ds/primitives/GoogleMark';
 import Select from '../ds/primitives/Select';
 import Switch from '../ds/primitives/Switch';
-import { call, errorText } from '../lib/api';
+import { call, desktop, errorText } from '../lib/api';
 import { needsReconsent, providerItems as serverProviderItems, reconsentText, type LlmStatus } from '../lib/assistant-server';
 import type { Appearance } from '../lib/appearance';
 import { cancelGoogle, connectGoogle } from '../lib/google-sign-in';
@@ -24,6 +24,7 @@ import McpSettings from './McpSettings';
 import MeetingSettings from './MeetingSettings';
 import ContactsSettings from './contacts/ContactsSettings';
 import ComputeSettings from './ComputeSettings';
+import DesktopSettings from './DesktopSettings';
 import './Settings.css';
 
 export type SettingsHandle = {
@@ -462,6 +463,7 @@ export default function Settings({
                     )}
                   </p>
                 </div>
+                {desktop && <DesktopSettings />}
               </>
             ) : section === 'Accounts' ? (
               <>

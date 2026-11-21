@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { useReducedMotion } from 'motion/react';
 import Button from './ds/primitives/Button';
-import Toaster, { notify as showNotice } from './ds/primitives/Toaster';
+import Toaster, { notify as showNotice, type NoticeAction } from './ds/primitives/Toaster';
 import { listen } from '@tauri-apps/api/event';
 import Sidebar from './components/Sidebar';
 import WindowControls from './components/WindowControls';
@@ -46,6 +46,9 @@ import { configureRegional, configureRegionalWording, regionalLocale, regionalTi
 import { backendText, folderLabel, isItalian, setLanguageLocale, tr, useLanguage } from './lib/i18n';
 import { personIndex, type PersonIndex } from './lib/people';
 import { replyAllRecipients } from './lib/reply-all';
+import { installMailtoRouting, mailtoDraft, type MailtoFields } from './lib/mailto';
+import { savedFileActions } from './lib/saved-file';
+import { rowMenuAction, rowMenuEntries, showRowMenu } from './lib/row-menu';
 import { patchExtraRead, repliesOf, threadState } from './lib/groups';
 import { useStore } from './lib/store';
 import { tick } from './lib/tick';
@@ -346,8 +349,8 @@ export default function App() {
       void call('prefetch_mail', { ids }).catch(() => {});
     }, 120);
   }
-  function notify(message: string, error = false) {
-    showNotice(message, error);
+  function notify(message: string, error = false, actions: NoticeAction[] = []) {
+    showNotice(message, error, actions);
   }
   async function printEmails(ids: number[], thread = false) {
     if (s.outputBusy) return;
@@ -373,7 +376,8 @@ export default function App() {
     if (s.outputBusy) return;
     s.outputBusy = true;
     try {
-      const saved = await call<{ count: number; path: string } | null>('export_mail', {
+      // The browser preview downloads instead of saving a file: it has no token and no actions.
+      const saved = await call<{ count: number; path: string; token?: number } | null>('export_mail', {
         italian: isItalian(),
         ids,
         format,
@@ -386,6 +390,8 @@ export default function App() {
                 `${saved.count} messaggi esportati: ${saved.path}`,
                 `${saved.count} messages exported: ${saved.path}`,
               ),
+          false,
+          savedFileActions(saved.token, notify),
         );
     } catch (error) {
       notify(errorText(error), true);
@@ -1183,6 +1189,45 @@ export default function App() {
       await refresh();
     }
   }
+  // The native menu of list rows (lib/row-menu.ts, docs/aspetto-nativo.md rule 33). `rowIds` are the
+  // rows it is for: the one right-clicked, or every ticked one. It acts without opening the row,
+  // through the paths the row and the reader use and with their locks; the focus is back on the row.
+  async function openRowMenu(id: number, at: { x: number; y: number }, rowIds: number[]) {
+    // The rows as the list holds them now, and the messages they stand for: a conversation row
+    // acts on every message of it the view holds, as its pin button does.
+    const listedRows = () =>
+      rowIds
+        .map((rowId) => s.page.items.find((item) => item.id === rowId))
+        .filter((row): row is EmailSummary => !!row);
+    const messagesOf = (rows: EmailSummary[]) => rows.flatMap((row) => (s.threads ? row.message_ids : [row.id]));
+    const rows = listedRows();
+    if (!rows.length) return;
+    const locked = messagesOf(rows).some((messageId) => s.busyIds.has(messageId) || shownOnly(messageId));
+    const choice = await showRowMenu(rowMenuEntries(rows, s.view, locked, tr), at);
+    const rowButton = (rowId: number) =>
+      document.querySelector<HTMLElement>(`.mail-row[data-row-id="${rowId}"] .mail-open`);
+    rowButton(id)?.focus();
+    if (!choice) return;
+    if (choice === 'reply' || choice === 'reply-all' || choice === 'forward') {
+      await compose(id, choice === 'forward', choice === 'reply-all');
+      return;
+    }
+    const command = rowMenuAction(choice);
+    // The list may have changed while the menu was open: a row that left is not acted on.
+    const messages = messagesOf(listedRows());
+    if (!command || !messages.length) return;
+    // Rows sent away leave the focus on the next row, as triage does; `action` moves it itself when
+    // the message on show is among them.
+    if (leavesList.includes(command.action) && !(s.selected && messages.includes(s.selected.id))) {
+      const listed = s.visibleOrder.filter((entry) => s.page.items.some((item) => item.id === entry));
+      const from = listed.indexOf(id);
+      const next = [...listed.slice(from + 1), ...listed.slice(0, Math.max(from, 0)).reverse()].find(
+        (entry) => !rowIds.includes(entry),
+      );
+      (next === undefined ? document.querySelector<HTMLElement>('.mail-list h1') : rowButton(next))?.focus();
+    }
+    await action(id, command.action, command.value, messages);
+  }
   async function restoreListFocus() {
     await tick();
     const active = document.activeElement;
@@ -1240,14 +1285,38 @@ export default function App() {
     // The control that asked for the composer, before the draft is made: that wait can move the focus.
     const opener = document.activeElement;
     try {
+      // A row's menu answers everyone without opening the message: its recipients are read first.
+      const message =
+        everyone && replyTo !== null && s.selected?.id !== replyTo ? await call<Email>('read_mail', { id: replyTo }) : null;
       let draft = await call<Draft>('create_draft', { accountId: s.accountId, replyTo, forward });
-      const selected = s.selected;
+      const selected = message ?? s.selected;
       if (everyone && selected && selected.id === replyTo) {
         const own = new Set((s.workspace?.accounts ?? []).map((account) => account.email.trim().toLowerCase()));
         draft = await call<Draft>('save_draft', {
           draft: { ...draft, ...replyAllRecipients(selected, draft.to, own) },
           importLeaseIds: [],
         });
+      }
+      openComposer(draft, opener);
+      await loadWorkspace();
+    } catch (e) {
+      notify(errorText(e), true);
+    }
+  }
+  // A mailto: link, of a message or of another program (lib/mailto.ts, rule 32): a new message from the
+  // account in view, as «Nuovo messaggio» makes it, filled with the link's fields and opened. Never sent
+  // from here: the person reads it and sends it.
+  async function composeMailto(fields: MailtoFields) {
+    const opener = document.activeElement;
+    try {
+      const created = await call<Draft>('create_draft', { accountId: s.accountId, replyTo: null, forward: false });
+      let draft: Draft;
+      try {
+        draft = await call<Draft>('save_draft', { draft: { ...created, ...mailtoDraft(fields) }, importLeaseIds: [] });
+      } catch (e) {
+        // Without the link's fields the new draft is empty: it does not stay in Drafts.
+        await call('discard_draft', { id: created.id }).catch(() => {});
+        throw e;
       }
       openComposer(draft, opener);
       await loadWorkspace();
@@ -1541,6 +1610,15 @@ export default function App() {
         },
       ),
     );
+    // Mail links to the composer: a message's, and in the desktop app those Windows hands to Qamille.
+    unsubscribers.push(
+      installMailtoRouting({
+        compose: (fields) => void composeMailto(fields),
+        refused: () => notify(tr('Questo link di posta non si può aprire.', 'This mail link cannot be opened.'), true),
+        failed: (error) => notify(errorText(error), true),
+        native: desktop ? { listen, call } : undefined,
+      }),
+    );
     // `workspace-changed` and its preview twin carry no content: until the backend stops sending
     // them (Task 2.2) they stay as a coalesced full refresh next to the typed `app-event`.
     const previewChanged = () => void refresh();
@@ -1808,6 +1886,7 @@ export default function App() {
                       )
                     }
                     loadMore={() => void loadMail(true)}
+                    rowMenu={(id, at, rows) => void openRowMenu(id, at, rows)}
                   />
                   <Reader
                     dark={darkNow === 'dark'}

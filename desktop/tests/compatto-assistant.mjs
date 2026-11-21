@@ -105,21 +105,21 @@ try {
     await page.context().close();
   });
 
-  await step('McpSettings: its six on/off options and the two installer options are Switches, none a native checkbox', async () => {
+  await step('McpSettings: its five on/off options and the two installer options are Switches, none a native checkbox', async () => {
     const page = await open('__c16b-mcp', mcpBody, { init: mcpInit });
     await expect(page.getByRole('button', { name: 'Save assistant permissions', exact: true })).toBeEnabled();
     assert.equal(await page.locator('input[type="checkbox"]:not([role="switch"])').count(), 0, 'no native checkbox');
-    const names = ['All accounts', 'synthetic@example.test', 'All calendars', 'Allow AI processing of messages and meetings', 'Allow permanent deletion of drafts', 'Run scheduled sends in the background at Windows sign-in'];
+    const names = ['All accounts', 'synthetic@example.test', 'All calendars', 'Allow AI processing of messages and meetings', 'Allow permanent deletion of drafts'];
     for (const name of names) await expect(page.getByRole('switch', { name, exact: true })).toBeVisible();
     await expect(page.getByRole('switch', { name: 'MCP connection', exact: true })).toBeChecked();
     await expect(page.getByRole('switch', { name: 'Qamille skill', exact: true })).toBeChecked();
-    assert.equal(await page.getByRole('switch').count(), 8);
+    assert.equal(await page.getByRole('switch').count(), 7);
     const track = page.locator('[data-scope="switch"][data-part="control"]').first();
     assert.deepEqual(await size(track), { width: 32, height: 18 });
     await page.context().close();
   });
 
-  await step('McpSettings: switches keep the permission semantics (all calendars, AI, autostart reach the saved profile)', async () => {
+  await step('McpSettings: switches keep the permission semantics (all calendars and AI reach the saved profile; no worker at sign-in)', async () => {
     const page = await open('__c16b-mcp', mcpBody, { init: mcpInit });
     const save = page.getByRole('button', { name: 'Save assistant permissions', exact: true });
     await expect(save).toBeEnabled();
@@ -131,13 +131,15 @@ try {
     await expect(page.getByRole('textbox', { name: /Allowed calendars/ })).toHaveCount(0);
     await flip(page, 'Allow AI processing of messages and meetings');
     await flip(page, 'synthetic@example.test');
-    await flip(page, 'Run scheduled sends in the background at Windows sign-in');
+    // Start at sign-in is Qamille in the tray now (Settings → General): the worker's switch is gone.
+    await expect(page.getByRole('switch', { name: 'Run scheduled sends in the background at Windows sign-in', exact: true })).toHaveCount(0);
+    await expect(page.getByText(/The worker is no longer needed at sign-in/)).toBeVisible();
     await save.click();
     const saved = await savedProfile(page);
     assert.equal(saved.calendar_ids, null);
     assert.equal(saved.ai_execute, true);
     assert.deepEqual(saved.account_ids, [1]);
-    assert.equal(await page.evaluate(() => window.calls.filter((call) => call.command === 'save_mcp_configuration').at(-1).args.config.worker_autostart), true);
+    assert.equal(await page.evaluate(() => window.calls.filter((call) => call.command === 'save_mcp_configuration').at(-1).args.config.worker_autostart), false);
     await flip(page, 'All accounts');
     await expect(page.getByRole('switch', { name: 'synthetic@example.test', exact: true })).toHaveCount(0);
     await page.context().close();

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-show-row-menu"
+description = "Enables the show_row_menu command without any pre-configured scope."
+commands.allow = ["show_row_menu"]
+
+[[permission]]
+identifier = "deny-show-row-menu"
+description = "Denies the show_row_menu command without any pre-configured scope."
+commands.deny = ["show_row_menu"]

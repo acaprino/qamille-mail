@@ -107,6 +107,8 @@ pub async fn meeting_confirm_close(window: tauri::WebviewWindow, italian: Option
     let italian = italian.unwrap_or(true);
     // Buttons named by what they do; Esc and the X keep recording.
     let (stop, keep) = if italian { ("Termina e chiudi", "Continua a registrare") } else { ("Stop and close", "Keep recording") };
+    // «Esci» from the tray: the window comes back with the question it owns.
+    crate::background::restore(tauri::Manager::app_handle(&window));
     blocking(move || Ok(rfd::MessageDialog::new().set_parent(&window).set_title(if italian { "Registrazione in corso" } else { "Recording in progress" })
         .set_description(if italian {
             "Chiudendo Qamille la registrazione si ferma e viene salvata."

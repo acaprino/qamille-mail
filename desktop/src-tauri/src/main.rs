@@ -9,6 +9,8 @@ mod window_shell;
 mod zone;
 
 // phase 3, Task 1: modules
+mod background;
+mod background_rules;
 
 // phase 3, Task 2: modules
 mod placement;
@@ -16,10 +18,14 @@ mod placement;
 // phase 3, Task 3: modules
 
 // phase 3, Task 4: modules
+mod launch_args;
+mod mail_handler;
 
 // phase 3, Task 5: modules
+mod saved_files;
 
 // phase 3, Task 6: modules
+mod row_menu;
 
 // phase 3, Task 8: modules
 
@@ -34,21 +40,25 @@ use commands::sync::*;
 use commands::legacy_local::*;
 
 fn main() {
-    if matches!(std::env::args().nth(1).as_deref(), Some("--skill" | "skill")) {
+    // A start for a mail link has the link first and nothing after it counts: a link passed unquoted
+    // (`mailto:x" --worker "`) never picks one of these modes.
+    let args = launch_args::effective(std::env::args().collect());
+    if matches!(args.get(1).map(String::as_str), Some("--skill" | "skill")) {
         print!("{}", qamille::infrastructure::assistant_packages::skill_text());
         return;
     }
-    if std::env::args().any(|a| a == "--mcp") {
+    if args.iter().any(|a| a == "--mcp") {
         qamille::mcp::serve();
         return;
     }
-    if std::env::args().any(|a| a == "--worker") {
+    if args.iter().any(|a| a == "--worker") {
         qamille::mcp::server::worker();
         return;
     }
     // Started by a restart after WebView2 failed (recovery.rs): the old process
     // must be gone before this one takes the workspace lock.
     recovery::wait_for_previous_instance();
+    background::take_restart_state();
     let demo = runtime::demo_requested(std::env::var_os("QAMILLE_DEMO").as_deref());
     // Before the first read of the data folder: an update that renamed the app's folder
     // from Qemille or Sparklone brings its workspace along.
@@ -91,12 +101,8 @@ fn main() {
     }
     context.config_mut().app.windows[0].create = false;
     let started = tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.unminimize();
-                let _ = window.set_focus();
-            }
-        }))
+        // Started again while it runs (also hidden in the tray or minimized): the window comes back.
+        .plugin(tauri_plugin_single_instance::init(background::second_instance))
         // Tauri 2.12 turns an `Err` returned from `.setup` into a panic, and a panic there ends the
         // process (exit code 101): a release build (no console) would end without a word. Both are
         // said here instead (audit Q2).
@@ -118,7 +124,17 @@ fn main() {
             match event {
                 // The chip closes with the main window, so the app can exit and reopen.
                 tauri::WindowEvent::Destroyed => reminders::close_with_main(window.app_handle()),
-                tauri::WindowEvent::CloseRequested { .. } => recovery::close_requested(window.app_handle()),
+                // X, Alt+F4, «Chiudi»: into the tray while that is on; otherwise, and for «Esci», the
+                // page's close guards decide.
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    if background::hides_on_close() {
+                        api.prevent_close();
+                        background::hide(window.app_handle());
+                    } else {
+                        recovery::close_requested(window.app_handle());
+                    }
+                }
+                tauri::WindowEvent::Resized(_) => background::window_resized(window),
                 _ => {}
             }
         })
@@ -127,6 +143,8 @@ fn main() {
             recovery::reload_ready, recovery::close_seen, recovery::close_settled, recovery::frontend_ready, recovery::frontend_failed,
             window_shell::session_end_ready, window_shell::show_system_menu, window_shell::window_snap_button,
             window_shell::window_appearance, window_shell::window_zoom,
+            background::autostart_status, background::autostart_set, background::close_to_tray_get, background::close_to_tray_set,
+            background::restore_main_window, undo_send_now, undo_quit_anyway,
             meeting_devices, meeting_list, meeting_list_page, meeting_read, meeting_start, meeting_capture_status,
             meeting_pause, meeting_resume, meeting_stop, meeting_recover, meeting_save_notes,
             meeting_add_note, meeting_update, meeting_delete, meeting_import, meeting_transcribe,
@@ -199,6 +217,7 @@ fn main() {
             print_mail,
             mail_action,
             queue_mail_action,
+            row_menu::show_row_menu,
             queue_draft_action,
             undo_action,
             dismiss_action,
@@ -213,6 +232,7 @@ fn main() {
             read_attached_message,
             attachment_preview_source,
             attachment_save,
+            saved_files::saved_file_open, saved_files::saved_file_reveal,
             list_drafts,
             create_draft,
             save_draft,
@@ -231,6 +251,7 @@ fn main() {
             save_signature,
             delete_signature,
             open_link,
+            launch_args::take_launch_mailto, mail_handler::mail_handler_status, mail_handler::mail_handler_register, mail_handler::mail_handler_unregister,
             summarize_mail,
             suggest_reply,
             ask_assistant,
@@ -321,17 +342,14 @@ fn setup_app(
     // After `compute_factory::configure` (in `DesktopState::new`); never in the demo.
     if !demo {
         let _ = state.legacy_local.startup();
-        // The uninstaller an upgrade runs first removes the worker's startup file, and a moved app
-        // folder leaves it naming the old one: with automatic startup on, write it again. Off the
-        // main thread (it waits for a file lock) and never a reason not to start.
+        // Start at sign-in is Qamille in the tray now: the old worker's startup file becomes this
+        // copy's entry, or goes, and a manual upgrade gets its entry back. Off the main thread (it
+        // reads the registry and waits for a file lock) and never a reason not to start; failures
+        // go to native.log, since a release build has no console.
+        let autostart_handle = app.handle().clone();
         let _ = std::thread::Builder::new()
             .name("qamille-autostart".into())
-            .spawn(|| {
-                if let Err(error) = qamille::infrastructure::mcp_config::refresh_autostart() {
-                    // Into native.log too: a release build has no console for stderr.
-                    native_feel::report(&format!("the worker's startup file was not refreshed: {}", error.message));
-                }
-            });
+            .spawn(move || background::migrate_legacy_launcher(&autostart_handle));
     }
     let main_window = tauri::WebviewWindowBuilder::from_config(app, &window_config)?
         .data_directory(webview_dir)
@@ -345,7 +363,22 @@ fn setup_app(
         .build()?;
     native_feel::harden_webview(&main_window, "index.html");
     window_shell::attach_main(&main_window);
-    native_feel::show_main_window(&main_window);
+    background::install(app)?;
+    // Started by Windows at sign-in: ready in the tray, and shown by the first restore. A restart
+    // comes back as the window was.
+    let args: Vec<String> = launch_args::effective(std::env::args().collect());
+    if background_rules::stays_hidden(&args, background::restarted_hidden()) {
+        native_feel::prepare_main_window(&main_window);
+        native_feel::set_webview_visible(&main_window, false);
+    } else {
+        native_feel::show_main_window(&main_window);
+    }
+    // phase 3, Task 4: launch arguments
+    // A mailto: link Windows started Qamille with waits for the page (`take_launch_mailto`). A restart
+    // keeps the first start's arguments, whose link was already opened.
+    if background::restarted_hidden().is_none() {
+        launch_args::route(app.handle(), &args);
+    }
     recovery::watch_startup(&main_window);
     reminders::spawn(app.handle().clone(), state.clone())?;
     if demo

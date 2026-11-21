@@ -132,6 +132,31 @@ try {
   await page.screenshot({ path: '../checks/email-export-inbox.png' });
   assert.deepEqual(errors, []);
   console.log('PASS folder selection reset and zero browser errors');
+
+  // The desktop answers an export with a token for the saved file, and the notice offers Open and Show in
+  // folder. The preview only downloads, so its export module is made to answer like the desktop; the
+  // commands behind the buttons are the preview's own (they say it cannot open files).
+  const desktopLike = await browser.newPage({ locale: 'en-US', viewport: { width: 1440, height: 900 }, acceptDownloads: true });
+  await desktopLike.route(/\/src\/lib\/preview-export\.ts/, async (route) => {
+    const original = await (await route.fetch()).text();
+    // Vite serves the module transformed: the answer is matched by its shape, not by its layout.
+    const answer = /(count:\s*emails\.length,\s*path:\s*filename)(\s*\})/;
+    assert.ok(answer.test(original), 'preview-export.ts no longer ends with the answer this test replaces');
+    await route.fulfill({ contentType: 'application/javascript', body: original.replace(answer, '$1, token: 77$2') });
+  });
+  await desktopLike.goto(process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:1420');
+  await desktopLike.locator('.mail-open', { hasText: `${anchor.subject}` }).click();
+  await desktopLike.getByRole('button', { name: 'More message actions' }).click();
+  await desktopLike.getByRole('menuitem', { name: 'Download .eml', exact: true }).click();
+  const notice = desktopLike.locator('[data-scope="toast"][data-part="root"]');
+  await expect(notice).toContainText('1 message exported');
+  assert.deepEqual(await notice.getByRole('button').allTextContents(), ['Open', 'Show in folder', ''], 'the export offers both actions before the close button');
+  await notice.getByRole('button', { name: 'Show in folder' }).click();
+  await expect(notice).toContainText('The browser preview cannot open saved files');
+  assert.deepEqual(await notice.getByRole('button').allTextContents(), ['']);
+  assert.ok((await desktopLike.evaluate(() => window.__previewCalls)).includes('saved_file_reveal'), 'the click reaches saved_file_reveal');
+  await desktopLike.close();
+  console.log('PASS an export with a token offers Open and Show in folder; a failing action says why');
 } finally {
   await browser.close();
 }

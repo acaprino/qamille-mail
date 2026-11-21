@@ -3,6 +3,7 @@ import { tr } from '../lib/i18n';
 import { messageDocument } from '../lib/message-html';
 import { externalAddress, fragmentOf, installBrowserGuards, linkHref } from '../lib/browser-guards';
 import { openExternal } from '../lib/external-link';
+import { isMailto, parseMailto, requestCompose } from '../lib/mailto';
 import './MessageHtml.css';
 
 // The keys that read and select stay in the frame, where they scroll the message and move the selection.
@@ -52,8 +53,8 @@ export default function MessageHtml({ html, notify, dark }: MessageHtmlProps) {
     // The frame never navigates, whatever kind of link was clicked (`a`, an image map's `area`, an
     // SVG link). A link to a part of the message scrolls to it: left to the frame it would resolve
     // against the app's own address, and the frame would end in the browser's error page. An absolute
-    // web or mail address opens in the system browser; anything else does nothing, a relative address
-    // included: it would only resolve against the app's own.
+    // web address opens in the system browser, a mail address in Qamille's composer (rule 32);
+    // anything else does nothing, a relative address included: it would only resolve against the app's own.
     event.preventDefault();
     const fragment = fragmentOf(href);
     if (fragment !== null) {
@@ -62,6 +63,12 @@ export default function MessageHtml({ html, notify, dark }: MessageHtmlProps) {
     }
     const address = externalAddress(href);
     if (address === null) return;
+    if (isMailto(address)) {
+      const fields = parseMailto(address);
+      if (fields) requestCompose(fields);
+      else notifyRef.current(tr('Questo link di posta non si può aprire.', 'This mail link cannot be opened.'), true);
+      return;
+    }
     void openExternal({ preventDefault: () => event.preventDefault(), currentTarget: { href: address } }, (message) =>
       notifyRef.current(message, true),
     );

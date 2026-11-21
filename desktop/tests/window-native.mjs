@@ -8,6 +8,8 @@ import { spawn } from 'node:child_process';
 const root = path.resolve(import.meta.dirname, '../..');
 const data = path.join(root, 'checks/window-controls', `native-${Date.now()}`);
 await fs.mkdir(data, { recursive: true });
+// The X closes Qamille here, as before the tray (src-tauri/src/background.rs).
+await fs.writeFile(path.join(data, 'background.json'), JSON.stringify({ close_to_tray: false, tray_notice_shown: true }));
 const executable = path.join(root, 'app/target/debug/qamille-desktop.exe');
 const port = 40000 + Math.floor(Math.random() * 10000);
 const options = {

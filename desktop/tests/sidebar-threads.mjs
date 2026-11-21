@@ -167,8 +167,12 @@ try {
   );
 } finally {
   if (native)
+    // The close button closes Qamille in this test window, instead of putting it in the tray.
     await page
-      .evaluate(() => window.__TAURI_INTERNALS__.invoke('plugin:window|close', { label: 'main' }))
+      .evaluate(async () => {
+        await window.__TAURI_INTERNALS__.invoke('close_to_tray_set', { on: false });
+        await window.__TAURI_INTERNALS__.invoke('plugin:window|close', { label: 'main' });
+      })
       .catch(() => {});
   await browser.close();
 }

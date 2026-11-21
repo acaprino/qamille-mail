@@ -571,6 +571,49 @@ impl UndoService {
             |snapshot, pending, claimed| self.dispatch(registry, snapshot, pending, claimed),
         )
     }
+    /// Qamille is about to quit (audit Q8): every `Pending` action stops being undoable now
+    /// (`expires_at_ms` = now) and one backing off after a failed connection is attempted now,
+    /// so the queue's next pass sends what would otherwise wait for the next start. `Committing`
+    /// rows are already on their way and `Failed` ones are notices: both are left alone. Wakes
+    /// the deadline thread, like a queue writer. Returns how many rows it changed.
+    pub fn send_now(&self) -> AppResult<usize> {
+        let now = self.context.clock.now_ms();
+        let changed = self.context.update_emails_with_events(&[], |store| {
+            let mut events = Vec::new();
+            for action in store.undo_actions.iter_mut().filter(|a| a.status == UndoStatus::Pending) {
+                let undoable = action.expires_at_ms > now;
+                let backing_off = action.retry_at_ms.is_some_and(|at| at > now);
+                if !undoable && !backing_off {
+                    continue;
+                }
+                action.expires_at_ms = action.expires_at_ms.min(now);
+                if backing_off {
+                    action.retry_at_ms = Some(now);
+                }
+                // The notice stops counting down: the action cannot be undone any more.
+                events.push(AppEvent::UndoChanged { action: action.clone() });
+            }
+            Ok((events.len(), events))
+        })?;
+        if changed > 0 {
+            self.schedule_dirty.store(true, Ordering::SeqCst);
+            self.has_work.store(true, Ordering::SeqCst);
+            self.notify();
+        }
+        Ok(changed)
+    }
+    /// The actions that have not reached the provider yet: `Pending` (undoable, due, or backing
+    /// off) and `Committing` (on their way). `Failed` rows are notices, not work.
+    pub fn unsettled(&self) -> AppResult<usize> {
+        // Polled while Qamille waits to quit: the shared snapshot, never a copy of the store.
+        Ok(self
+            .context
+            .read_shared()?
+            .undo_actions
+            .iter()
+            .filter(|a| matches!(a.status, UndoStatus::Pending | UndoStatus::Committing))
+            .count())
+    }
     /// One full queue pass, shared by both entry points: drain the
     /// connectivity wakes, read the snapshot, `prepare` it, claim every due
     /// `Pending` row and hand the batch to `on_claim`, then recompute the
@@ -1059,6 +1102,171 @@ mod tests {
         ];
         assert_eq!(earliest_pending(&store, now), now + 1_000);
         assert_eq!(earliest_pending(&Store::default(), now), i64::MAX);
+    }
+
+    mod quitting {
+        //! «Esci» with actions still undoable: they are sent before Qamille leaves (audit Q8).
+        use super::*;
+        use crate::{
+            application::{compute::NoCompute, ports::*},
+            domain::model::{Account, Attachment},
+            infrastructure::repository::MemoryRepository,
+        };
+
+        const NOW: i64 = 1_000_000;
+
+        struct TestClock(AtomicI64);
+        impl Clock for TestClock {
+            fn now(&self) -> i64 {
+                self.now_ms() / 1000
+            }
+            fn now_ms(&self) -> i64 {
+                self.0.load(Ordering::SeqCst)
+            }
+        }
+        #[derive(Default)]
+        struct Recorder(Mutex<Vec<AppEvent>>);
+        impl EventSink for Recorder {
+            fn emit(&self, event: AppEvent) {
+                self.0.lock().unwrap().push(event);
+            }
+        }
+        struct NoMail;
+        impl MailGateway for NoMail {
+            fn sync(&self, _: &Account) -> AppResult<SyncBatch> {
+                Ok(SyncBatch { emails: vec![], archive_folder: None, trash_folder: None })
+            }
+            fn apply(&self, _: &Account, _: u32, _: RemoteAction) -> AppResult<()> {
+                Ok(())
+            }
+            fn send(&self, _: &Account, _: &str, _: OutgoingMessage) -> AppResult<()> {
+                Ok(())
+            }
+            fn check_login(&self, _: &Account) -> AppResult<()> {
+                Ok(())
+            }
+        }
+        struct NoSecrets;
+        impl SecretStore for NoSecrets {
+            fn get(&self, _: &str) -> AppResult<String> {
+                Ok("test-only".into())
+            }
+            fn set(&self, _: &str, _: &str) -> AppResult<()> {
+                Ok(())
+            }
+        }
+        struct NoFiles;
+        impl AttachmentGateway for NoFiles {
+            fn total_size(&self, paths: &[String]) -> AppResult<u64> {
+                Ok(paths.len() as u64)
+            }
+            fn read_text(&self, _: &Attachment) -> AppResult<String> {
+                Ok(String::new())
+            }
+        }
+
+        /// One account with three messages, and the queue rows given.
+        fn service(rows: Vec<UndoAction>) -> (UndoService, Arc<ServiceContext>, Arc<Recorder>) {
+            let mut store = Store::default();
+            store.accounts.push(Account { id: 1, email: "one@example.test".into(), ..Default::default() });
+            for id in [10, 11, 12, 13] {
+                store.emails.push(Email { id, account_id: 1, ..Default::default() });
+            }
+            store.undo_actions = rows;
+            let recorder = Arc::new(Recorder::default());
+            let context = Arc::new(ServiceContext {
+                compute: Arc::new(NoCompute),
+                repository: Arc::new(MemoryRepository::new(store)),
+                mail: Arc::new(NoMail),
+                secrets: Arc::new(NoSecrets),
+                clock: Arc::new(TestClock(AtomicI64::new(NOW))),
+                attachments: Arc::new(NoFiles),
+                events: recorder.clone(),
+            });
+            let mail = MailService::new(context.clone());
+            let drafts = DraftService::new(context.clone());
+            (UndoService::new(context.clone(), mail, drafts), context, recorder)
+        }
+        fn statuses(context: &ServiceContext) -> Vec<(u64, UndoStatus, i64)> {
+            context.read().unwrap().undo_actions.iter().map(|a| (a.id, a.status, a.expires_at_ms)).collect()
+        }
+
+        #[test]
+        fn undo_send_now_makes_every_pending_action_due() {
+            let _wakes = connectivity::test_guard();
+            let mut retrying = row(4, 13, UndoStatus::Pending, NOW - 60_000);
+            retrying.attempts = 2;
+            retrying.retry_at_ms = Some(NOW + 300_000);
+            let (undo, context, recorder) = service(vec![
+                row(1, 10, UndoStatus::Pending, NOW + 20_000),
+                row(2, 11, UndoStatus::Pending, NOW + 5_000),
+                row(3, 12, UndoStatus::Pending, NOW + 30_000),
+                retrying,
+            ]);
+            assert_eq!(undo.send_now().unwrap(), 4);
+            // Every undo window ends now, and a confirmation backing off is attempted now.
+            for action in context.read().unwrap().undo_actions {
+                assert_eq!(action.expires_at_ms.min(NOW), action.expires_at_ms, "row {} still undoable", action.id);
+                assert!(action.retry_at_ms.is_none_or(|at| at <= NOW), "row {} still backing off", action.id);
+            }
+            assert_eq!(undo.next_deadline().unwrap(), Some(NOW));
+            // The rows are announced: the undo notices stop counting down.
+            let changed = recorder.0.lock().unwrap().iter().filter(|e| matches!(e, AppEvent::UndoChanged { .. })).count();
+            assert_eq!(changed, 4);
+            // The queue's next pass takes them all.
+            let workers = WorkerRegistry::new(
+                MailService::new(context.clone()),
+                DraftService::new(context.clone()),
+                context.clone(),
+                Arc::new(NullSink),
+                Arc::new(undo.clone()) as Arc<dyn CommitOutcome>,
+            );
+            recorder.0.lock().unwrap().clear();
+            assert!(undo.commit_due(&workers).unwrap());
+            let mut claimed: Vec<u64> = recorder
+                .0
+                .lock()
+                .unwrap()
+                .iter()
+                .filter_map(|e| match e {
+                    AppEvent::UndoChanged { action } if action.status == UndoStatus::Committing => Some(action.id),
+                    _ => None,
+                })
+                .collect();
+            claimed.sort();
+            assert_eq!(claimed, [1, 2, 3, 4]);
+        }
+
+        #[test]
+        fn undo_send_now_leaves_failed_and_committing_alone() {
+            let _wakes = connectivity::test_guard();
+            let (undo, context, _) = service(vec![
+                row(1, 10, UndoStatus::Failed, NOW + 20_000),
+                row(2, 11, UndoStatus::Committing, NOW + 20_000),
+                row(3, 12, UndoStatus::Pending, NOW + 20_000),
+            ]);
+            assert_eq!(undo.send_now().unwrap(), 1);
+            assert_eq!(
+                statuses(&context),
+                [(1, UndoStatus::Failed, NOW + 20_000), (2, UndoStatus::Committing, NOW + 20_000), (3, UndoStatus::Pending, NOW)],
+            );
+            // Nothing left to make due: nothing written, nothing announced.
+            let (undo, context, recorder) = service(vec![row(1, 10, UndoStatus::Failed, NOW + 20_000)]);
+            assert_eq!(undo.send_now().unwrap(), 0);
+            assert_eq!(statuses(&context), [(1, UndoStatus::Failed, NOW + 20_000)]);
+            assert!(recorder.0.lock().unwrap().is_empty());
+        }
+
+        #[test]
+        fn unsettled_counts_pending_and_committing() {
+            let (undo, _, _) = service(vec![
+                row(1, 10, UndoStatus::Pending, NOW + 20_000),
+                row(2, 11, UndoStatus::Committing, NOW - 1),
+                row(3, 12, UndoStatus::Failed, NOW - 1),
+            ]);
+            assert_eq!(undo.unsettled().unwrap(), 2);
+            assert_eq!(service(vec![]).0.unsettled().unwrap(), 0);
+        }
     }
 
     #[test]

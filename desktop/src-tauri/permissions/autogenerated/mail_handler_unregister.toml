@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-mail-handler-unregister"
+description = "Enables the mail_handler_unregister command without any pre-configured scope."
+commands.allow = ["mail_handler_unregister"]
+
+[[permission]]
+identifier = "deny-mail-handler-unregister"
+description = "Denies the mail_handler_unregister command without any pre-configured scope."
+commands.deny = ["mail_handler_unregister"]

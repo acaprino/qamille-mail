@@ -981,6 +981,15 @@ export async function previewCommand(
       return previewServer(command, args);
     case 'configure_indexing':
       throw new Error('Open the desktop app to configure local mail indexing.');
+    // mailto: links from outside the page (src-tauri/src/launch_args.rs, mail_handler.rs): a browser
+    // has no other program to hand one over, and no Windows to offer Qamille to.
+    case 'take_launch_mailto':
+      return null;
+    case 'mail_handler_status':
+      return { registered: false, name: 'Qamille', installed: false, supported: false, chosen: false };
+    case 'mail_handler_register':
+    case 'mail_handler_unregister':
+      throw new Error('Open the desktop app to choose Qamille for mailto links.');
     case 'open_link':
       window.open(String(args.url), '_blank', 'noopener,noreferrer');
       return;

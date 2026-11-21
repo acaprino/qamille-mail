@@ -175,11 +175,12 @@ pub fn quit(app: &AppHandle) {
     let _ = window.close();
 }
 
-/// Qamille started again while it runs: the window comes back. `args` and `cwd` are the second
-/// start's.
+/// Qamille started again while it runs: the window comes back, then a mailto: link it was started
+/// with goes to the composer (`launch_args`). `args` and `cwd` are the second start's.
 pub fn second_instance(app: &AppHandle, args: Vec<String>, cwd: String) {
-    let _ = (&args, &cwd);
+    let _ = &cwd;
     restore(app);
+    crate::launch_args::route(app, &args);
 }
 
 /// Whether this is the installed Professional: Tauri's NSIS installer writes `uninstall.exe` beside

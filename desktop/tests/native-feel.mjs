@@ -706,6 +706,131 @@ check('23. the mail rows get a native menu built by an app command (rule 33)', (
 // phase 3, Task 3: checks 24-25
 
 // phase 3, Task 4: check 26
+const { isMailto, parseMailto } = await import(pathToFileURL(path.join(desktop, 'src/lib/mailto.ts')).href);
+check("26. a mailto link opens Qamille's composer, and the installer registers exactly the keys the app removes (rule 32, audit Q10)", () => {
+  // A message's mail link goes to the composer, never to open_link (another mail program). The web
+  // links of a message still leave through open_link, so check 16 is unchanged.
+  const html = read('src/components/MessageHtml.tsx');
+  const openLink = rustItem(html, 'function openLink(');
+  assert.match(
+    openLink,
+    /if \(isMailto\(address\)\) \{\s*const fields = parseMailto\(address\);\s*if \(fields\) requestCompose\(fields\);[\s\S]*?return;\s*\}\s*void openExternal\(/,
+    'MessageHtml: a mailto: address goes to requestCompose(parseMailto(…)) and returns before openExternal',
+  );
+  assert.equal((html.match(/openExternal\(/g) ?? []).length, 1, 'MessageHtml calls openExternal in one place only');
+  assert.ok(isMailto(externalAddress('MAILTO:a@b.it')) && !isMailto(externalAddress('https://example.com/mailto:a@b.it')), 'isMailto reads the scheme');
+  assert.deepEqual(parseMailto(externalAddress('mailto:a@b.it?subject=x%0D%0ABcc:c@d.it')).bcc, [], 'a line break adds no recipient');
+  // The navigation hooks of the main window send a mail link to the page as compose-mailto, a web link
+  // to the browser; the reminder chip (open_outside false) opens neither.
+  const feel = read('src-tauri/src/native_feel.rs');
+  for (const head of ['pub fn navigation_guard(', 'pub fn new_window_guard(']) {
+    assert.match(
+      rustItem(feel, head),
+      /if crate::launch_args::is_mail_link\((?:[^()]|\(\))*\) \{\s*crate::launch_args::from_navigation\(&app, [^;]+\);\s*\} else \{\s*open_in_browser\([^;]+\);\s*\}/,
+      `${head.slice(7, -1)}: a mailto: address goes to launch_args::from_navigation, only a web one to open_in_browser`,
+    );
+  }
+  const launch = read('src-tauri/src/launch_args.rs');
+  assert.match(rustItem(launch, 'pub fn from_navigation('), /\bdeliver\(/, 'from_navigation hands the link to deliver');
+  assert.match(rustItem(launch, 'fn deliver('), /\.emit_to\("main", "compose-mailto", \w+\)/, 'deliver emits compose-mailto to the main window');
+  // Another program's link: at a cold start it waits for the page (not after a restart, which keeps the
+  // first start's arguments); a second start's comes after background::restore.
+  const setup = rustItem(read('src-tauri/src/main.rs'), 'fn setup_app(');
+  assert.match(
+    setup,
+    /if background::restarted_hidden\(\)\.is_none\(\) \{\s*launch_args::route\(app\.handle\(\), &args\);\s*\}/,
+    'setup_app routes the mailto: argument of a start that is not a restart',
+  );
+  const second = rustItem(read('src-tauri/src/background.rs'), 'pub fn second_instance(');
+  assert.ok(/\brestore\(app\);\s*crate::launch_args::route\(app, &args\);/.test(second), 'a second start restores the window, then routes its mailto: argument');
+  assert.match(rustItem(launch, 'pub fn take_launch_mailto('), /\.take\(\)/, 'the page takes the waiting link');
+
+  // Qamille never makes itself the default (Windows lets only the person choose): it registers what it
+  // opens, for the current user only, and never writes the mailto key itself.
+  const handler = read('src-tauri/src/mail_handler.rs');
+  assert.ok(!/HKEY_LOCAL_MACHINE|HKLM/.test(handler), 'mail_handler.rs writes only under HKEY_CURRENT_USER');
+  assert.match(handler, /HKEY_CURRENT_USER/, 'mail_handler.rs writes under HKEY_CURRENT_USER');
+  assert.match(handler, /ms-settings:defaultapps\?registeredAppUser=/, "the choice is the person's, in Settings > Default apps");
+  const constant = (name) => {
+    const found = handler.match(new RegExp(`pub const ${name}: &str = r?"([^"]+)";`));
+    assert.ok(found, `mail_handler.rs: no pub const ${name}`);
+    return found[1];
+  };
+  const [classes, registered, apps] = ['CLASSES', 'REGISTERED', 'APPS'].map(constant);
+  const [name, progId, key] = ['INSTALLED_NAME', 'INSTALLED_PROG_ID', 'INSTALLED_KEY'].map(constant);
+  assert.equal(classes, 'Software\\Classes');
+  assert.equal(registered, 'Software\\RegisteredApplications');
+  // What the app writes for a copy (`entries`), and therefore what the installer must write for the
+  // installed Professional, with the fixed names of `handler_keys(true, …)`.
+  const entries = rustItem(handler, 'pub fn entries(');
+  const shapes = [
+    /\(prog\.clone\(\), String::new\(\), keys\.display\.clone\(\)\)/,
+    /\(format!\(r"\{prog\}\\DefaultIcon"\), String::new\(\), icon\.clone\(\)\)/,
+    /\(format!\(r"\{prog\}\\shell\\open\\command"\), String::new\(\), command\)/,
+    /\(capabilities\.clone\(\), "ApplicationName"\.into\(\), keys\.display\.clone\(\)\)/,
+    /\(capabilities\.clone\(\), "ApplicationDescription"\.into\(\), keys\.display\.clone\(\)\)/,
+    /\(capabilities\.clone\(\), "ApplicationIcon"\.into\(\), icon\)/,
+    /\(format!\(r"\{capabilities\}\\URLAssociations"\), "mailto"\.into\(\), keys\.prog_id\.clone\(\)\)/,
+    /\(hive\.registered\.to_owned\(\), keys\.name\.clone\(\), capabilities\)/,
+  ];
+  for (const shape of shapes) assert.match(entries, shape, `entries no longer writes ${shape}: change this check and the hook together`);
+  assert.equal((entries.match(/^\s*\(/gm) ?? []).length, shapes.length, 'entries writes exactly these values');
+  assert.match(entries, /let command = format!\("\\"\{exe\}\\" \\"%1\\""\);/, 'the command is "<exe>" "%1", both in quotes');
+  assert.match(entries, /let icon = format!\("\\"\{exe\}\\",0"\);/, 'the icon is "<exe>",0');
+  assert.match(entries, /let prog = format!\(r"\{\}\\\{\}", hive\.classes, keys\.prog_id\);/, 'the ProgID lives under Software\\Classes');
+  assert.match(rustItem(handler, 'fn capabilities_key('), /format!\(r"\{\}\\\{\}\\Capabilities", hive\.apps, keys\.key\)/, 'the Capabilities key is <APPS>\\<key>\\Capabilities');
+  assert.match(
+    rustItem(handler, 'pub fn handler_keys('),
+    /if installed \{\s*HandlerKeys \{\s*name: INSTALLED_NAME\.into\(\),\s*display: INSTALLED_NAME\.into\(\),\s*prog_id: INSTALLED_PROG_ID\.into\(\),\s*key: INSTALLED_KEY\.into\(\),?\s*\}/,
+    'handler_keys(true, …) gives the fixed names',
+  );
+  const exe = '<exe>';
+  const prog = `${classes}\\${progId}`;
+  const capabilities = `${apps}\\${key}\\Capabilities`;
+  const expected = [
+    [prog, '', name],
+    [`${prog}\\DefaultIcon`, '', `"${exe}",0`],
+    [`${prog}\\shell\\open\\command`, '', `"${exe}" "%1"`],
+    [capabilities, 'ApplicationName', name],
+    [capabilities, 'ApplicationDescription', name],
+    [capabilities, 'ApplicationIcon', `"${exe}",0`],
+    [`${capabilities}\\URLAssociations`, 'mailto', progId],
+    [registered, name, capabilities],
+  ];
+  const hooks = read('src-tauri/windows/installer-hooks.nsh');
+  const quoted = '"((?:\\$\\\\"|[^"])*)"';
+  const unquote = (text) => text.replaceAll('$\\"', '"').replaceAll('$INSTDIR\\${MAINBINARYNAME}.exe', exe);
+  const install = nshMacro(hooks, 'NSIS_HOOK_POSTINSTALL');
+  const writes = [...install.matchAll(new RegExp(`^\\s*WriteRegStr\\s+(\\w+)\\s+${quoted}\\s+${quoted}\\s+${quoted}\\s*$`, 'gm'))];
+  assert.ok(writes.every((write) => write[1] === 'HKCU'), 'the installer writes the mailto keys under HKCU only');
+  assert.deepEqual(
+    writes.map((write) => write.slice(2).map(unquote)),
+    expected,
+    'NSIS_HOOK_POSTINSTALL writes exactly what mail_handler.rs writes for the installed Professional, in its order',
+  );
+  assert.ok(!/\bWriteReg(?!Str\b)\w*/.test(install) && !/\bDeleteReg/.test(install), 'the install hook writes only those strings');
+  const announce = /System::Call "shell32::SHChangeNotify\(i,i,i,i\) \(0x08000000, 0x1000, 0, 0\)"/;
+  assert.match(install, announce, 'the install hook tells Windows the associations changed (SHCNE_ASSOCCHANGED)');
+  // The uninstaller removes what the app's «Smetti» removes, and not on an /UPDATE.
+  const uninstall = nshMacro(hooks, 'NSIS_HOOK_POSTUNINSTALL');
+  const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const inUpdateBlock = (what) => new RegExp(`\\$\\{If\\}\\s+\\$UpdateMode\\s*<>\\s*1(?:(?!\\$\\{EndIf\\})[\\s\\S])*?${what}`);
+  for (const [what, removal] of [
+    ['the RegisteredApplications value', `DeleteRegValue\\s+HKCU\\s+"${escape(registered)}"\\s+"${escape(name)}"`],
+    ['the ProgID', `DeleteRegKey\\s+HKCU\\s+"${escape(prog)}"`],
+    ["the copy's key with its Capabilities", `DeleteRegKey\\s+HKCU\\s+"${escape(`${apps}\\${key}`)}"`],
+  ]) {
+    assert.match(uninstall, inUpdateBlock(removal), `the uninstall must remove ${what}, and not on an /UPDATE`);
+  }
+  const removal = rustItem(handler, 'pub fn unregister(');
+  assert.ok(
+    /delete_value\(hive\.registered, &keys\.name\)/.test(removal) &&
+      /delete_tree\(&format!\(r"\{\}\\\{\}", hive\.classes, keys\.prog_id\)\)/.test(removal) &&
+      /delete_tree\(&format!\(r"\{\}\\\{\}", hive\.apps, keys\.key\)\)/.test(removal),
+    "unregister removes the RegisteredApplications value, the ProgID and the copy's key, as the uninstaller does",
+  );
+  assert.ok(!/HKLM/.test(uninstall) && !/Classes\\mailto\b/i.test(hooks + handler), 'neither the app nor the installer writes or removes the mailto key itself');
+});
 
 // phase 3, Task 8: check 27
 

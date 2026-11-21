@@ -46,6 +46,7 @@ import { configureRegional, configureRegionalWording, regionalLocale, regionalTi
 import { backendText, folderLabel, isItalian, setLanguageLocale, tr, useLanguage } from './lib/i18n';
 import { personIndex, type PersonIndex } from './lib/people';
 import { replyAllRecipients } from './lib/reply-all';
+import { installMailtoRouting, mailtoDraft, type MailtoFields } from './lib/mailto';
 import { savedFileActions } from './lib/saved-file';
 import { rowMenuAction, rowMenuEntries, showRowMenu } from './lib/row-menu';
 import { patchExtraRead, repliesOf, threadState } from './lib/groups';
@@ -1302,6 +1303,20 @@ export default function App() {
       notify(errorText(e), true);
     }
   }
+  // A mailto: link, of a message or of another program (lib/mailto.ts, rule 32): a new message from the
+  // account in view, as «Nuovo messaggio» makes it, filled with the link's fields and opened. Never sent
+  // from here: the person reads it and sends it.
+  async function composeMailto(fields: MailtoFields) {
+    const opener = document.activeElement;
+    try {
+      const created = await call<Draft>('create_draft', { accountId: s.accountId, replyTo: null, forward: false });
+      const draft = await call<Draft>('save_draft', { draft: { ...created, ...mailtoDraft(fields) }, importLeaseIds: [] });
+      openComposer(draft, opener);
+      await loadWorkspace();
+    } catch (e) {
+      notify(errorText(e), true);
+    }
+  }
   // The reader's arrows: the row before or after the one on show, in the order the list shows them.
   function readerPosition() {
     const listed = selectedListId();
@@ -1587,6 +1602,15 @@ export default function App() {
             s.view !== 'Settings' || !s.settingsDirty || (await settingsPanel.current?.save()) !== false,
         },
       ),
+    );
+    // Mail links to the composer: a message's, and in the desktop app those Windows hands to Qamille.
+    unsubscribers.push(
+      installMailtoRouting({
+        compose: (fields) => void composeMailto(fields),
+        refused: () => notify(tr('Questo link di posta non si può aprire.', 'This mail link cannot be opened.'), true),
+        failed: (error) => notify(errorText(error), true),
+        native: desktop ? { listen, call } : undefined,
+      }),
     );
     // `workspace-changed` and its preview twin carry no content: until the backend stops sending
     // them (Task 2.2) they stay as a coalesced full refresh next to the typed `app-event`.

@@ -17,6 +17,8 @@ mod background_rules;
 // phase 3, Task 3: modules
 
 // phase 3, Task 4: modules
+mod launch_args;
+mod mail_handler;
 
 // phase 3, Task 5: modules
 mod saved_files;
@@ -245,6 +247,7 @@ fn main() {
             save_signature,
             delete_signature,
             open_link,
+            launch_args::take_launch_mailto, mail_handler::mail_handler_status, mail_handler::mail_handler_register, mail_handler::mail_handler_unregister,
             summarize_mail,
             suggest_reply,
             ask_assistant,
@@ -367,6 +370,11 @@ fn setup_app(
         native_feel::show_main_window(&main_window);
     }
     // phase 3, Task 4: launch arguments
+    // A mailto: link Windows started Qamille with waits for the page (`take_launch_mailto`). A restart
+    // keeps the first start's arguments, whose link was already opened.
+    if background::restarted_hidden().is_none() {
+        launch_args::route(app.handle(), &args);
+    }
     recovery::watch_startup(&main_window);
     reminders::spawn(app.handle().clone(), state.clone())?;
     if demo

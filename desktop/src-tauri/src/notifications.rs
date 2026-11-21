@@ -5,19 +5,22 @@
 //!   `SignInExpired`), emitted by the writer that knows them. The desktop sink (`runtime.rs`) hands
 //!   them to `observe`, which takes them away from the page, and a thread of its own sends them: the
 //!   writer that emitted one never waits for Windows, nor for the store read that names the senders.
-//! - They go out through the official plugin, from Rust only: the page has no permission of it. The
-//!   plugin sends them under `app.config().identifier`, the per-data-folder identifier of `main.rs`
-//!   (`tauri-plugin-notification` 2.8.1, `desktop.rs`, `Notification::build`). Windows shows a
-//!   notification of an unpackaged app reliably only for an identity it knows, so Qamille registers it
-//!   for the current user under `HKCU\Software\Classes\AppUserModelId\<identifier>` («Qamille», the
-//!   app's icon as `data\notification-icon.png`) while notifications are on, and takes it away when
-//!   they go off. Never the process's own AUMID: the window would leave the icons pinned on the taskbar.
+//! - They go out as Windows toasts from Rust only, with `tauri-winrt-notification`, the toast backend
+//!   of the official notification plugin, used directly: the plugin waits for each toast's answer on a
+//!   thread of its own, which under Do not disturb would stay until Qamille exits. Here a toast holds
+//!   its click handler and nothing waits (`toast`). The page has no notification permission at all.
+//! - A toast goes out under `app.config().identifier`, the per-data-folder identifier of `main.rs`.
+//!   Windows shows a notification of an unpackaged app reliably only for an identity it knows, so
+//!   Qamille registers it for the current user under `HKCU\Software\Classes\AppUserModelId\<identifier>`
+//!   («Qamille», the app's icon as `data\notification-icon.png`) while notifications are on, and takes
+//!   it away when they go off. Never the process's own AUMID: the window would leave the icons pinned
+//!   on the taskbar.
 //! - On by default in the Professional (registered at its first start after the update), off in the
 //!   open source edition. The identifier goes to `data\notification-aumid.txt` too, where the
 //!   Professional's uninstaller reads it (`windows/installer-hooks.nsh`).
 //! - A click brings the window back (`background::restore`) and tells the page what to open
-//!   (`notification-open`, `src/lib/notification-open.ts`). The plugin reports a click only while the
-//!   toast is on screen, not from the notification center once Qamille is gone.
+//!   (`notification-open`, `src/lib/notification-open.ts`), while Qamille runs: a click in the
+//!   notification center once Qamille is gone does nothing (no activation is registered for it).
 #![cfg_attr(not(windows), allow(dead_code, unused_variables))]
 
 use crate::notify_rules::{self, Kind, Prefs, WindowState};
@@ -26,8 +29,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock, mpsc};
-use tauri::{AppHandle, Emitter, Manager, Wry};
-use tauri_plugin_notification::NotificationExt;
+use tauri::{AppHandle, Emitter, Manager};
 
 /// The switches, in the data folder.
 const PREFERENCES_FILE: &str = "notifications.json";
@@ -113,15 +115,15 @@ fn supported(app: &AppHandle) -> bool {
     !app.config().identifier.ends_with(".preview")
 }
 
-/// The identity the plugin sends the notifications under: the per-data-folder identifier of `main.rs`.
+/// The identity the toasts go out under: the per-data-folder identifier of `main.rs`.
 fn identifier(app: &AppHandle) -> String {
     app.config().identifier.clone()
 }
 
-/// Whether the plugin sends under that identity: not from a development build in `target\debug` or
-/// `target\release`, where it uses PowerShell's (the same test as `Notification::build` in 2.8.1).
-/// Nothing is registered for a build that would not use it.
-fn plugin_uses_identity() -> bool {
+/// Whether the toasts go out under that identity: not from a development build in `target\debug` or
+/// `target\release`, which sends them under PowerShell's, as the official plugin does, and registers
+/// nothing.
+fn uses_identity() -> bool {
     let Ok(exe) = tauri::utils::platform::current_exe() else { return false };
     let folder = exe.parent().map(|folder| folder.display().to_string()).unwrap_or_default();
     let sep = std::path::MAIN_SEPARATOR;
@@ -240,17 +242,16 @@ fn unregister(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// The registry follows the general switch. Nothing for a development build (`plugin_uses_identity`).
+/// The registry follows the general switch. Nothing for a development build (`uses_identity`).
 fn apply_identity(app: &AppHandle, on: bool) -> Result<(), String> {
-    if !plugin_uses_identity() {
+    if !uses_identity() {
         return Ok(());
     }
     if on { register(app) } else { unregister(app) }
 }
 
-/// From `DesktopState::new`: the thread that sends what `observe` takes. First it registers the
-/// click handler (a notification sent before it reports no click) and puts the identity in step with
-/// the switch: on writes it again, also after a manual upgrade whose uninstaller removed it.
+/// From `DesktopState::new`: the thread that sends what `observe` takes. First it puts the identity in
+/// step with the switch: on writes it again, also after a manual upgrade whose uninstaller removed it.
 pub fn start(app: &AppHandle, context: Arc<ServiceContext>) {
     let (facts, received) = mpsc::channel();
     if FACTS.set(facts).is_err() {
@@ -258,13 +259,11 @@ pub fn start(app: &AppHandle, context: Arc<ServiceContext>) {
     }
     let app = app.clone();
     let _ = std::thread::Builder::new().name("qamille-notifications".into()).spawn(move || {
-        if !supported(&app) || app.try_state::<tauri_plugin_notification::Notification<Wry>>().is_none() {
+        if !supported(&app) {
             // Taken and dropped: they never reach the page either way.
             for _ in received {}
             return;
         }
-        let clicked = app.clone();
-        let _ = app.notification().on_action(move |performed| on_action(&clicked, performed));
         if let Err(error) = apply_identity(&app, current().enabled) {
             crate::native_feel::report(&format!("the notification identity was not updated: {error}"));
         }
@@ -328,13 +327,13 @@ fn announce(app: &AppHandle, context: &ServiceContext, fact: AppEvent) {
                 })
                 .collect();
             for (index, title, body) in notify_rules::new_mail_notices(&items, &account.email, italian) {
-                show(app, &title, &body, "Mail", json!({ "kind": "mail", "email_id": arrived[index].id, "account_id": account_id }));
+                show(app, &title, &body, Tone::Mail, json!({ "kind": "mail", "email_id": arrived[index].id, "account_id": account_id }));
             }
         }
         AppEvent::ScheduledSendFailed { draft_id, subject } => {
             if notify_rules::should_notify(Kind::ScheduledSend, &prefs, window) {
                 let (title, body) = notify_rules::scheduled_send_text(&subject, italian);
-                show(app, &title, &body, "Default", json!({ "kind": "scheduled", "draft_id": draft_id }));
+                show(app, &title, &body, Tone::Default, json!({ "kind": "scheduled", "draft_id": draft_id }));
             }
         }
         AppEvent::SignInExpired { account_id } => {
@@ -353,33 +352,57 @@ fn announce(app: &AppHandle, context: &ServiceContext, fact: AppEvent) {
                 Some(id) => json!({ "kind": "sign-in", "account_id": id }),
                 None => json!({ "kind": "sign-in" }),
             };
-            show(app, &title, &body, "Default", open);
+            show(app, &title, &body, Tone::Default, open);
         }
         _ => {}
     }
 }
 
-/// One notification; `open` is what its click opens. A notification that could not be prepared is a
-/// line in `native.log`. Windows may still keep it out of sight (Do not disturb, the app's switch in
-/// Windows Settings): the in-app notice stays, so nothing is lost.
-fn show(app: &AppHandle, title: &str, body: &str, sound: &str, open: serde_json::Value) {
-    let shown = app.notification().builder().title(title).body(body).sound(sound).extra("open", open).show();
-    if let Err(error) = shown {
-        crate::native_feel::report(&format!("a notification could not be shown: {error}"));
-    }
+/// The sound of a toast.
+#[derive(Clone, Copy, Debug)]
+enum Tone {
+    Mail,
+    Default,
 }
 
-/// A click on a notification (the plugin's thread): the window comes back through the one way back,
-/// then the page opens what the notification was about.
-fn on_action(app: &AppHandle, performed: &tauri_plugin_notification::ActionPerformed) {
-    if performed.action_id() != "tap" {
-        return;
+/// One toast under `aumid`, ready to show. Windows calls `on_click` when the toast is clicked, on a
+/// thread of its own, as long as it is on screen or in the notification center; the toast holds it and
+/// nothing of Qamille waits for an answer, so a toast that is never clicked leaves no thread or handle
+/// behind.
+#[cfg(windows)]
+fn toast(aumid: &str, title: &str, body: &str, tone: Tone, on_click: impl Fn() + Send + 'static) -> tauri_winrt_notification::Toast {
+    use tauri_winrt_notification::{Sound, Toast};
+    Toast::new(aumid)
+        .title(title)
+        .text1(body)
+        .sound(Some(match tone {
+            Tone::Mail => Sound::Mail,
+            Tone::Default => Sound::Default,
+        }))
+        .on_activated(move |_action| {
+            on_click();
+            Ok(())
+        })
+}
+
+/// One notification; `open` is what its click opens: the window comes back through the one way back,
+/// then the page opens what the notification was about. A toast Windows refused is a line in
+/// `native.log`. Windows may still keep it out of sight (Do not disturb, the app's switch in Windows
+/// Settings): the in-app notice stays, so nothing is lost.
+fn show(app: &AppHandle, title: &str, body: &str, tone: Tone, open: serde_json::Value) {
+    #[cfg(windows)]
+    {
+        let aumid = if uses_identity() { identifier(app) } else { tauri_winrt_notification::Toast::POWERSHELL_APP_ID.to_owned() };
+        let clicked = app.clone();
+        let shown = toast(&aumid, title, body, tone, move || {
+            crate::background::restore(&clicked);
+            let _ = clicked.emit_to("main", OPEN_EVENT, open.clone());
+        })
+        .show();
+        if let Err(error) = shown {
+            crate::native_feel::report(&format!("a notification could not be shown: {error}"));
+        }
     }
-    let Some(open) = performed.notification().and_then(|notification| notification.extra().get("open").cloned()) else {
-        return;
-    };
-    crate::background::restore(app);
-    let _ = app.emit_to("main", OPEN_EVENT, open);
 }
 
 /// What Settings → General → Windows shows and sends back.
@@ -452,6 +475,25 @@ mod tests {
         assert_eq!(empty, Saved::default());
         // Until the person chooses, the file says nothing about the general switch.
         assert_eq!(serde_json::to_string(&Saved::default()).unwrap(), r#"{"new_mail":true,"scheduled_send":true,"sign_in":true}"#);
+    }
+
+    /// Showing a toast leaves nothing of Qamille waiting for it: the click handler, which holds what
+    /// the click opens, lives in the toast alone (Windows keeps it while the toast is shown or in the
+    /// notification center, and calls it from a thread of its own). Building one is enough to see it:
+    /// a real toast never appears in a test.
+    #[cfg(windows)]
+    #[test]
+    fn a_toast_holds_its_click_and_nothing_else_does() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let clicks = Arc::new(AtomicUsize::new(0));
+        let held = clicks.clone();
+        let toast = toast("com.qamille.desktop.workspace-test", "Anna Rossi", "Preventivo", Tone::Mail, move || {
+            held.fetch_add(1, Ordering::SeqCst);
+        });
+        assert_eq!(Arc::strong_count(&clicks), 2, "the toast's click handler holds what it opens");
+        drop(toast);
+        assert_eq!(Arc::strong_count(&clicks), 1, "no thread, channel or handle of Qamille keeps it");
+        assert_eq!(clicks.load(Ordering::SeqCst), 0, "building a toast clicks nothing");
     }
 
     #[test]

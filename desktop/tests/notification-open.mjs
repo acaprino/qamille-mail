@@ -11,7 +11,7 @@ function recorder() {
   return {
     log,
     actions: {
-      openMail: (id) => log.push(['mail', id]),
+      openMail: (id, account) => log.push(['mail', id, account]),
       openDrafts: () => log.push(['drafts']),
       openAccounts: () => log.push(['accounts']),
       openServer: () => log.push(['server']),
@@ -19,10 +19,12 @@ function recorder() {
   };
 }
 
-test('a new-mail notification opens its message', () => {
+test('a new-mail notification opens its message, in the Inbox of its account', () => {
   const { log, actions } = recorder();
   assert.equal(routeNotificationOpen({ kind: 'mail', email_id: 42, account_id: 1 }, actions), true);
-  assert.deepEqual(log, [['mail', 42]]);
+  // Without the account the page shows every account's Inbox (null), never the one it had.
+  assert.equal(routeNotificationOpen({ kind: 'mail', email_id: 43 }, actions), true);
+  assert.deepEqual(log, [['mail', 42, 1], ['mail', 43, null]]);
 });
 
 test('a failed scheduled send opens Drafts', () => {

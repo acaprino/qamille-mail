@@ -161,8 +161,9 @@ impl Harness {
     }
 }
 
-/// A message as the provider describes it, received by Gmail at `date`.
-fn message(account_id: u32, uid: u32, folder: &str, read: bool, date: i64) -> Email {
+/// A message as the provider describes it, received by Gmail at `received` (its IMAP INTERNALDATE),
+/// with a Date header of the same moment.
+fn message(account_id: u32, uid: u32, folder: &str, read: bool, received: i64) -> Email {
     Email {
         account_id,
         uid: Some(uid),
@@ -175,7 +176,8 @@ fn message(account_id: u32, uid: u32, folder: &str, read: bool, date: i64) -> Em
         subject: format!("Subject {uid}"),
         body: format!("The body of {uid}, never in a notification"),
         read,
-        date,
+        date: received,
+        received_at: Some(received),
         ..Default::default()
     }
 }
@@ -196,15 +198,18 @@ fn mail_arrived_names_only_new_unread_inbox_messages() {
         message(a, 202, "Inbox", true, NOW - 4),
         // Not in the Inbox (filtered to All Mail by a Gmail rule).
         message(a, 203, "Archive", false, NOW - 3),
-        // Weeks old: the sync is still bringing in older mail, not new mail.
+        // Received weeks ago: the sync is still bringing in older mail, not new mail.
         message(a, 204, "Inbox", false, NOW - 30 * 24 * 3600),
         message(a, 205, "Inbox", false, NOW - 2),
+        // Written weeks ago (its Date header) but received now: a POP fetch by Gmail, greylisting, a
+        // message written offline or a moderated list. Arrival is when Gmail received it.
+        Email { date: NOW - 30 * 24 * 3600, ..message(a, 207, "Inbox", false, NOW - 1) },
     ];
     h.download(arrivals.clone());
     mail.sync().unwrap();
     assert_eq!(
         h.recorder.system(),
-        vec![AppEvent::MailArrived { account_id: a, ids: vec![h.id_of(201), h.id_of(205)] }],
+        vec![AppEvent::MailArrived { account_id: a, ids: vec![h.id_of(201), h.id_of(205), h.id_of(207)] }],
         "one event per arrival, naming only the new unread messages of the Inbox"
     );
 
@@ -215,6 +220,8 @@ fn mail_arrived_names_only_new_unread_inbox_messages() {
     h.download(next);
     mail.sync().unwrap();
     assert_eq!(h.recorder.system(), vec![AppEvent::MailArrived { account_id: a, ids: vec![h.id_of(206)] }]);
+    // The moment of receipt is only for this decision: the store never keeps it.
+    assert!(h.context.read().unwrap().emails.iter().all(|email| email.received_at.is_none()));
 
     // Nothing new: nothing announced, not even an empty event.
     h.recorder.clear();
@@ -377,4 +384,43 @@ fn inbox_unread_matches_the_snapshot_count() {
     let snapshot = workspace.snapshot().unwrap().counts["Inbox"];
     assert_eq!(workspace.inbox_unread().unwrap(), snapshot, "the taskbar and the sidebar count the same");
     assert_eq!(snapshot, before + 1, "of the six added, only the first counts");
+}
+
+#[test]
+fn taskbar_indexing_accounts_are_those_still_indexing() {
+    // The progress bar follows only the accounts that still index: one in error, blocked, unlinked
+    // from the server, on another model, waiting for a server that is not there, finished, switched
+    // off or removed stops it, whatever percent it reached.
+    let h = harness(Some(NOW - 600));
+    h.context
+        .update(|store| {
+            let template = store.accounts[0].clone();
+            store.accounts.clear();
+            for (id, state, enabled) in [
+                (1, "queued", true),
+                (2, "counting", true),
+                (3, "scanning", true),
+                (4, "waiting_model", true),
+                (5, "error", true),
+                (6, "blocked", true),
+                (7, "unlinked", true),
+                (8, "model_mismatch", true),
+                (9, "needs_server", true),
+                (10, "watching", true),
+                (11, "partial", true),
+                (12, "scanning", false),
+                (13, "paused", false),
+            ] {
+                let mut account = template.clone();
+                account.id = id;
+                account.email = format!("account{id}@example.com");
+                account.search_index.state = state.into();
+                account.search_index.enabled = enabled;
+                store.accounts.push(account);
+            }
+            Ok(())
+        })
+        .unwrap();
+    let workspace = WorkspaceService::new(h.context.clone());
+    assert_eq!(workspace.indexing_accounts().unwrap(), vec![1, 2, 3, 4]);
 }

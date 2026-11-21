@@ -90,6 +90,13 @@ impl WorkspaceService {
         let now = self.context.clock.now();
         Ok(store.emails.iter().filter(|e| counts_as_inbox_unread(e, now)).count())
     }
+    /// The accounts whose indexing is under way (`IndexProgress::in_progress`): the taskbar's progress
+    /// bar follows only these, so an account that failed, was switched off or removed below 100 %
+    /// takes its bar away.
+    pub fn indexing_accounts(&self) -> AppResult<Vec<u32>> {
+        let store = self.context.read_shared()?;
+        Ok(store.accounts.iter().filter(|a| a.search_index.in_progress()).map(|a| a.id).collect())
+    }
     pub fn save_settings(&self, mut update: SettingsUpdate) -> AppResult<()> {
         if !update.settings.time_zone.is_empty() && update.settings.time_zone.parse::<chrono_tz::Tz>().is_err() {
             return Err(AppError::validation("Choose a recognized IANA time zone"));

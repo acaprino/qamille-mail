@@ -345,9 +345,10 @@ pub struct MailService {
     /// The accounts whose expired sign-in `AppEvent::SignInExpired` announced, until a sync works again.
     sign_in_expired: Arc<Mutex<std::collections::HashSet<u32>>>,
 }
-/// How much older than the account's last sync a new message may be and still be an arrival: what
-/// Gmail received while the previous sync was downloading, or with the clocks apart. Older mail is the
-/// sync still bringing in the mailbox (an offline copy being prepared), never announced.
+/// How much earlier than the account's last sync a new message may have been received (IMAP
+/// INTERNALDATE, `Email::received_at`) and still be an arrival: what Gmail received while the previous
+/// sync was downloading, or with the clocks apart. Mail received earlier is the sync still bringing in
+/// the mailbox (an offline copy being prepared), never announced.
 const ARRIVAL_SLACK_SECS: i64 = 15 * 60;
 /// One of the account sets of `MailService`; a poisoned lock still holds a usable set.
 fn lock_set(set: &Mutex<std::collections::HashSet<u32>>) -> std::sync::MutexGuard<'_, std::collections::HashSet<u32>> {
@@ -1918,9 +1919,9 @@ impl MailService {
                             // same values names none of them, so the UI keeps
                             // patching by ids instead of reloading (decision 6).
                             let mut touched: Vec<u64> = Vec::new();
-                            // The new unread messages of the Inbox that are an arrival: received
-                            // since the account last synced (`ARRIVAL_SLACK_SECS`), with this
-                            // process's baseline set. Never the first sync of an account.
+                            // The new unread messages of the Inbox that are an arrival: received by
+                            // the provider since the account last synced (`ARRIVAL_SLACK_SECS`), with
+                            // this process's baseline set. Never the first sync of an account.
                             let arrival_since = current
                                 .account(account.id)
                                 .and_then(|a| a.last_sync)
@@ -2030,9 +2031,12 @@ impl MailService {
                                 }
                                 email.classified = true;
                                 touched.push(email.id);
+                                // The moment of receipt decides, not the Date header; a provider
+                                // without one has only the date. The store never keeps it.
+                                let received = email.received_at.take().unwrap_or(email.date);
                                 if email.folder == "Inbox"
                                     && !email.read
-                                    && arrival_since.is_some_and(|since| email.date >= since)
+                                    && arrival_since.is_some_and(|since| received >= since)
                                 {
                                     arrived.push(email.id);
                                 }

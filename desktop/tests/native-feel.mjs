@@ -710,13 +710,17 @@ check('24. system notifications come from Rust only, through the registered app 
     assert.ok(!JSON.parse(read(`src-tauri/${file}`)).permissions.some((p) => /^notification:/.test(p)), `${file}: no notification: permission for the page`);
   }
   assert.ok(!/@tauri-apps\/plugin-notification/.test(read('package.json')), 'no notification package for the page');
-  assert.match(read('src-tauri/Cargo.toml'), /^tauri-plugin-notification = "2"/m, 'the official plugin, 2.x');
+  // The toast backend of the official plugin, used directly: the plugin waits for every toast's answer
+  // on a thread of its own, which under Do not disturb stays until Qamille exits.
+  const cargo = read('src-tauri/Cargo.toml');
+  assert.match(cargo, /^tauri-winrt-notification = "0\.8"/m, 'tauri-winrt-notification 0.8 sends the toasts');
+  assert.ok(!/tauri-plugin-notification|notify-rust/.test(cargo + read('src-tauri/Cargo.lock')), 'no notification plugin, no notify-rust');
   const main = read('src-tauri/src/main.rs');
-  assert.match(main, /\.plugin\(tauri_plugin_notification::init\(\)\)/, 'the plugin is registered in main.rs');
+  assert.ok(!/tauri_plugin_notification/.test(main), 'no notification plugin in main.rs');
   assert.match(main, /notifications::notifications_get, notifications::notifications_set,/, 'the switches are app commands');
-  // The identity Windows shows the notifications under: the per-data-folder identifier the plugin
-  // sends them with (`app.config().identifier`), registered for the current user, never the process's
-  // own AUMID, which would detach the window from the icons pinned to the taskbar.
+  // The identity Windows shows the notifications under: the per-data-folder identifier the toasts go
+  // out with (`app.config().identifier`), registered for the current user, never the process's own
+  // AUMID, which would detach the window from the icons pinned to the taskbar.
   const notifications = read('src-tauri/src/notifications.rs');
   // The code without its test module and comments: an assertion on what it does is met by neither.
   const tests = notifications.indexOf('#[cfg(test)]\nmod tests');
@@ -724,7 +728,16 @@ check('24. system notifications come from Rust only, through the registered app 
   const code = notifications.slice(0, tests).replace(/(^|\s)\/\/.*$/gm, '$1');
   assert.match(code, /const CLASSES: &str = r"Software\\Classes\\AppUserModelId";/, 'the identity lives under HKCU\\Software\\Classes\\AppUserModelId');
   assert.match(code, /format!\(r"\{\w+\}\\\{\w+\}"\)/, 'the key is AppUserModelId\\<identifier>');
-  assert.match(rustItem(code, 'fn identifier('), /app\.config\(\)\.identifier/, 'the identifier is the one the plugin uses');
+  assert.match(rustItem(code, 'fn identifier('), /app\.config\(\)\.identifier/, 'the identifier is the per-data-folder one');
+  // A toast holds its click handler, and nothing of Qamille waits for its answer.
+  const toast = rustItem(code, 'fn toast(');
+  assert.ok(/Toast::new\(aumid\)/.test(toast) && /\.on_activated\(/.test(toast), 'toast() builds the toast with its click handler');
+  const show = rustItem(code, 'fn show(');
+  assert.match(show, /if uses_identity\(\) \{ identifier\(app\) \}/, 'a toast goes out under the registered identity');
+  assert.match(show, /toast\([\s\S]*\)\s*\.show\(\);/, 'show() shows the toast and returns');
+  for (const [name, body] of [['toast', toast], ['show', show]]) {
+    assert.ok(!/thread|spawn|recv|wait_for|on_dismissed|channel/.test(body), `${name}() starts nothing that waits for the toast`);
+  }
   assert.ok(/HKEY_CURRENT_USER/.test(code) && !/HKEY_LOCAL_MACHINE/.test(code), 'only for the current user');
   for (const file of fs.readdirSync(path.join(desktop, 'src-tauri/src'), { recursive: true })) {
     if (!String(file).endsWith('.rs')) continue;

@@ -6,8 +6,10 @@
 //! down to a minute. The sink (`runtime.rs`) shows every event to `observe`; a thread of its own counts
 //! the Inbox again 300 ms after the last `CountsChanged` (or an undo row, which changes what the
 //! sidebar counts), at most 2 s after the first, and once a minute for what another process changed
-//! (the MCP's writes reach the page through the change feed, not through the sink). Windows forgets an
-//! overlay when the button goes, so both are drawn again when the window gets the focus back.
+//! (the MCP's writes reach the page through the change feed, not through the sink). Each count also
+//! drops from the progress bar every account whose indexing is no longer under way (failed, switched
+//! off, removed, unlinked: no `IndexProgress` of 100 ever comes for them). Windows forgets an overlay
+//! when the button goes, so both are drawn again when the window gets the focus back.
 #![cfg_attr(not(windows), allow(dead_code, unused_variables))]
 
 use crate::taskbar_rules::{self, Bar, IndexBars};
@@ -90,14 +92,21 @@ fn run(app: &AppHandle, workspace: &WorkspaceService, received: &mpsc::Receiver<
     let mut refresh = start + REFRESH;
     loop {
         let wake = due.map_or(refresh, |(at, _)| at.min(refresh));
+        // A count soon: 300 ms after the last change, at most 2 s after the first.
+        let soon = |due: Option<(Instant, Instant)>| {
+            let now = Instant::now();
+            let first = due.map_or(now, |(_, first)| first);
+            Some(((now + SETTLE).min(first + AT_MOST), first))
+        };
         match received.recv_timeout(wake.saturating_duration_since(Instant::now())) {
-            Ok(Signal::Counts) => {
-                let now = Instant::now();
-                let first = due.map_or(now, |(_, first)| first);
-                due = Some(((now + SETTLE).min(first + AT_MOST), first));
-            }
+            Ok(Signal::Counts) => due = soon(due),
             Ok(Signal::Index { account, percent }) => show_bar(app, &mut shown, bars.apply(account, Some(percent), None)),
-            Ok(Signal::Waiting { account, waiting }) => show_bar(app, &mut shown, bars.apply(account, None, Some(waiting))),
+            Ok(Signal::Waiting { account, waiting }) => {
+                show_bar(app, &mut shown, bars.apply(account, None, Some(waiting)));
+                // An indexing that stops (unlinked, another model) says first that it no longer
+                // waits, then writes its state: the count after it drops the bar.
+                due = soon(due);
+            }
             Ok(Signal::Reset) => bars.reset(),
             Ok(Signal::Focused) => {
                 // Back from the tray, or after Explorer restarted: the button is new.
@@ -128,6 +137,10 @@ fn run(app: &AppHandle, workspace: &WorkspaceService, received: &mpsc::Receiver<
                 match workspace.inbox_unread() {
                     Ok(count) => show_count(app, &window, &mut shown, u32::try_from(count).unwrap_or(u32::MAX)),
                     Err(error) => crate::native_feel::report(&format!("the unread count for the taskbar failed: {}", error.message)),
+                }
+                match workspace.indexing_accounts() {
+                    Ok(indexing) => show_bar(app, &mut shown, bars.retain(&indexing)),
+                    Err(error) => crate::native_feel::report(&format!("the indexing state for the taskbar failed: {}", error.message)),
                 }
             }
             Err(mpsc::RecvTimeoutError::Disconnected) => return,

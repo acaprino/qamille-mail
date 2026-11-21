@@ -14,8 +14,9 @@ export type NotificationOpen = {
 };
 
 export type NotificationOpenActions = {
-  /** New mail: the message, in the Inbox. */
-  openMail(id: number): void;
+  /** New mail: the message, in the Inbox of its account (`null`: every account's Inbox), never the
+   *  account the list showed, which may not be the message's. */
+  openMail(id: number, accountId: number | null): void;
   /** A scheduled send that failed: the Drafts. */
   openDrafts(): void;
   /** An expired sign-in of a mail account: Settings → Accounts. */
@@ -42,7 +43,7 @@ export function parseNotificationOpen(payload: unknown): NotificationOpen | null
 export function routeNotificationOpen(payload: unknown, actions: NotificationOpenActions): boolean {
   const open = parseNotificationOpen(payload);
   if (!open) return false;
-  if (open.kind === 'mail' && open.email_id !== undefined) actions.openMail(open.email_id);
+  if (open.kind === 'mail' && open.email_id !== undefined) actions.openMail(open.email_id, open.account_id ?? null);
   else if (open.kind === 'scheduled') actions.openDrafts();
   else if (open.account_id === undefined && actions.openServer) actions.openServer();
   else actions.openAccounts();

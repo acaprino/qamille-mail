@@ -160,6 +160,19 @@ impl IndexBars {
         Some((if waits { Bar::Paused } else { Bar::Normal }, lowest))
     }
 
+    /// The accounts whose indexing is under way now (`WorkspaceService::indexing_accounts`): every
+    /// other one stops showing, whatever percent it reached (it failed, was switched off or removed,
+    /// or the server unlinked it). One that had reached 100 stays finished. Answers the bar to show.
+    pub fn retain(&mut self, indexing: &[u32]) -> Option<(Bar, u8)> {
+        for (id, state) in &mut self.accounts {
+            if !indexing.contains(id) {
+                state.active = false;
+                state.waiting = false;
+            }
+        }
+        self.bar()
+    }
+
     /// «Reindex» (`search_reindex`): what comes next is a full indexing again, also for the accounts
     /// that had reached 100.
     pub fn reset(&mut self) {
@@ -238,6 +251,29 @@ mod tests {
         assert_eq!(bars.apply(1, None, Some(false)), Some((Bar::Normal, 35)));
         assert_eq!(bars.apply(1, Some(100), None), None);
         assert_eq!(bars.apply(1, None, Some(true)), None, "a finished indexing that waits again shows nothing");
+    }
+
+    #[test]
+    fn index_bar_stops_with_an_account_that_stopped_indexing() {
+        let mut bars = IndexBars::default();
+        assert_eq!(bars.apply(1, Some(40), None), Some((Bar::Normal, 40)));
+        assert_eq!(bars.apply(2, Some(20), None), Some((Bar::Normal, 20)));
+        // Account 2 failed, was switched off or removed below 100 %, or the server unlinked it (which
+        // even says it no longer waits): only the accounts still indexing keep the bar.
+        assert_eq!(bars.apply(2, None, Some(false)), Some((Bar::Normal, 20)));
+        assert_eq!(bars.retain(&[1]), Some((Bar::Normal, 40)));
+        assert_eq!(bars.retain(&[]), None, "nothing indexes: no bar");
+        // An account that resumes its full indexing shows it again...
+        assert_eq!(bars.apply(1, Some(41), None), Some((Bar::Normal, 41)));
+        assert_eq!(bars.apply(1, Some(100), None), None);
+        // ...but one that had finished stays finished: a drop for new mail is still not shown.
+        assert_eq!(bars.retain(&[]), None);
+        assert_eq!(bars.apply(1, Some(30), None), None);
+        // A waiting account that stops no longer counts as waiting when it comes back.
+        let mut bars = IndexBars::default();
+        assert_eq!(bars.apply(3, Some(10), Some(true)), Some((Bar::Paused, 10)));
+        assert_eq!(bars.retain(&[]), None);
+        assert_eq!(bars.apply(3, Some(11), None), Some((Bar::Normal, 11)));
     }
 
     #[test]

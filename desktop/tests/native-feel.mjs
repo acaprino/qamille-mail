@@ -374,6 +374,8 @@ check('14. every WebView locks its root against overscroll (rule 4, audit Q5)', 
     locked(css, selector, /overscroll-behavior:\s*contain/, `${file}: ${selector} must contain its overscroll`);
     locked(css, selector, /(?<![-\w])height:\s*100vh/, `${file}: ${selector} must be exactly one window tall (height: 100vh)`);
   }
+  // A long unbreakable error is wider than the window at 200 %: centred without `safe` its left side is cut off.
+  locked(read('src/styles.css'), '.startup-state', /align-items:\s*safe center/, 'styles.css: .startup-state must centre safely (align-items: safe center)');
   // The message frame stays free of the lock: it never scrolls vertically and hands the wheel to the reader.
   assert.ok(!/overscroll-behavior/.test(read('src/lib/message-html.ts')), 'the message frame must not set overscroll-behavior');
 });
@@ -498,6 +500,24 @@ check("17. the installer removes the worker's startup and, when asked, the data 
     /if !demo \{(?:(?!\n    \})[\s\S])*?mcp_config::refresh_autostart\(\)/,
     'setup_app must refresh the worker startup file when the app starts (not in the demo)',
   );
+});
+
+check("18. the calendar sheet's end-of-session step never calls the provider (rule 15, audit Q6)", () => {
+  // Saving an event at sign-out or reload would create it, or send invitations to its guests, without
+  // anyone confirming: the guard answers `false` and "Ricarica la finestra" asks instead.
+  const calendar = stripComments(read('src/components/Calendar.tsx')).replace(/(^|\s)\/\/.*$/gm, '$1');
+  const start = calendar.search(/useDirtyCloseGuard\(\s*'calendar-event'/);
+  assert.ok(start >= 0, "Calendar.tsx no longer registers useDirtyCloseGuard('calendar-event', …): change this check with it");
+  let depth = 0;
+  let end = -1;
+  for (let at = calendar.indexOf('(', start); at < calendar.length && end < 0; at++) {
+    if (calendar[at] === '(') depth++;
+    if (calendar[at] === ')' && --depth === 0) end = at;
+  }
+  assert.ok(end > start, 'the useDirtyCloseGuard call of the calendar sheet is not closed');
+  const guard = calendar.slice(start, end + 1);
+  assert.match(guard, /,\s*async \(\) => false,?\s*\)$/, "the calendar sheet's saveNow must be exactly `async () => false`");
+  assert.ok(!/\b(save|calendarCall)\b/.test(guard), "the calendar sheet's guard must not reach save() or calendarCall");
 });
 
 if (failures.length) {

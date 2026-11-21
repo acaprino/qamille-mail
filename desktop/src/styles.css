@@ -2441,8 +2441,9 @@
 .startup-state {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  /* `safe`: when the window is shorter than the content, the top stays reachable instead of being cut off. */
+  /* `safe`: when the window is shorter than the content, or an error is wider than the window (a long
+     unbreakable word at 200 %), the top and the left stay reachable instead of being cut off. */
+  align-items: safe center;
   justify-content: safe center;
   /* The root never scrolls (docs/aspetto-nativo.md rule 4): in a short window, at 200 % zoom, the screen
      scrolls inside itself. */

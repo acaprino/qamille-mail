@@ -57,6 +57,7 @@ const TEXT = {
     retry: 'Try again', rightNow: 'Windows cannot open the credentials key right now',
     unavailable: 'Windows could not open the credentials key right now (error 0x8007000D). Nothing was changed: try again later.',
     notice: 'The credentials of the other computer are in data\\credentials-set-aside-20261121-101500',
+    putBack: 'If Windows opens them again later, they can be put back',
   },
   'it-IT': {
     sidebar: 'Barra laterale', workspace: 'Alex Spazio personale', accounts: 'Account', credentials: 'Credenziali',
@@ -76,19 +77,24 @@ const TEXT = {
     retry: 'Riprova', rightNow: 'Windows non riesce ad aprire ora la chiave delle credenziali',
     unavailable: 'Windows non riesce ad aprire ora la chiave delle credenziali (errore 0x8007000D). Non è cambiato niente: riprova più tardi.',
     notice: 'Le credenziali dell’altro computer sono in data\\credentials-set-aside-20261121-101500',
+    putBack: 'Se poi Windows torna ad aprirle, si possono rimettere a posto',
   },
 };
 
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const errors = [];
-async function open(vault, locale) {
+async function open(vault, locale, server) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale });
   const page = await context.newPage();
   page.on('pageerror', (error) => errors.push(error.message));
   page.setDefaultTimeout(15000);
-  await page.addInitScript((value) => (window.__previewVault = value), vault);
+  await page.addInitScript(({ vault, server }) => {
+    window.__previewVault = vault;
+    if (server) window.__previewServer = server;
+  }, { vault, server });
   await page.goto(process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:1420');
-  await page.getByRole('button', { name: /^(New message|Nuovo messaggio)/ }).waitFor();
+  // The Professional opens on its server sign-in, not on the mail.
+  if (!server) await page.getByRole('button', { name: /^(New message|Nuovo messaggio)/ }).waitFor();
   return { page, context };
 }
 const vault = (page) => page.evaluate(() => window.__previewVault);
@@ -163,7 +169,25 @@ try {
       await page.evaluate(() => (window.__previewVault.state = 'ready'));
       await dialog.getByRole('button', { name: t.retry, exact: true }).click();
       await expect(dialog).toHaveCount(0);
-      console.log(`PASS [${locale}] when Windows cannot open the key right now, only «Try again» is offered`);
+      console.log(`PASS [${locale}] when Windows cannot open the key right now, «Try again» comes first`);
+      await context.close();
+    }
+    {
+      // «Try again» fails: the way out is the confirmed new sign-in, which only moves files.
+      const { page, context } = await open({ state: 'unavailable' }, locale);
+      const dialog = page.getByRole('dialog', { name: t.doNotOpen });
+      await dialog.getByRole('button', { name: t.retry, exact: true }).click();
+      await expect(toast(page, t.unavailable)).toBeVisible();
+      await dialog.getByRole('button', { name: t.signInAgain }).click();
+      await expect(dialog).toContainText(t.putBack);
+      await dialog.getByRole('button', { name: t.cancel, exact: true }).click();
+      assert.equal((await vault(page)).startedOver, undefined, 'cancel sets nothing aside');
+      await dialog.getByRole('button', { name: t.signInAgain }).click();
+      await dialog.getByRole('button', { name: t.signInAgain }).click();
+      await expect(dialog).toHaveCount(0);
+      await expect(toast(page, t.previous)).toBeVisible();
+      assert.equal((await vault(page)).startedOver, 1);
+      console.log(`PASS [${locale}] when «Try again» fails, a confirmed new sign-in sets the credentials aside`);
       await context.close();
     }
     {
@@ -220,6 +244,30 @@ try {
       console.log(`PASS [${locale}] Settings sets the transfer passphrase (twice, 8 characters that are not spaces) and removes it`);
       await context.close();
     }
+  }
+  {
+    // The Professional's server sign-in after «Later»: a sign-in refused because the passphrase
+    // must come first brings the dialog back, since Settings cannot be reached from there.
+    const { page, context } = await open(
+      { state: 'locked', transfer: true, passphrase: 'correct horse battery' },
+      'en-US',
+      { edition: 'professional' },
+    );
+    const dialog = page.getByRole('dialog', { name: TEXT['en-US'].fromAnother });
+    await dialog.getByRole('button', { name: 'Later', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Sign in to Qamille' })).toBeVisible();
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await page.getByRole('button', { name: 'I agree, continue', exact: true }).click();
+    await page.getByLabel('Username or email').fill('mario');
+    await page.getByLabel('Password', { exact: true }).fill('una password lunga');
+    await page.locator('.server-connect').getByRole('button', { name: 'Sign in', exact: true }).click();
+    await expect(dialog).toBeVisible();
+    await dialog.getByLabel('Transfer passphrase').fill('correct horse battery');
+    await dialog.getByRole('button', { name: 'Open the credentials' }).click();
+    await expect(dialog).toHaveCount(0);
+    console.log('PASS a sign-in refused for the transfer passphrase brings the dialog back, over the server sign-in');
+    await context.close();
   }
   {
     // A vault error from the backend, shown by the page in the interface language.

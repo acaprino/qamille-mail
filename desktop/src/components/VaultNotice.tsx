@@ -2,14 +2,15 @@
 // from another Windows user or computer (the dialog asks for the transfer passphrase, or says the
 // accounts need a new sign-in), damaged files, or Windows unable to open the key right now. It draws
 // over everything, the Professional's server sign-in included. «Later» closes it until the next
-// start; Settings → Accounts has the same controls. When a sign-in has set the old credentials of
+// start, or until a sign-in is refused for the passphrase; Settings → Accounts has the same
+// controls. When a sign-in has set the old credentials of
 // another computer aside (`setAside`, from the workspace snapshot), it says where, once.
 import { useEffect, useRef, useState } from 'react';
 import Button from '../ds/primitives/Button';
 import Modal from '../ds/primitives/Modal';
 import { call } from '../lib/api';
 import { tr } from '../lib/i18n';
-import type { VaultStatus } from '../lib/vault';
+import { VAULT_LOCKED_EVENT, type VaultStatus } from '../lib/vault';
 import VaultUnlock from './VaultUnlock';
 
 type Props = {
@@ -25,11 +26,16 @@ export default function VaultNotice({ notify, changed, setAside }: Props) {
 
   useEffect(() => {
     let live = true;
-    void call<VaultStatus>('vault_status')
-      .then((value) => live && setStatus(value))
-      .catch(() => {});
+    const read = () =>
+      void call<VaultStatus>('vault_status')
+        .then((value) => live && setStatus(value))
+        .catch(() => {});
+    read();
+    // A sign-in refused for the transfer passphrase brings the dialog back after «Later».
+    window.addEventListener(VAULT_LOCKED_EVENT, read);
     return () => {
       live = false;
+      window.removeEventListener(VAULT_LOCKED_EVENT, read);
     };
   }, []);
 

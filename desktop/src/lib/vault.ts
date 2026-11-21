@@ -27,6 +27,25 @@ export function retryable(status: VaultStatus): boolean {
   return status.state === 'damaged' && (status.code === 'vault_unavailable' || status.code === 'vault_storage');
 }
 
+/** Raised on `window` when a sign-in is refused because the transfer passphrase must be entered
+ *  first (`vault_locked`): the start-up dialog comes back, even where Settings cannot be reached
+ *  (the Professional's server sign-in). */
+export const VAULT_LOCKED_EVENT = 'qamille:vault-locked';
+
+/** The commands that start a sign-in and save its credential in the vault. A `vault_locked` from
+ *  another command (a status read) does not bring the dialog back. */
+export const SIGN_IN_COMMANDS: ReadonlySet<string> = new Set([
+  'connect_google',
+  'connect_password',
+  'contacts_authorize',
+  'save_settings',
+  'server_connect',
+  'server_change_temporary_password',
+  'server_signup_confirm',
+  'server_connect_browser',
+  'server_browser_disable_device',
+]);
+
 /** `MIN_TRANSFER_PASSPHRASE_CHARS` in secret.rs: characters that are not spaces. */
 export const MIN_TRANSFER_PASSPHRASE = 8;
 

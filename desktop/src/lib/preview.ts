@@ -1255,6 +1255,13 @@ function previewServer(command: string, args: Record<string, unknown>) {
       return { kind: agreed ? 'ready' : 'consent_needed', label, external };
     }
     case 'server_connect':
+      // Phase 3, Task 7: a vault that the transfer passphrase opens refuses the sign-in first.
+      if (window.__previewVault?.state === 'locked' && window.__previewVault.transfer)
+        throw {
+          code: 'vault_locked',
+          message:
+            'The credentials key belongs to another Windows user or another computer: enter the transfer passphrase in Settings, or sign in to the accounts again.',
+        };
       return connect(args.url);
     case 'server_change_temporary_password':
       return connect(args.url, true);

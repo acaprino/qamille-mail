@@ -28,10 +28,11 @@ pub async fn vault_unlock(passphrase: String) -> AppResult<VaultStatus> {
 }
 
 /// The credentials that do not open here go to a folder of their own in the data folder, never
-/// deleted; the answer is that folder's name.
+/// deleted; the answer is that folder's name. `unopenable`: Windows still cannot open the key
+/// after «Try again», and the person confirmed.
 #[tauri::command]
-pub async fn vault_start_over() -> AppResult<String> {
-    blocking(|| secret::start_over().map_err(vault_error)).await
+pub async fn vault_start_over(unopenable: Option<bool>) -> AppResult<String> {
+    blocking(move || secret::start_over(unopenable.unwrap_or(false)).map_err(vault_error)).await
 }
 
 /// The person was told where a sign-in set the old credentials aside.

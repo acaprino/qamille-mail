@@ -176,8 +176,9 @@ pub fn unlock_with_transfer_passphrase(passphrase: String) -> Result<VaultStatus
 
 /// Sets credentials that do not open here aside (never deletes them) so the person can sign in
 /// again. Returns the name of the folder, inside the data folder, that now holds them.
-pub fn start_over() -> Result<String, String> {
-    workspace_vault().start_over()
+/// `unopenable_too`: the person tried again, Windows still cannot open the key, and they confirmed.
+pub fn start_over(unopenable_too: bool) -> Result<String, String> {
+    workspace_vault().start_over(unopenable_too)
 }
 
 /// Before a sign-in that will save a credential: an error when the save would be refused (a
@@ -238,6 +239,9 @@ pub struct Vault {
     root: PathBuf,
     store: KeyStore,
     kdf: KdfParams,
+    /// Tests: the DPAPI check before a set-aside fails with this code.
+    #[cfg(test)]
+    broken_dpapi: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -356,7 +360,13 @@ impl TransferCopy {
 
 impl Vault {
     pub fn with_key_store(root: impl Into<PathBuf>, store: KeyStore) -> Self {
-        Self { root: root.into(), store, kdf: TRANSFER_KDF }
+        Self {
+            root: root.into(),
+            store,
+            kdf: TRANSFER_KDF,
+            #[cfg(test)]
+            broken_dpapi: None,
+        }
     }
 
     fn path(&self, name: &str) -> PathBuf {
@@ -688,13 +698,16 @@ impl Vault {
     }
 
     /// Only for credentials that do not open: locked to another user, or damaged. A file that
-    /// cannot be read right now is not damaged, and starting over then would drop good ones.
-    pub fn start_over(&self) -> Result<String, String> {
+    /// cannot be read right now is not damaged, and starting over then would drop good ones. A key
+    /// that Windows cannot open now (`vault_unavailable`) may be good too: it is set aside only
+    /// with `unopenable_too`, when trying again did not help and the person confirmed. Setting
+    /// aside only moves files, so it can be undone by moving them back.
+    pub fn start_over(&self, unopenable_too: bool) -> Result<String, String> {
         let _lock = self.lock()?;
         match self.load() {
             Ok(Loaded::Open(_)) => Err(NOTHING_TO_START_OVER.into()),
-            // Unreadable now, or Windows unavailable now: good credentials may be behind it.
-            Err(message) if matches!(error_code(&message), vault_codes::STORAGE | vault_codes::UNAVAILABLE) => Err(message),
+            Err(message) if error_code(&message) == vault_codes::STORAGE => Err(message),
+            Err(message) if error_code(&message) == vault_codes::UNAVAILABLE && !unopenable_too => Err(message),
             Ok(Loaded::Locked { .. }) | Err(_) => self.set_aside(),
         }
     }
@@ -727,6 +740,10 @@ impl Vault {
     /// Moves the credentials and their keys into a new folder of the data folder. The marker
     /// written first names that folder, so a crash halfway is finished at the next load.
     fn set_aside(&self) -> Result<String, String> {
+        // A new key is written right after: while Windows cannot protect one, nothing moves.
+        if self.store == KeyStore::Dpapi {
+            self.check_dpapi()?;
+        }
         let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S").to_string();
         let mut name = format!("{SET_ASIDE_PREFIX}{stamp}");
         let mut next = 2;
@@ -738,6 +755,15 @@ impl Vault {
         self.move_aside(&name)?;
         fs::remove_file(self.path(SET_ASIDE_MARKER)).map_err(storage_error)?;
         Ok(name)
+    }
+
+    /// Windows protects and opens a test value for this user right now.
+    fn check_dpapi(&self) -> Result<(), String> {
+        #[cfg(test)]
+        if let Some(code) = self.broken_dpapi {
+            return Err(unavailable_message(code));
+        }
+        dpapi_round_trip().map_err(unavailable_message)
     }
 
     fn finish_set_aside(&self) -> Result<(), String> {
@@ -877,6 +903,20 @@ fn unprotect_bytes(bytes: &[u8]) -> Result<Zeroizing<Vec<u8>>, Refusal> {
     super::dpapi::unprotect(bytes)
         .map(Zeroizing::new)
         .map_err(|error| Refusal { foreign: error.foreign(), code: error.code })
+}
+
+#[cfg(windows)]
+fn dpapi_round_trip() -> Result<(), u32> {
+    const PROBE: &[u8] = b"Qamille: can Windows protect a key now?";
+    let blob = super::dpapi::protect(PROBE).map_err(|error| error.code)?;
+    let back = Zeroizing::new(super::dpapi::unprotect(&blob).map_err(|error| error.code)?);
+    // ERROR_INVALID_DATA: what came back is not what went in.
+    if back.as_slice() == PROBE { Ok(()) } else { Err(0x8007_000D) }
+}
+
+#[cfg(not(windows))]
+fn dpapi_round_trip() -> Result<(), u32> {
+    Err(0)
 }
 
 #[cfg(not(windows))]
@@ -1524,11 +1564,11 @@ mod tests {
         let protected = workspace.protected();
         protected.set_transfer_passphrase("forgotten passphrase").unwrap();
         let open = workspace.files();
-        assert_eq!(protected.start_over().unwrap_err(), NOTHING_TO_START_OVER);
+        assert_eq!(protected.start_over(false).unwrap_err(), NOTHING_TO_START_OVER);
         assert_eq!(workspace.files(), open);
         workspace.as_if_from_another_user();
         let before = workspace.files();
-        let folder = protected.start_over().unwrap();
+        let folder = protected.start_over(false).unwrap();
         assert!(folder.starts_with(SET_ASIDE_PREFIX));
         assert_eq!(protected.set_aside_notice(), None, "the person asked for it and saw the folder");
         let after = workspace.files();
@@ -1549,7 +1589,7 @@ mod tests {
         // Credentials that cannot be read at this moment (here: a folder in their place).
         fs::rename(workspace.path(VAULT_FILE), workspace.path("held.json")).unwrap();
         fs::create_dir(workspace.path(VAULT_FILE)).unwrap();
-        let error = protected.start_over().unwrap_err();
+        let error = protected.start_over(false).unwrap_err();
         assert!(error.starts_with(STORAGE_FAILED), "{error}");
         assert!(workspace.set_aside_folders().is_empty());
         fs::remove_dir(workspace.path(VAULT_FILE)).unwrap();
@@ -1700,9 +1740,53 @@ mod tests {
         // A sign-in and a start-over are both refused: good credentials may be behind it.
         assert_eq!(error_code(&protected.set("gmail:new@example.test", "fresh").unwrap_err()), vault_codes::UNAVAILABLE);
         assert!(protected.check_writable().is_err());
-        assert_eq!(error_code(&protected.start_over().unwrap_err()), vault_codes::UNAVAILABLE);
+        assert_eq!(error_code(&protected.start_over(false).unwrap_err()), vault_codes::UNAVAILABLE);
         assert_eq!(workspace.files(), before);
         assert!(workspace.set_aside_folders().is_empty());
+    }
+
+    #[test]
+    fn vault_key_blob_that_stays_unopenable_is_set_aside_when_the_person_confirms() {
+        let workspace = Workspace::new();
+        workspace.earlier_install();
+        let protected = workspace.protected();
+        protected.get(AI_KEY).unwrap();
+        let mut document = workspace.protected_document();
+        let last = document.blob.len() - 1;
+        document.blob[last] ^= 0x01;
+        fs::write(workspace.path(PROTECTED_KEY_FILE), serde_json::to_vec(&document).unwrap()).unwrap();
+        let before = workspace.files();
+        // «Try again» failed, and the person confirmed signing in to the accounts again.
+        let folder = protected.start_over(true).unwrap();
+        let after = workspace.files();
+        for name in [VAULT_FILE, PROTECTED_KEY_FILE] {
+            assert_eq!(after[&format!("{folder}/{name}")], before[name], "{name}: moved, never deleted");
+        }
+        assert_eq!(protected.status(), VaultStatus::Ready { protected: true, transfer: false });
+        protected.set("gmail:new@example.test", "fresh").unwrap();
+        assert_eq!(protected.get("gmail:new@example.test").unwrap(), "fresh");
+        assert_other_data_kept(&workspace);
+    }
+
+    #[test]
+    fn vault_key_nothing_is_set_aside_while_windows_cannot_protect_a_new_key() {
+        let workspace = Workspace::new();
+        workspace.earlier_install();
+        workspace.protected().get(AI_KEY).unwrap();
+        workspace.as_if_from_another_user();
+        let mut broken = workspace.protected();
+        broken.broken_dpapi = Some(0x8009_0345);
+        let before = workspace.files();
+        // A sign-in would set the old credentials aside and then fail to write the new key.
+        let error = broken.set("gmail:new@example.test", "fresh").unwrap_err();
+        assert_eq!(error, unavailable_message(0x8009_0345));
+        assert_eq!(error_code(&error), vault_codes::UNAVAILABLE);
+        assert_eq!(error_code(&broken.start_over(true).unwrap_err()), vault_codes::UNAVAILABLE);
+        assert_eq!(workspace.files(), before);
+        assert!(workspace.set_aside_folders().is_empty());
+        // Once Windows protects again, the sign-in goes on.
+        workspace.protected().set("gmail:new@example.test", "fresh").unwrap();
+        assert_eq!(workspace.set_aside_folders().len(), 1);
     }
 
     #[test]
@@ -1780,7 +1864,7 @@ mod tests {
         fs::write(workspace.path(VAULT_FILE), &damaged).unwrap();
         assert!(protected.get(AI_KEY).is_err());
         assert!(protected.set("other", "replacement").is_err());
-        assert!(protected.start_over().is_ok(), "a damaged vault can be set aside on request");
+        assert!(protected.start_over(false).is_ok(), "a damaged vault can be set aside on request");
         assert_eq!(protected.get(AI_KEY).unwrap(), "");
         let folder = &workspace.set_aside_folders()[0];
         assert_eq!(workspace.read(&format!("{folder}/{VAULT_FILE}")), damaged);

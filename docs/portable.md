@@ -65,7 +65,12 @@ degli account, ma Windows non apre la chiave delle credenziali:
 
 Se Windows non riesce ad aprire la chiave per un altro motivo (un profilo non
 caricato, un file rovinato), Qamille lo dice con il codice d'errore di Windows e
-non mette da parte niente, nemmeno a un nuovo accesso: si riprova più tardi.
+non mette da parte niente, nemmeno a un nuovo accesso: si riprova con «Riprova».
+Se riprovando la chiave non si apre ancora, compare «Accedi di nuovo agli
+account»: dopo una conferma mette da parte le credenziali come sopra, e se poi
+Windows torna ad aprirle si possono rimettere a posto (qui sotto). In ogni caso,
+se in quel momento Windows non riesce a proteggere una chiave nuova, non si
+sposta niente.
 
 **Una cartella usata a turno su due computer** (per esempio su una chiavetta):
 ogni volta che passa all'altro computer, Qamille chiede la frase di trasferimento,

@@ -1,7 +1,8 @@
 // Credentials that do not open on this Windows user (phase 3, Task 7): the transfer passphrase
 // chosen on the other computer opens them, or the person signs in to the accounts again. Starting
 // over sets the old files aside in the data folder (never deletes them) and always asks first.
-// When Windows cannot open the key right now (`retryable`), only «Try again» is offered.
+// When Windows cannot open the key right now (`retryable`), «Try again» comes first; only when it
+// fails is the confirmed new sign-in offered (`unopenable`): it moves files and can be undone.
 // Shown by the start-up notice and by Settings → Accounts. Errors come from the vault with a
 // `vault_*` code; errorText words them in the interface language (lib/vault.ts).
 import { useState, type ReactNode } from 'react';
@@ -24,7 +25,10 @@ export default function VaultUnlock({ status, done, error, children }: Props) {
   const [passphrase, setPassphrase] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
+  // «Try again» did not help: the key may stay unopenable, so the way out is offered.
+  const [retried, setRetried] = useState(false);
   const transfer = status.state === 'locked' && status.transfer;
+  const unopenable = retryable(status);
 
   async function run(work: () => Promise<void>) {
     setBusy(true);
@@ -44,7 +48,7 @@ export default function VaultUnlock({ status, done, error, children }: Props) {
     });
   const startOver = () =>
     run(async () => {
-      const folder = await call<string>('vault_start_over');
+      const folder = await call<string>('vault_start_over', { unopenable });
       const next = await call<VaultStatus>('vault_status');
       setConfirming(false);
       done(
@@ -59,14 +63,21 @@ export default function VaultUnlock({ status, done, error, children }: Props) {
     run(async () => {
       const next = await call<VaultStatus>('vault_status');
       if (next.state === 'ready') done(next, tr('Credenziali aperte.', 'Credentials opened.'));
-      else if (next.state === 'damaged' && retryable(next)) error(backendText(next.message));
-      else done(next, '');
+      else if (next.state === 'damaged' && retryable(next)) {
+        setRetried(true);
+        error(backendText(next.message));
+      } else done(next, '');
     });
 
   if (confirming)
     return (
       <div>
         <p>
+          {unopenable &&
+            tr(
+              'Windows non riesce ad aprire la chiave delle credenziali nemmeno riprovando. Se poi Windows torna ad aprirle, si possono rimettere a posto: la guida della cartella portatile dice come. ',
+              'Windows still cannot open the credentials key after trying again. If Windows opens them again later, they can be put back: the portable folder guide says how. ',
+            )}
           {tr(
             'Le credenziali di prima vanno in una cartella a parte dentro data, senza essere cancellate, e Qamille non le usa più. Poi accedi di nuovo a Google, agli account IMAP e, nella Professional, al server. La posta e le impostazioni restano.',
             'The previous credentials go to a separate folder inside data, without being deleted, and Qamille no longer uses them. Then sign in again to Google, to the IMAP accounts and, in Professional, to the server. Mail and settings stay.',
@@ -148,11 +159,16 @@ export default function VaultUnlock({ status, done, error, children }: Props) {
             {children}
           </div>
         </form>
-      ) : retryable(status) ? (
+      ) : unopenable ? (
         <div className="button-row">
           <Button variant="primary" disabled={busy} onClick={() => void retry()}>
             {busy ? tr('Attendi…', 'Working…') : tr('Riprova', 'Try again')}
           </Button>
+          {retried && (
+            <Button variant="secondary" disabled={busy} onClick={() => setConfirming(true)}>
+              {tr('Accedi di nuovo agli account', 'Sign in to the accounts again')}
+            </Button>
+          )}
           {children}
         </div>
       ) : (

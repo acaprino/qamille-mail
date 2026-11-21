@@ -70,7 +70,7 @@ export function previewVault(command: string, args: Record<string, unknown>): Va
       return;
     case 'vault_start_over':
       if (ready) throw new Error('The credentials open on this computer: there is nothing to start over.');
-      if (vault.state === 'unavailable')
+      if (vault.state === 'unavailable' && !args.unopenable)
         throw new Error('Windows could not open the credentials key right now (error 0x8007000D). Nothing was changed: try again later.');
       vault.state = 'ready';
       vault.transfer = false;

@@ -187,6 +187,8 @@ export default function ActivityCenter({
         closeActivityPanel();
     }
     function onKey(event: KeyboardEvent) {
+      // Another handler already took this Esc (the search field clears itself): it is not also for the panel.
+      if (event.defaultPrevented) return;
       if (event.key === 'Escape' && activityCenter.open && !imeComposing(event)) closeFromInside();
     }
     window.addEventListener('pointerdown', outside);

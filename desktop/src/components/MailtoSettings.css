@@ -1,0 +1,8 @@
+/* The buttons under the help text of «Link mailto degli altri programmi» (MailtoSettings.tsx). */
+.mailto-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}

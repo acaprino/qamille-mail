@@ -404,6 +404,8 @@ pub fn offer_reload_if_not_ready(window: &WebviewWindow) {
 pub fn page_load(window: WebviewWindow, payload: PageLoadPayload<'_>) {
     if payload.event() == PageLoadEvent::Started {
         watch_startup(&window);
+        // The new page has no compose-mailto listener yet: a mail link waits for its take (rule 32).
+        crate::launch_args::page_started();
     }
 }
 

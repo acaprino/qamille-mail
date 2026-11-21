@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import MailtoSettings from './MailtoSettings';
 import Switch from '../ds/primitives/Switch';
 import { call, errorText } from '../lib/api';
 import { tr } from '../lib/i18n';
@@ -88,7 +89,7 @@ export default function DesktopSettings() {
           </p>
         </div>
       )}
-      {/* phase 3, Task 4: default mail app */}
+      <MailtoSettings />
     </>
   );
 }

@@ -432,6 +432,59 @@ check('16. a link in a message opens only an absolute web or mail address, or sc
   for (const written of ['', 'part2', 'https://example.com/#x', '\u00a0#x', '/#x']) assert.equal(fragmentOf(written), null, JSON.stringify(written));
 });
 
+// The body of `!macro <name>` in an NSIS hooks file, without `;` comments: an assertion on one macro
+// is met neither by the other macro nor by a comment.
+function nshMacro(text, name) {
+  const plain = text.replace(/^[ \t]*;.*$/gm, '');
+  const found = plain.match(new RegExp(`^!macro ${name}\\b([\\s\\S]*?)^!macroend`, 'm'));
+  assert.ok(found, `the hooks file must define !macro ${name}`);
+  return found[1];
+}
+
+check("17. the installer removes the worker's startup and, when asked, the data (audit Q23)", () => {
+  const nsis = JSON.parse(read('src-tauri/tauri.professional.conf.json')).bundle?.windows?.nsis;
+  const hooksPath = nsis?.installerHooks?.replace(/^\.\//, '');
+  assert.equal(hooksPath, 'windows/installer-hooks.nsh', 'the Professional installer must take its hooks from windows/installer-hooks.nsh');
+  const hooks = read(`src-tauri/${hooksPath}`);
+
+  // What the app writes, read from the code that writes it: the startup file and the data folder.
+  const launcher = rustItem(read('../app/src/infrastructure/mcp_config.rs'), 'fn startup_launcher()');
+  assert.match(launcher, /env::var_os\("APPDATA"\)/, 'the startup file is still placed under %APPDATA%');
+  const written = launcher.match(/\.join\("(Microsoft\/Windows\/[^"]*\.vbs)"\)/);
+  assert.ok(written, 'startup_launcher no longer joins a .vbs path: change this check and the hook together');
+  const startupFile = written[1].replaceAll('/', '\\');
+  const dataDir = rustItem(read('../app/src/infrastructure/legacy_store.rs'), 'pub fn data_dir()');
+  assert.match(dataDir, /\.parent\(\)[\s\S]*\.join\("data"\)/, 'the data folder is still <executable folder>\\data');
+
+  const before = nshMacro(hooks, 'NSIS_HOOK_PREUNINSTALL');
+  // Only the workers started from this install folder: matched on the executable's full path and on
+  // --worker as a whole argument. Killing by image name (taskkill /IM, nsis_tauri_utils::KillProcess)
+  // would end every Qamille of the user too: a portable copy, or the window itself.
+  assert.ok(!/taskkill|KillProcess|\/IM\b/i.test(before), 'workers must not be ended by image name');
+  assert.match(before, /\$INSTDIR\\\$\{MAINBINARYNAME\}\.exe/, 'the hook must name the executable of this install folder');
+  assert.match(before, /\$\$_\.ExecutablePath\s+-eq\s+\$\$env:\w+/, 'a process must be matched on its full executable path');
+  assert.match(before, /\$\$_\.CommandLine\s+-match\s+'\(\^\|\\s\)--worker\(\\s\|\$\$\)'/, 'a process must be matched on --worker as a whole argument');
+  assert.match(before, /Stop-Process\s+-Id\s+\$\$_\.ProcessId/, 'the matching processes must be stopped');
+  // The startup file goes with the program, but an update keeps it: the worker must still start at the
+  // next sign-in (the template keeps the HKCU Run value on an update the same way).
+  assert.match(before, /ReadEnvStr\s+\$\d\s+APPDATA/, 'the startup folder is found from %APPDATA%, as mcp_config.rs does');
+  assert.match(
+    before,
+    new RegExp(`\\$\\{If\\}\\s+\\$UpdateMode\\s*<>\\s*1[\\s\\S]*Delete\\s+"\\$\\d\\\\${startupFile.replaceAll('\\', '\\\\')}"[\\s\\S]*\\$\\{EndIf\\}`),
+    `${startupFile} must be deleted, and not on an update`,
+  );
+
+  const after = nshMacro(hooks, 'NSIS_HOOK_POSTUNINSTALL');
+  // The template's "Delete app data" only empties %APPDATA%\<identifier> and %LOCALAPPDATA%\<identifier>,
+  // where Qamille keeps nothing: its data and credentials.key sit beside the program.
+  assert.match(
+    after,
+    /\$\{If\}\s+\$DeleteAppDataCheckboxState\s*=\s*1\s+\$\{AndIf\}\s+\$UpdateMode\s*<>\s*1[\s\S]*RMDir\s+\/r\s+"\$INSTDIR\\data"[\s\S]*\$\{EndIf\}/,
+    'the data folder must go only when the box is ticked, and never on an update',
+  );
+  assert.ok(!/RMDir\s+\/r\s+"\$INSTDIR"/.test(after), 'only the data folder is removed recursively, never the install folder');
+});
+
 if (failures.length) {
   console.error(`\n${failures.length} native-feel check(s) failed. See docs/aspetto-nativo.md.`);
   process.exit(1);

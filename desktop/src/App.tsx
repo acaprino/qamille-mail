@@ -34,6 +34,7 @@ import { captureActive, flushMeetingDrafts, meetingCall, requestMeetingOpen, typ
 import { installWindowCloseHandler, registerCloseGuard } from './lib/window-close';
 import { paintWindowBackground } from './lib/native-window';
 import { installWindowShell, windowAppearance, zoomWindow } from './lib/window-shell';
+import { installNotificationOpen } from './lib/notification-open';
 import Icon from './ds/primitives/Icon';
 import UndoStack from './components/UndoStack';
 import { refreshActivity } from './lib/activity-center';
@@ -235,6 +236,8 @@ export default function App() {
     return {
       // Account picked while unsaved settings held the user back; applied once they leave.
       leaveAccount: null as { id: number | null } | null,
+      // What runs once that view is there (`navigate`'s `then`): dropped if the user stays.
+      afterLeave: null as (() => void) | null,
       reportedSyncError: '',
       // Accounts whose typed `sync-progress` the UI has seen: a snapshot pulled at startup never
       // overrides them (see seedSyncActivities).
@@ -858,19 +861,25 @@ export default function App() {
       if (request === v.readRequest) s.openingId = null;
     }
   }
-  function navigate(next: Folder, account?: { id: number | null }) {
+  /** Goes to `next` (and `account`). `then` runs once the view is there: at once, or after the
+   *  unsaved-settings question let the user leave; never if they stay. */
+  function navigate(next: Folder, account?: { id: number | null }, then?: () => void) {
     if (s.view === 'Settings' && next !== 'Settings' && s.settingsDirty) {
       s.leaveTarget = next;
       v.leaveAccount = account ?? null;
+      v.afterLeave = then ?? null;
       return;
     }
     if (account) s.accountId = account.id;
     goTo(next);
+    then?.();
   }
   async function finishLeaving(save: boolean) {
     const target = s.leaveTarget;
     const account = v.leaveAccount;
+    const after = v.afterLeave;
     v.leaveAccount = null;
+    v.afterLeave = null;
     if (save && !(await settingsPanel.current?.save())) {
       s.leaveTarget = null;
       return;
@@ -884,6 +893,7 @@ export default function App() {
     } else if (target) {
       if (account) s.accountId = account.id;
       goTo(target);
+      after?.();
     }
   }
   function goTo(next: Folder) {
@@ -1591,6 +1601,24 @@ export default function App() {
       ),
     );
     unsubscribers.push(installWindowShell());
+    // A click on a Windows notification (lib/notification-open.ts): Rust brought the window back.
+    unsubscribers.push(
+      installNotificationOpen({
+        // The Inbox of the message's account, so the list shows it; a message gone meanwhile (deleted,
+        // moved) leaves the Inbox open without an error.
+        openMail: (id, accountId) =>
+          navigate('Inbox', { id: accountId }, () =>
+            void call<{ folder?: string }[]>('read_rows', { ids: [id] })
+              .then((rows) => {
+                if (rows.some((row) => (row.folder ?? 'Inbox') === 'Inbox')) void open(id);
+              })
+              .catch(() => {}),
+          ),
+        openDrafts: () => navigate('Drafts'),
+        openAccounts: () => (navigate('Settings'), void tick().then(() => settingsPanel.current?.showSection('Accounts'))),
+        openServer: () => (navigate('Settings'), void tick().then(() => settingsPanel.current?.showSection('Compute'))),
+      }),
+    );
     void installWindowCloseHandler(notify)
       .then((unsubscribe) => (disposed ? unsubscribe() : unsubscribers.push(unsubscribe)))
       .catch((error) => notify(errorText(error), true));
@@ -2069,6 +2097,7 @@ export default function App() {
           discard={() => void finishLeaving(false)}
           stay={() => {
             s.leaveTarget = null;
+            v.afterLeave = null;
           }}
         />
       )}

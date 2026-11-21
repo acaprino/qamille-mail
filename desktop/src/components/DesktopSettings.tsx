@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import MailtoSettings from './MailtoSettings';
 import Switch from '../ds/primitives/Switch';
+import NotificationSettings from './NotificationSettings';
 import { call, errorText } from '../lib/api';
 import { tr } from '../lib/i18n';
 import { useReactive } from '../lib/store';
@@ -75,7 +76,7 @@ export default function DesktopSettings() {
           )}
         </p>
       </div>
-      {/* phase 3, Task 3: notifications */}
+      <NotificationSettings />
       {state.autostart.supported && (
         <div className="setting-row">
           <Switch checked={state.autostart.enabled} disabled={state.busy} onChange={(on) => void setAutostart(on)}>

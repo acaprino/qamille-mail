@@ -281,6 +281,9 @@ pub struct SyncService {
     state_lock: Mutex<()>,
     outcome: Mutex<Outcome>,
     schedule: Mutex<Schedule>,
+    /// The server refused this device (`unauthorized`) and `SignInExpired` said so: not again until a
+    /// pass works.
+    refused: std::sync::atomic::AtomicBool,
 }
 
 fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
@@ -329,6 +332,7 @@ impl SyncService {
             state_lock: Mutex::new(()),
             outcome: Mutex::new(Outcome::default()),
             schedule: Mutex::new(Schedule::default()),
+            refused: std::sync::atomic::AtomicBool::new(false),
         }
     }
 
@@ -569,6 +573,7 @@ impl SyncService {
             Ok(())
         });
         let result = result.and(saved);
+        self.note_refusal(&result);
         let mut outcome = lock(&self.outcome);
         *outcome = Outcome::default();
         match result {
@@ -587,6 +592,22 @@ impl SyncService {
             }
         }
         Ok(report)
+    }
+
+    /// The server no longer knows this device (`unauthorized`): announced once (a Windows notification,
+    /// desktop `notifications.rs`), and again only after a pass that worked. Every other failure is
+    /// not an expired sign-in.
+    fn note_refusal(&self, result: &AppResult<()>) {
+        use std::sync::atomic::Ordering;
+        match result {
+            Err(error) if error.code == "unauthorized" => {
+                if !self.refused.swap(true, Ordering::SeqCst) {
+                    self.context.events.emit(AppEvent::SignInExpired { account_id: None });
+                }
+            }
+            Ok(()) => self.refused.store(false, Ordering::SeqCst),
+            Err(_) => {}
+        }
     }
 
     /// The endpoint and the user when the synchronization may talk to the server: a session, the

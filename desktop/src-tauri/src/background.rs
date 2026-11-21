@@ -160,7 +160,8 @@ fn tray_notice(app: &AppHandle) {
 pub fn restore(app: &AppHandle) {
     let Some(window) = app.get_webview_window("main") else { return };
     crate::native_feel::set_webview_visible(&window, true);
-    let _ = window.show();
+    // `show_main` opens a maximized saved placement maximized, the first time (rule 29).
+    crate::window_shell::show_main(&window);
     let _ = window.unminimize();
     let _ = window.set_focus();
     // A page that did not draw while the window was hidden asks now, with the window in view.

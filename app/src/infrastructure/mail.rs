@@ -933,6 +933,8 @@ pub(super) fn metadata_row(
             email.date_missing = false;
         }
     }
+    // When the server received it, whatever its Date header says: whether it is new mail.
+    email.received_at = row.internal_date().map(|date| date.timestamp());
     Some(email)
 }
 

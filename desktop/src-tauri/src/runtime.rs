@@ -25,10 +25,17 @@ pub fn demo_requested(value: Option<&OsStr>) -> bool {
 /// writer returns from `update_with_events` becomes one `app-event` Tauri
 /// emission, after the commit, serialized with its `kind` tag. Only this
 /// process installs it — MCP, the native UI and the tests keep `NullSink`, so
-/// no other process ever announces UI events.
+/// no other process ever announces UI events. The taskbar sees every event
+/// first; the three facts of a Windows notification (new mail, a failed
+/// scheduled send, an expired sign-in) go to `notifications.rs` only, never to
+/// the page (docs/aspetto-nativo.md, rules 28 and 30).
 struct TauriEventSink(tauri::AppHandle);
 impl EventSink for TauriEventSink {
     fn emit(&self, event: AppEvent) {
+        crate::taskbar::observe(&self.0, &event);
+        if crate::notifications::observe(&self.0, &event) {
+            return;
+        }
         // Only the main window: events carry mail subjects and notices, and the reminder chip
         // (which may listen) needs none of them (native audit T18).
         let _ = self.0.emit_to("main", "app-event", event);
@@ -119,7 +126,7 @@ impl DesktopState {
         // search and job (spec D3, A1).
         qamille::infrastructure::compute_factory::configure(repository.clone(), Arc::new(KeyringSecrets));
         let context = Arc::new(ServiceContext { compute: qamille::infrastructure::compute_factory::routed(),
-            events: Arc::new(TauriEventSink(app)),
+            events: Arc::new(TauriEventSink(app.clone())),
             repository,
             mail: Arc::new(qamille::infrastructure::provider_registry::ProviderRegistry::initial(Store::data_dir().join("attachments"))),
             secrets: Arc::new(KeyringSecrets),
@@ -185,6 +192,11 @@ impl DesktopState {
             )
             .with_revoker(Arc::new(qamille::infrastructure::sync_state::GoogleRevoker)),
         );
+        let workspace = application::workspace::WorkspaceService::new(context.clone());
+        // The threads that turn the sink's events into the taskbar's state and into Windows
+        // notifications: running before any writer can announce something.
+        crate::taskbar::start(&app, workspace.clone());
+        crate::notifications::start(&app, context.clone());
         Ok(Self {
             context: context.clone(),
             _workspace_lock: workspace_lock,
@@ -200,7 +212,7 @@ impl DesktopState {
             workers,
             mail,
             previews,
-            workspace: application::workspace::WorkspaceService::new(context.clone()),
+            workspace,
             assistant: application::assistant::AssistantService::new(
                 context.clone(),
                 Arc::new(ConfiguredAssistant),

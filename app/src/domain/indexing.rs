@@ -239,6 +239,15 @@ impl Default for IndexProgress {
         }
     }
 }
+impl IndexProgress {
+    /// The indexing of the account is under way: switched on and queued, counting, scanning, or
+    /// waiting for the model of a server that is there. Every other state stops it whatever percent
+    /// it reached: paused, finished (`watching`, `partial`), failed (`error`, `blocked`), refused or
+    /// on another model (`unlinked`, `model_mismatch`), or with no server (`needs_server`).
+    pub fn in_progress(&self) -> bool {
+        self.enabled && matches!(self.state.as_str(), "queued" | "counting" | "scanning" | "waiting_model")
+    }
+}
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MessageIndexState {

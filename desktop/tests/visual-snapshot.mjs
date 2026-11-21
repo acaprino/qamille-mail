@@ -160,7 +160,7 @@ try {
   });
   await state('reader-menu', {}, async (page) => {
     await page.getByRole('button', { name: 'More message actions' }).click();
-    await page.locator('[data-scope="popover"][data-part="content"]').waitFor();
+    await page.locator('[data-scope="menu"][data-part="content"]').waitFor();
   });
   await state('reader-summary', {}, async (page) => {
     await page.locator('.ai-summary > button').click();

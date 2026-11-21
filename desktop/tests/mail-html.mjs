@@ -2,6 +2,7 @@
 import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 import { openAllGroups } from './support/groups.mjs';
 
@@ -49,6 +50,24 @@ try {
   });
   await page.goto(url);
   await expect(page.locator('.message-body')).toBeVisible();
+  // The newsletter also holds every other kind of link a message can have: an image map, an SVG link
+  // (xlink:href), a link to a later part of the message, and the anchor another one names with name=.
+  const sample = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, '../src/lib/sample.json'), 'utf8'));
+  const newsletter = sample.emails.find(email => email.id === 8);
+  assert.ok(newsletter.body_html.includes('</div></body>'));
+  const gif = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+  const links = `<a name="legacy"></a><p><a id="jump" href="#part2">Jump to part 2</a></p>
+    <p><a id="spaced" href=" https://example.com/spaced ">Spaced</a> <a id="nbsp" href="&nbsp;https://example.com/x">No-break space</a>
+    <a id="bom" href="&#xFEFF;https://example.com/x">BOM</a> <a id="ideographic" href="&#x3000;https://example.com/x">Ideographic space</a>
+    <a id="nohost" href="http:foo">No slashes</a> <a id="oneslash" href="HTTP:/foo">One slash</a> <a id="relative" href="/relative">Relative</a>
+    <a id="data" href="data:text/html,x">Data</a></p>
+    <map name="zones"><area shape="rect" coords="0,0,100,100" href="https://example.com/a" alt="Zone"></map>
+    <img usemap="#zones" src="${gif}" width="100" height="100" alt="">
+    <svg width="120" height="40" xmlns:xlink="http://www.w3.org/1999/xlink"><a xlink:href="https://example.com/b"><rect width="120" height="40" fill="#c00"/></a></svg>
+    <div style="height:1400px">Space</div>
+    <h2 id="part2">Part 2</h2><p><a id="back" href="#legacy">Back to the top</a></p>`;
+  await page.evaluate(([id, html]) => window.__previewEdit(id, { body_html: html }),
+    [8, newsletter.body_html.replace('</div></body>', `${links}</div></body>`)]);
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 
   // A plain-text message keeps the text reader.
@@ -113,6 +132,50 @@ try {
   await expect.poll(() => page.evaluate(() => window.openedLinks)).toEqual(['https://focus.example.com/issue']);
   await expect(frame.locator('h1')).toBeVisible();
 
+  // Every other link leaves through the browser too, and none of them navigates the frame: it keeps
+  // its document (a navigation would end in the browser's error page, chrome-error).
+  const iframe = page.locator('.html-body iframe');
+  const frameAddress = () => page.frames().filter(f => f !== page.mainFrame()).map(f => f.url());
+  await iframe.evaluate(element => { element.contentDocument.__kept = true; });
+  const address = frameAddress();
+  const kept = () => iframe.evaluate(element => element.contentDocument?.__kept === true);
+  await frame.locator('img[usemap]').click({ position: { x: 30, y: 30 } });
+  await expect.poll(() => page.evaluate(() => window.openedLinks.slice(1))).toEqual(['https://example.com/a']);
+  await frame.locator('svg a').click();
+  await expect.poll(() => page.evaluate(() => window.openedLinks.slice(1))).toEqual(['https://example.com/a', 'https://example.com/b']);
+  assert.equal(await kept(), true, 'An image map or SVG link must not navigate the frame');
+  assert.deepEqual(frameAddress(), address, 'The frame keeps its address');
+
+  // A link to a part of the message scrolls to it, by id or by the name of an anchor, and opens nothing.
+  const placeOf = id => iframe.evaluate((element, target) => Math.round(
+    element.getBoundingClientRect().top + element.contentDocument.getElementById(target).getBoundingClientRect().top), id);
+  const viewport = await page.evaluate(() => window.innerHeight);
+  const onScreen = async id => { const top = await placeOf(id); return top >= 0 && top < viewport; };
+  assert.ok(await placeOf('part2') > viewport, 'Part 2 starts below what is on screen');
+  await frame.locator('#jump').click();
+  await expect.poll(() => onScreen('part2')).toBe(true);
+  await frame.locator('#back').click();
+  await expect.poll(() => onScreen('jump')).toBe(true);
+  assert.equal(await kept(), true, 'A link to a part of the message must not navigate the frame');
+  assert.deepEqual(frameAddress(), address, 'The frame keeps its address');
+  assert.equal(await page.evaluate(() => window.openedLinks.length), 3, 'A link to a part of the message opens nothing');
+
+  // The system browser gets an absolute web or mail address the message wrote, never an address that only
+  // resolves against the app's own (http://tauri.localhost/...): a relative link, a scheme without `//`
+  // (http:foo, HTTP:/foo) or a leading no-break space, BOM or ideographic space (DOMPurify trims those from
+  // an attribute; externalAddress itself is checked in native-feel.mjs) must not reach open_link as one.
+  for (const id of ['spaced', 'nbsp', 'bom', 'ideographic', 'nohost', 'oneslash', 'relative', 'data']) {
+    await frame.locator(`#${id}`).click();
+    assert.equal(await kept(), true, `#${id} must not navigate the frame`);
+  }
+  // Each click is handled before the next one: a link that did open something has shown by now.
+  await page.waitForTimeout(300);
+  const opened = await page.evaluate(() => window.openedLinks.slice(3));
+  assert.equal(opened[0], 'https://example.com/spaced', 'A leading space is dropped, as the URL parser does');
+  assert.ok(opened.every(link => /^https:\/\/example\.com\//.test(link)), `Only absolute addresses of the message open: ${opened}`);
+  assert.ok(!opened.some(link => link.startsWith(url)), 'No address of the app itself reaches the browser');
+  assert.deepEqual(frameAddress(), address, 'The frame keeps its address');
+
   // Keys pressed in the message body reach the app's shortcuts; the reading keys stay in the frame.
   await frame.locator('h1').click();
   await page.keyboard.press('ArrowDown');
@@ -135,7 +198,7 @@ try {
   await expect.poll(archived).toBeGreaterThan(before);
 
   assert.deepEqual(errors, []);
-  console.log('mail-html: 29 checks passed');
+  console.log('mail-html: all checks passed');
 } finally {
   await browser?.close();
   server.kill();

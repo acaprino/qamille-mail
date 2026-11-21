@@ -2,7 +2,7 @@ import { useState, type MouseEvent } from 'react';
 import Button from '../ds/primitives/Button';
 import Icon from '../ds/primitives/Icon';
 import Modal from '../ds/primitives/Modal';
-import { call, errorText } from '../lib/api';
+import { openExternal } from '../lib/external-link';
 import { tr } from '../lib/i18n';
 import './GoogleSetupGuide.css';
 
@@ -11,15 +11,9 @@ export type GoogleSetupGuideProps = { close: () => void; configure: () => void }
 export default function GoogleSetupGuide({ close, configure }: GoogleSetupGuideProps) {
   const [linkError, setLinkError] = useState('');
 
-  async function openLink(event: MouseEvent<HTMLAnchorElement>) {
-    event.preventDefault();
-    const url = event.currentTarget.href;
+  function openLink(event: MouseEvent<HTMLAnchorElement>) {
     setLinkError('');
-    try {
-      await call('open_link', { url });
-    } catch (error) {
-      setLinkError(errorText(error));
-    }
+    return openExternal(event, setLinkError);
   }
 
   return (

@@ -81,6 +81,21 @@ try {
     await expect(page.getByText(/revocation not done/)).toBeVisible();
     await expect(page.getByRole('link', { name: 'Permissions of your Google account' })).toBeVisible();
     console.log('PASS a failed revocation is reported as not done, with the way out');
+    // The way out opens in the system browser: the click is never left to the page (the desktop
+    // webview would deny the new window and do nothing), and no window of the app's own opens.
+    await page.evaluate(() => {
+      window.__clicks = [];
+      window.__opened = [];
+      document.addEventListener('click', (event) => window.__clicks.push(event), true);
+      window.open = (address) => (window.__opened.push(String(address)), null);
+    });
+    const pages = context.pages().length;
+    await page.getByRole('link', { name: 'Permissions of your Google account' }).click();
+    await expect.poll(() => page.evaluate(() => window.__previewCalls.includes('open_link'))).toBe(true);
+    await expect.poll(() => page.evaluate(() => window.__opened)).toEqual(['https://myaccount.google.com/permissions']);
+    expect(await page.evaluate(() => window.__clicks.map((event) => event.defaultPrevented))).toEqual([true]);
+    expect(context.pages().length).toBe(pages);
+    console.log('PASS the way out opens in the system browser, never in the page');
     await context.close();
   }
   if (errors.length) throw new Error(`page errors: ${errors.join(' | ')}`);

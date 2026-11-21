@@ -6,6 +6,7 @@ import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { mountGallery } from './support/mount.mjs';
 
+const base = process.env.QAMILLE_PREVIEW_URL ?? 'http://127.0.0.1:1420';
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const errors = [];
 const watch = (page) => page.on('pageerror', (error) => errors.push(error.message));
@@ -155,6 +156,19 @@ try {
     await expect(panel).toBeVisible();
     assert.equal(await width(panel), '420px', 'narrow panel');
     console.log('PASS SidePanel: 760px wide, 420px with narrow');
+
+    // Closed with the focus inside it, the panel gives the focus back to the button that opened it; a focus
+    // that has moved to the page on its own stays where it is.
+    await page.keyboard.press('Escape');
+    await expect(panel).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Open narrow', exact: true })).toBeFocused();
+    await page.getByRole('button', { name: 'Open wide', exact: true }).click();
+    await expect(panel).toBeVisible();
+    await after.focus();
+    await page.keyboard.press('Escape');
+    await expect(panel).toHaveCount(0);
+    await expect(after).toBeFocused();
+    console.log('PASS SidePanel: the focus returns to the opener on close, unless it had moved to the page');
     await page.close();
   }
 
@@ -261,6 +275,325 @@ try {
     assert.equal(tooltipZ, await token('--z-toast'), 'tooltip is --z-toast');
     assert.ok(popoverZ < panelZ && panelZ < modalZ && modalZ < tooltipZ, `popover ${popoverZ} < panel ${panelZ} < modal ${modalZ} < toast ${tooltipZ}`);
     console.log(`PASS Layers: popover ${popoverZ} < panel ${panelZ} < modal ${modalZ} < toast ${tooltipZ}, all from the --z-* tokens`);
+    await page.close();
+  }
+
+  // ---------------------------------------------------------------- Menu: the reader's "More actions"
+  // A command menu is a real menu (Task 12, audit Q16 F15): role menu with menu items, the arrows, Home
+  // and End move, a letter jumps to the item that starts with it, Esc gives the focus back to the trigger.
+  {
+    const page = await context.newPage();
+    watch(page);
+    await page.goto(base);
+    await expect(page.locator('.message-title')).toBeVisible();
+    const subject = await page.locator('.message-title').textContent();
+    const trigger = page.getByRole('button', { name: 'More message actions', exact: true });
+    const menu = page.getByRole('menu', { name: 'Message actions' });
+    // The item the keys are on: the only one marked, and the one the menu names as its active descendant.
+    const on = async (name) => {
+      const marked = menu.locator('[data-highlighted]');
+      await expect(marked).toHaveCount(1);
+      await expect(marked).toHaveAccessibleName(name);
+      await expect(menu).toHaveAttribute('aria-activedescendant', await marked.getAttribute('id'));
+    };
+
+    // (a) role menu, items role menuitem; the trigger says it opens a menu.
+    await trigger.click();
+    await expect(menu).toBeVisible();
+    await ready(menu);
+    await expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByRole('dialog', { name: 'Message actions' })).toHaveCount(0);
+    await expect(menu.getByRole('menuitem')).toHaveText(['Print email', 'Print thread', 'Download .eml']);
+    // Set aside is a switch: a menu item that says whether it is on.
+    await expect(menu.getByRole('menuitemcheckbox', { name: 'Set aside' })).toHaveAttribute('aria-checked', 'false');
+    assert.equal(await menu.locator('button').count(), 0, 'no plain button left inside the menu');
+    console.log('PASS Menu (reader): role menu with menu items, and the trigger has aria-haspopup="menu"');
+
+    // (b) Down moves from item to item, Up back; Home and End go to the first and the last.
+    await page.keyboard.press('ArrowDown');
+    await on('Print email');
+    await page.keyboard.press('ArrowDown');
+    await on('Print thread');
+    await page.keyboard.press('ArrowDown');
+    await on('Download .eml');
+    await page.keyboard.press('ArrowUp');
+    await on('Print thread');
+    await page.keyboard.press('End');
+    await on('Set aside');
+    await page.keyboard.press('Home');
+    await on('Print email');
+    console.log('PASS Menu (reader): Down and Up move between the items, Home and End go to the ends');
+
+    // (c) A letter brings the item that starts with it; the same letter again, the next one. The letter is
+    // the menu's: E does not archive the message behind it.
+    await page.keyboard.press('d');
+    await on('Download .eml');
+    await page.waitForTimeout(500); // the typeahead forgets the letters typed after 350 ms
+    await page.keyboard.press('s');
+    await on('Set aside');
+    await page.waitForTimeout(500);
+    await page.keyboard.press('p');
+    await on('Print email');
+    await page.keyboard.press('p');
+    await on('Print thread');
+    await page.waitForTimeout(500);
+    await page.keyboard.press('e');
+    await page.waitForTimeout(300);
+    await expect(menu).toBeVisible();
+    await expect(page.locator('.message-title')).toHaveText(subject);
+    console.log('PASS Menu (reader): a letter jumps to the item that starts with it, and never reaches the shortcuts');
+
+    // (d) Esc closes it and gives the focus back to the trigger; nothing stays in <body>.
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    assert.equal(await page.locator('body > [data-scope="menu"]').count(), 0, 'a closed Menu leaves a layer in <body>');
+    console.log('PASS Menu (reader): Esc closes it and the focus returns to the trigger');
+
+    // From the keyboard: Enter on the trigger opens on the first item. Down on the trigger opens the menu
+    // too, and does not step to the next message (on a menu button the arrows are the menu's).
+    const position = page.locator('.reader-position');
+    const where = await position.textContent();
+    // Ark moves the focus into the menu on the next frame: a key pressed before then goes to the trigger,
+    // so each step waits for it.
+    await page.keyboard.press('Enter');
+    await expect(menu).toBeVisible();
+    await ready(menu);
+    await on('Print email');
+    await page.keyboard.press('Escape');
+    await expect(trigger).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(menu).toBeVisible();
+    await ready(menu);
+    await on('Print email');
+    await page.waitForTimeout(300);
+    await expect(position).toHaveText(where);
+    await expect(page.locator('.message-title')).toHaveText(subject);
+    console.log('PASS Menu (reader): Enter or Down on the trigger opens it on the first item, and Down stays on the message');
+
+    // A choice runs the action and gives the focus back to the trigger: Set aside, then back.
+    await page.keyboard.press('End');
+    await on('Set aside');
+    await page.keyboard.press('Enter');
+    await expect(menu).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    await trigger.click();
+    await expect(menu.getByRole('menuitemcheckbox', { name: 'Set aside' })).toHaveAttribute('aria-checked', 'true');
+    await menu.getByRole('menuitemcheckbox', { name: 'Set aside' }).click();
+    await expect(menu).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    await trigger.click();
+    await expect(menu.getByRole('menuitemcheckbox', { name: 'Set aside' })).toHaveAttribute('aria-checked', 'false');
+    await page.keyboard.press('Escape');
+    console.log('PASS Menu (reader): a choice, by Enter or by click, runs it and returns the focus to the trigger');
+    await page.close();
+  }
+
+  // ---------------------------------------------------------------- Menu: the primitive alone
+  {
+    const page = await context.newPage();
+    watch(page);
+    await mountGallery(page, 'menu');
+    const trigger = page.getByRole('button', { name: 'More row actions', exact: true });
+    const menu = page.getByRole('menu', { name: 'Row actions' });
+    const picked = page.locator('output[aria-label="Picked"]');
+    const items = menu.locator('[role^="menuitem"]');
+    const on = async (name) => {
+      const marked = menu.locator('[data-highlighted]');
+      await expect(marked).toHaveCount(1);
+      await expect(marked).toHaveAccessibleName(name);
+      await expect(menu).toHaveAttribute('aria-activedescendant', await marked.getAttribute('id'));
+    };
+    const open = async () => {
+      await trigger.click();
+      await expect(menu).toBeVisible();
+      await ready(menu);
+    };
+
+    // The order: the groups as given, a separator between two groups, and the destructive item, listed
+    // first, moved to the end after a separator of its own.
+    await open();
+    const names = ['Print', 'Download', 'Archive', 'Pin', 'Details', 'Delete'];
+    await expect(items).toHaveCount(names.length);
+    for (const [index, name] of names.entries()) await expect(items.nth(index)).toHaveAccessibleName(name);
+    const shape = await menu.evaluate((node) => [...node.children].map((child) => child.getAttribute('role')));
+    assert.deepEqual(shape, ['menuitem', 'menuitem', 'menuitem', 'separator', 'menuitemcheckbox', 'menuitem', 'separator', 'menuitem']);
+    console.log('PASS Menu: a separator between groups, and the destructive item last, after its own separator');
+
+    // A disabled item says so and why, the arrows skip it, and a click on it does nothing.
+    const download = menu.getByRole('menuitem', { name: 'Download', exact: true });
+    await expect(download).toHaveAttribute('aria-disabled', 'true');
+    await expect(download).toHaveAttribute('title', 'Not while printing');
+    await page.keyboard.press('ArrowDown');
+    await on('Print');
+    await page.keyboard.press('ArrowDown');
+    await on('Archive');
+    await download.click({ force: true });
+    await expect(menu).toBeVisible();
+    await expect(picked).toHaveText('none');
+    console.log('PASS Menu: a disabled item is marked, skipped by the arrows and does nothing on a click');
+
+    // A shortcut is shown at the end of the item and is not part of its name.
+    const print = menu.getByRole('menuitem', { name: 'Print', exact: true });
+    await expect(print.locator('kbd')).toHaveText('Ctrl+P');
+    await expect(print).toHaveAttribute('aria-keyshortcuts', 'Ctrl+P');
+    console.log('PASS Menu: a shortcut shows in a <kbd> and is announced as aria-keyshortcuts, not as the name');
+
+    // A click chooses: the action runs once, the menu closes and the focus is back on the trigger.
+    await menu.getByRole('menuitem', { name: 'Archive', exact: true }).click();
+    await expect(menu).toHaveCount(0);
+    await expect(picked).toHaveText('archive');
+    await expect(trigger).toBeFocused();
+    assert.equal(await page.locator('body > [data-scope="menu"]').count(), 0, 'a Menu closed by a choice leaves a layer in <body>');
+    // Enter chooses the item the keys are on: End is the destructive one. (Enter on the trigger opens it;
+    // End waits for the focus to be in the menu, which Ark moves there on the next frame.)
+    await page.keyboard.press('Enter');
+    await expect(menu).toBeVisible();
+    await ready(menu);
+    await page.keyboard.press('End');
+    await on('Delete');
+    await page.keyboard.press('Enter');
+    await expect(menu).toHaveCount(0);
+    await expect(picked).toHaveText('archive,delete');
+    await expect(trigger).toBeFocused();
+    console.log('PASS Menu: a click or Enter runs the item once and gives the focus back to the trigger');
+
+    // A switch: menuitemcheckbox, its state in aria-checked and a check mark.
+    await open();
+    const pin = menu.getByRole('menuitemcheckbox', { name: 'Pin', exact: true });
+    await expect(pin).toHaveAttribute('aria-checked', 'false');
+    assert.equal(await pin.locator('svg').count(), 0, 'an unchecked switch shows no mark');
+    await pin.click();
+    await expect(menu).toHaveCount(0);
+    await open();
+    await expect(pin).toHaveAttribute('aria-checked', 'true');
+    assert.equal(await pin.locator('svg').count(), 1, 'a checked switch shows its mark');
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    console.log('PASS Menu: a switch is a menuitemcheckbox with aria-checked and a check mark');
+
+    // An item that opens a Modal: when the Modal closes, the focus goes back to the menu's trigger.
+    await open();
+    await menu.getByRole('menuitem', { name: 'Details', exact: true }).click();
+    const details = page.getByRole('dialog', { name: 'Details' });
+    await expect(details).toBeVisible();
+    await ready(details);
+    await expect(menu).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(details).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    console.log('PASS Menu: a Modal opened from an item gives the focus back to the trigger when it closes');
+
+    // Tab does not leave an open menu (Ark): it closes with Esc, a choice or a press outside.
+    await open();
+    await page.keyboard.press('Tab');
+    await expect(menu).toBeVisible();
+    await ready(menu);
+    await page.keyboard.press('Escape');
+    await expect(trigger).toBeFocused();
+
+    // A press outside closes it: on another control the focus stays where the press put it, on the bare
+    // page it goes back to the trigger.
+    const elsewhere = page.getByRole('button', { name: 'Elsewhere', exact: true });
+    await open();
+    await elsewhere.click();
+    await expect(menu).toHaveCount(0);
+    await page.waitForTimeout(200);
+    await expect(elsewhere).toBeFocused();
+    await open();
+    await page.mouse.click(900, 40);
+    await expect(menu).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    console.log('PASS Menu: a press outside closes it, and leaves the focus on the control it pressed');
+
+    // The layer is --z-popover, as the Popover's.
+    await open();
+    const z = await page.locator('[data-scope="menu"][data-part="positioner"]').evaluate((el) => {
+      const probe = document.createElement('i');
+      probe.style.zIndex = 'var(--z-popover)';
+      probe.style.position = 'relative';
+      document.body.append(probe);
+      const expected = Number(getComputedStyle(probe).zIndex);
+      probe.remove();
+      return [Number(getComputedStyle(el).zIndex), expected];
+    });
+    assert.equal(z[0], z[1], 'the menu is on --z-popover');
+    await page.keyboard.press('Escape');
+    console.log('PASS Menu: on --z-popover');
+
+    // The same look as the Popover the menus used: the same items in both, measured in computed values,
+    // at rest, under the pointer and from the keyboard.
+    const look = (surface, keyboard) =>
+      surface.evaluate((node, keyboard) => {
+        const pick = (el, names) => {
+          const css = getComputedStyle(el);
+          return Object.fromEntries(names.map((n) => [n, css.getPropertyValue(n)]));
+        };
+        const px = (value) => Math.round(value * 100) / 100;
+        const rows = [...node.children].map((row) => {
+          const label = [...row.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim()) ?? row.querySelector('span')?.firstChild;
+          const range = document.createRange();
+          range.selectNodeContents(label);
+          const box = row.getBoundingClientRect();
+          const icon = row.querySelector('svg').getBoundingClientRect();
+          return {
+            width: px(box.width),
+            height: px(box.height),
+            icon: [icon.x - box.x, icon.y - box.y, icon.width, icon.height].map(px),
+            label: px(range.getBoundingClientRect().x - box.x),
+            style: pick(row, [
+              'display', 'align-items', 'gap', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left', 'border-top-left-radius',
+              'font-family', 'font-size', 'font-weight', 'line-height', 'color', 'background-color', 'opacity', 'white-space', 'cursor',
+              ...(keyboard ? ['outline-style', 'outline-width', 'outline-color', 'outline-offset'] : []),
+            ]),
+          };
+        });
+        const box = node.getBoundingClientRect();
+        return {
+          width: px(box.width),
+          height: px(box.height),
+          style: pick(node, [
+            'min-width', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left', 'color', 'background-color',
+            'border-top-width', 'border-top-style', 'border-top-color', 'border-top-left-radius', 'box-shadow',
+            'animation-duration', 'animation-timing-function', 'z-index',
+          ]),
+          rows,
+        };
+      }, keyboard);
+    const popoverTrigger = page.getByRole('button', { name: 'Open the popover', exact: true });
+    const menuTrigger = page.getByRole('button', { name: 'Open the menu', exact: true });
+    const popoverLook = page.getByRole('dialog', { name: 'Popover look' });
+    const menuLook = page.getByRole('menu', { name: 'Menu look' });
+    const measure = async (opener, surface, how) => {
+      await page.mouse.move(1, 1);
+      if (how === 'keyboard') {
+        await opener.focus();
+        await page.keyboard.press('Shift+Tab');
+        await page.keyboard.press('Tab');
+        await page.keyboard.press('Enter');
+      } else await opener.click();
+      await expect(surface).toBeVisible();
+      await ready(surface);
+      // Measured once the entry animation (it moves the surface) is over.
+      await surface.evaluate((el) => Promise.all(el.getAnimations().map((animation) => animation.finished)));
+      if (how === 'pointer') {
+        await surface.locator('button, [role^="menuitem"]').first().hover();
+        await page.waitForTimeout(100);
+      }
+      const seen = await look(surface, how === 'keyboard');
+      await page.keyboard.press('Escape');
+      await expect(surface).toHaveCount(0);
+      return seen;
+    };
+    for (const how of ['rest', 'pointer', 'keyboard']) {
+      const before = await measure(popoverTrigger, popoverLook, how);
+      const after = await measure(menuTrigger, menuLook, how);
+      assert.deepEqual(after, before, `${how}: the Menu looks like the Popover it replaces`);
+    }
+    console.log('PASS Menu: the same sizes, tokens and states as the Popover, at rest, under the pointer and from the keyboard');
     await page.close();
   }
 

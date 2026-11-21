@@ -282,8 +282,8 @@ offer the extracted text. The browser sample preview never renders real document
 
 The engines come from the `artcraft-web` repository (public, `acaprino/artcraft-web`).
 `npm run artcraft:sync` (run automatically before `dev` and `build`) takes the latest
-GitHub release of it (plain HTTPS, no sign-in; `scripts/artcraft-github.mjs` checks each package
-against the release's SHA-256 and caches it in `.cache/artcraft-web`), used only when its tag
+GitHub release of it (plain HTTPS, no sign-in; `scripts/github-release.mjs`, shared with Sigrid, checks each
+package against the release's SHA-256 and caches it in `.cache/artcraft-web`), used only when its tag
 is on artcraft-web's `main`, or `dist/` of `ARTCRAFT_WEB_DIR` when set (engines not released
 yet); without the network the existing copy stays. It
 copies it into `src/vendor/artcraft/` and the licences into `public/artcraft-licenses/`,

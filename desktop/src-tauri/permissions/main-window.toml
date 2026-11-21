@@ -9,6 +9,7 @@ permissions = [
   "allow-close-seen",
   "allow-close-settled",
   "allow-frontend-ready",
+  "allow-frontend-failed",
   "allow-session-end-ready",
   "allow-show-system-menu",
   "allow-window-snap-button",

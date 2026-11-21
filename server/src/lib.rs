@@ -10,6 +10,7 @@ pub mod cli;
 pub mod compute;
 pub mod config;
 pub mod db;
+pub mod embedding;
 pub mod error;
 pub mod ext;
 pub mod http;
@@ -342,13 +343,23 @@ impl Server {
                 vec![Arc::new(AccountsUsage(Arc::clone(&self.state.accounts)))];
             sinks.extend(self.usage_sinks.iter().cloned());
             let sink: Arc<dyn compute::UsageSink> = Arc::new(FanOutUsage(sinks));
-            let state = compute::ComputeState::new(
+            // Il modello di embedding che `/admin` può cambiare (`/admin/api/embedding`): quello
+            // locale, o un servizio interno per i vettori dei testi.
+            let remote_embedding = embedding::EmbeddingHolder::default();
+            let embedding_admin = embedding::EmbeddingAdmin::new(
+                remote_embedding.clone(),
                 Arc::clone(&parts.backend),
+                self.config.data_dir.join(embedding::SETTINGS_FILE),
+                std::time::Duration::from_secs(self.config.embedding_switch_pause_secs),
+            );
+            let state = compute::ComputeState::new(
+                Arc::new(embedding::SwitchableBackend::new(Arc::clone(&parts.backend), remote_embedding)),
                 compute::ComputeAuth::Devices(Arc::new(gate)),
                 "remote",
             )
             .with_speech(Arc::clone(&parts.speech), parts.transcription_parallelism)
-            .with_usage(Arc::clone(&sink));
+            .with_usage(Arc::clone(&sink))
+            .with_embedding_admin(Arc::new(embedding_admin));
             // One supervisor for the gateway and for the models: the removal of a model stops the child.
             let builtin = self.config.llm.provider == llm::LlmProvider::Builtin;
             let supervisor = if builtin {

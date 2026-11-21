@@ -57,6 +57,19 @@ async function step(name, work) {
   results.push(name);
   console.log(`PASS ${name}`);
 }
+// Where the focus goes when a composer closes: the row on show in the list, else the control that opened
+// the composer, else the heading of the page (the Drafts page's when the draft that opened it is gone).
+const selectedRow = page.locator('.mail-row.selected .mail-open, .reply-row.selected .reply-open');
+const composeMain = page.locator('.compose-main');
+const draftsHeading = page.locator('.drafts-page h1');
+// The preview cannot send, and a send left to run out its undo time fails with a notice that covers the page:
+// take it back and discard the draft.
+async function takeBackSend(title) {
+  await page.getByRole('button', { name: /^Undo: Sending message/ }).click();
+  await expect(subject()).toHaveValue(title);
+  await panel.getByRole('button', { name: 'Discard draft' }).click();
+  await expect(tab(title)).toHaveCount(0);
+}
 try {
   await step('Two drafts keep separate recipients, formatting and text', async () => {
     await create(titleA, 'First draft content.');
@@ -72,6 +85,34 @@ try {
     await expect
       .poll(async () => (await snapshot()).drafts.find((draft) => draft.subject === titleA)?.body)
       .toContain('First draft content.');
+  });
+  await step('The editor toolbar is one Tab stop and moves with the arrows, Home and End', async () => {
+    const toolbar = panel.getByRole('toolbar', { name: 'Text formatting' });
+    const stops = toolbar.locator('button[tabindex="0"]');
+    const focusedName = () => page.evaluate(() => document.activeElement?.getAttribute('aria-label'));
+    await expect(stops).toHaveCount(1);
+    await body().focus();
+    await page.keyboard.press('Shift+Tab');
+    assert.equal(await focusedName(), 'Bold', 'Shift+Tab from the text lands on the toolbar, on its first button');
+    await page.keyboard.press('ArrowRight');
+    assert.equal(await focusedName(), 'Italic', 'the right arrow moves to the next button');
+    await expect(stops).toHaveCount(1);
+    assert.equal(await stops.getAttribute('aria-label'), 'Italic', 'the one Tab stop follows the focus');
+    await page.keyboard.press('End');
+    // Redo is off with nothing to redo: the end of the toolbar is the last button that works.
+    const last = await toolbar.locator('button:not(:disabled)').last().getAttribute('aria-label');
+    assert.equal(await focusedName(), last, 'End goes to the last button');
+    await page.keyboard.press('Home');
+    assert.equal(await focusedName(), 'Bold', 'Home goes to the first button');
+    await page.keyboard.press('ArrowLeft');
+    assert.equal(await focusedName(), last, 'the left arrow from the first button wraps to the last');
+    await page.keyboard.press('Home');
+    await page.keyboard.press('Tab');
+    await expect(body()).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    assert.equal(await focusedName(), 'Bold', 'Tab leaves the toolbar for the text, Shift+Tab comes back to where it was');
+    await expect(stops).toHaveCount(1);
+    await body().focus();
   });
   await step('Collapsed tabs survive navigation and reopen without losing edits', async () => {
     await panel.getByRole('button', { name: 'Minimize draft' }).click();
@@ -108,7 +149,10 @@ try {
       await expect
         .poll(async () => (await snapshot()).drafts.find((draft) => draft.subject === titleA)?.body)
         .toContain('Latest A edit');
+      // No message is selected here and the composer was opened from the New message button.
+      await expect(selectedRow).toHaveCount(0);
       await panel.getByRole('button', { name: 'Save and close draft' }).click();
+      await expect(composeMain).toBeFocused();
       await page.getByRole('button', { name: /^Drafts\s*\d*$/ }).click();
       await page
         .locator('.drafts-list')
@@ -121,6 +165,8 @@ try {
   await step('Undo Send restores its tab without replacing another open draft', async () => {
     await panel.getByRole('button', { name: 'Send', exact: true }).click();
     await expect(tab(titleA)).toHaveCount(0);
+    // Opened from the Drafts page, whose item goes away with the draft: the page's heading takes the focus.
+    await expect(draftsHeading).toBeFocused();
     await page.getByRole('button', { name: /^Undo: Sending message/ }).click();
     await expect(subject()).toHaveValue(titleA);
     await expect(tabs.getByRole('tab')).toHaveCount(2);
@@ -131,9 +177,51 @@ try {
     await activate(titleA);
     await panel.getByRole('button', { name: 'Discard draft' }).click();
     await expect(tab(titleA)).toHaveCount(0);
+    await expect(draftsHeading).toBeFocused();
     await expect(tab(titleB)).toHaveCount(1);
     await page.getByRole('button', { name: /^Undo: Draft discarded/ }).click();
     await expect(subject()).toHaveValue(titleA);
+    await expect(tabs.getByRole('tab')).toHaveCount(2);
+  });
+  await step('Send and Discard hand the focus back to the control that opened the composer', async () => {
+    // On the Drafts page there is no list: the New message button that opened the composer takes it back.
+    for (const name of ['Send', 'Discard draft']) {
+      await create(`Focus after ${name}`, 'Some text.');
+      await panel.getByRole('button', { name, exact: true }).click();
+      await expect(tab(`Focus after ${name}`)).toHaveCount(0);
+      await expect(composeMain).toBeFocused();
+      if (name === 'Send') await takeBackSend(`Focus after ${name}`);
+    }
+    // With a message on show in the list, the focus goes to its row.
+    await page.getByRole('button', { name: /^Inbox\s*\d*$/ }).click();
+    await page.locator('.mail-open').first().click();
+    await expect(selectedRow).toHaveCount(1);
+    for (const name of ['Send', 'Discard draft']) {
+      await create(`Row after ${name}`, 'Some text.');
+      await panel.getByRole('button', { name, exact: true }).click();
+      await expect(tab(`Row after ${name}`)).toHaveCount(0);
+      await expect(selectedRow).toBeFocused();
+      if (name === 'Send') await takeBackSend(`Row after ${name}`);
+    }
+    await expect(tabs.getByRole('tab')).toHaveCount(2);
+  });
+  await step('Send from a composer opened from Drafts with the keyboard lands on the page heading, ring shown', async () => {
+    await create('Keyboard send', 'Some text.');
+    await panel.getByRole('button', { name: 'Minimize draft' }).click();
+    await page.getByRole('button', { name: /^Drafts\s*\d*$/ }).click();
+    await page.locator('.drafts-list').getByRole('button', { name: /Keyboard send/ }).focus();
+    await page.keyboard.press('Enter');
+    await expect(subject()).toHaveValue('Keyboard send');
+    await panel.getByRole('button', { name: 'Send', exact: true }).focus();
+    await page.keyboard.press('Enter');
+    await expect(tab('Keyboard send')).toHaveCount(0);
+    await expect(draftsHeading).toBeFocused();
+    const ring = await draftsHeading.evaluate((el) => {
+      const { outlineStyle, outlineWidth } = getComputedStyle(el);
+      return `${outlineStyle} ${outlineWidth}`;
+    });
+    assert.equal(ring, 'solid 2px', 'the heading shows the focus ring of every control');
+    await takeBackSend('Keyboard send');
     await expect(tabs.getByRole('tab')).toHaveCount(2);
   });
   await step('Keyboard tab navigation and overflow work at the minimum window size', async () => {

@@ -7,8 +7,8 @@ import { useRef, useState } from 'react';
 import Button from '../../ds/primitives/Button';
 import Field from '../../ds/primitives/Field';
 import Icon from '../../ds/primitives/Icon';
+import Menu from '../../ds/primitives/Menu';
 import Modal from '../../ds/primitives/Modal';
-import Popover from '../../ds/primitives/Popover';
 import { errorText } from '../../lib/api';
 import { tr } from '../../lib/i18n';
 import { deleteMeeting, MeetingError, meetingCall, type MeetingDetail } from '../../lib/meetings';
@@ -25,7 +25,6 @@ export type MeetingMenuProps = {
 };
 
 export default function MeetingMenu({ detail, title, notify, onchange, ondeleted }: MeetingMenuProps) {
-  const [open, setOpen] = useState(false);
   const [dialog, setDialog] = useState<'rename' | 'delete' | null>(null);
   const [name, setName] = useState('');
   const [busy, setBusyState] = useState(false);
@@ -42,7 +41,6 @@ export default function MeetingMenu({ detail, title, notify, onchange, ondeleted
   const empty = name.trim() === '';
 
   function ask(kind: 'rename' | 'delete') {
-    setOpen(false);
     // The name the meeting has, not the words the page falls back on: an untitled one starts empty
     // (and stays refused until it is given a name), not with "Riunione senza nome" to save as a name.
     setName(detail.meeting.title);
@@ -103,9 +101,7 @@ export default function MeetingMenu({ detail, title, notify, onchange, ondeleted
 
   return (
     <>
-      <Popover
-        open={open}
-        onOpenChange={setOpen}
+      <Menu
         label={tr('Azioni sulla riunione', 'Meeting actions')}
         tip={tr('Altre azioni', 'More actions')}
         trigger={
@@ -113,16 +109,17 @@ export default function MeetingMenu({ detail, title, notify, onchange, ondeleted
             <Icon name="more" size={18} />
           </Button>
         }
-      >
-        <button type="button" onClick={() => ask('rename')}>
-          <Icon name="edit" size={15} />
-          {tr('Rinomina', 'Rename')}
-        </button>
-        <button type="button" onClick={() => ask('delete')}>
-          <Icon name="trash" size={15} />
-          {tr('Elimina', 'Delete')}
-        </button>
-      </Popover>
+        items={[
+          { value: 'rename', label: tr('Rinomina', 'Rename'), icon: 'edit', onSelect: () => ask('rename') },
+          {
+            value: 'delete',
+            label: tr('Elimina', 'Delete'),
+            icon: 'trash',
+            destructive: true,
+            onSelect: () => ask('delete'),
+          },
+        ]}
+      />
 
       {dialog === 'rename' ? (
         <Modal

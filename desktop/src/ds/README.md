@@ -17,10 +17,11 @@ Il sistema visivo è un modulo interno, `desktop/src/ds/`, non un pacchetto. L�
 | `styles/tailwind.css` | Tailwind v4 (tema e utility, niente preflight) e `tw-animate-css`; i nomi di colore di unlumen e shadcn mappati sui token, la tavolozza propria di Tailwind spenta. Vedi «Tailwind». |
 | `styles/ark.css` | In testa gli `@import` di `styles/nav.css` e di `styles/ark/*.css`, poi le regole del suggerimento. Importato da `system.css`. Vedi «Le regole di `ark.css`». |
 | `styles/nav.css` | Le regole proprie di `NavList` e `Count`: `.nav-hover`, `.nav-active-bar`, `.count-digits`. |
-| `styles/ark/*.css` | L’aspetto delle parti delle primitive, un file per primitiva: `dialog`, `popover`, `select`, `checkbox`, `switch`, `tabs`, `slider`, `date-picker`, `recipients`, `toast`. |
-| `primitives/` | I componenti React (`.tsx`): `Button`, `Field`, `Modal`, `SidePanel`, `Popover`, `Tooltip`, `Select`, `Checkbox`, `Switch`, `Tabs`, `Slider`, `DateField`, `RecipientsInput`, `Toaster`, `Icon`, `Count`, `NavList`. |
+| `styles/ark/*.css` | L’aspetto delle parti delle primitive, un file per primitiva: `dialog`, `popover`, `menu`, `select`, `checkbox`, `switch`, `tabs`, `slider`, `date-picker`, `recipients`, `toast`. |
+| `primitives/` | I componenti React (`.tsx`): `Button`, `Field`, `Modal`, `SidePanel`, `Popover`, `Menu`, `Tooltip`, `Select`, `Checkbox`, `Switch`, `Tabs`, `Slider`, `DateField`, `RecipientsInput`, `Toaster`, `Icon`, `Count`, `NavList`. |
 | `unlumen/` | I componenti di unlumen UI copiati nel progetto, con il loro `README.md` che annota le modifiche. Vedi «I componenti di unlumen». |
 | `cn.ts` | `cn(...)`: unisce i nomi di classe (`clsx`) e lascia vincere l’ultima classe di Tailwind in conflitto (`tailwind-merge`). Ogni `className` delle primitive passa da qui. |
+| `focus-return.ts` | `useReturnFocus(ref)`: l’hook con cui `Modal` e `SidePanel` rimettono il focus a chi lo aveva quando compaiono. Vedi «Modal» e «SidePanel». |
 | `README.md` | Questa guida. |
 
 Le regole di una sola pagina, come `.calendar-event`, restano in `desktop/src/styles.css` o nel `.css` accanto al componente, annidate sotto la sua classe radice: non entrano nel modulo. I file del modulo non importano da `desktop/src/lib/`, da `desktop/src/components/` né da `@tauri-apps`, e i componenti di unlumen importano solo dal modulo (ADR-0011, INV-001): il modulo si può esportare e provare da solo. Le dipendenze ammesse sono quelle di ADR-0011 v3, a versione esatta, senza `^`: `react` e `react-dom` 19.3.1, `@ark-ui/react` 5.39.3, `motion` 14.7.1, `@internationalized/date` 3.12.4, `clsx` 2.1.1, `tailwind-merge` 3.7.0, `tailwindcss` e `@tailwindcss/vite` 4.3.3, `tw-animate-css` 1.4.0, e per la build `@vitejs/plugin-react` 6.1.2. Nessun altro kit, e nessuna dipendenza per il carattere: IBM Plex Sans sta in `desktop/public/fonts/ibm-plex-sans/`.
@@ -30,6 +31,7 @@ Le regole di una sola pagina, come `.calendar-event`, restano in `desktop/src/st
 Nell’app si usano le primitive React. Ognuna produce HTML con le classi di `system.css` e le parti `[data-scope][data-part]` di Ark; sotto ogni primitiva c’è quell’HTML, che è anche ciò che i test cercano (ruoli, nomi, classi) e ciò che si scrive a mano fuori dall’app.
 
 - Non scrivere a mano le classi `primary`, `secondary`, `icon-button`, `text-button`, `popover`, `side-panel-layer` né l’elemento `<dialog>` nei componenti dell’app: sono dentro le primitive (ADR-0011, INV-002).
+- Un menu di comandi è un `Menu`, non un `Popover`: un `Popover` i cui figli sono tutti pulsanti fa fallire `desktop/tests/ds-usage.mjs`. Il `Popover` resta per ciò che non è un menu: un filtro, un selettore, un piccolo modulo.
 - Non scrivere `<select>`, `<input type="checkbox">`, `role="tablist"` a mano fuori dal modulo: sono `Select`, `Checkbox` o `Switch`, `Tabs` (ADR-0011, INV-003). L’unica eccezione è la casella di selezione di ogni riga della posta (`components/MailList.tsx`), che resta markup semplice (le righe non usano Ark, per i tempi). I campi `type="time"` restano nativi.
 - Non importare `@ark-ui/*` nei componenti dell’app (INV-007): se manca una prop, la si aggiunge alla primitiva.
 - Le primitive sono controllate: lo stato sta nel chiamante, che passa `value` (o `checked`, `open`) e lo aggiorna in `onChange` (o `onOpenChange`). Le classi di pagina si passano con `className`, e `cn` le unisce a quelle della primitiva; il nodo si chiede con `ref`.
@@ -58,7 +60,7 @@ L’HTML che produce, e che si scrive fuori dall’app:
 
 ## Le primitive
 
-Sono sedici componenti più l’icona. La loro forma è fissata: cambiare un controllo vuol dire cambiare un solo file, e cambiano tutti i punti dell’app che lo usano (ADR-0011). Ogni file ha un’esportazione predefinita, salvo `NavList.tsx` (`NavList` e `NavItem` per nome); `Toaster.tsx` esporta anche `notify`, `Icon.tsx` anche `iconPaths`. In tabella le props (quelle senza «?» sono obbligatorie; il resto degli attributi del nodo passa dove indicato); sotto, una sezione per primitiva con un esempio in TSX e l’HTML che produce.
+Sono diciassette componenti più l’icona. La loro forma è fissata: cambiare un controllo vuol dire cambiare un solo file, e cambiano tutti i punti dell’app che lo usano (ADR-0011). Ogni file ha un’esportazione predefinita, salvo `NavList.tsx` (`NavList` e `NavItem` per nome); `Toaster.tsx` esporta anche `notify`, `Icon.tsx` anche `iconPaths`, `Menu.tsx` anche il tipo `MenuItem`. In tabella le props (quelle senza «?» sono obbligatorie; il resto degli attributi del nodo passa dove indicato); sotto, una sezione per primitiva con un esempio in TSX e l’HTML che produce.
 
 | Primitiva | Basata su | Props | Lo stile sta in |
 |---|---|---|---|
@@ -67,6 +69,7 @@ Sono sedici componenti più l’icona. La loro forma è fissata: cambiare un con
 | `Modal` | Ark `Dialog`, modale | `size?` (`sm`, `md`, `lg`; predefinito `md`); `onClose?`; `aria-label?` o `aria-labelledby`; `className?`; `children`; gli attributi di `<div>` | `styles/ark/dialog.css` |
 | `SidePanel` | Ark `Dialog`, non modale | `onScrim` (obbligatoria); `narrow?`; `onClose?`; `onOpen?`; `ref?`; `aria-label?`; `className?`; `children`; gli attributi di `<div>` | `styles/ark/dialog.css` |
 | `Popover` | Ark `Popover` | `trigger` (un elemento); `label`; `tip?`; `open?`; `onOpenChange?`; `className?`; `children` | `styles/ark/popover.css` |
+| `Menu` | Ark `Menu` | `trigger` (un elemento); `label`; `items` (`{ value, label, onSelect, destructive?, disabled?, shortcut?, icon?, group?, checked?, title? }[]`); `tip?`; `open?`; `onOpenChange?` | `styles/ark/menu.css` |
 | `Tooltip` | Ark `Tooltip` | `text`; `shortcut?`; `children` (l’unico elemento che fa da attivatore) | `styles/ark.css` |
 | `Select` | Ark `Select` | `value` (`''` = niente); `onChange?`; `items` (`{ value, label, disabled? }[]`); `label?` o `aria-label`; `placeholder?`; `aria-required?`; `aria-invalid?`; `disabled?`; `className?` | `styles/ark/select.css` |
 | `Checkbox` | Ark `Checkbox` | `checked`; `onChange?`; `indeterminate?`; `disabled?`; `aria-label?`; `children` (etichetta) | `styles/ark/checkbox.css` |
@@ -130,7 +133,7 @@ const [name, setName] = useState('');
 
 ### Modal
 
-Il dialog centrato di ADR-0008: «devo decidere prima di continuare». È un `Dialog` di Ark UI modale, aperto appena compare e disegnato sopra tutto, nel `Portal` di Ark al livello `z-modal`: Ark gestisce velo, trappola del focus e Esc; solo Esc arriva come `onClose` (un clic sul velo non chiude: un modulo a metà non va perso). Chi lo usa lo chiude smontandolo; il `Modal` ricorda l’elemento che aveva il focus quando è comparso e glielo restituisce se il focus cadrebbe su `<body>`. Se il chiamante non smonta il `Modal`, resta aperto. Un solo velo (`scrim`), bordo `border`, raggio `radius-xl` (12px), ombra `shadow`, padding 22px; entra in `motion-panel` sfumando, salendo di 8px e crescendo dal 98%, mentre il velo sfuma. `size` sceglie la larghezza: senza, `modal-md` (560px); `sm` è `modal-sm` (420px), `lg` è `modal-lg` (960px). Il titolo è un `h2` (`text-xl` dentro il dialog), le azioni stanno in un `div.modal-actions`. `className` e gli altri attributi vanno sul contenuto. Monta il `Modal` solo quando serve, con `{asking && …}`.
+Il dialog centrato di ADR-0008: «devo decidere prima di continuare». È un `Dialog` di Ark UI modale, aperto appena compare e disegnato sopra tutto, nel `Portal` di Ark al livello `z-modal`: Ark gestisce velo, trappola del focus e Esc; solo Esc arriva come `onClose` (un clic sul velo non chiude: un modulo a metà non va perso). Chi lo usa lo chiude smontandolo; il `Modal` ricorda l’elemento che aveva il focus quando è comparso e glielo restituisce (`useReturnFocus`, in `focus-return.ts`, che usa anche il `SidePanel`) se il focus cadrebbe su `<body>`; se quell’elemento non c’è più perché era la voce di un menu o di un popover che si è chiuso, lo dà al pulsante di quel popup. Se il chiamante non smonta il `Modal`, resta aperto. Un solo velo (`scrim`), bordo `border`, raggio `radius-xl` (12px), ombra `shadow`, padding 22px; entra in `motion-panel` sfumando, salendo di 8px e crescendo dal 98%, mentre il velo sfuma. `size` sceglie la larghezza: senza, `modal-md` (560px); `sm` è `modal-sm` (420px), `lg` è `modal-lg` (960px). Il titolo è un `h2` (`text-xl` dentro il dialog), le azioni stanno in un `div.modal-actions`. `className` e gli altri attributi vanno sul contenuto. Monta il `Modal` solo quando serve, con `{asking && …}`.
 
 L’ultima riga di azioni del dialog (`.modal-actions`, o una delle righe locali elencate in `styles/ark/dialog.css`) resta attaccata al fondo quando il contenuto è più alto della finestra, per esempio con il testo ingrandito: il resto scorre sotto di lei e una linea sottile la separa solo finché c’è altro contenuto sotto.
 
@@ -168,7 +171,7 @@ const [asking, setAsking] = useState(false);
 
 ### SidePanel
 
-Il pannello laterale di ADR-0008: «guardo o modifico una cosa senza perdere il contesto». Entra da destra (24px, sfumando) in `motion-panel` con `ease-out` sopra `scrim-soft` e non è modale. Larghezza `panel-wide` (760px, gli allegati) o, con `narrow`, `panel-narrow` (420px, l’evento del calendario); sotto 1180px di finestra il pannello largo occupa tutta la finestra. Bordo sinistro `border` e ombra `shadow`. `onScrim` è obbligatorio: lo chiama il clic sul velo, che è solo una scorciatoia per il puntatore; le vie accessibili sono il pulsante di chiusura e Esc. È un `Dialog` di Ark UI non modale: niente trappola del focus, il resto della pagina resta raggiungibile con Tab. Esc chiama `onClose` (o `onScrim` se manca): chi lo usa non ascolta più il tasto. Chi usa il pannello lo smonta per chiuderlo. `onOpen` parte quando è visibile, per mettere il focus (senza, lo riceve il primo controllo). `ref` consegna il nodo del pannello. Dentro: `.side-panel-bar` con `.panel-title` e un pulsante `panel-close`, poi `.side-panel-body`, che scorre. Il pannello non va in un portale: riempie il suo antenato posizionato, che deve essere `position: relative`.
+Il pannello laterale di ADR-0008: «guardo o modifico una cosa senza perdere il contesto». Entra da destra (24px, sfumando) in `motion-panel` con `ease-out` sopra `scrim-soft` e non è modale. Larghezza `panel-wide` (760px, gli allegati) o, con `narrow`, `panel-narrow` (420px, l’evento del calendario); sotto 1180px di finestra il pannello largo occupa tutta la finestra. Bordo sinistro `border` e ombra `shadow`. `onScrim` è obbligatorio: lo chiama il clic sul velo, che è solo una scorciatoia per il puntatore; le vie accessibili sono il pulsante di chiusura e Esc. È un `Dialog` di Ark UI non modale: niente trappola del focus, il resto della pagina resta raggiungibile con Tab. Esc chiama `onClose` (o `onScrim` se manca): chi lo usa non ascolta più il tasto. Chi usa il pannello lo smonta per chiuderlo, e smontato Ark non può restituire il focus: il `SidePanel` ricorda l’elemento che lo aveva quando è comparso (`useReturnFocus`, lo stesso del `Modal`) e glielo rimette alla chiusura, se è ancora nella pagina; se il pannello era stato aperto da una voce di un menu o di un popover che nel frattempo si è chiuso, il focus va al pulsante di quel popup. Lo fa solo se il focus è ancora dentro il pannello o su `<body>`: un focus che l’utente ha spostato sulla pagina dietro (il pannello non è modale) resta dov’è. `onOpen` parte quando è visibile, per mettere il focus (senza, lo riceve il primo controllo). `ref` consegna il nodo del pannello. Dentro: `.side-panel-bar` con `.panel-title` e un pulsante `panel-close`, poi `.side-panel-body`, che scorre. Il pannello non va in un portale: riempie il suo antenato posizionato, che deve essere `position: relative`.
 
 ```tsx
 import { useRef } from 'react';
@@ -202,36 +205,89 @@ const closeButton = useRef<HTMLButtonElement>(null);
 
 ### Popover
 
-Il menu o il filtro ancorato al suo pulsante, il terzo contenitore di ADR-0008, su `Popover` di Ark UI: bordo `border`, raggio `radius-lg` (8px), ombra `shadow`, padding 5px, almeno 180px di larghezza, livello `z-popover`; entra sfumando e scendendo di 4px. Props: `trigger` (l’unico elemento pulsante: Ark gli unisce i suoi attributi e il suo `ref`, quindi dev’essere un `<button>` o un `Button` senza `tip`), `label` (il nome accessibile della superficie), `tip` (il suggerimento di un pulsante a sola icona: il `Tooltip` avvolge l’attivatore di Ark, così gli attributi di entrambi arrivano al pulsante), `open` e `onOpenChange` per controllarlo, `className`. Senza `open` il popover tiene il proprio stato. Si apre dal pulsante; Esc, un clic fuori o il focus che esce lo chiudono e il focus torna al pulsante; una voce che fa il suo lavoro chiama `onOpenChange(false)`, cioè mette `open` a `false`. La superficie esiste solo da aperta, sotto il pulsante a destra, nel `Portal` di Ark. Un `Modal` aperto da una voce sta sopra: il primo Esc chiude il `Modal`, il secondo il popover. Le voci sono `<button>` semplici, che la superficie stila (padding 8px 9px, raggio `radius-sm` (4px), `hover` al passaggio); `.popover-divider` separa i gruppi. Per contenuti lunghi non usare un popover: apri un pannello o un dialog.
+Il filtro, il selettore o il piccolo modulo ancorato al suo pulsante, il terzo contenitore di ADR-0008, su `Popover` di Ark UI: bordo `border`, raggio `radius-lg` (8px), ombra `shadow`, padding 5px, almeno 180px di larghezza, livello `z-popover`; entra sfumando e scendendo di 4px. Un menu di comandi non è un popover: è un `Menu` (sotto), e `ds-usage.mjs` rifiuta un `Popover` i cui figli sono tutti pulsanti. Props: `trigger` (l’unico elemento pulsante: Ark gli unisce i suoi attributi e il suo `ref`, quindi dev’essere un `<button>` o un `Button` senza `tip`), `label` (il nome accessibile della superficie, che è un `role="dialog"`), `tip` (il suggerimento di un pulsante a sola icona: il `Tooltip` avvolge l’attivatore di Ark, così gli attributi di entrambi arrivano al pulsante), `open` e `onOpenChange` per controllarlo, `className`. Senza `open` il popover tiene il proprio stato. Si apre dal pulsante e il focus va al primo controllo; Esc, un clic fuori o il focus che esce lo chiudono e il focus torna al pulsante; un’azione che ha finito il suo lavoro chiama `onOpenChange(false)`, cioè mette `open` a `false`. La superficie esiste solo da aperta, sotto il pulsante a destra, nel `Portal` di Ark. Un `Modal` aperto da dentro sta sopra: il primo Esc chiude il `Modal`, il secondo il popover. I `<button>` dentro la superficie prendono l’aspetto delle voci di un menu (padding 8px 9px, raggio `radius-sm` (4px), `hover` al passaggio), che era il primo uso del popover: un modulo con pulsanti veri li ridisegna, come «Registra ora» in `components/meetings/RecordNow.css`; `.popover-divider` separa due gruppi. Per contenuti lunghi non usare un popover: apri un pannello o un dialog.
 
 ```tsx
 import { useState } from 'react';
 import Button from '../ds/primitives/Button';
-import Icon from '../ds/primitives/Icon';
+import Field from '../ds/primitives/Field';
 import Popover from '../ds/primitives/Popover';
 
 const [open, setOpen] = useState(false);
+const [name, setName] = useState('');
 
 <Popover
   open={open}
   onOpenChange={setOpen}
-  label="Azioni sul messaggio"
-  trigger={
-    <Button variant="icon" type="button" aria-label="Altre azioni sul messaggio">
-      <Icon name="more" size={18} />
-    </Button>
-  }
+  label="Registra ora"
+  className="record-popover"
+  trigger={<Button variant="primary">Registra ora</Button>}
 >
-  <button type="button" onClick={() => { print(); setOpen(false); }}><Icon name="print" size={16} />Stampa email</button>
+  <form className="record-form" onSubmit={(event) => { event.preventDefault(); start(name); setOpen(false); }}>
+    <Field><span>Nome (facoltativo)</span><input value={name} onChange={(event) => setName(event.currentTarget.value)} /></Field>
+    <div className="record-actions">
+      <Button variant="primary" type="submit">Registra</Button>
+    </div>
+  </form>
 </Popover>
 ```
 
 ```html
-<button class="icon-button" type="button" aria-label="Altre azioni sul messaggio" data-scope="popover" data-part="trigger" aria-haspopup="dialog" aria-expanded="true" data-state="open">…</button>
+<button class="primary" type="button" data-scope="popover" data-part="trigger" aria-haspopup="dialog" aria-expanded="true" data-state="open">Registra ora</button>
 <!-- aperto, nel Portal in <body> -->
 <div data-scope="popover" data-part="positioner">
-  <div data-scope="popover" data-part="content" role="dialog" aria-label="Azioni sul messaggio" data-state="open">
-    <button type="button"><svg …/>Stampa email</button>
+  <div data-scope="popover" data-part="content" class="record-popover" role="dialog" aria-label="Registra ora" data-state="open">
+    <form class="record-form">…</form>
+  </div>
+</div>
+```
+
+### Menu
+
+Il menu di comandi ancorato al suo pulsante («Altre azioni» del lettore, della rubrica e di una riunione), su `Menu` di Ark UI: per lo screen reader e per UI Automation è un menu (`role="menu"`, voci `menuitem`), non un dialog. Ha la superficie e le voci del `Popover` che i menu usavano, con le stesse misure e gli stessi token, quindi a vederlo non cambia nulla: bordo `border`, raggio `radius-lg` (8px), ombra `shadow`, padding 5px, almeno 180px di larghezza, livello `z-popover`, nel `Portal` di Ark sotto il pulsante a destra, solo da aperto; entra sfumando e scendendo di 4px (`motion-panel`, spento con `prefers-reduced-motion`). Le voci hanno padding 8px 9px, raggio `radius-sm` (4px) e l’icona di 15px a 8px dal testo; in un menu dove alcune voci hanno l’icona, quelle senza lasciano vuoto il suo posto, così le parole cominciano tutte sullo stesso bordo.
+
+Props: `trigger` (l’unico elemento pulsante, come nel `Popover`: Ark gli unisce attributi e `ref`), `label` (il nome accessibile del menu: Ark lo chiamerebbe come il suo pulsante, la primitiva gli dà `label`), `items`, `tip` (il suggerimento di un pulsante a sola icona, come nel `Popover`), `onOpenChange`, che dice quando si apre e quando si chiude, e `open`: un cambio di `open` lo apre o lo chiude, come fa il lettore quando cambia il messaggio. Lo stato resta di Ark: un menu comandato da fuori renderebbe il focus al pulsante a ogni chiusura, anche dopo un clic su un altro controllo. Ogni voce di `items` è `{ value, label, onSelect, destructive?, disabled?, shortcut?, icon?, group?, checked?, title? }` (il tipo `MenuItem`):
+
+- `value` la distingue; `label` è il suo nome, e ciò che cerca una lettera digitata; `onSelect` è il comando.
+- `icon` è il nome di un’`Icon`, disegnata a 15px prima del testo.
+- `group`: le voci dello stesso gruppo stanno insieme, e fra due gruppi va un separatore (`<hr role="separator">`, la linea di `.popover-divider`: 1px in `border`, 4px sopra e sotto).
+- `destructive`: Elimina e simili vanno in fondo, dopo un separatore loro, dovunque siano nell’elenco.
+- `disabled`: la voce resta visibile a metà opacità con `aria-disabled`, le frecce e le lettere la saltano e un clic non fa nulla; `title` dice perché, come «Messaggio inviato: si gestisce da Inviati».
+- `checked` fa della voce un interruttore (`menuitemcheckbox` con `aria-checked`): accesa mostra il segno di spunta al posto dell’icona, come «Metti da parte».
+- `shortcut` è una scorciatoia che l’app ha davvero: si vede in fondo alla voce, in un `<kbd>`, ed è annunciata come `aria-keyshortcuts`, non come parte del nome.
+
+Tastiera, come la vuole Ark: Invio, Spazio o Giù sul pulsante aprono il menu sulla prima voce, Su sull’ultima (sul pulsante le frecce sono del menu: non passano al messaggio seguente, vedi «Tastiera e scorciatoie»); Giù e Su spostano fra le voci, Home e Fine vanno alla prima e all’ultima; una lettera porta alla voce che comincia così, la stessa lettera di nuovo alla seguente; Invio o Spazio scelgono; Tab non esce dal menu. Esc, la scelta di una voce e un clic fuori lo chiudono; con Esc e con la scelta il focus torna al pulsante, con un clic fuori resta dove l’ha messo il clic (su un altro controllo) o torna al pulsante (sul fondo della pagina). La primitiva rimette il focus sul pulsante già prima di eseguire il comando: un `Modal` o un `SidePanel` aperto dalla voce ricorda il pulsante e glielo rende quando si chiude. Mentre il menu è aperto il focus è sul menu, che indica la voce corrente con `aria-activedescendant`; Ark la segna con `data-highlighted`. Le lettere e le frecce restano al menu: le scorciatoie dell’app (`E`, `R`, `N`) non partono mentre il menu ha il focus (`shortcutCoveredByLayer` copre `role="menu"`).
+
+Le due indicazioni sono quelle che avevano i pulsanti del popover: sotto il puntatore la voce prende il fondo `hover`; con la tastiera la voce corrente prende l’anello del focus, 2px in `accent` staccato di 3px, come ogni controllo. La primitiva scrive `data-keyboard` sul menu finché a guidare sono i tasti, perché `:focus-visible` qui non basta: Ark lascia il focus dov’era quando si preme il pulsante, e un menu aperto col mouse dopo un tasto premuto altrove risulterebbe aperto da tastiera. Con i temi Contrasto (`forced-colors.css`) il menu ha un bordo, la voce corrente un contorno tratteggiato in `Highlight`, il separatore è in `CanvasText` e una voce disattivata in `GrayText`.
+
+```tsx
+import Button from '../ds/primitives/Button';
+import Icon from '../ds/primitives/Icon';
+import Menu from '../ds/primitives/Menu';
+
+<Menu
+  label="Azioni sulla riunione"
+  tip="Altre azioni"
+  trigger={
+    <Button variant="icon" aria-label="Altre azioni">
+      <Icon name="more" size={18} />
+    </Button>
+  }
+  items={[
+    { value: 'rename', label: 'Rinomina', icon: 'edit', onSelect: () => ask('rename') },
+    { value: 'delete', label: 'Elimina', icon: 'trash', destructive: true, onSelect: () => ask('delete') },
+  ]}
+/>
+```
+
+```html
+<button class="icon-button" type="button" aria-label="Altre azioni" aria-haspopup="menu" aria-expanded="true" data-placement="bottom-end">…</button>
+<!-- aperto, nel Portal in <body>: guidano i tasti, ed Elimina è la voce corrente -->
+<div data-scope="menu" data-part="positioner">
+  <div data-scope="menu" data-part="content" role="menu" tabindex="0" aria-label="Azioni sulla riunione" aria-labelledby="(il suo stesso id)" aria-activedescendant="…/delete" data-state="open" data-keyboard>
+    <div data-scope="menu" data-part="item" role="menuitem" id="…/rename" data-value="rename" data-valuetext="Rinomina"><svg …/><span>Rinomina</span></div>
+    <hr data-scope="menu" data-part="separator" role="separator" aria-orientation="horizontal">
+    <div data-scope="menu" data-part="item" role="menuitem" id="…/delete" data-value="delete" data-valuetext="Elimina" data-highlighted><svg …/><span>Elimina</span></div>
   </div>
 </div>
 ```
@@ -635,14 +691,14 @@ Anche `font-sans` (`--font-text`) e `rounded-sm`, `rounded-md`, `rounded-lg`, `r
 - **Selettore.** `[data-scope='select'][data-part='trigger']`, mai una classe generata da Tailwind e mai il nome di una classe interna di Ark. Lo stato è `[data-state]` o l’attributo booleano (`[data-disabled]`, `[data-highlighted]`, `[data-selected]`, `[data-invalid]`). Dove due primitive della stessa famiglia si distinguono, lo fa l’attributo `data-variant` o `data-size` che la primitiva scrive (`Modal`: `data-variant="modal"` e `data-size`; `SidePanel`: `data-variant="side"` e `data-narrow`; `Tabs`: `data-variant`). Le parti che il modulo aggiunge da sé seguono la stessa forma: `data-part="highlight"` e `data-part="trigger-label"` in `Tabs`, `data-part="item"` attorno a scheda e `after`. Fa eccezione `switch.css`, che sceglie su `.switch-row` e `button[role='switch']`, perché Apple Switch non è una parte di Ark (le sue parti portano comunque `data-scope="switch"` e `data-part`, per i test e l’esportazione).
 - **Solo token.** Ogni colore, raggio, ombra, livello, dimensione del testo e durata viene da `theme.css`; vale `node tests/style-tokens.mjs` (ADR-0009). Altezza dei controlli: `--control-height`.
 - **Un file per primitiva.** Una primitiva nuova porta il suo `styles/ark/<nome>.css` e la riga `@import` in testa a `ark.css`, scritta come stringa (`@import './ark/<nome>.css';`): gli `@import` vanno prima di ogni regola, altrimenti il CSS li ignora. Le regole del suggerimento (`tooltip`) stanno in `ark.css`.
-- **Livelli.** Le parti che escono dal flusso stanno sulla scala `--z-popover` < `--z-panel` < `--z-modal` < `--z-toast`, nessun valore nuovo: `Popover` a `z-popover`, `SidePanel` a `z-panel`, `Modal` a `z-modal`, e a `z-toast` le liste di `Select` e dei suggerimenti dei destinatari, il suggerimento e gli avvisi, che devono vedersi sopra un dialog. `Modal`, `Popover`, `Tooltip`, la lista di `Select` e quella dei suggerimenti stanno nel `Portal` di Ark, in `<body>`: in React il contenuto del portale vive e muore con l’albero che lo contiene. `SidePanel` e il calendario di `DateField` restano dove sono.
+- **Livelli.** Le parti che escono dal flusso stanno sulla scala `--z-popover` < `--z-panel` < `--z-modal` < `--z-toast`, nessun valore nuovo: `Popover` e `Menu` a `z-popover`, `SidePanel` a `z-panel`, `Modal` a `z-modal`, e a `z-toast` le liste di `Select` e dei suggerimenti dei destinatari, il suggerimento e gli avvisi, che devono vedersi sopra un dialog. `Modal`, `Popover`, `Menu`, `Tooltip`, la lista di `Select` e quella dei suggerimenti stanno nel `Portal` di Ark, in `<body>`: in React il contenuto del portale vive e muore con l’albero che lo contiene. `SidePanel` e il calendario di `DateField` restano dove sono.
 - **Specificità bassa dove serve.** Le regole dei contenitori (`dialog.css`) sono in `:where()`: una classe di pagina sulla primitiva (la stampa, la scheda contatto) le ridefinisce.
 - **Movimento.** Le entrate in CSS usano `motion-panel` ed `ease-out`, e ogni file le spegne sotto `prefers-reduced-motion`. Il suggerimento anima solo `[data-state='open']`: con l’animazione su ogni stato, Ark aspettava la fine dell’animazione prima di smontarlo e un suggerimento chiuso restava sullo schermo accanto al nuovo. Vedi «Stati e movimento».
 
 ## Tastiera e scorciatoie
 
-- **Esc a strati.** Ark ascolta Esc su `document` in fase di cattura e solo lo strato più alto reagisce: la lista di un `Select`, i suggerimenti, il calendario di `DateField`, un `Popover`, un `Modal` o un `SidePanel` prendono Esc prima di tutto il resto, ovunque sia il focus. La finestra di scrittura si riduce a icona con Esc solo se nessuno strato è aperto e il focus è al suo interno (il suo gestore controlla `defaultPrevented`). Un `Modal` aperto da una voce di un `Popover` sta sopra: il primo Esc chiude il `Modal`, il secondo il popover.
-- **Guardia delle scorciatoie.** Le scorciatoie a tasto singolo del componente radice dell’app (`N`, `R`, `E`, le frecce, `Ctrl+Z`) passano da `shortcutIgnored` in `desktop/src/lib/shortcut-guard.ts`: ignorano i tasti premuti dentro `input`, `textarea`, `select`, un’area `contenteditable` e dentro le parti di Ark che leggono i tasti da sé (`[data-scope]` di `select`, `combobox`, `tags-input`, `date-picker`, `slider`, e `[role="slider"]`). Così scrivere una lettera per cercare in un elenco non archivia il messaggio. Una primitiva nuova che legge i tasti aggiunge qui il suo `data-scope` e un caso in `tests/shortcut-guard.mjs`.
+- **Esc a strati.** Ark ascolta Esc su `document` in fase di cattura e solo lo strato più alto reagisce: la lista di un `Select`, i suggerimenti, il calendario di `DateField`, un `Popover`, un `Menu`, un `Modal` o un `SidePanel` prendono Esc prima di tutto il resto, ovunque sia il focus. La finestra di scrittura si riduce a icona con Esc solo se nessuno strato è aperto e il focus è al suo interno (il suo gestore controlla `defaultPrevented`). Un `Modal` aperto da una voce di un `Popover` sta sopra: il primo Esc chiude il `Modal`, il secondo il popover.
+- **Guardia delle scorciatoie.** Le scorciatoie a tasto singolo del componente radice dell’app (`N`, `R`, `E`, le frecce, `Ctrl+Z`) passano da `shortcutIgnored` in `desktop/src/lib/shortcut-guard.ts`: ignorano i tasti premuti dentro `input`, `textarea`, `select`, un’area `contenteditable` e dentro le parti di Ark che leggono i tasti da sé (`[data-scope]` di `select`, `combobox`, `tags-input`, `date-picker`, `slider`, e `[role="slider"]`). Così scrivere una lettera per cercare in un elenco non archivia il messaggio. Una primitiva nuova che legge i tasti aggiunge qui il suo `data-scope` e un caso in `tests/shortcut-guard.mjs`. Un dialog, un popover o un menu che ha il focus (`role="menu"`, come `Menu`) tiene per sé tutti i tasti, e un `Modal` aperto anche senza il focus (`shortcutCoveredByLayer`). Le frecce passano da un messaggio all’altro solo dalla pagina, dall’elenco o dal lettore (`arrowsMoveMail`), e mai da un pulsante che apre un menu (`aria-haspopup="menu"`): lì Giù e Su aprono il menu.
 - **Suggerimenti.** `tip`, `shortcut` e `hint` mostrano solo le scorciatoie che l’app ha già (`N`, `R`, `E`, `Ctrl+K`, `Ctrl+Z`, frecce): non se ne inventano.
 
 ## Colore
@@ -678,8 +734,8 @@ La scala, in `text-2xs`…`text-3xl`: 11,5, 12,5, 13,5, 14, 15, 18, 20 e 26 px. 
 ## Bordi, ombre e raggi
 
 - Separa con filetti da 1px, non con ombre o blocchi di colore.
-- Nessuna ombra a riposo. `shadow` (un’ombra morbida e larga, `0 10px 40px`) sta solo sulle superfici fluttuanti: dialog, pannello laterale, popover, liste di `Select` e dei suggerimenti, calendario di `DateField`, avvisi, composizione. `shadow-sm` esiste ma vale `none` nei due temi: i controlli sono piatti, e le regole che lo scrivono (pulsante primario, chip della scheda `segment`, marchio) non disegnano nulla. Il suggerimento non ha ombra: lo stacca il suo fondo scuro. L’unica ombra a riposo è quella piccola del pallino di Apple Switch, copiata dall’originale.
-- Raggi: `radius-sm` (4px) per tag, chip, contatori, `<kbd>`, caselle, voci dei menu e suggerimento, `radius-md` (6px) per controlli, pulsanti e righe della barra laterale, `radius-lg` (8px) per popover, liste, avvisi, calendario e riquadri, `radius-xl` (12px) per dialog e composizione, `radius-sheet` (14px) per il foglio, `radius-full` per pillole e interruttori.
+- Nessuna ombra a riposo. `shadow` (un’ombra morbida e larga, `0 10px 40px`) sta solo sulle superfici fluttuanti: dialog, pannello laterale, popover, menu, liste di `Select` e dei suggerimenti, calendario di `DateField`, avvisi, composizione. `shadow-sm` esiste ma vale `none` nei due temi: i controlli sono piatti, e le regole che lo scrivono (pulsante primario, chip della scheda `segment`, marchio) non disegnano nulla. Il suggerimento non ha ombra: lo stacca il suo fondo scuro. L’unica ombra a riposo è quella piccola del pallino di Apple Switch, copiata dall’originale.
+- Raggi: `radius-sm` (4px) per tag, chip, contatori, `<kbd>`, caselle, voci dei menu e suggerimento, `radius-md` (6px) per controlli, pulsanti e righe della barra laterale, `radius-lg` (8px) per popover, menu, liste, avvisi, calendario e riquadri, `radius-xl` (12px) per dialog e composizione, `radius-sheet` (14px) per il foglio, `radius-full` per pillole e interruttori.
 - Livelli, in ordine: `z-popover` 10, `z-composer` 12, `z-dock` 13, `z-floating` 16, `z-panel` 20, `z-modal` 30 (il dialog centrato), `z-toast` 50 (anche le liste, il suggerimento e gli avvisi), `z-window` 100. Gli z-index da 1 a 5 restano liberi per l’ordine interno di un componente (l’evidenza di `NavList` sta a 0, le righe a 1).
 
 ## Gerarchia nelle righe
@@ -695,7 +751,7 @@ Una scelta di aspetto per la lista della posta, fatta per far capire con uno sgu
 
 ## Sovrapposizioni
 
-Solo questi tre contenitori (ADR-0008), ognuno con la sua primitiva: `SidePanel` per guardare o modificare in contesto, `Modal` per decidere prima di continuare, `Popover` per un menu o un filtro ancorato. Nessun colore di velo, larghezza o z-index letterale fuori da `theme.css`. Il pannello laterale non è modale (`aria-modal="false"`, nessuna trappola del focus, velo `scrim-soft`), il dialog centrato lo è (`aria-modal="true"`, velo `scrim`, focus trattenuto). Tutti e tre sono su Ark, hanno l’ombra `shadow` e usano la scala dei livelli; le liste (`Select`, suggerimenti), il suggerimento e gli avvisi stanno sopra i dialog, a `z-toast`. La finestra di scrittura non è un `Modal`.
+Solo questi tre contenitori (ADR-0008): `SidePanel` per guardare o modificare in contesto, `Modal` per decidere prima di continuare, e il contenitore ancorato al suo pulsante, che ha due primitive: `Menu` per un menu di comandi, `Popover` per un filtro, un selettore o un piccolo modulo. Nessun colore di velo, larghezza o z-index letterale fuori da `theme.css`. Il pannello laterale non è modale (`aria-modal="false"`, nessuna trappola del focus, velo `scrim-soft`), il dialog centrato lo è (`aria-modal="true"`, velo `scrim`, focus trattenuto). Tutti e tre sono su Ark, hanno l’ombra `shadow` e usano la scala dei livelli; le liste (`Select`, suggerimenti), il suggerimento e gli avvisi stanno sopra i dialog, a `z-toast`. La finestra di scrittura non è un `Modal`.
 
 ## Contenuti
 
@@ -713,7 +769,7 @@ Solo questi tre contenitori (ADR-0008), ognuno con la sua primitiva: `SidePanel`
 - Focus: contorno di 2px in `accent`, staccato di 3px (2px attorno a casella, interruttore e pomello del cursore; dentro la barra laterale è in `accent-on-sidebar` e sulle righe rientra di 2px, perché la barra scorre e lo taglierebbe). Non rimuoverlo.
 - Disabilitato: opacità 0,5 e cursore normale.
 - Pressione: nessun cambio di scala; i pulsanti cambiano solo al passaggio del mouse.
-- Il movimento ha due forme. Le entrate in CSS durano `motion-panel` (180ms) con `ease-out` (`cubic-bezier(0.16, 1, 0.3, 1)`): il dialog sale di 8px e cresce dal 98% mentre il velo sfuma, il pannello laterale entra da destra di 24px sfumando, popover e lista di `Select` scendono di 4px sfumando, il suggerimento sfuma, gli avvisi scorrono al loro posto. Le molle di Motion, che vengono dai componenti di unlumen, muovono ciò che cambia sotto gli occhi: l’evidenza di `Tabs`, l’evidenza e la barra di `NavList`, il pallino di `Switch`, le cifre di `Count`, l’entrata e l’uscita delle righe della posta.
+- Il movimento ha due forme. Le entrate in CSS durano `motion-panel` (180ms) con `ease-out` (`cubic-bezier(0.16, 1, 0.3, 1)`): il dialog sale di 8px e cresce dal 98% mentre il velo sfuma, il pannello laterale entra da destra di 24px sfumando, popover, menu e lista di `Select` scendono di 4px sfumando, il suggerimento sfuma, gli avvisi scorrono al loro posto. Le molle di Motion, che vengono dai componenti di unlumen, muovono ciò che cambia sotto gli occhi: l’evidenza di `Tabs`, l’evidenza e la barra di `NavList`, il pallino di `Switch`, le cifre di `Count`, l’entrata e l’uscita delle righe della posta.
 - `prefers-reduced-motion` spegne tutto. Le entrate in CSS si spengono in ogni file (gli avvisi tengono solo la dissolvenza); `Count` mostra il numero fermo e `NavList` non mostra l’evidenza che segue il puntatore; le molle di Motion (evidenza di `Tabs`, barra di `NavItem`, pallino di `Switch`, righe delle liste) lo seguono tutte tramite `<MotionConfig reducedMotion="user">` in `desktop/src/main.tsx`.
 - Il movimento accompagna un cambiamento di stato o di posizione; non aggiungere animazioni decorative.
 

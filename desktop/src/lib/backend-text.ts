@@ -272,6 +272,8 @@ const EXACT = new Map<string, string>([
   ['The document is protected and cannot be previewed automatically.', 'Il documento è protetto e non può essere visualizzato automaticamente.'],
   ['The document is protected; some content may be unavailable.', 'Il documento è protetto; alcuni contenuti potrebbero non essere disponibili.'],
   ['The visual preview is no longer available. Open the attachment again.', "L'anteprima visiva non è più disponibile. Apri di nuovo l'allegato."],
+  // Saving an attachment (src-tauri/src/zone.rs): the antivirus or the attachment policy deleted it.
+  ['Windows security removed the saved file. Check Windows Security.', 'La sicurezza di Windows ha rimosso il file salvato. Controlla Sicurezza di Windows.'],
   ['Invalid preview handle.', 'Identificatore di anteprima non valido.'],
   ['Preview state lock failed', "Impossibile bloccare lo stato dell'anteprima."],
   ['Preview handle unavailable', "Identificatore dell'anteprima non disponibile."],

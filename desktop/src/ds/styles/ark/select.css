@@ -57,6 +57,7 @@
   max-height: 280px;
   padding: 4px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border);

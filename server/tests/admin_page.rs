@@ -297,7 +297,8 @@ fn page_script() -> &'static str {
 fn function_text<'a>(script: &'a str, name: &str) -> &'a str {
     let start = script.find(&format!("function {name}(")).unwrap_or_else(|| panic!("function {name}"));
     let rest = &script[start + 1..];
-    let end = rest.find("\n  function ").or_else(|| rest.find("\n  async function ")).map_or(script.len(), |n| start + 1 + n);
+    // The nearer of the two: an `async function` right after must not be swallowed.
+    let end = [rest.find("\n  function "), rest.find("\n  async function ")].into_iter().flatten().min().map_or(script.len(), |n| start + 1 + n);
     &script[start..end]
 }
 
@@ -314,7 +315,7 @@ fn the_page_has_a_models_section_hidden_until_the_key_is_given() {
     assert!(script.contains("byId('models-section').hidden = false"));
     assert!(function_text(script, "lock").contains("byId('models-section').hidden = true"));
     // Shown together with the users, after the key is accepted.
-    assert!(function_text(script, "loadUsers").contains("models-section") || function_text(script, "loadUsers").contains("loadModels"));
+    assert!(function_text(script, "loadAll").contains("await loadModels();"));
 }
 
 #[test]
@@ -369,7 +370,7 @@ fn models_are_rendered_with_text_content_only() {
 #[test]
 fn remove_asks_for_a_second_click_and_uses_no_browser_dialog() {
     let script = page_script();
-    assert!(script.contains("Sicuro? Rimuovi"));
+    assert!(script.contains("secondClick(remove, 'Rimuove il modello «'"));
     for dialog in ["confirm(", "alert(", "prompt("] {
         assert!(!script.contains(dialog), "app.js contiene «{dialog}»");
     }
@@ -405,4 +406,142 @@ async fn the_page_is_still_served_with_the_security_headers_and_the_models_secti
     }
     let html = request(ts.admin(), "GET", "/admin", None, loopback(), &[]).await.text;
     assert!(html.contains("id=\"models-section\""));
+}
+
+// --- The «Embedding» section ---------------------------------------------------------------
+
+#[test]
+fn the_embedding_section_is_hidden_until_the_key_is_given_and_uses_the_admin_api() {
+    let html = page_html();
+    let at = html.find("id=\"embedding-section\"").expect("la sezione");
+    let tag = &html[html[..at].rfind('<').unwrap()..at + html[at..].find('>').unwrap()];
+    assert!(tag.contains("hidden"), "{tag}");
+    let script = page_script();
+    assert!(function_text(script, "lock").contains("byId('embedding-section').hidden = true"));
+    for call in ["api('GET', '/embedding')", "api('PUT', '/embedding', body)"] {
+        assert!(script.contains(call), "manca {call}");
+    }
+    // The key of the service is typed and sent; the field is emptied when the save worked and at «Esci».
+    assert!(html.contains("id=\"embedding-key\" type=\"password\" autocomplete=\"off\""));
+    assert!(function_text(script, "renderEmbedding").contains("byId('embedding-key').value = ''"));
+    assert!(function_text(script, "lock").contains("byId('embedding-key').value = ''"));
+}
+
+#[test]
+fn another_embedding_model_asks_for_a_second_click() {
+    let script = page_script();
+    // The form asks before it runs the save, and the save is the only place that sends.
+    let asked = script.find("if (embeddingChanges() && !secondClick(save, 'Cambia il modello di embedding").expect("la conferma");
+    let run = script.find("runEmbedding(save, saveEmbedding);").expect("il salvataggio");
+    assert!(asked < run, "la conferma viene prima della richiesta");
+    assert_eq!(script.matches("api('PUT', '/embedding', body)").count(), 1);
+    assert!(function_text(script, "saveEmbedding").contains("api('PUT', '/embedding', body)"));
+    // The page says what a change costs, and that vectors keep the index's length.
+    let html = page_html();
+    assert!(html.contains("id=\"embedding-warning\"") && html.contains("reindicizzare"));
+    assert!(html.contains("id=\"embedding-dim\""));
+    assert!(function_text(script, "renderEmbedding").contains("String(data.dimensions)"));
+}
+
+// --- What costs waits for a second click, and «Esci» really closes -----------------------------
+
+#[test]
+fn what_costs_waits_for_a_second_click() {
+    let script = page_script();
+    // The first click arms and stops there; only a click on an armed button goes on.
+    let helper = function_text(script, "secondClick");
+    assert!(helper.contains("if (disarm(button)) return true;"), "{helper}");
+    // A double click is not a confirmation, and the armed button disarms when it loses the focus.
+    let early = helper.find("Date.now() - armedAt.get(button) < 500) return false;").expect("il doppio clic");
+    assert!(early < helper.find("if (disarm(button)) return true;").unwrap(), "{helper}");
+    assert!(helper.contains("button.addEventListener('blur', () => disarm(button), { once: true });"), "{helper}");
+    // Escape, a click anywhere else and a held Enter.
+    let init = function_text(script, "init");
+    for line in [
+        "if (event.key === 'Escape') disarmAll();",
+        "document.addEventListener('click', (event) => disarmAll(event.target.closest('button')), true);",
+        "if (event.repeat && event.key === 'Enter'",
+    ] {
+        assert!(init.contains(line), "manca {line}");
+    }
+    assert!(helper.contains("    return false;\n  }\n"), "{helper}");
+    assert_eq!(helper.matches("return true;").count(), 1, "{helper}");
+    for (guard, action) in [
+        ("secondClick(reset, ", "'/reset-password')"),
+        ("secondClick(remove, 'Cancella «'", "api('DELETE', '/users/' + encodeURIComponent(user.id))"),
+        ("secondClick(revoke, ", "'/devices/' + encodeURIComponent(device.id))"),
+        ("secondClick(remove, 'Rimuove il modello «'", "api('DELETE', '/models/' + encodeURIComponent(model.id))"),
+        ("secondClick(button, 'Scarta le impostazioni", "runLlm(button, resetLlm)"),
+        ("secondClick(save, 'Cambia il modello di embedding", "runEmbedding(save, saveEmbedding)"),
+    ] {
+        let asked = script.find(&format!("!{guard}")).unwrap_or_else(|| panic!("manca la conferma {guard}"));
+        let done = script.find(action).unwrap_or_else(|| panic!("manca {action}"));
+        assert!(asked < done && done - asked < 700, "{action} non segue la sua conferma");
+        assert!(script[asked..done].contains(")) return;"), "{action} parte anche senza conferma");
+        assert_eq!(script.matches(action).count(), 1, "{action} ha una sola strada");
+    }
+}
+
+#[test]
+fn an_answer_that_arrives_after_esci_draws_nothing() {
+    let script = page_script();
+    assert!(function_text(script, "lock").contains("session += 1;"));
+    let api = function_text(script, "api");
+    assert!(api.contains("const mine = session;"));
+    // After each wait, before anything is read or drawn; and before a stale 401 can lock the new session.
+    assert_eq!(api.matches("if (mine !== session) throw new Unauthorized('sessione chiusa');").count(), 3, "{api}");
+    assert!(api.find("if (mine !== session)").unwrap() < api.find("response.status === 401").unwrap());
+    // «Esci» leaves no button armed for whoever comes next.
+    assert!(function_text(script, "lock").contains("disarmAll();"));
+}
+
+#[test]
+fn a_section_that_does_not_load_says_so_instead_of_vanishing() {
+    let script = page_script();
+    for (load, section) in [("loadModels", "models"), ("loadLlm", "llm"), ("loadEmbedding", "embedding")] {
+        let text = function_text(script, load);
+        assert!(text.contains(&format!("byId('{section}-section').hidden = e.status === 404;")), "{load}");
+        assert!(text.contains("syncNav();"), "{load}");
+    }
+    // Without its data a form is not there to be saved empty («nessun assistente»).
+    assert!(function_text(script, "loadLlm").contains("byId('llm-form').hidden = true;"));
+    assert!(function_text(script, "loadEmbedding").contains("byId('embedding-form').hidden = true;"));
+    // A table redraw skipped for an armed button keeps the polling going.
+    assert!(function_text(script, "loadModels").contains("if (!drawn || data.models.some((m) => m.state === 'downloading'))"));
+    // The one-time password is shown before the table reload, which may fail.
+    for shown in ["result.temporary_password);\n        await loadUsers();", "created.temporary_password);\n        await loadUsers();"] {
+        assert!(script.contains(shown), "{shown}");
+    }
+}
+
+/// Every class named in `class="…"` of a page.
+fn page_classes(html: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for part in html.split("class=\"").skip(1) {
+        for class in part[..part.find('"').unwrap()].split_whitespace() {
+            if !out.iter().any(|c| c == class) {
+                out.push(class.to_owned());
+            }
+        }
+    }
+    out
+}
+
+/// True when the stylesheet has a rule naming `.class` (not only a longer class that starts with it).
+fn styled(css: &str, class: &str) -> bool {
+    let needle = format!(".{class}");
+    css.match_indices(&needle).any(|(at, _)| {
+        css[at + needle.len()..].chars().next().is_none_or(|c| !(c.is_alphanumeric() || c == '-' || c == '_'))
+    })
+}
+
+#[test]
+fn every_class_of_the_page_has_a_rule_and_no_hidden_field_can_block_a_save() {
+    let css = include_str!("../src/http/admin/app.css");
+    for class in page_classes(page_html()) {
+        assert!(styled(css, &class), "nessuna regola per .{class}");
+    }
+    // A type=url field inside a hidden block is checked by the browser anyway, and cancels the
+    // save without a message: the server checks the address and says what is wrong.
+    assert!(!page_html().contains("type=\"url\""));
 }

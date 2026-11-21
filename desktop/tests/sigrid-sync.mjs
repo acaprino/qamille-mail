@@ -1,0 +1,646 @@
+// scripts/sync-sigrid.mjs: bringing Sigrid into vendor/sigrid/. The package is a fake one built here, like the
+// ones a Sigrid release holds: its files, a package.json and the provenance.json that lists every other file with its
+// SHA-256. A release arrives unpacked ({ tag, dir }, what latestMainRelease finds); SIGRID_DIR is a fake checkout
+// whose `npm run release` leaves a real .tgz (built with the system tar) and its manifest in release/.
+// The scratch folders are under desktop/.cache (ignored by git), not in the system's temp folder.
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { basename, dirname, join } from 'node:path';
+import test from 'node:test';
+import { latestSigridRelease, renameRetrying, replaceVendor, syncSigrid } from '../scripts/sync-sigrid.mjs';
+
+const TAR = process.platform === 'win32' ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
+const cache = join(import.meta.dirname, '..', '.cache');
+mkdirSync(cache, { recursive: true });
+const scratch = mkdtempSync(join(cache, 'test-sigrid-sync-'));
+test.after(() => rmSync(scratch, { recursive: true, force: true }));
+let counter = 0;
+const fresh = (name) => join(scratch, `${name}-${++counter}`);
+
+const sha256 = (data) => createHash('sha256').update(data).digest('hex');
+const COMMIT = '0123456789abcdef0123456789abcdef01234567';
+const write = (file, text) => {
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, text);
+};
+
+// A Sigrid package, unpacked: <dir>/package.json, the files and provenance.json. The folder is called "package", like
+// the top folder of the .tgz. `files` adds to (or, with a different text, replaces) the default ones.
+function sigridPackage({ peerDependencies, version = '1.2.3', commit = COMMIT, files = {}, name = '@acaprino/sigrid' } = {}) {
+  const dir = join(fresh('pkg'), 'package');
+  const all = {
+    'package.json': `${JSON.stringify({ name, version, peerDependencies }, null, 2)}\n`,
+    'dist/index.js': 'export const sigrid = 1;\n',
+    'dist/index.d.ts': 'export declare const sigrid: 1;\n',
+    'src/styles/theme.css': ':root { color-scheme: light dark; }\n',
+    LICENSE: 'MIT\n',
+    ...files,
+  };
+  for (const [path, text] of Object.entries(all)) write(join(dir, path), text);
+  const provenance = { package: name, version, commit, files: Object.fromEntries(Object.keys(all).sort().map((path) => [path, sha256(all[path])])) };
+  write(join(dir, 'provenance.json'), `${JSON.stringify(provenance, null, 2)}\n`);
+  return dir;
+}
+
+// The desktop folder of Qamille: its package.json, and optionally a copy of Sigrid synced earlier (a whole,
+// verifiable package, version 0.9.0, with an old.txt that no newer package has).
+function desktopOf({ dependencies = { react: '19.3.1' }, devDependencies = {}, old = false } = {}) {
+  const desktop = fresh('desktop');
+  write(join(desktop, 'package.json'), `${JSON.stringify({ name: 'qamille-desktop', dependencies, devDependencies }, null, 2)}\n`);
+  if (old) cpSync(sigridPackage({ version: '0.9.0', commit: '9'.repeat(40), files: { 'old.txt': 'old\n' } }), join(desktop, 'vendor', 'sigrid'), { recursive: true });
+  return desktop;
+}
+
+// Every file under a folder, with its content: to compare a folder with another, or with itself before and after.
+function tree(dir, prefix = '') {
+  const found = {};
+  for (const entry of readdirSync(join(dir, prefix), { withFileTypes: true })) {
+    const path = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) Object.assign(found, tree(dir, path));
+    else found[path] = readFileSync(join(dir, path), 'utf8');
+  }
+  return found;
+}
+
+const vendorOf = (desktop) => join(desktop, 'vendor', 'sigrid');
+const lines = () => { const list = []; list.log = (line) => list.push(line); return list; };
+const releaseOf = (dir, tag = 'v1.2.3') => ({ tag, dir });
+const synced = (tag = 'v1.2.3') => `sigrid: ${tag} (${COMMIT.slice(0, 7)}) synced`;
+
+// The old copy is untouched and no staging or aside folder is left.
+const assertKept = (desktop, before) => {
+  assert.deepEqual(tree(vendorOf(desktop)), before);
+  assert.equal(existsSync(`${vendorOf(desktop)}.part`), false);
+  assert.equal(existsSync(`${vendorOf(desktop)}.old`), false);
+};
+
+test('a verified package lands in vendor/sigrid', async () => {
+  const dir = sigridPackage();
+  const desktop = desktopOf({ old: true });
+  const log = lines();
+  await syncSigrid({ desktop, release: releaseOf(dir), log: log.log });
+  // The whole package, provenance.json included, and nothing of the earlier copy.
+  assert.deepEqual(tree(vendorOf(desktop)), tree(dir));
+  assert.ok('provenance.json' in tree(vendorOf(desktop)));
+  assert.equal(existsSync(join(vendorOf(desktop), 'old.txt')), false);
+  assert.equal(existsSync(`${vendorOf(desktop)}.part`), false);
+  assert.deepEqual([...log], [synced()]);
+});
+
+test('the first sync creates vendor/sigrid', async () => {
+  const dir = sigridPackage();
+  const desktop = desktopOf();
+  assert.equal(existsSync(join(desktop, 'vendor')), false);
+  await syncSigrid({ desktop, release: releaseOf(dir), log: () => {} });
+  assert.deepEqual(tree(vendorOf(desktop)), tree(dir));
+});
+
+test('a file that differs from provenance.json is refused and the old copy stays', async () => {
+  const dir = sigridPackage();
+  write(join(dir, 'dist', 'index.js'), 'export const sigrid = "tampered";\n');
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  const log = lines();
+  await assert.rejects(syncSigrid({ desktop, release: releaseOf(dir), log: log.log }), /dist\/index\.js does not match provenance\.json/);
+  assertKept(desktop, before);
+  assert.deepEqual([...log], []);
+});
+
+test('a file that provenance.json does not list is refused and the old copy stays', async () => {
+  const dir = sigridPackage();
+  write(join(dir, 'dist', 'extra.js'), 'console.log("extra");\n');
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  await assert.rejects(syncSigrid({ desktop, release: releaseOf(dir), log: () => {} }), /dist\/extra\.js is not in provenance\.json/);
+  assertKept(desktop, before);
+});
+
+test('a file that provenance.json lists but the package lacks is refused and the old copy stays', async () => {
+  const dir = sigridPackage();
+  rmSync(join(dir, 'src', 'styles', 'theme.css'));
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  await assert.rejects(syncSigrid({ desktop, release: releaseOf(dir), log: () => {} }), /src\/styles\/theme\.css is listed in provenance\.json but missing/);
+  assertKept(desktop, before);
+});
+
+test('a package without provenance.json, or that is not Sigrid, is refused', async () => {
+  const bare = sigridPackage();
+  rmSync(join(bare, 'provenance.json'));
+  const other = sigridPackage({ name: 'left-pad' });
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  await assert.rejects(syncSigrid({ desktop, release: releaseOf(bare), log: () => {} }), /no provenance\.json/);
+  await assert.rejects(syncSigrid({ desktop, release: releaseOf(other), log: () => {} }), /"left-pad", not @acaprino\/sigrid/);
+  assertKept(desktop, before);
+});
+
+test('an exact peer that differs from Qamille stops the sync', async () => {
+  const dir = sigridPackage({ peerDependencies: { react: '19.0.0' } });
+  const desktop = desktopOf({ dependencies: { react: '19.3.1' }, old: true });
+  const before = tree(vendorOf(desktop));
+  const log = lines();
+  await assert.rejects(syncSigrid({ desktop, release: releaseOf(dir), log: log.log }), (error) => {
+    assert.match(error.message, /react/);
+    assert.match(error.message, /19\.0\.0/);
+    assert.match(error.message, /19\.3\.1/);
+    return true;
+  });
+  assertKept(desktop, before);
+  assert.deepEqual([...log], []);
+});
+
+test('an exact peer that equals Qamille passes, whether it is a dependency or a devDependency', async () => {
+  const dir = sigridPackage({ peerDependencies: { react: '19.3.1', 'react-dom': '19.3.1' } });
+  const desktop = desktopOf({ dependencies: { react: '19.3.1' }, devDependencies: { 'react-dom': '19.3.1' } });
+  const log = lines();
+  await syncSigrid({ desktop, release: releaseOf(dir), log: log.log });
+  assert.deepEqual([...log], [synced()], 'an enforced peer that holds needs no line');
+  assert.deepEqual(tree(vendorOf(desktop)), tree(dir));
+});
+
+test('an exact peer may be written =1.2.3 or v1.2.3, in Sigrid or in Qamille', async () => {
+  // Equal once the prefix is taken off: passes, with no line.
+  const equal = sigridPackage({ peerDependencies: { react: 'v19.3.1', 'react-dom': '=19.3.1' } });
+  const log = lines();
+  await syncSigrid({ desktop: desktopOf({ dependencies: { react: '19.3.1', 'react-dom': 'v19.3.1' } }), release: releaseOf(equal), log: log.log });
+  assert.deepEqual([...log], [synced()]);
+  // Different: still an exact peer, so it stops the sync and is not mistaken for a range.
+  for (const peer of ['v19.0.0', '=19.0.0']) {
+    const other = sigridPackage({ peerDependencies: { react: peer } });
+    const log = lines();
+    await assert.rejects(syncSigrid({ desktop: desktopOf(), release: releaseOf(other), log: log.log }), (error) => {
+      assert.ok(error.message.includes(`react is exactly ${peer} in Sigrid, but Qamille has 19.3.1`), error.message);
+      return true;
+    });
+    assert.deepEqual([...log], [], peer);
+  }
+});
+
+test('a range peer is reported, not enforced', async () => {
+  const dir = sigridPackage({ peerDependencies: { react: '^18.0.0 || ^19.0.0', 'react-dom': '^18.0.0', 'solid-js': '^1.0.0' } });
+  // react-dom is far from the range and still passes; solid-js is not Qamille's at all, so it is not mentioned.
+  const desktop = desktopOf({ dependencies: { react: '19.3.1' }, devDependencies: { 'react-dom': '17.0.2' } });
+  const log = lines();
+  await syncSigrid({ desktop, release: releaseOf(dir), log: log.log });
+  assert.deepEqual([...log], [
+    'sigrid: peer react ^18.0.0 || ^19.0.0 is a range, not enforced (Qamille has 19.3.1)',
+    'sigrid: peer react-dom ^18.0.0 is a range, not enforced (Qamille has 17.0.2)',
+    synced(),
+  ]);
+  assert.deepEqual(tree(vendorOf(desktop)), tree(dir));
+});
+
+test('no release and no copy fails with a useful message', async () => {
+  const desktop = desktopOf();
+  const log = lines();
+  await assert.rejects(syncSigrid({ desktop, release: null, log: log.log }), (error) => {
+    assert.match(error.message, /network/);
+    assert.match(error.message, /SIGRID_DIR/);
+    assert.match(error.message, /acaprino\/sigrid/);
+    return true;
+  });
+  assert.equal(existsSync(vendorOf(desktop)), false);
+});
+
+test('no release but a copy keeps the copy', async () => {
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  const log = lines();
+  await syncSigrid({ desktop, release: null, log: log.log });
+  assert.deepEqual([...log], ["sigrid: no release of Sigrid's main reachable, keeping the existing copy"]);
+  assertKept(desktop, before);
+});
+
+test('no release and a copy that no longer matches its provenance.json is not kept as good', async () => {
+  const mess = {
+    // A sync that died half-way through deleting the old code: provenance.json survived, a file did not.
+    'a file is missing': (copy) => rmSync(join(copy, 'dist', 'index.js')),
+    'a file was changed': (copy) => write(join(copy, 'dist', 'index.js'), 'export const sigrid = "edited";\n'),
+    'a file was added': (copy) => write(join(copy, 'dist', 'extra.js'), 'extra\n'),
+    'provenance.json is gone': (copy) => rmSync(join(copy, 'provenance.json')),
+  };
+  for (const [what, spoil] of Object.entries(mess)) {
+    const desktop = desktopOf({ old: true });
+    spoil(vendorOf(desktop));
+    const before = tree(vendorOf(desktop));
+    const log = lines();
+    await assert.rejects(syncSigrid({ desktop, release: null, log: log.log }), (error) => {
+      assert.match(error.message, /^sigrid: no release of acaprino\/sigrid's main reachable, and the copy in vendor\/sigrid fails its checks/, what);
+      assert.match(error.message, /network/, what);
+      assert.match(error.message, /SIGRID_DIR/, what);
+      assert.match(error.message, /dist\/index\.js|dist\/extra\.js|no provenance\.json/, what);
+      return true;
+    });
+    assertKept(desktop, before);
+    assert.deepEqual([...log], [], what);
+  }
+});
+
+test('vendor/sigrid.old without vendor/sigrid is the copy of an interrupted sync: it comes back, even offline', async () => {
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  renameSync(vendorOf(desktop), `${vendorOf(desktop)}.old`);
+  const log = lines();
+  await syncSigrid({ desktop, release: null, log: log.log });
+  assert.deepEqual([...log], [
+    'sigrid: vendor/sigrid was missing, the previous copy of an interrupted sync is back',
+    "sigrid: no release of Sigrid's main reachable, keeping the existing copy",
+  ]);
+  assertKept(desktop, before);
+});
+
+test('vendor/sigrid.old without vendor/sigrid is restored before a new package replaces it', async () => {
+  const dir = sigridPackage();
+  const desktop = desktopOf({ old: true });
+  renameSync(vendorOf(desktop), `${vendorOf(desktop)}.old`);
+  await syncSigrid({ desktop, release: releaseOf(dir), log: () => {} });
+  assert.deepEqual(tree(vendorOf(desktop)), tree(dir));
+  assert.equal(existsSync(`${vendorOf(desktop)}.old`), false);
+});
+
+test('a vendor/sigrid.old left beside vendor/sigrid is removed, and never replaces it', async () => {
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  write(join(`${vendorOf(desktop)}.old`, 'stale.txt'), 'stale\n');
+  await syncSigrid({ desktop, release: null, log: () => {} });
+  assertKept(desktop, before);
+});
+
+// A rename that fails as it does on Windows when a file of the folder is held open (EPERM), for the moves `fails`
+// names by their folders' base names; every other rename really happens.
+const failingRename = (fails) => (from, to) => {
+  if (fails(basename(from), basename(to))) throw Object.assign(new Error(`EPERM: operation not permitted, rename '${basename(from)}' -> '${basename(to)}'`), { code: 'EPERM' });
+  renameSync(from, to);
+};
+
+test('a new copy that cannot be put in place brings the old one back', () => {
+  const dir = sigridPackage();
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  assert.throws(() => replaceVendor(dir, desktop, failingRename((from) => from === 'sigrid.part')), /EPERM/);
+  assertKept(desktop, before);
+});
+
+test('an old copy that cannot be put aside stays where it is', () => {
+  const dir = sigridPackage();
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  assert.throws(() => replaceVendor(dir, desktop, failingRename((from, to) => to === 'sigrid.old')), /EPERM/);
+  assertKept(desktop, before);
+});
+
+test('when the old copy cannot be put back either it waits in vendor/sigrid.old, and the next sync restores it', async () => {
+  const dir = sigridPackage();
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  assert.throws(
+    () => replaceVendor(dir, desktop, failingRename((from) => from === 'sigrid.part' || from === 'sigrid.old')),
+    (error) => /EPERM/.test(error.message) && /sigrid\.old/.test(error.message),
+  );
+  // What a crash between the two renames would have left: no vendor/sigrid, the old copy beside it, no .part.
+  assert.equal(existsSync(vendorOf(desktop)), false);
+  assert.deepEqual(tree(`${vendorOf(desktop)}.old`), before);
+  assert.equal(existsSync(`${vendorOf(desktop)}.part`), false);
+  await syncSigrid({ desktop, release: null, log: () => {} });
+  assertKept(desktop, before);
+});
+
+test('a rename that the system refuses for a moment is tried again; any other error is not', () => {
+  const calls = [];
+  const waits = [];
+  const flaky = (failures, code) => {
+    let count = 0;
+    return () => { calls.push(code); if (count++ < failures) throw Object.assign(new Error(code), { code }); };
+  };
+  const options = (rename, extra = {}) => ({ rename, wait: (ms) => waits.push(ms), ...extra });
+  renameRetrying('a', 'b', options(flaky(2, 'EPERM')));
+  assert.equal(calls.length, 3, 'two refusals, then it works');
+  assert.deepEqual(waits, [100, 200]);
+  calls.length = 0;
+  waits.length = 0;
+  assert.throws(() => renameRetrying('a', 'b', options(flaky(99, 'EBUSY'), { attempts: 3 })), /EBUSY/);
+  assert.equal(calls.length, 3, 'given up after the attempts');
+  assert.deepEqual(waits, [100, 200]);
+  calls.length = 0;
+  waits.length = 0;
+  assert.throws(() => renameRetrying('a', 'b', options(flaky(1, 'ENOENT'))), /ENOENT/);
+  assert.equal(calls.length, 1, 'a missing folder is not a busy one');
+  assert.deepEqual(waits, []);
+});
+
+test('a link inside the package is refused and the old copy stays', async () => {
+  const dir = sigridPackage();
+  const elsewhere = fresh('elsewhere');
+  write(join(elsewhere, 'outside.txt'), 'outside\n');
+  // A junction needs no administrator rights on Windows (a file symlink does); elsewhere it is a plain symlink.
+  symlinkSync(elsewhere, join(dir, 'dist', 'linked'), 'junction');
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  await assert.rejects(syncSigrid({ desktop, release: releaseOf(dir), log: () => {} }), /dist\/linked is not a plain file/);
+  assertKept(desktop, before);
+  assert.equal(readFileSync(join(elsewhere, 'outside.txt'), 'utf8'), 'outside\n', 'what the link pointed at is untouched');
+});
+
+// The package folder as a .tgz with one top folder, "package", written to `out` (the system tar, as in a release).
+function packTgz(packageDir, out) {
+  mkdirSync(dirname(out), { recursive: true });
+  execFileSync(TAR, ['-czf', out, '-C', dirname(packageDir), 'package'], { stdio: 'ignore' });
+  return out;
+}
+
+// SIGRID_DIR: a fake checkout. Its `npm run release` copies a prebuilt release/ (the .tgz and its manifest) into
+// place and records the arguments it got, as Sigrid's scripts/release.mjs would leave release/.
+// `releaseScript` replaces what that script does (to make it fail, or leave nothing behind).
+function fakeCheckout({ manifestSha = null, packageDir = sigridPackage(), releaseScript = null } = {}) {
+  const checkout = fresh('checkout');
+  const tgz = packTgz(packageDir, join(checkout, 'prebuilt', 'acaprino-sigrid-1.2.3.tgz'));
+  const manifest = { version: '1.2.3', packages: [{ name: '@acaprino/sigrid', file: 'acaprino-sigrid-1.2.3.tgz', sha256: manifestSha ?? sha256(readFileSync(tgz)) }] };
+  write(join(checkout, 'prebuilt', 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+  write(join(checkout, 'package.json'), `${JSON.stringify({ name: 'fake-sigrid', scripts: { release: 'node make-release.mjs' } })}\n`);
+  write(join(checkout, 'make-release.mjs'), releaseScript ?? [
+    "import { cpSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';",
+    "rmSync('release', { recursive: true, force: true });",
+    "mkdirSync('release');",
+    "cpSync('prebuilt', 'release', { recursive: true });",
+    "writeFileSync('release-args.json', JSON.stringify(process.argv.slice(2)));",
+    '',
+  ].join('\n'));
+  return { checkout, packageDir };
+}
+
+test('SIGRID_DIR builds the package in the checkout and takes it from release/', async () => {
+  const { checkout, packageDir } = fakeCheckout();
+  const desktop = desktopOf({ old: true });
+  const log = lines();
+  await syncSigrid({ desktop, source: checkout, log: log.log });
+  assert.deepEqual(JSON.parse(readFileSync(join(checkout, 'release-args.json'), 'utf8')), ['--skip-test']);
+  assert.deepEqual(tree(vendorOf(desktop)), tree(packageDir));
+  assert.equal(log.at(-1), synced());
+  assert.equal(existsSync(`${vendorOf(desktop)}.part`), false);
+  assert.equal(existsSync(join(desktop, '.cache', 'sigrid-local')), false, 'the staging folder is removed');
+});
+
+test('SIGRID_DIR wins over a release that was found', async () => {
+  const { checkout, packageDir } = fakeCheckout();
+  const found = sigridPackage({ version: '9.9.9' });
+  const desktop = desktopOf();
+  await syncSigrid({ desktop, release: releaseOf(found, 'v9.9.9'), source: checkout, log: () => {} });
+  assert.deepEqual(tree(vendorOf(desktop)), tree(packageDir));
+});
+
+test('SIGRID_DIR: a package that differs from its manifest is refused and the old copy stays', async () => {
+  const { checkout } = fakeCheckout({ manifestSha: '0'.repeat(64) });
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  await assert.rejects(syncSigrid({ desktop, source: checkout, log: () => {} }), /SHA-256 differs from the manifest/);
+  assertKept(desktop, before);
+});
+
+test('SIGRID_DIR: a package that differs from its provenance.json is refused and the old copy stays', async () => {
+  const packageDir = sigridPackage();
+  write(join(packageDir, 'dist', 'index.js'), 'export const sigrid = "tampered";\n');
+  const { checkout } = fakeCheckout({ packageDir });
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  await assert.rejects(syncSigrid({ desktop, source: checkout, log: () => {} }), /dist\/index\.js does not match provenance\.json/);
+  assertKept(desktop, before);
+  assert.equal(existsSync(join(desktop, '.cache', 'sigrid-local')), false, 'the staging folder is removed, refused or not');
+});
+
+test('SIGRID_DIR: a release script that fails is reported with the folder, and the old copy stays', async () => {
+  const { checkout } = fakeCheckout({ releaseScript: 'process.exit(1);\n' });
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  await assert.rejects(syncSigrid({ desktop, source: checkout, log: () => {} }), (error) => {
+    assert.match(error.message, /^sigrid: /);
+    assert.ok(error.message.includes('SIGRID_DIR'), error.message);
+    assert.ok(error.message.includes(checkout), error.message);
+    assert.match(error.message, /exit code 1/);
+    return true;
+  });
+  assertKept(desktop, before);
+  assert.equal(existsSync(join(desktop, '.cache', 'sigrid-local')), false, 'the staging folder is removed');
+});
+
+test('SIGRID_DIR: a release script that leaves no manifest is reported with the folder', async () => {
+  const { checkout } = fakeCheckout({ releaseScript: '' });
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  await assert.rejects(syncSigrid({ desktop, source: checkout, log: () => {} }), (error) => {
+    assert.match(error.message, /^sigrid: npm run release left no release\/manifest\.json in SIGRID_DIR /);
+    assert.ok(error.message.includes(checkout), error.message);
+    return true;
+  });
+  assertKept(desktop, before);
+});
+
+test('SIGRID_DIR that is not a checkout of Sigrid is refused', async () => {
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  await assert.rejects(syncSigrid({ desktop, source: fresh('nothing-here'), log: () => {} }), /no package\.json/);
+  assertKept(desktop, before);
+});
+
+// The release path end to end, with a local server standing in for GitHub: releases/latest, compare and the assets.
+// The manifest lists another package first, which is not served: only Sigrid's own is fetched.
+test('the latest release of Sigrid is downloaded, verified and synced', async () => {
+  const packageDir = sigridPackage({ peerDependencies: { react: '^19.0.0' } });
+  const tgz = readFileSync(packTgz(packageDir, join(fresh('release'), 'acaprino-sigrid-1.2.3.tgz')));
+  const manifest = { version: '1.2.3', packages: [
+    { name: '@acaprino/other', file: 'acaprino-other-1.2.3.tgz', sha256: '0'.repeat(64) },
+    { name: '@acaprino/sigrid', file: 'acaprino-sigrid-1.2.3.tgz', sha256: sha256(tgz) },
+  ] };
+  const repo = '/repos/acaprino/sigrid';
+  const requests = [];
+  let api = '';
+  const server = createServer((req, res) => {
+    requests.push(req.url);
+    const send = (body, type = 'application/json') => { res.writeHead(200, { 'Content-Type': type }); res.end(body); };
+    if (req.url === `${repo}/releases/latest`) {
+      send(JSON.stringify({ tag_name: 'v1.2.3', assets: [
+        { name: 'manifest.json', url: `${api}/asset/manifest` },
+        { name: 'acaprino-sigrid-1.2.3.tgz', url: `${api}/asset/package` },
+      ] }));
+    } else if (req.url === `${repo}/compare/main...v1.2.3`) send(JSON.stringify({ status: 'behind' }));
+    else if (req.url === '/asset/manifest') send(JSON.stringify(manifest));
+    else if (req.url === '/asset/package') send(tgz, 'application/octet-stream');
+    else { res.writeHead(404); res.end('not found'); }
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  api = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const cacheDir = fresh('cache');
+    const desktop = desktopOf({ dependencies: { react: '19.3.1' }, old: true });
+    const log = lines();
+    const release = await latestSigridRelease(cacheDir, log.log, api);
+    assert.deepEqual(release, { tag: 'v1.2.3', dir: join(cacheDir, 'v1.2.3', 'package'), cached: join(cacheDir, 'v1.2.3') });
+    assert.deepEqual(requests.filter((url) => url.startsWith('/asset/')), ['/asset/manifest', '/asset/package']);
+    await syncSigrid({ desktop, release, log: log.log });
+    assert.deepEqual(tree(vendorOf(desktop)), tree(packageDir));
+    assert.deepEqual([...log], [
+      'sigrid: v1.2.3 downloaded from acaprino/sigrid',
+      'sigrid: peer react ^19.0.0 is a range, not enforced (Qamille has 19.3.1)',
+      synced(),
+    ]);
+    // The cache holds the release for the next run, with its marker beside the package.
+    assert.deepEqual(readdirSync(join(cacheDir, 'v1.2.3')).sort(), ['.complete', 'package']);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('a release whose manifest lacks Sigrid is not used', async () => {
+  const server = createServer((req, res) => {
+    const send = (body) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(body); };
+    if (req.url.endsWith('/releases/latest')) send(JSON.stringify({ tag_name: 'v1.2.3', assets: [{ name: 'manifest.json', url: `${api}/asset/manifest` }] }));
+    else if (req.url.includes('/compare/')) send(JSON.stringify({ status: 'identical' }));
+    else if (req.url === '/asset/manifest') send(JSON.stringify({ version: '1.2.3', packages: [{ name: '@acaprino/other', file: 'o.tgz', sha256: '0'.repeat(64) }] }));
+    else { res.writeHead(404); res.end('not found'); }
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const api = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const log = lines();
+    assert.equal(await latestSigridRelease(fresh('cache'), log.log, api), null);
+    assert.deepEqual([...log], ['sigrid: v1.2.3 could not be downloaded (@acaprino/sigrid is not in the manifest of v1.2.3)']);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+// A local GitHub that serves one Sigrid release: `tag`, and as its package `packageDir` packed as a .tgz.
+// `serve(dir)` swaps the package for the following requests, under the same tag. `assets()` counts the downloads.
+async function fakeSigridRelease({ tag = 'v1.2.3', packageDir }) {
+  const repo = '/repos/acaprino/sigrid';
+  const requests = [];
+  let api = '';
+  let tgz;
+  let manifest;
+  const serve = (dir) => {
+    tgz = readFileSync(packTgz(dir, join(fresh('release'), 'acaprino-sigrid.tgz')));
+    manifest = { version: tag.slice(1), packages: [{ name: '@acaprino/sigrid', file: 'acaprino-sigrid.tgz', sha256: sha256(tgz) }] };
+  };
+  serve(packageDir);
+  const server = createServer((req, res) => {
+    requests.push(req.url);
+    const send = (body, type = 'application/json') => { res.writeHead(200, { 'Content-Type': type }); res.end(body); };
+    if (req.url === `${repo}/releases/latest`) {
+      send(JSON.stringify({ tag_name: tag, assets: [
+        { name: 'manifest.json', url: `${api}/asset/manifest` },
+        { name: 'acaprino-sigrid.tgz', url: `${api}/asset/package` },
+      ] }));
+    } else if (req.url === `${repo}/compare/main...${tag}`) send(JSON.stringify({ status: 'behind' }));
+    else if (req.url === '/asset/manifest') send(JSON.stringify(manifest));
+    else if (req.url === '/asset/package') send(tgz, 'application/octet-stream');
+    else { res.writeHead(404); res.end('not found'); }
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  api = `http://127.0.0.1:${server.address().port}`;
+  return {
+    api,
+    serve,
+    assets: () => requests.filter((url) => url.startsWith('/asset/')).length,
+    close: () => new Promise((resolve) => server.close(resolve)),
+  };
+}
+
+test('a cached release that fails its checks is removed from the cache, and the next run downloads it again', async () => {
+  const packageDir = sigridPackage();
+  const github = await fakeSigridRelease({ packageDir });
+  try {
+    const cacheDir = fresh('cache');
+    const entry = join(cacheDir, 'v1.2.3');
+    const desktop = desktopOf({ old: true });
+    const before = tree(vendorOf(desktop));
+    // The first run downloads the release; its .complete marker is written before any check of the package.
+    const first = await latestSigridRelease(cacheDir, () => {}, github.api);
+    assert.equal(github.assets(), 2, 'the manifest and the package');
+    assert.equal(existsSync(join(entry, '.complete')), true);
+    // The cached copy is damaged. The next run trusts the marker: nothing is downloaded, and the sync refuses it.
+    write(join(first.dir, 'dist', 'index.js'), 'export const sigrid = "damaged";\n');
+    const second = await latestSigridRelease(cacheDir, () => {}, github.api);
+    assert.equal(github.assets(), 2, 'a complete entry is not downloaded again');
+    assert.deepEqual(second, first);
+    const log = lines();
+    await assert.rejects(syncSigrid({ desktop, release: second, log: log.log }), (error) => {
+      assert.match(error.message, /dist\/index\.js does not match provenance\.json/);
+      assert.match(error.message, /The cached copy of v1\.2\.3 was removed, so the next run downloads it again\./);
+      return true;
+    });
+    assert.equal(existsSync(entry), false, 'the broken entry is gone from the cache');
+    assertKept(desktop, before);
+    assert.deepEqual([...log], []);
+    // The run after that downloads the release again, and now the package is whole.
+    const third = await latestSigridRelease(cacheDir, log.log, github.api);
+    assert.equal(github.assets(), 4, 'downloaded again');
+    await syncSigrid({ desktop, release: third, log: log.log });
+    assert.deepEqual(tree(vendorOf(desktop)), tree(packageDir));
+    assert.deepEqual([...log], ['sigrid: v1.2.3 downloaded from acaprino/sigrid', synced()]);
+  } finally {
+    await github.close();
+  }
+});
+
+test('a package that fails its checks and did not come from the cache leaves no cache to remove', async () => {
+  const dir = sigridPackage();
+  write(join(dir, 'dist', 'index.js'), 'export const sigrid = "tampered";\n');
+  const desktop = desktopOf({ old: true });
+  await assert.rejects(syncSigrid({ desktop, release: releaseOf(dir), log: () => {} }), (error) => {
+    assert.doesNotMatch(error.message, /cached copy/);
+    return true;
+  });
+  assert.equal(existsSync(dir), true, 'the folder of the package is not deleted when no cache folder was named');
+});
+
+test('a release whose tag is not v<version of its provenance.json> is refused, and the old copy stays', async () => {
+  const dir = sigridPackage();
+  const desktop = desktopOf({ old: true });
+  const before = tree(vendorOf(desktop));
+  // A package of version 1.2.3 uploaded to another release, or to a tag that only looks like its own.
+  for (const tag of ['v1.2.4', 'v1.2.30', 'v1.2', '1.2.3', 'sigrid-v1.2.3']) {
+    const log = lines();
+    await assert.rejects(syncSigrid({ desktop, release: releaseOf(dir, tag), log: log.log }), (error) => {
+      assert.ok(error.message.includes(`the release ${tag} holds a package whose provenance.json says version "1.2.3", which is the tag v1.2.3`), error.message);
+      assert.match(error.message, /uploaded to the wrong release/);
+      assert.doesNotMatch(error.message, /cached copy/);
+      return true;
+    }, tag);
+    assertKept(desktop, before);
+    assert.deepEqual([...log], [], tag);
+  }
+  // A provenance.json with no version cannot belong to any tag.
+  const unversioned = sigridPackage();
+  const provenance = JSON.parse(readFileSync(join(unversioned, 'provenance.json'), 'utf8'));
+  delete provenance.version;
+  write(join(unversioned, 'provenance.json'), `${JSON.stringify(provenance, null, 2)}\n`);
+  await assert.rejects(syncSigrid({ desktop, release: releaseOf(unversioned), log: () => {} }), /says version null\. A package was uploaded to the wrong release/);
+  assertKept(desktop, before);
+  // The right tag passes; a package built in SIGRID_DIR has no tag to check.
+  await syncSigrid({ desktop, release: releaseOf(dir, 'v1.2.3'), log: () => {} });
+  assert.deepEqual(tree(vendorOf(desktop)), tree(dir));
+});
+
+test('a release of the wrong tag is refused with the package and the cache it came from, end to end', async () => {
+  // Version 1.2.3 was uploaded to the release v1.2.4.
+  const github = await fakeSigridRelease({ tag: 'v1.2.4', packageDir: sigridPackage() });
+  try {
+    const cacheDir = fresh('cache');
+    const desktop = desktopOf({ old: true });
+    const before = tree(vendorOf(desktop));
+    const release = await latestSigridRelease(cacheDir, () => {}, github.api);
+    assert.equal(release.tag, 'v1.2.4');
+    await assert.rejects(syncSigrid({ desktop, release, log: () => {} }), (error) => {
+      assert.match(error.message, /the release v1\.2\.4 holds a package whose provenance\.json says version "1\.2\.3"/);
+      assert.match(error.message, /The cached copy of v1\.2\.4 was removed/);
+      return true;
+    });
+    assert.equal(existsSync(join(cacheDir, 'v1.2.4')), false);
+    assertKept(desktop, before);
+  } finally {
+    await github.close();
+  }
+});

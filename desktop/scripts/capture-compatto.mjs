@@ -127,14 +127,14 @@ const VIEWS = {
     },
   },
   // The menu behind "More actions" in the reader.
-  popover: {
+  menu: {
     async go(page) {
       await page.locator('.mail-row').first().locator('button.mail-open').click();
       await page.locator('.message-title').waitFor();
       const more = page.getByRole('button', { name: either('More message actions', 'Altre azioni sul messaggio') });
       if (!(await more.count())) skip('no "More message actions" button');
       await more.first().click();
-      if (!(await visible(page.locator('[data-scope="popover"][data-part="content"], .popover')))) skip('the popover did not open');
+      if (!(await visible(page.locator('[data-scope="menu"][data-part="content"]')))) skip('the menu did not open');
     },
   },
   // The hint of an icon button: hover the buttons of the reader until one shows.

@@ -765,7 +765,9 @@ async fn delete_account(
 // --- Pagina /admin ----------------------------------------------------------------
 
 const ADMIN_INDEX_HTML: &str = include_str!("http/admin/index.html");
-const ADMIN_APP_CSS: &str = include_str!("http/admin/app.css");
+/// Lo stile della pagina: pubblico perché una pagina che estende questa (`AdminPage::Extension`)
+/// lo serva com'è, senza tenerne una copia.
+pub const ADMIN_APP_CSS: &str = include_str!("http/admin/app.css");
 const ADMIN_APP_JS: &str = include_str!("http/admin/app.js");
 
 fn static_page(content_type: &'static str, body: &'static str) -> Response {

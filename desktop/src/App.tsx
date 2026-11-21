@@ -7,7 +7,13 @@ import Sidebar from './components/Sidebar';
 import WindowControls from './components/WindowControls';
 import MailList from './components/MailList';
 import { imeComposing } from './ds/ime';
-import { shortcutCoveredByLayer, shortcutIgnored, zoomKey } from './lib/shortcut-guard';
+import {
+  arrowsMoveMail,
+  isAppChord,
+  shortcutCoveredByLayer,
+  shortcutIgnored,
+  zoomKey,
+} from './lib/shortcut-guard';
 import { syncErrors, type MailSyncStatus } from './lib/mail-sync';
 import SearchBar from './components/SearchBar';
 import Reader from './components/Reader';
@@ -247,6 +253,12 @@ export default function App() {
       earlyMarks: new Map<number, number>(),
       // Workspace snapshots in flight: a patch from an event makes them stale (see onAppEvent).
       snapshotsRunning: 0,
+      // The control that had the focus when each composer opened (by draft id): the place to go back to
+      // when the composer closes and nothing in the list is selected.
+      composerOpeners: new Map<number, HTMLElement>(),
+      // The last workspace reload that a composer asked for (it saved or queued something): the lists it
+      // rebuilds settle when this is done.
+      workspaceSettling: Promise.resolve(),
       searchTimer: undefined as ReturnType<typeof setTimeout> | undefined,
       prefetchTimer: undefined as ReturnType<typeof setTimeout> | undefined,
       // Rows the events named, read together (see wantRows). `rowsLatest` remembers which read asked
@@ -264,6 +276,13 @@ export default function App() {
   const searchElement = useRef<HTMLInputElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const reduceMotion = useReducedMotion();
+
+  // The page has drawn: without this, src-tauri/src/recovery.rs offers to reload after 15 s. App's
+  // first effect, not a frame after render() in main.tsx: a render that throws never commits, so an
+  // empty window never passes for a ready one.
+  useEffect(() => {
+    if (desktop) void call('frontend_ready').catch(() => {});
+  }, []);
 
   // Every function below reads the state through `s` and `v`, never a value of one render, so a
   // listener or timer that holds an older copy of a function still sees the current state.
@@ -1175,11 +1194,14 @@ export default function App() {
       !active.closest('.reader')
     )
       return;
-    const target =
+    (selectedRowButton() || document.querySelector<HTMLElement>('.mail-list h1'))?.focus();
+  }
+  // The open button of the row on show in the list, a conversation's main row or one of its replies.
+  function selectedRowButton() {
+    return (
       document.querySelector<HTMLElement>('.mail-row.selected .mail-open') ||
-      document.querySelector<HTMLElement>('.reply-row.selected .reply-open') ||
-      document.querySelector<HTMLElement>('.mail-list h1');
-    target?.focus();
+      document.querySelector<HTMLElement>('.reply-row.selected .reply-open')
+    );
   }
   function queued(pending: UndoAction) {
     ++v.workspaceRequest;
@@ -1215,6 +1237,8 @@ export default function App() {
     }
   }
   async function compose(replyTo: number | null = null, forward = false, everyone = false) {
+    // The control that asked for the composer, before the draft is made: that wait can move the focus.
+    const opener = document.activeElement;
     try {
       let draft = await call<Draft>('create_draft', { accountId: s.accountId, replyTo, forward });
       const selected = s.selected;
@@ -1225,7 +1249,7 @@ export default function App() {
           importLeaseIds: [],
         });
       }
-      openComposer(draft);
+      openComposer(draft, opener);
       await loadWorkspace();
     } catch (e) {
       notify(errorText(e), true);
@@ -1241,15 +1265,44 @@ export default function App() {
     const next = position - 1 + delta;
     if (position > 0 && next >= 0 && next < s.visibleOrder.length) void open(s.visibleOrder[next]);
   }
-  function openComposer(draft: Draft) {
+  function openComposer(draft: Draft, opener: Element | null = document.activeElement) {
+    if (opener instanceof HTMLElement && opener !== document.body && !opener.closest('.composer-panel'))
+      v.composerOpeners.set(draft.id, opener);
     if (!s.composers.some((item) => item.id === draft.id)) {
       s.composers = [...s.composers, structuredClone(draft)];
     }
     s.activeComposerId = draft.id;
   }
-  function closeComposer(id: number) {
+  // `returnFocus` is false when another composer takes the place of this one (a copy of the draft).
+  function closeComposer(id: number, returnFocus = true) {
     s.composers = s.composers.filter((draft) => draft.id !== id);
     if (s.activeComposerId === id) s.activeComposerId = null;
+    const opener = v.composerOpeners.get(id);
+    v.composerOpeners.delete(id);
+    if (returnFocus) void restoreComposerFocus(id, opener);
+  }
+  // A composer that closes (sent, saved, discarded) fades out with the focus still in it, or leaves it on
+  // <body> when its tab was what had it. The focus goes to the row on show in the list, else to the control
+  // that opened the composer, else to the heading of the list or of the Drafts page; a focus that is
+  // already somewhere else stays.
+  async function restoreComposerFocus(id: number, opener: HTMLElement | undefined) {
+    await tick();
+    const placed = placeFocusAfterComposer(id, opener);
+    // The reload the same action started can take away what was just focused (a draft that was sent
+    // leaves the Drafts list): once it has landed, a focus that fell to <body> goes to the next place.
+    await v.workspaceSettling;
+    await tick();
+    if (placed && !placed.isConnected && document.activeElement === document.body) placeFocusAfterComposer(id, opener);
+  }
+  function placeFocusAfterComposer(id: number, opener: HTMLElement | undefined) {
+    const active = document.activeElement;
+    if (active && active !== document.body && !document.getElementById(`compose-panel-${id}`)?.contains(active)) return null;
+    const target =
+      selectedRowButton() ||
+      (opener?.isConnected ? opener : null) ||
+      document.querySelector<HTMLElement>('.mail-list h1, .drafts-page h1');
+    target?.focus();
+    return target;
   }
   async function sync() {
     if (syncing()) return;
@@ -1291,7 +1344,9 @@ export default function App() {
     if (s.printPreview || shortcutCoveredByLayer(e.target)) return;
     const inComposer = e.target instanceof HTMLElement && e.target.closest('.composer-panel,.composer-dock');
     const editing = shortcutIgnored(e.target);
-    if (!inComposer && !editing && (e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+    // AltGr is Ctrl+Alt on Windows: a typed character, never a chord (Ctrl+AltGr+K, Ctrl+AltGr+Z).
+    const chord = isAppChord(e);
+    if (!inComposer && !editing && chord && !e.shiftKey && e.key.toLowerCase() === 'z') {
       const workspace = s.workspace;
       const latest =
         workspace &&
@@ -1302,7 +1357,7 @@ export default function App() {
       }
       return;
     }
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+    if (chord && e.key.toLowerCase() === 'k') {
       e.preventDefault();
       if (!isMailView()) navigate('Inbox');
       void tick().then(() => searchElement.current?.focus());
@@ -1337,7 +1392,14 @@ export default function App() {
       e.preventDefault();
       void action(selected.id, 'archive');
     }
-    if (isMailView() && ['ArrowUp', 'ArrowDown'].includes(e.key) && s.visibleOrder.length) {
+    // The arrows step through the messages only from the page, the list or the reader: in the
+    // sidebar, on a top-bar button or in the activity panel they belong to that control.
+    if (
+      isMailView() &&
+      ['ArrowUp', 'ArrowDown'].includes(e.key) &&
+      arrowsMoveMail(e.target) &&
+      s.visibleOrder.length
+    ) {
       e.preventDefault();
       const listed = selectedListId();
       const at = listed === null ? -1 : s.visibleOrder.indexOf(listed);
@@ -1446,12 +1508,14 @@ export default function App() {
         },
         {
           last: true,
-          // Session end: the notes first; the recording only once the session really ends.
+          // Session end: the notes first; the recording only once the session really ends. Unsaved
+          // notes answer false; a stop or cancel that fails throws, and endSession counts that too.
           sessionEnd: async (last) => {
-            await flushMeetingDrafts();
-            if (!last) return;
+            const saved = await flushMeetingDrafts();
+            if (!last) return saved;
             if (captureActive(await meetingCall<CaptureSnapshot>('meeting_capture_status'))) await meetingCall('meeting_stop');
             await call('meeting_cancel_all_jobs');
+            return saved;
           },
         },
       ),
@@ -1469,8 +1533,12 @@ export default function App() {
           v.leaveAccount = null;
           return false;
         },
-        // Session end: nobody can answer "Vuoi salvare?", so the changes are saved.
-        { sessionEnd: async () => s.view === 'Settings' && s.settingsDirty && settingsPanel.current?.save() },
+        // Session end: nobody can answer "Vuoi salvare?", so the changes are saved. Nothing to save
+        // counts as saved; a save that fails answers false.
+        {
+          sessionEnd: async () =>
+            s.view !== 'Settings' || !s.settingsDirty || (await settingsPanel.current?.save()) !== false,
+        },
       ),
     );
     // `workspace-changed` and its preview twin carry no content: until the backend stops sending
@@ -1616,13 +1684,22 @@ export default function App() {
                       find();
                     }}
                     onKeyDown={(event) => {
-                      // The Enter that picks an IME candidate is not a search (aspetto-nativo.md, rule 24).
+                      // The Enter that picks an IME candidate is not a search, and the Escape that drops
+                      // one is not a clear (aspetto-nativo.md, rule 24).
                       if (event.key === 'Enter' && !imeComposing(event.nativeEvent)) {
                         event.preventDefault();
                         find(true);
+                      } else if (event.key === 'Escape' && !imeComposing(event.nativeEvent)) {
+                        // Esc empties a field that has text, and the list goes back to the whole view;
+                        // on an empty field it does what it did before: nothing.
+                        if (s.searchInput) {
+                          event.preventDefault();
+                          applySearch('');
+                        }
                       }
                     }}
                     aria-label={tr('Cerca email', 'Search mail')}
+                    aria-keyshortcuts="Control+K"
                     placeholder={tr('Cerca una persona, una parola o una data', 'Search a person, a word or a date')}
                   />
                   <kbd>Ctrl K</kbd>
@@ -1815,7 +1892,7 @@ export default function App() {
                   <div className="page-heading">
                     <div>
                       <span className="page-kicker">{tr('Riprendi da dove avevi lasciato', 'Pick up where you left off')}</span>
-                      <h1>{folderLabel('Drafts')}</h1>
+                      <h1 tabIndex={-1}>{folderLabel('Drafts')}</h1>
                       <p>
                         {workspace.drafts.length}{' '}
                         {workspace.drafts.length === 1
@@ -1877,11 +1954,13 @@ export default function App() {
                   workspace={workspace}
                   close={closeComposer}
                   compose={() => void compose()}
-                  changed={() => void loadWorkspace().catch((e) => notify(errorText(e), true))}
+                  changed={() => {
+                    v.workspaceSettling = loadWorkspace().catch((e) => notify(errorText(e), true));
+                  }}
                   notify={notify}
                   queued={queued}
                   copied={(id, saved) => {
-                    closeComposer(id);
+                    closeComposer(id, false);
                     openComposer(saved);
                   }}
                 />

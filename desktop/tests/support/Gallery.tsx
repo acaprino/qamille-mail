@@ -11,6 +11,7 @@ import TabsGallery from './gallery/TabsGallery';
 import RecipientsGallery from './gallery/RecipientsGallery';
 import ModalSection from './gallery/Modal';
 import PopoverSection from './gallery/Popover';
+import MenuSection from './gallery/Menu';
 import SidePanelSection from './gallery/SidePanel';
 import NoticesGallery from './gallery/NoticesGallery';
 
@@ -80,6 +81,8 @@ export default function Gallery({ which, props = {} }: GalleryProps) {
       return <SidePanelSection />;
     case 'popover':
       return <PopoverSection />;
+    case 'menu':
+      return <MenuSection />;
     case 'recipients':
       return <RecipientsGallery props={props} />;
     default:

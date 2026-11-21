@@ -199,6 +199,26 @@ pub fn failure_of(kind: i32) -> Failure {
     }
 }
 
+/// The meeting recorder's state, mirrored here (as `domain::meeting::CaptureState`)
+/// so this file stays free of dependencies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CapturePhase {
+    Idle,
+    Preparing,
+    Recording,
+    Paused,
+    Saving,
+    Saved,
+    Interrupted,
+}
+
+/// Whether leaving the app must stop the recorder first: the same states the page's
+/// close guard stops (`captureActive` in `lib/meetings.ts`). Exiting under any of them
+/// would cut the audio, and the meeting would be found "interrupted" at the next start.
+pub fn must_stop_capture(phase: CapturePhase) -> bool {
+    matches!(phase, CapturePhase::Preparing | CapturePhase::Recording | CapturePhase::Paused | CapturePhase::Saving)
+}
+
 /// Whether `url` is the app's own page, the only one its windows may show:
 /// Tauri's local origin (`http://tauri.localhost` on Windows, or `https` with
 /// `useHttpsScheme`) or, in a dev build, the dev server's origin.
@@ -222,6 +242,56 @@ pub fn opens_outside(url: &str) -> bool {
     let lower = url.to_ascii_lowercase();
     (lower.starts_with("https://") || lower.starts_with("http://") || lower.starts_with("mailto:"))
         && !url.contains(['\r', '\n', '\0'])
+}
+
+/// A window the page asks for (`target="_blank"`, `window.open`) opens in the browser when it is a web or
+/// mail address, and never when it is the app's own page: only a relative link, which resolves against
+/// the app's address, gets there, and it is no link of a message.
+pub fn opens_from_new_window(url: &str, dev_origin: Option<&str>) -> bool {
+    opens_outside(url) && !is_app_page(url, dev_origin)
+}
+
+/// Whether a frame of the app's pages may load `uri`: the message document, which `MessageHtml.tsx`
+/// gives its frame as `srcdoc`, or an empty frame. A link in a message opens in the browser, never in
+/// its frame, and no frame loads the app page (a second app inside the first) or the web. A link to a
+/// part of the message (`#…`) is no exception: a `srcdoc` frame has no address of its own, so the
+/// browser resolves it against the app's (`http://tauri.localhost/#…`) and would start a navigation to
+/// it, which this refuses. `MessageHtml.tsx` cancels the click and scrolls to the part itself, so the
+/// frame never asks.
+pub fn frame_may_navigate(uri: &str) -> bool {
+    matches!(uri, "about:srcdoc" | "about:blank")
+}
+
+/// Microsoft's download of the WebView2 Runtime (Evergreen bootstrapper).
+pub const WEBVIEW2_DOWNLOAD: &str = "https://go.microsoft.com/fwlink/p/?LinkId=2124703";
+
+/// The message of a start that failed (`startup_failed` in `main.rs`): the reason, or, when the
+/// WebView2 Runtime is missing, what that is and where to get it (its lookup error names nothing
+/// a person could act on; `native.log` keeps it).
+pub fn startup_failure_text(error: &str, italian: bool, webview_missing: bool) -> String {
+    let headline = if italian { "Qamille non è riuscito ad avviarsi." } else { "Qamille could not start." };
+    if !webview_missing {
+        return format!("{headline}\n\n{error}");
+    }
+    let advice = if italian {
+        "Manca il componente di Windows che disegna le finestre (Microsoft Edge WebView2 Runtime). Installalo da"
+    } else {
+        "The Windows component that draws the windows (Microsoft Edge WebView2 Runtime) is missing. Install it from"
+    };
+    let again = if italian { "e riapri Qamille." } else { "and open Qamille again." };
+    format!("{headline}\n\n{advice} {WEBVIEW2_DOWNLOAD} {again}")
+}
+
+/// The text a panic carries (`panic!` gives a `&str` or a `String`), so a start that panicked
+/// can say why like one that failed.
+pub fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(text) = payload.downcast_ref::<&str>() {
+        (*text).to_owned()
+    } else if let Some(text) = payload.downcast_ref::<String>() {
+        text.clone()
+    } else {
+        "no message".to_owned()
+    }
 }
 
 #[cfg(test)]
@@ -333,5 +403,87 @@ mod tests {
         assert!(!opens_outside("file:///C:/Windows/System32/calc.exe"));
         assert!(!opens_outside("javascript:alert(1)"));
         assert!(!opens_outside("https://example.com/\r\nx"));
+    }
+
+    #[test]
+    fn a_new_window_never_sends_the_apps_own_page_to_the_browser() {
+        assert!(opens_from_new_window("https://example.com/a", None));
+        assert!(opens_from_new_window("mailto:someone@example.com", Some("http://127.0.0.1:1420")));
+        // A relative link of a message resolves against the app's own address.
+        assert!(!opens_from_new_window("http://tauri.localhost/foo", None));
+        assert!(!opens_from_new_window("HTTP://TAURI.LOCALHOST/%C2%A0https://example.com/x", None));
+        assert!(!opens_from_new_window("http://127.0.0.1:1420/foo", Some("http://127.0.0.1:1420")));
+        // Without a dev server that address is just a web address.
+        assert!(opens_from_new_window("http://127.0.0.1:1420/foo", None));
+        assert!(!opens_from_new_window("file:///C:/x", None));
+        assert!(!opens_from_new_window("https://example.com/\r\nx", None));
+    }
+
+    #[test]
+    fn only_the_message_document_may_load_in_a_frame() {
+        assert!(frame_may_navigate("about:srcdoc"));
+        assert!(frame_may_navigate("about:blank"));
+        assert!(!frame_may_navigate("https://x.it/"));
+        assert!(!frame_may_navigate("http://tauri.localhost/index.html"));
+        // Chromium's mark for a navigation it blocked: refused, the frame keeps its message.
+        assert!(!frame_may_navigate("about:blank#blocked"));
+        for refused in [
+            "",
+            "about:",
+            "about:srcdocs",
+            "about://blank",
+            "data:text/html,<p>x</p>",
+            "javascript:alert(1)",
+            "blob:http://tauri.localhost/4f1c",
+            "file:///C:/x.html",
+            "mailto:a@x.it",
+            "http://127.0.0.1:1420/",
+        ] {
+            assert!(!frame_may_navigate(refused), "{refused}");
+        }
+    }
+
+    #[test]
+    fn only_an_active_or_paused_capture_is_stopped_before_exit() {
+        assert!(!must_stop_capture(CapturePhase::Idle));
+        assert!(must_stop_capture(CapturePhase::Recording));
+        assert!(must_stop_capture(CapturePhase::Paused));
+        // Starting and saving are live too: the page's close guard stops them (`captureActive`).
+        assert!(must_stop_capture(CapturePhase::Preparing));
+        assert!(must_stop_capture(CapturePhase::Saving));
+        // Already ended, saved or interrupted: nothing left to stop.
+        assert!(!must_stop_capture(CapturePhase::Saved));
+        assert!(!must_stop_capture(CapturePhase::Interrupted));
+    }
+
+    #[test]
+    fn startup_failure_names_the_reason_and_the_runtime() {
+        let busy = "Questa cartella è già aperta in un'altra interfaccia Qamille.";
+        let italian = startup_failure_text(busy, true, false);
+        assert!(italian.starts_with("Qamille non è riuscito ad avviarsi."), "{italian}");
+        assert!(italian.contains(busy), "the reason must be said: {italian}");
+        let english = startup_failure_text("file is not a database", false, false);
+        assert!(english.starts_with("Qamille could not start."), "{english}");
+        assert!(english.contains("file is not a database"), "the reason must be said: {english}");
+        // The runtime's own error names no component: the text must say what is missing and where to get it.
+        let lookup = "The system cannot find the file specified. (0x80070002)";
+        for italian in [true, false] {
+            let missing = startup_failure_text(lookup, italian, true);
+            assert!(missing.contains("WebView2"), "{missing}");
+            assert!(missing.contains("https://go.microsoft.com/fwlink/p/?LinkId=2124703"), "{missing}");
+        }
+        assert!(startup_failure_text(lookup, true, true).starts_with("Qamille non è riuscito ad avviarsi."));
+        assert!(startup_failure_text(lookup, false, true).starts_with("Qamille could not start."));
+    }
+
+    #[test]
+    fn a_panic_at_startup_keeps_its_message() {
+        fn payload(start: fn()) -> Box<dyn std::any::Any + Send> {
+            std::panic::catch_unwind(start).expect_err("the start must panic")
+        }
+        // `panic!` with a literal carries a `&str`, with arguments a `String`.
+        assert_eq!(panic_message(&*payload(|| panic!("store missing"))), "store missing");
+        assert_eq!(panic_message(&*payload(|| panic!("{} rows unreadable", 3))), "3 rows unreadable");
+        assert_eq!(panic_message(&*payload(|| std::panic::panic_any(7_u8))), "no message");
     }
 }

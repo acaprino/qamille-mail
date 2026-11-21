@@ -5,7 +5,8 @@
 // The look is in ds/styles/ark/dialog.css. `size` is `sm`, `md` (default) or `lg`.
 import { Dialog } from '@ark-ui/react/dialog';
 import { Portal } from '@ark-ui/react/portal';
-import { useEffect, useRef, useState, type HTMLAttributes } from 'react';
+import { useRef, type HTMLAttributes } from 'react';
+import { useReturnFocus } from '../focus-return';
 
 export type ModalProps = HTMLAttributes<HTMLDivElement> & {
   size?: 'sm' | 'md' | 'lg';
@@ -16,33 +17,10 @@ export type ModalProps = HTMLAttributes<HTMLDivElement> & {
   initialFocus?: () => HTMLElement | null;
 };
 
-/** The button that opened the popup (`aria-controls`, as Ark sets it) holding `element`, if any. */
-function popupTrigger(element: HTMLElement | null): HTMLElement | null {
-  for (let node = element?.parentElement; node; node = node.parentElement) {
-    if (!node.id) continue;
-    const trigger = document.querySelector<HTMLElement>(`[aria-controls="${CSS.escape(node.id)}"]`);
-    if (trigger && !node.contains(trigger)) return trigger;
-  }
-  return null;
-}
-
 export default function Modal({ size = 'md', onClose, initialFocus, 'aria-label': ariaLabel, className, children, ...rest }: ModalProps) {
-  // The caller closes the dialog by unmounting it, which gives Ark no chance to restore the focus:
-  // put it back on the opener when it would fall to <body>.
-  const [opener] = useState(() =>
-    document.activeElement instanceof HTMLElement ? document.activeElement : null,
-  );
-  // Opened from an item of a menu or popover that closes meanwhile: back to that popup's trigger.
-  const [fallback] = useState(() => popupTrigger(opener));
+  // The caller closes the dialog by unmounting it, which gives Ark no chance to restore the focus.
   const content = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const dialog = content.current;
-    return () => {
-      const lost = document.activeElement === document.body || !!dialog?.contains(document.activeElement);
-      const target = opener?.isConnected ? opener : fallback?.isConnected ? fallback : null;
-      if (lost && target) target.focus();
-    };
-  }, [opener, fallback]);
+  useReturnFocus(content);
   return (
     <Dialog.Root
       open

@@ -10,7 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [{ "label": "main", "title": "Qamille", "width": 1440, "height": 900, "minWidth": 1000, "minHeight": 640, "decorations": false, "shadow": true, "backgroundColor": "#f6f7f9", "dragDropEnabled": false }],
+    "windows": [{ "label": "main", "title": "Qamille", "width": 1440, "height": 900, "minWidth": 1000, "minHeight": 640, "decorations": false, "shadow": true, "backgroundColor": "#f6f7f9", "dragDropEnabled": false, "center": true, "preventOverflow": true }],
     "security": {
       "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; media-src 'self' blob:; font-src 'self'; connect-src 'self' ipc: http://ipc.localhost; object-src 'none'; frame-src 'none'; base-uri 'self'; form-action 'none'"
     }

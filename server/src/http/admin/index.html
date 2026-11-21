@@ -9,162 +9,276 @@
 <script src="/admin/app.js" defer></script>
 </head>
 <body>
-<header class="bar">
-  <h1>Qamille · Amministrazione</h1>
-  <button id="lock" type="button" class="secondary" hidden>Esci</button>
-</header>
-<main>
-  <section id="key-section" class="card narrow" aria-labelledby="key-title">
-    <h2 id="key-title">Chiave amministratore</h2>
-    <p class="hint">La chiave resta solo in questa pagina, in memoria: ricaricando o chiudendo la scheda va scritta di nuovo. Non si salva nel browser.</p>
+<div id="key-section" class="gate">
+  <div class="gate-card">
+    <p class="brand"><span class="brand-mark" aria-hidden="true">Q</span><span class="brand-name">Qamille</span><span class="brand-sub">Server</span></p>
+    <h1>Amministrazione</h1>
+    <p class="hint">Scrivi la chiave amministratore. Resta solo in questa pagina, in memoria: ricaricando o chiudendo la scheda va scritta di nuovo.</p>
     <form id="key-form" autocomplete="off">
-      <label for="key-input">Chiave</label>
-      <input id="key-input" name="admin-key" type="password" autocomplete="off" spellcheck="false" required>
+      <label class="field" for="key-input">Chiave amministratore</label>
+      <input id="key-input" name="admin-key" type="password" autocomplete="off" spellcheck="false" aria-describedby="key-error" required>
+      <p id="key-error" class="note note-danger" role="alert" hidden></p>
       <button id="key-submit" type="submit">Entra</button>
     </form>
-    <p id="key-error" class="error" role="alert" hidden></p>
-  </section>
+  </div>
+</div>
 
-  <section id="users-section" aria-labelledby="users-title" hidden>
-    <div class="toolbar">
-      <h2 id="users-title">Utenti</h2>
-      <div class="toolbar-actions">
-        <button id="refresh" type="button" class="secondary">Aggiorna</button>
-        <button id="new-user-toggle" type="button">Nuovo utente</button>
-      </div>
-    </div>
+<div id="shell" class="shell" hidden>
+  <p id="armed-note" class="sr-only" role="status"></p>
+  <a class="skip" href="#content">Vai al contenuto</a>
+  <aside class="sidebar">
+    <p class="brand"><span class="brand-mark" aria-hidden="true">Q</span><span class="brand-name">Qamille</span><span class="brand-sub">Server</span></p>
+    <nav class="nav" aria-label="Sezioni">
+      <button type="button" class="nav-item" data-view="users">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18 14.3c2.1.7 3.5 2.6 3.5 5.7"/></svg>
+        <span>Utenti</span>
+      </button>
+      <button type="button" class="nav-item" data-view="llm" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5h16v11H9.5L4 20z"/><path d="M8 9h8"/><path d="M8 12.5h5"/></svg>
+        <span>Assistente</span>
+      </button>
+      <button type="button" class="nav-item" data-view="embedding" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+        <span>Embedding</span>
+      </button>
+      <button type="button" class="nav-item" data-view="models" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3l8.5 4.5L12 12 3.5 7.5z"/><path d="M3.5 12L12 16.5l8.5-4.5"/><path d="M3.5 16.5L12 21l8.5-4.5"/></svg>
+        <span>Modelli</span>
+      </button>
+    </nav>
+    <button id="lock" type="button" class="nav-item nav-exit" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M10 4H5v16h5"/><path d="M14 8l4 4-4 4"/><path d="M18 12H9"/></svg>
+      <span>Esci</span>
+    </button>
+  </aside>
 
-    <form id="new-user-form" class="card" autocomplete="off" hidden>
-      <h3>Nuovo utente</h3>
-      <div class="fields">
-        <label>Username
-          <input id="new-username" type="text" maxlength="64" spellcheck="false" required>
-        </label>
-        <label>Email (facoltativa)
-          <input id="new-email" type="email" maxlength="254" spellcheck="false">
-        </label>
-        <label>Massimo di dispositivi (vuoto: predefinito)
-          <input id="new-max" type="number" min="0" step="1" inputmode="numeric">
-        </label>
-      </div>
-      <div class="actions">
-        <button id="new-user-submit" type="submit">Crea</button>
-        <button id="new-user-cancel" type="button" class="secondary">Annulla</button>
-      </div>
-    </form>
+  <main id="content" tabindex="-1">
+    <section id="users-section" class="view" aria-labelledby="users-title" hidden>
+      <header class="view-head">
+        <div>
+          <h1 id="users-title">Utenti</h1>
+          <p id="users-count" class="view-sub"></p>
+        </div>
+        <div class="toolbar-actions">
+          <button id="refresh" type="button" class="secondary">Aggiorna</button>
+          <button id="new-user-toggle" type="button" aria-expanded="false" aria-controls="new-user-form">Nuovo utente</button>
+        </div>
+      </header>
 
-    <div id="secret-box" class="card secret" role="status" hidden>
-      <p id="secret-label"></p>
-      <div class="secret-row">
-        <code id="secret-value"></code>
-        <button id="secret-copy" type="button">Copia</button>
-      </div>
-      <p class="hint">Viene mostrata una volta sola: comunicala all'utente, che la cambierà al primo accesso.</p>
-      <button id="secret-close" type="button" class="secondary">Fatto</button>
-    </div>
+      <form id="new-user-form" class="sheet" autocomplete="off" hidden>
+        <h2>Nuovo utente</h2>
+        <div class="fields">
+          <label class="field">Username
+            <input id="new-username" type="text" maxlength="64" spellcheck="false" autocapitalize="none" required>
+          </label>
+          <label class="field">Email <span class="optional">facoltativa</span>
+            <input id="new-email" type="email" maxlength="254" spellcheck="false">
+          </label>
+          <label class="field">Massimo di dispositivi <span class="optional">vuoto: predefinito</span>
+            <input id="new-max" type="number" min="0" step="1" inputmode="numeric">
+          </label>
+        </div>
+        <div class="actions">
+          <button id="new-user-submit" type="submit">Crea utente</button>
+          <button id="new-user-cancel" type="button" class="secondary">Annulla</button>
+        </div>
+      </form>
 
-    <p id="status" class="status" role="status"></p>
-    <p id="error" class="error" role="alert" hidden></p>
+      <div id="secret-box" class="callout callout-warn" role="status" hidden>
+        <p id="secret-label"></p>
+        <div class="secret-row">
+          <code id="secret-value"></code>
+          <button id="secret-copy" type="button" aria-describedby="secret-label">Copia</button>
+        </div>
+        <p class="hint">Si vede una volta sola: comunicala all'utente, che la cambierà al primo accesso.</p>
+        <button id="secret-close" type="button" class="secondary">Fatto</button>
+      </div>
 
-    <div class="table-wrap">
-      <table id="users-table">
-        <thead>
-          <tr>
-            <th scope="col">Username</th>
-            <th scope="col">Email</th>
-            <th scope="col">Stato</th>
-            <th scope="col">Dispositivi attivi</th>
-            <th scope="col">Massimo</th>
-            <th scope="col" id="llm-col" hidden>Token assistente</th>
-            <th scope="col">Azioni</th>
-          </tr>
-        </thead>
-        <tbody id="users-body"></tbody>
-      </table>
-    </div>
-    <p id="empty" class="hint" hidden>Nessun utente. Crea il primo con «Nuovo utente».</p>
-  </section>
+      <p id="status" class="status" role="status"></p>
+      <p id="error" class="note note-danger" role="alert" hidden></p>
 
-  <section id="llm-section" aria-labelledby="llm-title" hidden>
-    <div class="toolbar">
-      <h2 id="llm-title">Assistente</h2>
-      <div class="toolbar-actions">
-        <button id="llm-refresh" type="button" class="secondary">Aggiorna</button>
+      <div id="users-wrap" class="sheet table-wrap">
+        <table id="users-table" class="stack">
+          <thead>
+            <tr>
+              <th scope="col">Utente</th>
+              <th scope="col" class="w-state">Stato</th>
+              <th scope="col" class="num w-num">Dispositivi</th>
+              <th scope="col" id="llm-col" class="num w-num" hidden>Token assistente</th>
+              <th scope="col" class="col-actions w-actions">Azioni</th>
+            </tr>
+          </thead>
+          <tbody id="users-body"></tbody>
+        </table>
       </div>
-    </div>
-    <p id="llm-now" class="hint"></p>
-    <form id="llm-form" class="card" autocomplete="off">
-      <fieldset class="choices">
-        <legend>Chi risponde alle domande</legend>
-        <label class="inline"><input type="radio" name="llm-provider" value="none"> Nessuno (assistente spento)</label>
-        <label class="inline"><input type="radio" name="llm-provider" value="openai-compatible"> API compatibile OpenAI</label>
-        <label class="inline"><input type="radio" name="llm-provider" value="builtin"> Modello locale su questo server</label>
-      </fieldset>
-      <div id="llm-openai" class="fields" hidden>
-        <label>Indirizzo base
-          <input id="llm-base-url" type="url" spellcheck="false" placeholder="https://api.openai.com/v1">
-        </label>
-        <label>Chiave API
-          <input id="llm-key" type="password" autocomplete="off" spellcheck="false">
-        </label>
-        <label>Modello predefinito
-          <input id="llm-model" type="text" spellcheck="false" placeholder="gpt-4.1-mini">
-        </label>
-        <label>Altri modelli ammessi, separati da virgole
-          <input id="llm-allowed" type="text" spellcheck="false">
-        </label>
+      <div id="empty" class="empty" hidden>
+        <p class="empty-title">Nessun utente</p>
+        <p class="hint">Crea il primo con «Nuovo utente»: riceve una password provvisoria da cambiare al primo accesso.</p>
       </div>
-      <div id="llm-key-box" hidden>
-        <p id="llm-key-hint" class="hint"></p>
-        <label id="llm-key-remove-label" class="inline"><input id="llm-key-remove" type="checkbox"> Togli la chiave impostata qui</label>
-      </div>
-      <div id="llm-builtin" class="fields" hidden>
-        <label>Modello locale
-          <select id="llm-builtin-model"></select>
-        </label>
-        <p class="hint">I modelli locali si scaricano dalla sezione «Modelli», qui sotto.</p>
-      </div>
-      <div class="fields">
-        <label>Token al giorno per utente (0: nessun limite)
-          <input id="llm-cap" type="number" min="0" step="1" inputmode="numeric">
-        </label>
-      </div>
-      <div class="actions">
-        <button id="llm-save" type="submit">Salva e applica</button>
-        <button id="llm-reset" type="button" class="secondary">Torna alla configurazione del server</button>
-      </div>
-      <p id="llm-status" class="status" role="status"></p>
-      <p id="llm-error" class="error" role="alert" hidden></p>
-    </form>
-  </section>
+    </section>
 
-  <section id="models-section" aria-labelledby="models-title" hidden>
-    <div class="toolbar">
-      <h2 id="models-title">Modelli</h2>
-      <div class="toolbar-actions">
-        <button id="models-refresh" type="button" class="secondary">Aggiorna</button>
+    <section id="llm-section" class="view" aria-labelledby="llm-title" hidden>
+      <header class="view-head">
+        <div>
+          <h1 id="llm-title">Assistente</h1>
+          <p class="view-sub">Chi risponde alle domande che gli utenti fanno dall'app.</p>
+        </div>
+        <div class="toolbar-actions">
+          <button id="llm-refresh" type="button" class="secondary">Aggiorna</button>
+        </div>
+      </header>
+      <p id="llm-load-error" class="note note-danger" role="alert" hidden></p>
+      <div class="now">
+        <span class="now-label">In uso ora</span>
+        <p id="llm-now"></p>
       </div>
-    </div>
-    <p id="models-host" class="hint"></p>
-    <p id="models-status" class="status" role="status"></p>
-    <p id="models-error" class="error" role="alert" hidden></p>
-    <div class="table-wrap">
-      <table id="models-table">
-        <thead>
-          <tr>
-            <th scope="col">Modello</th>
-            <th scope="col">Tipo</th>
-            <th scope="col">Stato</th>
-            <th scope="col">Disco richiesto</th>
-            <th scope="col">Memoria richiesta</th>
-            <th scope="col">Licenza</th>
-            <th scope="col">Azioni</th>
-          </tr>
-        </thead>
-        <tbody id="models-body"></tbody>
-      </table>
-    </div>
-  </section>
-</main>
+      <form id="llm-form" class="sheet" autocomplete="off">
+        <fieldset class="choices">
+          <legend>Chi risponde</legend>
+          <label class="choice"><input type="radio" name="llm-provider" value="none">
+            <span class="choice-text"><strong>Nessuno</strong><span>L'assistente è spento.</span></span>
+          </label>
+          <label class="choice"><input type="radio" name="llm-provider" value="openai-compatible">
+            <span class="choice-text"><strong>API compatibile OpenAI</strong><span>Un servizio esterno, o un modello già in funzione nella tua rete.</span></span>
+          </label>
+          <label class="choice"><input type="radio" name="llm-provider" value="builtin">
+            <span class="choice-text"><strong>Modello locale</strong><span>Gira dentro questo server.</span></span>
+          </label>
+        </fieldset>
+        <div id="llm-openai" class="fields" hidden>
+          <label class="field">Indirizzo base
+            <input id="llm-base-url" type="text" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="https://api.openai.com/v1">
+          </label>
+          <label class="field">Modello predefinito
+            <input id="llm-model" type="text" spellcheck="false" autocapitalize="none" placeholder="gpt-4.1-mini">
+          </label>
+          <label class="field">Altri modelli ammessi <span class="optional">separati da virgole</span>
+            <input id="llm-allowed" type="text" spellcheck="false" autocapitalize="none">
+          </label>
+          <div class="field-group">
+            <label class="field">Chiave API
+              <input id="llm-key" type="password" autocomplete="off" spellcheck="false" aria-describedby="llm-key-hint">
+            </label>
+            <div id="llm-key-box" class="key-box" hidden>
+              <p id="llm-key-hint" class="hint"></p>
+              <label id="llm-key-remove-label" class="check"><input id="llm-key-remove" type="checkbox"> Togli la chiave impostata qui</label>
+            </div>
+          </div>
+        </div>
+        <div id="llm-builtin" class="fields" hidden>
+          <label class="field">Modello locale
+            <select id="llm-builtin-model"></select>
+          </label>
+          <p class="hint field-note">I modelli locali si scaricano dalla sezione «Modelli».</p>
+        </div>
+        <div class="fields">
+          <label class="field">Token al giorno per utente <span class="optional">0: nessun limite</span>
+            <input id="llm-cap" type="number" min="0" step="1" inputmode="numeric">
+          </label>
+        </div>
+        <div class="form-foot">
+          <div class="actions">
+            <button id="llm-save" type="submit">Salva e applica</button>
+            <button id="llm-reset" type="button" class="secondary guarded"><span class="when-plain">Torna alla configurazione del server</span><span class="when-armed">Sì, scarta le impostazioni</span></button>
+          </div>
+          <p id="llm-status" class="status" role="status"></p>
+          <p id="llm-error" class="note note-danger" role="alert" hidden></p>
+        </div>
+      </form>
+    </section>
+
+    <section id="embedding-section" class="view" aria-labelledby="embedding-title" hidden>
+      <header class="view-head">
+        <div>
+          <h1 id="embedding-title">Modello di embedding</h1>
+          <p class="view-sub">Trasforma mail e allegati in vettori: è ciò che fa funzionare la ricerca per significato.</p>
+        </div>
+        <div class="toolbar-actions">
+          <button id="embedding-refresh" type="button" class="secondary">Aggiorna</button>
+        </div>
+      </header>
+      <p id="embedding-load-error" class="note note-danger" role="alert" hidden></p>
+      <div class="now">
+        <span class="now-label">In uso ora</span>
+        <p id="embedding-now"></p>
+      </div>
+      <p id="embedding-last-error" class="note note-warn" role="status" hidden></p>
+      <ul class="callout facts">
+        <li><strong><span id="embedding-dim">256</span> valori per vettore, sempre.</strong> È la misura dell'indice di ogni app.</li>
+        <li><strong>Il server prova il modello prima di salvare.</strong> Se restituisce un altro numero di valori lo rifiuta, e non cambia nulla.</li>
+        <li><strong>Cambiare modello fa reindicizzare ogni app.</strong> Lo propone l'app stessa, e intanto cerca solo per parole.</li>
+      </ul>
+      <form id="embedding-form" class="sheet" autocomplete="off">
+        <fieldset class="choices">
+          <legend>Chi calcola i vettori</legend>
+          <label class="choice"><input type="radio" name="embedding-provider" value="builtin">
+            <span class="choice-text"><strong>Modello locale</strong><span>EmbeddingGemma 2, dentro questo server. Legge testo e immagini.</span></span>
+          </label>
+          <label class="choice"><input type="radio" name="embedding-provider" value="openai-compatible">
+            <span class="choice-text"><strong>API compatibile OpenAI interna</strong><span>Ollama, vLLM o simili, sulla stessa macchina o rete privata. Solo testo.</span></span>
+          </label>
+        </fieldset>
+        <p id="embedding-builtin-note" class="note note-warn" hidden>EmbeddingGemma 2 non è installato: installalo dalla sezione «Modelli». Serve anche con un'API, per dividere i testi in passaggi.</p>
+        <div id="embedding-openai" class="fields" hidden>
+          <label class="field">Indirizzo base
+            <input id="embedding-base-url" type="text" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="http://ollama:11434/v1">
+          </label>
+          <label class="field">Modello
+            <input id="embedding-model" type="text" maxlength="40" spellcheck="false" autocapitalize="none" placeholder="embeddinggemma">
+          </label>
+          <div class="field-group">
+            <label class="field">Chiave API <span class="optional">facoltativa</span>
+              <input id="embedding-key" type="password" autocomplete="off" spellcheck="false" aria-describedby="embedding-key-hint">
+            </label>
+            <div id="embedding-key-box" class="key-box" hidden>
+              <p id="embedding-key-hint" class="hint"></p>
+              <label id="embedding-key-remove-label" class="check"><input id="embedding-key-remove" type="checkbox"> Togli la chiave salvata</label>
+            </div>
+          </div>
+        </div>
+        <div id="embedding-warning" class="callout callout-warn" role="status" hidden>
+          <p><strong>Stai per cambiare modello o indirizzo: se i vettori cambiano, ogni app chiederà di reindicizzare la posta.</strong></p>
+          <p>Finché non lo fa, in quell'app la ricerca per significato resta ferma; quella per parole continua. Con un modello di solo testo le immagini non si cercano per significato.</p>
+        </div>
+        <div class="form-foot">
+          <div class="actions">
+            <button id="embedding-save" type="submit" class="guarded"><span class="when-plain">Salva e applica</span><span class="when-armed">Sì, cambia modello</span></button>
+          </div>
+          <p id="embedding-status" class="status" role="status"></p>
+          <p id="embedding-error" class="note note-danger" role="alert" hidden></p>
+        </div>
+      </form>
+    </section>
+
+    <section id="models-section" class="view" aria-labelledby="models-title" hidden>
+      <header class="view-head">
+        <div>
+          <h1 id="models-title">Modelli</h1>
+          <p id="models-host" class="view-sub"></p>
+        </div>
+        <div class="toolbar-actions">
+          <button id="models-refresh" type="button" class="secondary">Aggiorna</button>
+        </div>
+      </header>
+      <p id="models-status" class="status" role="status"></p>
+      <p id="models-error" class="note note-danger" role="alert" hidden></p>
+      <div class="sheet table-wrap">
+        <table id="models-table" class="stack">
+          <thead>
+            <tr>
+              <th scope="col">Modello</th>
+              <th scope="col">Stato</th>
+              <th scope="col" class="num">Disco</th>
+              <th scope="col" class="num">Memoria</th>
+              <th scope="col">Licenza</th>
+              <th scope="col" class="col-actions">Azioni</th>
+            </tr>
+          </thead>
+          <tbody id="models-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
 </body>
 </html>

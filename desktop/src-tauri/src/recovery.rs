@@ -9,6 +9,11 @@
 //!   webview is gone, ask to restart Qamille.
 //! - The app's page does not load (a dev build without its dev server): ask to
 //!   retry, with the reason.
+//! - The page loads but App does not draw within `STARTUP_WAIT` (its script fails or
+//!   never runs, its first render throws), or its root fails later (`frontend_failed`,
+//!   from React's `onUncaughtError`): offer to reload it. The watch starts again with
+//!   every page the window loads, also a reload the page starts itself, and Esc reloads
+//!   too: an empty window never stays empty.
 //! - "Ricarica la finestra" in the system menu: the page saves what it can,
 //!   as at sign-out, then reloads. If something was not saved, or the page
 //!   does not answer within `RELOAD_WAIT`, ask: never discard by itself.
@@ -18,14 +23,23 @@
 //!   running after `CLOSE_STUCK` when the person asks again, gets a choice here:
 //!   wait, or close Qamille without the page.
 //!
+//! Every way out that leaves without the page (`exit_app`, `restart_app`, the forced
+//! close) first stops and saves a running recording (`finish_meetings_before_exit`),
+//! as the page's close guard would: otherwise it is found "interrupted" at the next start.
+//! A failed start (`startup_failed` in `main.rs`) says why itself: from then on no dialog
+//! here opens (`stop_asking`).
+//!
 //! WebView2 reports these from its own callbacks, which must not run a dialog's
 //! modal loop: every dialog and reload here runs on a thread of its own, and
 //! one dialog at a time covers a failure reported by several windows.
 
-use crate::shell_rules::{self, Failure};
+use crate::runtime::DesktopState;
+use crate::shell_rules::{self, CapturePhase, Failure};
+use qamille::domain::meeting::CaptureState;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
+use tauri::webview::{PageLoadEvent, PageLoadPayload};
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 
 /// To the main window: save what can be saved without asking, then call
@@ -46,15 +60,23 @@ const CLOSE_ANSWER: Duration = Duration::from_secs(3);
 /// may be stuck in a guard (a save that never ends): offer the way out.
 const CLOSE_STUCK: Duration = Duration::from_secs(10);
 
-/// The page draws within this after the window shows, or the app offers a reload.
+/// The page draws within this after the window shows or reloads, or the app offers a reload.
 const STARTUP_WAIT: Duration = Duration::from_secs(15);
+/// The longest an exit waits for a recording to be stopped and saved (normally well under
+/// a second): a way out of a broken window must stay a way out.
+const EXIT_SAVE_WAIT: Duration = Duration::from_secs(20);
 
+/// The main page now loading has drawn (`frontend_ready`); reset at every load it watches.
 static FRONTEND_READY: AtomicBool = AtomicBool::new(false);
+/// Watches armed so far (`watch_startup`): the newest retires the older ones.
+static PAGE_LOADS: AtomicU64 = AtomicU64::new(0);
 static CLOSE_ASKED: AtomicU64 = AtomicU64::new(0);
 static CLOSE_SEEN: AtomicU64 = AtomicU64::new(0);
 static CLOSING_SINCE: Mutex<Option<Instant>> = Mutex::new(None);
 
 static ASKING: AtomicBool = AtomicBool::new(false);
+/// Qamille is leaving by itself (a failed start, `stop_asking`): no recovery dialog opens.
+static STOPPED_ASKING: AtomicBool = AtomicBool::new(false);
 static ENGINE_GONE: AtomicBool = AtomicBool::new(false);
 static PENDING_RELOAD: AtomicU64 = AtomicU64::new(0);
 static NEXT_RELOAD: AtomicU64 = AtomicU64::new(1);
@@ -89,9 +111,10 @@ fn ask(window: &WebviewWindow, title: &str, text: &str, first: &str, second: &st
     }
 }
 
-/// Runs `decide` on its own thread unless a recovery dialog is already open.
+/// Runs `decide` on its own thread unless a recovery dialog is already open, or Qamille
+/// has stopped asking.
 fn ask_once(window: &WebviewWindow, decide: impl FnOnce(&WebviewWindow) + Send + 'static) {
-    if ASKING.swap(true, Ordering::SeqCst) {
+    if STOPPED_ASKING.load(Ordering::SeqCst) || ASKING.swap(true, Ordering::SeqCst) {
         return;
     }
     let window = window.clone();
@@ -107,6 +130,11 @@ fn later(window: &WebviewWindow, act: impl FnOnce(&WebviewWindow) + Send + 'stat
 }
 
 fn reload(window: &WebviewWindow) {
+    // The new page must draw again: watched from now, in case it never starts loading;
+    // `page_load` arms the watch again when it does.
+    if window.label() == "main" {
+        watch_startup(window);
+    }
     if let Err(error) = window.reload() {
         crate::native_feel::report(&format!("could not reload {}: {error}", window.label()));
     }
@@ -131,7 +159,7 @@ pub fn process_failed(window: &WebviewWindow, kind: i32) {
                         words("Ricarica la finestra", "Reload the window"),
                         words("Chiudi Qamille", "Close Qamille"),
                     ) == Some(false);
-                    if close { window.app_handle().exit(0) } else { reload(window) }
+                    if close { exit_app(window.app_handle()) } else { reload(window) }
                 });
             } else {
                 // The reminder chip, out of automatic reloads: closed until `chip_may_open`.
@@ -164,7 +192,7 @@ pub fn process_failed(window: &WebviewWindow, kind: i32) {
         }
         Failure::PageHung => chip_failed(window),
         Failure::EngineExited if main => {
-            if ENGINE_GONE.swap(true, Ordering::SeqCst) {
+            if STOPPED_ASKING.load(Ordering::SeqCst) || ENGINE_GONE.swap(true, Ordering::SeqCst) {
                 return;
             }
             // Not `ask_once`: this one must not be skipped behind another dialog.
@@ -179,7 +207,7 @@ pub fn process_failed(window: &WebviewWindow, kind: i32) {
                     words("Riavvia Qamille", "Restart Qamille"),
                     words("Chiudi Qamille", "Close Qamille"),
                 ) == Some(false);
-                if close { window.app_handle().exit(0) } else { restart_app(window.app_handle()) }
+                if close { exit_app(window.app_handle()) } else { restart_app(window.app_handle()) }
             });
         }
         failure => crate::native_feel::report(&format!("a WebView2 process of {} failed ({failure:?}, kind {kind})", window.label())),
@@ -252,7 +280,7 @@ pub fn page_not_loaded(window: &WebviewWindow, status: i32) {
             words("Riprova", "Try again"),
             words("Chiudi Qamille", "Close Qamille"),
         ) == Some(false);
-        if close { window.app_handle().exit(0) } else { reload(window) }
+        if close { exit_app(window.app_handle()) } else { reload(window) }
     });
 }
 
@@ -316,39 +344,87 @@ pub fn reload_ready(window: WebviewWindow, token: u64, saved: bool) {
     });
 }
 
-/// Right after the main window shows: a page that loads but never draws (its
-/// script fails, or never runs) would leave an empty window with no message.
+/// Arms the watch of the main page's current load: a page that loads but never draws
+/// (its script fails or never runs, App's first render throws) would leave an empty
+/// window with no message. Armed by `page_load` whenever a page starts loading, whoever
+/// started it, and also when the window shows and by `reload`, so a load Qamille starts
+/// is watched even if it never starts loading. The newest arm retires the older ones:
+/// each load gets one watch, its whole `STARTUP_WAIT` and at most one dialog.
 pub fn watch_startup(window: &WebviewWindow) {
+    FRONTEND_READY.store(false, Ordering::SeqCst);
+    let load = PAGE_LOADS.fetch_add(1, Ordering::SeqCst) + 1;
     let window = window.clone();
     std::thread::spawn(move || {
         std::thread::sleep(STARTUP_WAIT);
-        if FRONTEND_READY.load(Ordering::SeqCst) || window.app_handle().get_webview_window("main").is_none() {
+        if PAGE_LOADS.load(Ordering::SeqCst) != load
+            || FRONTEND_READY.load(Ordering::SeqCst)
+            || window.app_handle().get_webview_window("main").is_none()
+        {
             return;
         }
-        ask_once(&window, |window| {
-            let answer = ask(
-                window,
-                words("Qamille non si è aperto", "Qamille did not open"),
-                words(
-                    "La finestra di Qamille non ha finito di aprirsi. La posta e le bozze salvate sono al sicuro.",
-                    "Qamille's window did not finish opening. Your mail and saved drafts are safe.",
-                ),
-                words("Ricarica la finestra", "Reload the window"),
-                words("Chiudi Qamille", "Close Qamille"),
-            );
-            match answer {
-                Some(true) => reload(window),
-                Some(false) => window.app_handle().exit(0),
-                None => {}
-            }
-        });
+        ask_once(&window, |window| offer_reload(window, false));
     });
 }
 
-/// The page's first frame is drawn (`src/main.tsx`).
+/// The main window's `on_page_load` (`main.rs`): every page that starts loading in it
+/// (the first one, a reload by Qamille or one the page starts itself, a `location.reload()`)
+/// is watched from its own start. Runs inside a WebView2 callback: arming asks nothing here.
+pub fn page_load(window: WebviewWindow, payload: PageLoadPayload<'_>) {
+    if payload.event() == PageLoadEvent::Started {
+        watch_startup(&window);
+    }
+}
+
+/// The main window is empty: its page never drew (`watch_startup`), or its root failed
+/// (`frontend_failed`), after it had drawn when `opened`. Esc and the X reload too: here
+/// that is the harmless choice, since any other would leave the window empty.
+fn offer_reload(window: &WebviewWindow, opened: bool) {
+    let (title, text) = if opened {
+        (
+            words("La finestra di Qamille è vuota", "Qamille's window is empty"),
+            words(
+                "Un errore ha lasciato vuota la finestra di Qamille. La posta e le bozze salvate sono al sicuro.",
+                "An error left Qamille's window empty. Your mail and saved drafts are safe.",
+            ),
+        )
+    } else {
+        (
+            words("Qamille non si è aperto", "Qamille did not open"),
+            words(
+                "La finestra di Qamille non ha finito di aprirsi. La posta e le bozze salvate sono al sicuro.",
+                "Qamille's window did not finish opening. Your mail and saved drafts are safe.",
+            ),
+        )
+    };
+    let close = ask(
+        window,
+        title,
+        text,
+        words("Ricarica la finestra", "Reload the window"),
+        words("Chiudi Qamille", "Close Qamille"),
+    ) == Some(false);
+    if close { exit_app(window.app_handle()) } else { reload(window) }
+}
+
+/// App's first effect ran (`src/App.tsx`): the page rendered and drew its first frame.
 #[tauri::command]
 pub fn frontend_ready() {
     FRONTEND_READY.store(true, Ordering::SeqCst);
+}
+
+/// The main page's root failed (React's `onUncaughtError`, `src/main.tsx`): with no error
+/// boundary React removes the whole tree, so the window is empty. Logged, then the same
+/// choice as a page that never drew.
+#[tauri::command]
+pub fn frontend_failed(window: WebviewWindow, message: String) {
+    // One bounded line: the page's text goes into `native.log`.
+    let message: String = message.chars().map(|c| if c.is_control() { ' ' } else { c }).take(500).collect();
+    crate::native_feel::report(&format!("the page of {} failed: {message}", window.label()));
+    if window.label() != "main" {
+        return;
+    }
+    let opened = FRONTEND_READY.load(Ordering::SeqCst);
+    ask_once(&window, move |window| offer_reload(window, opened));
 }
 
 /// Main's `CloseRequested` (X, Alt+F4, the taskbar, the system menu). The
@@ -378,6 +454,7 @@ pub fn close_requested(app: &AppHandle) {
                 words("Chiudi Qamille", "Close Qamille"),
             ) == Some(false);
             if close {
+                finish_meetings_before_exit(window.app_handle());
                 let _ = window.destroy();
             }
         });
@@ -396,10 +473,80 @@ pub fn close_settled() {
     *CLOSING_SINCE.lock().unwrap_or_else(|e| e.into_inner()) = None;
 }
 
+/// A failed start says why and exits (`startup_failed`, `main.rs`): from now on no recovery
+/// dialog opens over that message for the page loading behind it, whose answers could only
+/// reload or quit an app that is already leaving.
+pub fn stop_asking() {
+    STOPPED_ASKING.store(true, Ordering::SeqCst);
+}
+
+/// Quits Qamille without the page: its recording is stopped and saved first.
+fn exit_app(app: &AppHandle) {
+    finish_meetings_before_exit(app);
+    app.exit(0);
+}
+
 fn restart_app(app: &AppHandle) {
+    finish_meetings_before_exit(app);
     // SAFETY: the variable is only read by the next process, at its start.
     unsafe { std::env::set_var(RESTART_AFTER, std::process::id().to_string()) };
     app.request_restart();
+}
+
+/// Before the app leaves without its page: stops and saves a running recording, then
+/// stops the meeting jobs for the app closing, as the page's meetings close guard does
+/// (`App.tsx`). Blocks until that is done, at most `EXIT_SAVE_WAIT`: call it from a thread
+/// of its own, or from `startup_failed` (`main.rs`) just before its exit, never from a
+/// WebView2 callback. Without the app's state it does nothing. Failures go to `native.log`
+/// and never stop the exit.
+pub fn finish_meetings_before_exit(app: &AppHandle) {
+    let (done, finished) = std::sync::mpsc::channel();
+    let handle = app.clone();
+    let spawned = std::thread::Builder::new().name("qamille-exit-meetings".into()).spawn(move || {
+        stop_recording_and_jobs(&handle);
+        let _ = done.send(());
+    });
+    match spawned {
+        Ok(_) => {
+            if let Err(error) = finished.recv_timeout(EXIT_SAVE_WAIT) {
+                crate::native_feel::report(&format!("the recording was not confirmed saved before exit: {error}"));
+            }
+        }
+        Err(error) => crate::native_feel::report(&format!("could not stop the recording before exit: {error}")),
+    }
+}
+
+fn stop_recording_and_jobs(app: &AppHandle) {
+    let Some(state) = app.try_state::<DesktopState>() else { return };
+    // `capture_state` reads the recorder alone, so unlike `capture_status` it cannot fail on
+    // the repository while the recorder is live. If even that fails, stop anyway: stopping
+    // a recorder that is not recording changes nothing.
+    let live = match state.meetings.capture_state() {
+        Ok(capture) => shell_rules::must_stop_capture(capture_phase(&capture)),
+        Err(error) => {
+            crate::native_feel::report(&format!("could not read the recorder before exit: {}", error.message));
+            true
+        }
+    };
+    if live {
+        if let Err(error) = state.meetings.stop() {
+            crate::native_feel::report(&format!("could not stop the recording before exit: {}", error.message));
+        }
+    }
+    state.meetings.cancel_all_jobs();
+}
+
+/// No wildcard: a new recorder state must be sorted here.
+fn capture_phase(state: &CaptureState) -> CapturePhase {
+    match state {
+        CaptureState::Idle => CapturePhase::Idle,
+        CaptureState::Preparing => CapturePhase::Preparing,
+        CaptureState::Recording => CapturePhase::Recording,
+        CaptureState::Paused => CapturePhase::Paused,
+        CaptureState::Saving => CapturePhase::Saving,
+        CaptureState::Saved => CapturePhase::Saved,
+        CaptureState::Interrupted => CapturePhase::Interrupted,
+    }
 }
 
 /// First thing in `main`: after a restart, wait (at most 10 s) for the process

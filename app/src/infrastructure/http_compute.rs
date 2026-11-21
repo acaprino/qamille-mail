@@ -22,6 +22,7 @@
 use crate::application::compute::{ComputeGateway, ComputeHealth, EMBEDDING_BATCH, EMBEDDING_DIMENSIONS, EMBEDDING_MODEL_ID, SpeechSegment, codes};
 use crate::application::{AppError, AppResult};
 use serde_json::{Value, json};
+use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -87,6 +88,17 @@ impl EndpointSource for FixedEndpoint {
 /// Largest answer read: 4 MiB of extracted text, JSON-escaped.
 const MAX_ANSWER: u64 = 16 * 1024 * 1024;
 const HEALTH_CACHE: Duration = Duration::from_secs(1);
+/// With the requests that make vectors: the embedding model this client checked in `/health`. A
+/// server whose model changed since answers a short pause (`rate_limited`), and the message starts
+/// again from its check, instead of ending with vectors of two models (D4). Older servers ignore it.
+const MODEL_HEADER: &str = "X-Qamille-Embedding-Model";
+
+thread_local! {
+    /// The embedding model this thread last read in `/health`, and the identity of that server. A
+    /// message is indexed on one thread: it checks the model (`rag_segments`), then sends its batches.
+    // shortcut: kept per thread, not per message; a message whose batches ran on another thread than its check would send another thread's model (refused as a pause) or none, pass the checked identity through ComputeGateway when that can happen
+    static CHECKED_MODEL: RefCell<Option<(String, String)>> = const { RefCell::new(None) };
+}
 /// A window may wait in the server's queue, then take up to 10 minutes (server: 900 s).
 const TRANSCRIPTION_TIMEOUT: Duration = Duration::from_secs(960);
 /// Largest WAV window sent: 15 s of 16 kHz mono 16-bit is about 480 KB.
@@ -196,6 +208,14 @@ fn vector(value: &Value) -> AppResult<Vec<f32>> {
     Ok(out)
 }
 
+/// `request` with the model this client checked, when there is one.
+fn with_model<B>(request: ureq::RequestBuilder<B>, model: Option<&str>) -> ureq::RequestBuilder<B> {
+    match model {
+        Some(model) => request.header(MODEL_HEADER, model),
+        None => request,
+    }
+}
+
 fn multipart(name: &str, data: &[u8]) -> (String, Vec<u8>) {
     let mut seed = [0u8; 12];
     let _ = getrandom::fill(&mut seed);
@@ -211,14 +231,14 @@ fn multipart(name: &str, data: &[u8]) -> (String, Vec<u8>) {
 }
 
 impl Client {
-    fn send(&self, agent: &ureq::Agent, endpoint: &Endpoint, method: &str, path: &str, body: &Body) -> Result<Value, Failure> {
+    fn send(&self, agent: &ureq::Agent, endpoint: &Endpoint, method: &str, path: &str, body: &Body, model: Option<&str>) -> Result<Value, Failure> {
         let url = format!("{}{path}", endpoint.base_url);
         let auth = format!("Bearer {}", endpoint.token);
         let result = match (method, body) {
-            ("GET", _) => agent.get(&url).header("Authorization", &auth).call(),
-            (_, Body::Empty) => agent.post(&url).header("Authorization", &auth).send_empty(),
-            (_, Body::Json(value)) => agent.post(&url).header("Authorization", &auth).header("Content-Type", "application/json").send(serde_json::to_vec(value).unwrap_or_default().as_slice()),
-            (_, Body::Bytes { content_type, data }) => agent.post(&url).header("Authorization", &auth).header("Content-Type", content_type.as_str()).send(*data),
+            ("GET", _) => with_model(agent.get(&url), model).header("Authorization", &auth).call(),
+            (_, Body::Empty) => with_model(agent.post(&url), model).header("Authorization", &auth).send_empty(),
+            (_, Body::Json(value)) => with_model(agent.post(&url), model).header("Authorization", &auth).header("Content-Type", "application/json").send(serde_json::to_vec(value).unwrap_or_default().as_slice()),
+            (_, Body::Bytes { content_type, data }) => with_model(agent.post(&url), model).header("Authorization", &auth).header("Content-Type", content_type.as_str()).send(*data),
         };
         let mut response = match result {
             Ok(response) => response,
@@ -246,15 +266,15 @@ impl Client {
         Err(Failure::Answer(error, retry_after(&value)))
     }
 
-    /// One request with the retry rules of D2, on `agent`.
-    fn call(&self, agent: &ureq::Agent, method: &str, path: &str, body: Body, content: bool) -> AppResult<Value> {
+    /// One request with the retry rules of D2, on `agent`; `model`: the embedding model checked.
+    fn call(&self, agent: &ureq::Agent, method: &str, path: &str, body: Body, content: bool, model: Option<&str>) -> AppResult<Value> {
         let mut transport_failures = 0;
         let mut busy = 0;
         let mut rediscovered = false;
         let mut path = path.to_owned();
         loop {
             let endpoint = self.source.endpoint()?;
-            match self.send(agent, &endpoint, method, &path, &body) {
+            match self.send(agent, &endpoint, method, &path, &body, model) {
                 Ok(value) => return Ok(value),
                 // A server not yet updated after the rebranding knows the routes by their old name.
                 Err(Failure::NotFound(error)) => match path.strip_prefix(ROUTE_PREFIX) {
@@ -308,7 +328,7 @@ impl Client {
 
     fn server_answers(&self) -> bool {
         let Ok(endpoint) = self.source.endpoint() else { return false };
-        matches!(self.send(&self.health_agent, &endpoint, "GET", "/health", &Body::Empty), Ok(value) if value["models"].is_array())
+        matches!(self.send(&self.health_agent, &endpoint, "GET", "/health", &Body::Empty, None), Ok(value) if value["models"].is_array())
     }
 
     fn forget_health(&self) {
@@ -344,7 +364,66 @@ impl HttpCompute {
     }
 
     fn call(&self, method: &str, path: &str, body: Body, content: bool) -> AppResult<Value> {
-        self.client.call(&self.client.agent, method, path, body, content)
+        self.client.call(&self.client.agent, method, path, body, content, None)
+    }
+
+    /// [`Self::call`] for a request that makes vectors: with the model this thread checked.
+    fn call_checked(&self, method: &str, path: &str, body: Body, content: bool) -> AppResult<Value> {
+        let model = self.checked_model();
+        self.client.call(&self.client.agent, method, path, body, content, model.as_deref())
+    }
+
+    /// `/health`, from the cache of the last second or from the server.
+    fn read_health(&self) -> AppResult<ComputeHealth> {
+        if let Some(health) = self.cached_health() {
+            return Ok(health);
+        }
+        let _single = self.health_fetch.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(health) = self.cached_health() {
+            return Ok(health);
+        }
+        let mut answer = self.client.call(&self.client.health_agent, "GET", "/health", Body::Empty, false, None)?;
+        if !answer["models"].is_array() {
+            // The credential was not recognized: a restarted local server, or a replaced remote
+            // session. Once more if the source says so.
+            let endpoint = self.client.source.endpoint()?;
+            let refused = || AppError::new(codes::UNAUTHORIZED, "The compute server refused the credentials of this request.");
+            if !self.client.source.renew(&endpoint) {
+                return Err(self.client.source.refused(&endpoint, refused()));
+            }
+            answer = self.client.call(&self.client.health_agent, "GET", "/health", Body::Empty, false, None)?;
+            if !answer["models"].is_array() {
+                let endpoint = self.client.source.endpoint()?;
+                return Err(self.client.source.refused(&endpoint, refused()));
+            }
+        }
+        let health = ComputeHealth {
+            version: answer["version"].as_str().unwrap_or_default().to_owned(),
+            models: serde_json::from_value(answer["models"].clone()).map_err(|_| AppError::new(codes::INTERNAL, "The compute server returned an unreadable status."))?,
+            embedding: serde_json::from_value(serde_json::json!({
+                "model": answer["embedding"]["model"],
+                "dimensions": answer["embedding"]["dimensions"],
+                "quantization": answer["embedding"]["quantization"].as_str().unwrap_or_default(),
+            }))
+            .ok(),
+        };
+        if let Ok(mut cached) = self.client.health.lock() {
+            *cached = Some((Instant::now(), health.clone()));
+        }
+        Ok(health)
+    }
+
+    /// The model of the last `/health` read on this thread, if it came from this server.
+    fn checked_model(&self) -> Option<String> {
+        let server = self.client.source.identity();
+        CHECKED_MODEL.with(|checked| checked.borrow().as_ref().filter(|(from, _)| *from == server).map(|(_, model)| model.clone()))
+    }
+
+    /// Kept for the batches that follow on this thread. A model the header cannot carry is not
+    /// kept: those requests go as before.
+    fn remember(&self, health: &ComputeHealth) {
+        let checked = health.embedding.as_ref().filter(|embedding| !embedding.model.is_empty() && embedding.model.bytes().all(|b| b.is_ascii_graphic())).map(|embedding| (self.client.source.identity(), embedding.model.clone()));
+        CHECKED_MODEL.with(|cell| *cell.borrow_mut() = checked);
     }
 
     fn cached_health(&self) -> Option<ComputeHealth> {
@@ -354,7 +433,7 @@ impl HttpCompute {
 
     fn embed_inputs(&self, inputs: Vec<String>) -> AppResult<Vec<Vec<f32>>> {
         let count = inputs.len();
-        let answer = self.call("POST", "/v1/embeddings", Body::Json(json!({"model": EMBEDDING_MODEL_ID, "input": inputs, "dimensions": EMBEDDING_DIMENSIONS})), false)?;
+        let answer = self.call_checked("POST", "/v1/embeddings", Body::Json(json!({"model": EMBEDDING_MODEL_ID, "input": inputs, "dimensions": EMBEDDING_DIMENSIONS})), false)?;
         let data = answer["data"].as_array().ok_or_else(|| AppError::new(codes::INTERNAL, "The compute server returned no vectors."))?;
         if data.len() != count {
             return Err(AppError::new(codes::INTERNAL, "The compute server returned a different number of vectors."));
@@ -443,7 +522,7 @@ impl ComputeGateway for HttpCompute {
     }
 
     fn embed_image(&self, bytes: &[u8]) -> AppResult<Vec<f32>> {
-        let answer = self.call("POST", "/qamille/v1/embeddings/image", Body::Bytes { content_type: "application/octet-stream".into(), data: bytes }, true)?;
+        let answer = self.call_checked("POST", "/qamille/v1/embeddings/image", Body::Bytes { content_type: "application/octet-stream".into(), data: bytes }, true)?;
         vector(&answer["embedding"])
     }
 
@@ -454,41 +533,8 @@ impl ComputeGateway for HttpCompute {
     }
 
     fn health(&self) -> AppResult<ComputeHealth> {
-        if let Some(health) = self.cached_health() {
-            return Ok(health);
-        }
-        let _single = self.health_fetch.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-        if let Some(health) = self.cached_health() {
-            return Ok(health);
-        }
-        let mut answer = self.client.call(&self.client.health_agent, "GET", "/health", Body::Empty, false)?;
-        if !answer["models"].is_array() {
-            // The credential was not recognized: a restarted local server, or a replaced remote
-            // session. Once more if the source says so.
-            let endpoint = self.client.source.endpoint()?;
-            let refused = || AppError::new(codes::UNAUTHORIZED, "The compute server refused the credentials of this request.");
-            if !self.client.source.renew(&endpoint) {
-                return Err(self.client.source.refused(&endpoint, refused()));
-            }
-            answer = self.client.call(&self.client.health_agent, "GET", "/health", Body::Empty, false)?;
-            if !answer["models"].is_array() {
-                let endpoint = self.client.source.endpoint()?;
-                return Err(self.client.source.refused(&endpoint, refused()));
-            }
-        }
-        let health = ComputeHealth {
-            version: answer["version"].as_str().unwrap_or_default().to_owned(),
-            models: serde_json::from_value(answer["models"].clone()).map_err(|_| AppError::new(codes::INTERNAL, "The compute server returned an unreadable status."))?,
-            embedding: serde_json::from_value(serde_json::json!({
-                "model": answer["embedding"]["model"],
-                "dimensions": answer["embedding"]["dimensions"],
-                "quantization": answer["embedding"]["quantization"].as_str().unwrap_or_default(),
-            }))
-            .ok(),
-        };
-        if let Ok(mut cached) = self.client.health.lock() {
-            *cached = Some((Instant::now(), health.clone()));
-        }
+        let health = self.read_health()?;
+        self.remember(&health);
         Ok(health)
     }
 
@@ -505,7 +551,7 @@ impl ComputeGateway for HttpCompute {
         std::thread::Builder::new()
             .name("compute-transcription".into())
             .spawn(move || {
-                let answer = client.call(&agent, "POST", "/v1/audio/transcriptions", Body::Bytes { content_type, data: &body }, false);
+                let answer = client.call(&agent, "POST", "/v1/audio/transcriptions", Body::Bytes { content_type, data: &body }, false, None);
                 let _ = sender.send(answer);
             })
             .map_err(|_| AppError::new(codes::INTERNAL, "Cannot start the transcription request."))?;
@@ -544,12 +590,20 @@ mod tests {
 
     /// [`script`], also keeping each request body as text.
     fn script_with_bodies(replies: Vec<Option<(u16, String)>>) -> (String, Log, Log) {
+        let (url, seen, bodies, _) = script_with_headers(replies);
+        (url, seen, bodies)
+    }
+
+    /// [`script_with_bodies`], also keeping the header lines of each request (lowercase).
+    fn script_with_headers(replies: Vec<Option<(u16, String)>>) -> (String, Log, Log, Log) {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let port = listener.local_addr().unwrap().port();
         let seen = Arc::new(Mutex::new(Vec::new()));
         let log = seen.clone();
         let bodies = Arc::new(Mutex::new(Vec::new()));
         let body_log = bodies.clone();
+        let headers = Arc::new(Mutex::new(Vec::new()));
+        let header_log = headers.clone();
         std::thread::spawn(move || {
             let mut replies = replies.into_iter();
             for stream in listener.incoming() {
@@ -558,12 +612,15 @@ mod tests {
                 let mut first = String::new();
                 reader.read_line(&mut first).unwrap();
                 let mut length = 0usize;
+                let mut lines = String::new();
                 loop {
                     let mut line = String::new();
                     reader.read_line(&mut line).unwrap();
                     if line.trim().is_empty() { break; }
+                    lines.push_str(&line.to_ascii_lowercase());
                     if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") { length = value.trim().parse().unwrap(); }
                 }
+                header_log.lock().unwrap().push(lines);
                 let mut body = vec![0; length];
                 reader.read_exact(&mut body).unwrap();
                 log.lock().unwrap().push(first.split_whitespace().nth(1).unwrap_or("").to_owned());
@@ -576,7 +633,7 @@ mod tests {
                 }
             }
         });
-        (format!("http://127.0.0.1:{port}"), seen, bodies)
+        (format!("http://127.0.0.1:{port}"), seen, bodies, headers)
     }
 
     fn compute(base_url: String) -> HttpCompute {
@@ -819,5 +876,35 @@ mod tests {
         assert!(text.contains("a_b__.pdf"));
         assert!(!text.contains("a\"b"));
         let _ = std::io::sink().write_all(&body);
+    }
+
+    #[test]
+    fn the_batches_carry_the_model_this_thread_checked() {
+        let health = json!({"status": "ok", "version": "1.2.0", "models": [], "embedding": {"model": "bge-m3#1", "dimensions": 256, "quantization": ""}}).to_string();
+        let (url, seen, _, headers) = script_with_headers(vec![Some((200, embedding(vec![1.0; 256]))), Some((200, health)), Some((200, embedding(vec![1.0; 256])))]);
+        let compute = compute(url);
+        // Before any check of `/health` nothing is sent: as the apps released before.
+        compute.embed_query("prima").unwrap();
+        compute.health().unwrap();
+        compute.embed_query("dopo").unwrap();
+        assert_eq!(seen.lock().unwrap().as_slice(), ["/v1/embeddings", "/health", "/v1/embeddings"]);
+        let headers = headers.lock().unwrap().clone();
+        assert!(!headers[0].contains("x-qamille-embedding-model"), "{}", headers[0]);
+        assert!(headers[2].contains("x-qamille-embedding-model: bge-m3#1"), "{}", headers[2]);
+        // Another thread has not checked anything: its batches go as before.
+        let other = std::thread::scope(|scope| scope.spawn(|| compute.checked_model()).join().unwrap());
+        assert_eq!(other, None);
+    }
+
+    #[test]
+    fn a_batch_refused_because_the_model_changed_abandons_the_message() {
+        // The server's answer to a batch checked with another model: a pause longer than the
+        // seconds waited in the same call, so the message stops (no attempt lost) and starts again.
+        let changed = json!({"error": {"code": "rate_limited", "message": "busy", "retry_after_s": 10}}).to_string();
+        let (url, seen) = script(vec![Some((429, changed))]);
+        let error = compute(url).embed_documents("t", &["a".into()]).unwrap_err();
+        assert_eq!(error.code, "rate_limited");
+        assert!(crate::application::compute::is_transient(error.code));
+        assert_eq!(seen.lock().unwrap().len(), 1, "not asked again in the same call");
     }
 }

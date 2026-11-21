@@ -37,6 +37,8 @@ import {
   regionalTimeZone,
 } from '../lib/regional';
 import { useReactive } from '../lib/store';
+import { tick } from '../lib/tick';
+import { useDirtyCloseGuard } from '../lib/use-dirty-close-guard';
 import { cn } from '../lib/utils';
 import './Calendar.css';
 
@@ -199,6 +201,7 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
   const creationKey = useRef('');
   const editGeneration = useRef(0);
   const titleInput = useRef<HTMLInputElement>(null);
+  const newEventButton = useRef<HTMLButtonElement>(null);
 
   const formValues = (): CalendarForm => ({
     title: s.title,
@@ -715,9 +718,11 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
     }
   }
 
-  async function save() {
+  // True when the event was saved; false when nothing was sent (invalid times, read-only, a save
+  // already running) or the save failed.
+  async function save(): Promise<boolean> {
     const { timeError, readOnly, formCalendar } = derive();
-    if (s.busy || timeError || readOnly) return;
+    if (s.busy || timeError || readOnly) return false;
     const generation = editGeneration.current;
     const event = s.selected;
     const edited = formValues();
@@ -791,12 +796,28 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
       if (!event && s.hidden.includes(calendarKey(calendar))) s.hidden = s.hidden.filter((k) => k !== calendarKey(calendar));
       else await load();
       say(tr('Evento salvato', 'Event saved'));
+      return true;
     } catch (e) {
       s.sheetError = errorText(e);
+      return false;
     } finally {
       s.busy = false;
     }
   }
+  // Closing the window over typed event details asks first (focus returns to the sheet). Unlike the
+  // contact form, the sheet never saves at session end or on a reload: that would create an event
+  // (or send invitations to its guests) nobody confirmed. It answers `false` without any call, so
+  // "Ricarica la finestra" asks and a sign-out neither creates nor sends anything.
+  useDirtyCloseGuard(
+    'calendar-event',
+    Boolean(D.dirty),
+    () => {
+      busyEditing();
+      titleInput.current?.focus();
+    },
+    async () => false,
+  );
+
   async function remove() {
     const event = s.selected;
     if (!event || s.busy) return;
@@ -826,6 +847,10 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
       } else await call('delete_event', { id: Number(event.id) });
       closeEditor();
       await load();
+      // The sheet gave the focus back to the event it came from, which is gone now: take it to the
+      // calendar's own action instead of <body>.
+      await tick();
+      if (document.activeElement === document.body) newEventButton.current?.focus();
       say(tr('Evento eliminato', 'Event deleted'));
     } catch (e) {
       s.sheetError = errorText(e);
@@ -1078,7 +1103,7 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
                   <Icon name="refresh" size={17} />
                 </Button>
               )}
-              <Button variant="primary" onClick={newEvent}>
+              <Button variant="primary" ref={newEventButton} onClick={newEvent}>
                 <Icon name="plus" size={17} />
                 {tr('Nuovo evento', 'New event')}
               </Button>
@@ -1247,6 +1272,9 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
 
       {s.form && (
         <SidePanel
+          // Another event opened by keyboard while the sheet shows one is a new opening: Esc goes back to
+          // that event, not to the first one.
+          key={s.selected ? eventKey(s.selected) : 'new'}
           narrow
           className="event-sheet"
           aria-labelledby="event-editor-title"

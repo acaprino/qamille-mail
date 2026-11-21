@@ -324,6 +324,11 @@ impl BaseUrl {
     }
 
     pub fn chat_url(&self) -> String {
+        self.endpoint("/chat/completions")
+    }
+
+    /// L'indirizzo di una rotta del servizio (`/chat/completions`, `/embeddings`).
+    pub fn endpoint(&self, route: &str) -> String {
         let host = if self.host.contains(':') {
             format!("[{}]", self.host)
         } else {
@@ -331,7 +336,7 @@ impl BaseUrl {
         };
         let port = self.port.map(|p| format!(":{p}")).unwrap_or_default();
         let scheme = if self.https { "https" } else { "http" };
-        format!("{scheme}://{host}{port}{}/chat/completions", self.path)
+        format!("{scheme}://{host}{port}{}{route}", self.path)
     }
 
     pub fn default_label(&self) -> String {
@@ -1164,8 +1169,27 @@ impl LlmHolder {
     }
 }
 
-fn trimmed(value: Option<&str>) -> Option<String> {
+pub(crate) fn trimmed(value: Option<&str>) -> Option<String> {
     value.map(str::trim).filter(|v| !v.is_empty()).map(str::to_owned)
+}
+
+/// Un file di impostazioni scritto per intero o per niente: un file temporaneo (0600 su Unix:
+/// può contenere una chiave), poi lo spostamento al suo posto.
+pub(crate) fn save_private(path: &Path, body: &[u8]) -> std::io::Result<()> {
+    let temporary = path.with_extension("json.tmp");
+    {
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create(true).truncate(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let mut file = options.open(&temporary)?;
+        file.write_all(body)?;
+        file.sync_all()?;
+    }
+    std::fs::rename(&temporary, path)
 }
 
 /// Le impostazioni dell'assistente scelte dal pannello. `api_key` `None`: vale la chiave della
@@ -1238,20 +1262,7 @@ impl LlmSettings {
     /// spostamento al suo posto.
     pub fn save(&self, path: &Path) -> std::io::Result<()> {
         let body = serde_json::to_vec_pretty(self).map_err(std::io::Error::other)?;
-        let temporary = path.with_extension("json.tmp");
-        {
-            let mut options = std::fs::OpenOptions::new();
-            options.write(true).create(true).truncate(true);
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::OpenOptionsExt;
-                options.mode(0o600);
-            }
-            let mut file = options.open(&temporary)?;
-            file.write_all(&body)?;
-            file.sync_all()?;
-        }
-        std::fs::rename(&temporary, path)
+        save_private(path, &body)
     }
 
     /// `base` con queste impostazioni sopra, validata come la configurazione all'avvio.
@@ -1348,7 +1359,7 @@ impl fmt::Debug for LlmAdmin {
 }
 
 /// Le ultime quattro lettere di una chiave lunga, per riconoscerla; di una corta, nessuna.
-fn key_hint(key: &ApiKey) -> String {
+pub(crate) fn key_hint(key: &ApiKey) -> String {
     let chars: Vec<char> = key.expose().chars().collect();
     if chars.len() < 16 {
         return "…".to_owned();

@@ -167,6 +167,9 @@ fn show(app: &AppHandle, view: &ReminderView) -> tauri::Result<()> {
                 // Same profile as the main window, so device preferences are shared.
                 .data_directory(qamille::model::Store::data_dir().join("webview"))
                 .general_autofill_enabled(false)
+                // wry's own drop handler would take a file dragged onto the chip, with the copy
+                // cursor, for a drop nothing reads; without it the page refuses the drop.
+                .disable_drag_drop_handler()
                 .on_navigation(crate::native_feel::navigation_guard(app, false))
                 .build()?;
             crate::native_feel::harden_webview(&window, "reminder.html");

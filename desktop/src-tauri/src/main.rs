@@ -312,7 +312,8 @@ fn setup_app(
             .name("qamille-autostart".into())
             .spawn(|| {
                 if let Err(error) = qamille::infrastructure::mcp_config::refresh_autostart() {
-                    eprintln!("Qamille: the worker's startup file was not refreshed: {}", error.message);
+                    // Into native.log too: a release build has no console for stderr.
+                    native_feel::report(&format!("the worker's startup file was not refreshed: {}", error.message));
                 }
             });
     }

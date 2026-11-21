@@ -1,16 +1,16 @@
-// Brings the toolkit (@acaprino/toolkit, the design system) into desktop/vendor/toolkit/, after checking every file
+// Brings Sigrid (@acaprino/sigrid, the design system) into desktop/vendor/sigrid/, after checking every file
 // of the package against its provenance.json. Output is generated and ignored by git.
-// Qamille always takes the latest release of the toolkit repository's main branch, with no pin of its own:
-//   the latest GitHub release of acaprino/toolkit, used only when its tag is on main (public, plain HTTPS),
-//   cached in desktop/.cache/toolkit (a release is refused unless its tag is v<version of its provenance.json>, and a
+// Qamille always takes the latest release of the Sigrid repository's main branch, with no pin of its own:
+//   the latest GitHub release of acaprino/sigrid, used only when its tag is on main (public, plain HTTPS),
+//   cached in desktop/.cache/sigrid (a release is refused unless its tag is v<version of its provenance.json>, and a
 //   cached release that fails its checks is deleted from the cache, so the next run downloads it again);
-//   TOOLKIT_DIR, when set, takes its place: a checkout of the toolkit, where `npm run release -- --skip-test`
+//   SIGRID_DIR, when set, takes its place: a checkout of Sigrid, where `npm run release -- --skip-test`
 //   builds the package (to try changes that are not released yet);
-//   without the network the copy already in vendor/toolkit stays, if it still matches its own provenance.json.
-// The copy is replaced without ever being lost: the new one is written to vendor/toolkit.part, the old one is renamed
-// to vendor/toolkit.old, the new one is renamed into place, and the old one is deleted last. If a sync stops half-way,
-// the next one puts vendor/toolkit.old back.
-// The official repository is the only source. Not part of predev/prebuild: nothing imports the toolkit yet.
+//   without the network the copy already in vendor/sigrid stays, if it still matches its own provenance.json.
+// The copy is replaced without ever being lost: the new one is written to vendor/sigrid.part, the old one is renamed
+// to vendor/sigrid.old, the new one is renamed into place, and the old one is deleted last. If a sync stops half-way,
+// the next one puts vendor/sigrid.old back.
+// The official repository is the only source. Not part of predev/prebuild: nothing imports Sigrid yet.
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync } from 'node:fs';
@@ -18,10 +18,10 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { isPlainFileName, latestMainRelease, untar } from './github-release.mjs';
 
-export const TOOLKIT_REPO = 'acaprino/toolkit';
-const TOOLKIT_PACKAGE = '@acaprino/toolkit';
-// The toolkit tags its releases <prefix><version> (tagPrefix in its .github/release.json): v1.2.3.
-const TOOLKIT_TAG_PREFIX = 'v';
+export const SIGRID_REPO = 'acaprino/sigrid';
+const SIGRID_PACKAGE = '@acaprino/sigrid';
+// Sigrid tags its releases <prefix><version> (tagPrefix in its .github/release.json): v1.2.3.
+const SIGRID_TAG_PREFIX = 'v';
 // A peer pinned to one version (as opposed to a range such as "^18.0.0 || ^19.0.0" or "*"): "1.2.3", and also
 // "=1.2.3" and "v1.2.3", which npm reads the same way (`bare` takes the prefix off).
 const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
@@ -47,7 +47,7 @@ function filesOf(dir, prefix = '') {
 
 // Checks the unpacked package in `dir` against its provenance.json: the same files, with the same SHA-256, no more
 // and no fewer. Returns { provenance, problems }: what is wrong with the package, an empty list when it is good.
-// It serves a new package and the copy already in vendor/toolkit alike.
+// It serves a new package and the copy already in vendor/sigrid alike.
 function inspect(dir) {
   const file = join(dir, 'provenance.json');
   if (!existsSync(file)) return { provenance: null, problems: ['no provenance.json'] };
@@ -57,7 +57,7 @@ function inspect(dir) {
   } catch (error) {
     return { provenance: null, problems: [`provenance.json cannot be read (${error.message})`] };
   }
-  if (provenance?.package !== TOOLKIT_PACKAGE) return { provenance, problems: [`the package is ${JSON.stringify(provenance?.package)}, not ${TOOLKIT_PACKAGE}`] };
+  if (provenance?.package !== SIGRID_PACKAGE) return { provenance, problems: [`the package is ${JSON.stringify(provenance?.package)}, not ${SIGRID_PACKAGE}`] };
   const listed = provenance.files;
   if (!listed || typeof listed !== 'object' || typeof provenance.commit !== 'string') return { provenance, problems: ['provenance.json lacks files or commit'] };
   let present;
@@ -75,15 +75,15 @@ function inspect(dir) {
 }
 
 // A new package that fails the check is an error. Returns its provenance. `tag` is the tag of the release the package
-// came from (none for a package built in TOOLKIT_DIR): the release of tag v1.2.3 must hold version 1.2.3, or a package
+// came from (none for a package built in SIGRID_DIR): the release of tag v1.2.3 must hold version 1.2.3, or a package
 // uploaded to the wrong release would be synced under that tag.
 function verify(dir, tag) {
   const { provenance, problems } = inspect(dir);
-  if (problems.length) throw new Error(`toolkit: the package fails its checks against provenance.json. Rebuild or download it again.\n  ${problems.join('\n  ')}`);
+  if (problems.length) throw new Error(`sigrid: the package fails its checks against provenance.json. Rebuild or download it again.\n  ${problems.join('\n  ')}`);
   const version = typeof provenance.version === 'string' ? provenance.version : null;
-  if (tag !== undefined && (version === null || tag !== `${TOOLKIT_TAG_PREFIX}${version}`)) {
-    const belongs = version === null ? '' : `, which is the tag ${TOOLKIT_TAG_PREFIX}${version}`;
-    throw new Error(`toolkit: the release ${tag} holds a package whose provenance.json says version ${JSON.stringify(version)}${belongs}. A package was uploaded to the wrong release.`);
+  if (tag !== undefined && (version === null || tag !== `${SIGRID_TAG_PREFIX}${version}`)) {
+    const belongs = version === null ? '' : `, which is the tag ${SIGRID_TAG_PREFIX}${version}`;
+    throw new Error(`sigrid: the release ${tag} holds a package whose provenance.json says version ${JSON.stringify(version)}${belongs}. A package was uploaded to the wrong release.`);
   }
   return provenance;
 }
@@ -101,8 +101,8 @@ function dropCached(cached, tag) {
   return `\n  The cached copy of ${tag} was removed, so the next run downloads it again.`;
 }
 
-// The toolkit's peerDependencies that Qamille also declares. A peer pinned to an exact version must be the version
-// Qamille has, or the toolkit would run on another copy of it than it was built for; a range is only reported.
+// Sigrid's peerDependencies that Qamille also declares. A peer pinned to an exact version must be the version
+// Qamille has, or Sigrid would run on another copy of it than it was built for; a range is only reported.
 function checkPeers(dir, desktop, log) {
   const peers = readJson(join(dir, 'package.json')).peerDependencies ?? {};
   const own = readJson(join(desktop, 'package.json'));
@@ -110,10 +110,10 @@ function checkPeers(dir, desktop, log) {
   const mismatches = [];
   for (const [name, spec] of Object.entries(peers)) {
     if (!Object.hasOwn(have, name)) continue;
-    if (!EXACT_VERSION.test(bare(spec))) log(`toolkit: peer ${name} ${spec} is a range, not enforced (Qamille has ${have[name]})`);
-    else if (bare(have[name]) !== bare(spec)) mismatches.push(`peer ${name} is exactly ${spec} in the toolkit, but Qamille has ${have[name]}`);
+    if (!EXACT_VERSION.test(bare(spec))) log(`sigrid: peer ${name} ${spec} is a range, not enforced (Qamille has ${have[name]})`);
+    else if (bare(have[name]) !== bare(spec)) mismatches.push(`peer ${name} is exactly ${spec} in Sigrid, but Qamille has ${have[name]}`);
   }
-  if (mismatches.length) throw new Error(`toolkit: ${mismatches.join('; ')}. Align desktop/package.json with the toolkit, or the toolkit with Qamille.`);
+  if (mismatches.length) throw new Error(`sigrid: ${mismatches.join('; ')}. Align desktop/package.json with Sigrid, or Sigrid with Qamille.`);
 }
 
 // Windows answers EPERM, EACCES or EBUSY to a rename while something (the antivirus, the indexer) still holds a file
@@ -131,14 +131,14 @@ export function renameRetrying(from, to, { rename = renameSync, wait = pause, at
   }
 }
 
-// Replaces vendor/toolkit with the package in `dir`, with no moment in which the copy exists nowhere: the package is
-// copied to vendor/toolkit.part, the old copy is renamed to vendor/toolkit.old, the .part is renamed into place, and
+// Replaces vendor/sigrid with the package in `dir`, with no moment in which the copy exists nowhere: the package is
+// copied to vendor/sigrid.part, the old copy is renamed to vendor/sigrid.old, the .part is renamed into place, and
 // the old copy is deleted last (that deletion cannot fail the sync: the next one removes what is left). If the new
-// copy cannot be put in place the old one is renamed back; if even that fails it stays in toolkit.old, and
+// copy cannot be put in place the old one is renamed back; if even that fails it stays in sigrid.old, and
 // restoreInterrupted brings it back at the next sync. `rename` is where the tests make the renames fail.
 export function replaceVendor(dir, desktop, rename = renameRetrying) {
   const vendor = join(desktop, 'vendor');
-  const target = join(vendor, 'toolkit');
+  const target = join(vendor, 'sigrid');
   const part = `${target}.part`;
   const old = `${target}.old`;
   rmSync(part, { recursive: true, force: true });
@@ -175,11 +175,11 @@ export function replaceVendor(dir, desktop, rename = renameRetrying) {
   }
 }
 
-// A sync that stopped after putting the old copy aside and before the new one was in place leaves vendor/toolkit.old
-// and no vendor/toolkit: that is the last good copy, and it goes back. A toolkit.old beside a vendor/toolkit is what
+// A sync that stopped after putting the old copy aside and before the new one was in place leaves vendor/sigrid.old
+// and no vendor/sigrid: that is the last good copy, and it goes back. A sigrid.old beside a vendor/sigrid is what
 // a sync left when it stopped before deleting it, and is removed.
 function restoreInterrupted(desktop, log) {
-  const target = join(desktop, 'vendor', 'toolkit');
+  const target = join(desktop, 'vendor', 'sigrid');
   const old = `${target}.old`;
   if (!existsSync(old)) return;
   if (existsSync(target)) {
@@ -191,46 +191,46 @@ function restoreInterrupted(desktop, log) {
     return;
   }
   renameRetrying(old, target);
-  log('toolkit: vendor/toolkit was missing, the previous copy of an interrupted sync is back');
+  log('sigrid: vendor/sigrid was missing, the previous copy of an interrupted sync is back');
 }
 
-// Builds the package in a checkout of the toolkit and unpacks it into `into`. The checkout's own release script writes
+// Builds the package in a checkout of Sigrid and unpacks it into `into`. The checkout's own release script writes
 // release/: the .tgz and the manifest that gives its SHA-256.
 function buildLocal(source, into, log) {
-  if (!existsSync(join(source, 'package.json'))) throw new Error(`toolkit: TOOLKIT_DIR ${source} is not a checkout of the toolkit (no package.json)`);
-  log(`toolkit: building the package in ${source} (npm run release -- --skip-test)`);
+  if (!existsSync(join(source, 'package.json'))) throw new Error(`sigrid: SIGRID_DIR ${source} is not a checkout of Sigrid (no package.json)`);
+  log(`sigrid: building the package in ${source} (npm run release -- --skip-test)`);
   try {
     execSync(`${NPM} run release -- --skip-test`, { cwd: source, stdio: 'inherit' });
   } catch (error) {
     const how = typeof error.status === 'number' ? `exit code ${error.status}` : error.message;
-    throw new Error(`toolkit: npm run release -- --skip-test failed in TOOLKIT_DIR ${source} (${how})`);
+    throw new Error(`sigrid: npm run release -- --skip-test failed in SIGRID_DIR ${source} (${how})`);
   }
   const releaseDir = join(source, 'release');
-  if (!existsSync(join(releaseDir, 'manifest.json'))) throw new Error(`toolkit: npm run release left no release/manifest.json in TOOLKIT_DIR ${source}`);
+  if (!existsSync(join(releaseDir, 'manifest.json'))) throw new Error(`sigrid: npm run release left no release/manifest.json in SIGRID_DIR ${source}`);
   const manifest = readJson(join(releaseDir, 'manifest.json'));
-  const pkg = manifest.packages?.find((p) => p.name === TOOLKIT_PACKAGE);
-  if (!pkg) throw new Error(`toolkit: ${join(releaseDir, 'manifest.json')} does not list ${TOOLKIT_PACKAGE}`);
-  if (!isPlainFileName(pkg.file)) throw new Error(`toolkit: the manifest lists ${JSON.stringify(pkg.file)}, which is not a plain file name`);
+  const pkg = manifest.packages?.find((p) => p.name === SIGRID_PACKAGE);
+  if (!pkg) throw new Error(`sigrid: ${join(releaseDir, 'manifest.json')} does not list ${SIGRID_PACKAGE}`);
+  if (!isPlainFileName(pkg.file)) throw new Error(`sigrid: the manifest lists ${JSON.stringify(pkg.file)}, which is not a plain file name`);
   const file = join(releaseDir, pkg.file);
-  if (sha256(file) !== pkg.sha256) throw new Error(`toolkit: ${pkg.file}: SHA-256 differs from the manifest`);
+  if (sha256(file) !== pkg.sha256) throw new Error(`sigrid: ${pkg.file}: SHA-256 differs from the manifest`);
   rmSync(into, { recursive: true, force: true });
   untar(file, into);
 }
 
 // Verifies the package of `release` ({ tag, dir, cached }: `dir` is the unpacked package, null when there is none; `cached`
-// is the folder of that release in the cache, when it came from there), checks its peers and puts it in vendor/toolkit.
+// is the folder of that release in the cache, when it came from there), checks its peers and puts it in vendor/sigrid.
 // Nothing is touched before the package and its peers are good. A cached release that fails its checks is removed from
-// the cache. Without a package the copy in vendor/toolkit stays, but only if it is whole: it is checked against its own
+// the cache. Without a package the copy in vendor/sigrid stays, but only if it is whole: it is checked against its own
 // provenance.json, like a new one.
 function install(release, desktop, log) {
   const { dir, tag, cached } = release ?? {};
   if (!dir) {
-    const advice = `Check the network (the latest release of ${TOOLKIT_REPO}'s main), or set TOOLKIT_DIR to a checkout of the toolkit.`;
-    const kept = join(desktop, 'vendor', 'toolkit');
-    if (!existsSync(kept)) throw new Error(`toolkit: no release of ${TOOLKIT_REPO}'s main reachable and no copy in vendor/toolkit. ${advice}`);
+    const advice = `Check the network (the latest release of ${SIGRID_REPO}'s main), or set SIGRID_DIR to a checkout of Sigrid.`;
+    const kept = join(desktop, 'vendor', 'sigrid');
+    if (!existsSync(kept)) throw new Error(`sigrid: no release of ${SIGRID_REPO}'s main reachable and no copy in vendor/sigrid. ${advice}`);
     const { problems } = inspect(kept);
-    if (problems.length) throw new Error(`toolkit: no release of ${TOOLKIT_REPO}'s main reachable, and the copy in vendor/toolkit fails its checks against provenance.json. ${advice}\n  ${problems.join('\n  ')}`);
-    log("toolkit: no release of the toolkit's main reachable, keeping the existing copy");
+    if (problems.length) throw new Error(`sigrid: no release of ${SIGRID_REPO}'s main reachable, and the copy in vendor/sigrid fails its checks against provenance.json. ${advice}\n  ${problems.join('\n  ')}`);
+    log("sigrid: no release of Sigrid's main reachable, keeping the existing copy");
     return;
   }
   let provenance;
@@ -242,18 +242,18 @@ function install(release, desktop, log) {
   }
   checkPeers(dir, desktop, log);
   replaceVendor(dir, desktop);
-  log(`toolkit: ${tag ?? `v${provenance.version}`} (${provenance.commit.slice(0, 7)}) synced`);
+  log(`sigrid: ${tag ?? `v${provenance.version}`} (${provenance.commit.slice(0, 7)}) synced`);
 }
 
-// desktop: Qamille's desktop folder. release: { tag, dir, cached }, the latest release of the toolkit's main already
+// desktop: Qamille's desktop folder. release: { tag, dir, cached }, the latest release of Sigrid's main already
 // downloaded, `dir` being the unpacked package (null when there is none) and `cached` the cache folder of the release
-// (removed when the package fails its checks; optional). source: a checkout of the toolkit; it wins
+// (removed when the package fails its checks; optional). source: a checkout of Sigrid; it wins
 // over `release`: its package is built there and takes the release's place.
-export async function syncToolkit({ desktop, release = null, source = null, log = console.log }) {
+export async function syncSigrid({ desktop, release = null, source = null, log = console.log }) {
   restoreInterrupted(desktop, log);
   if (!source) return install(release, desktop, log);
   // The checkout's package is unpacked into a staging folder of its own, removed at the end.
-  const staging = join(desktop, '.cache', 'toolkit-local');
+  const staging = join(desktop, '.cache', 'sigrid-local');
   try {
     buildLocal(source, staging, log);
     install({ dir: staging }, desktop, log);
@@ -262,30 +262,30 @@ export async function syncToolkit({ desktop, release = null, source = null, log 
   }
 }
 
-// The latest release of the toolkit's main (see github-release.mjs), its one package unpacked into <cache>/<tag>/package/.
+// The latest release of Sigrid's main (see github-release.mjs), its one package unpacked into <cache>/<tag>/package/.
 // Resolves to { tag, dir, cached } with dir the unpacked package and cached the release's folder in the cache, or null
-// (no network, no release): syncToolkit then falls back to the copy it already has. `api` is where GitHub's API is; only
+// (no network, no release): syncSigrid then falls back to the copy it already has. `api` is where GitHub's API is; only
 // the tests replace it.
-export async function latestToolkitRelease(cache, log = console.log, api) {
+export async function latestSigridRelease(cache, log = console.log, api) {
   const found = await latestMainRelease({
-    repo: TOOLKIT_REPO,
+    repo: SIGRID_REPO,
     cache,
-    label: 'toolkit',
+    label: 'sigrid',
     log,
     api,
-    select: (manifest, tag) => [manifest.packages?.find((p) => p.name === TOOLKIT_PACKAGE) ?? (() => { throw new Error(`${TOOLKIT_PACKAGE} is not in the manifest of ${tag}`); })()],
+    select: (manifest, tag) => [manifest.packages?.find((p) => p.name === SIGRID_PACKAGE) ?? (() => { throw new Error(`${SIGRID_PACKAGE} is not in the manifest of ${tag}`); })()],
     unpack: (file, part) => untar(file, join(part, 'package')),
   });
   return found && { tag: found.tag, dir: join(found.dir, 'package'), cached: found.dir };
 }
 
-// Command line: `npm run toolkit:sync`. A failure is reported and sets the exit code; the process is left to end by
+// Command line: `npm run sigrid:sync`. A failure is reported and sets the exit code; the process is left to end by
 // itself, because on Windows an uncaught error right after a request leaves Node aborting on exit (0xC0000409).
 async function main() {
   const desktop = resolve(import.meta.dirname, '..');
-  const explicit = process.env.TOOLKIT_DIR;
-  const release = explicit ? null : await latestToolkitRelease(join(desktop, '.cache', 'toolkit'));
-  await syncToolkit({ desktop, release, source: explicit ? resolve(explicit) : null });
+  const explicit = process.env.SIGRID_DIR;
+  const release = explicit ? null : await latestSigridRelease(join(desktop, '.cache', 'sigrid'));
+  await syncSigrid({ desktop, release, source: explicit ? resolve(explicit) : null });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

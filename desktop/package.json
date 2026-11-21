@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "artcraft:sync": "node scripts/sync-artcraft.mjs",
-    "toolkit:sync": "node scripts/sync-toolkit.mjs",
+    "sigrid:sync": "node scripts/sync-sigrid.mjs",
     "ds:export": "node scripts/ds-export.mjs",
     "predev": "npm run artcraft:sync",
     "dev": "vite --host 127.0.0.1",

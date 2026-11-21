@@ -1,6 +1,6 @@
 // The latest GitHub release of acaprino/artcraft-web, unpacked like artcraft-web's dist/: <cache>/<tag>/<engine>/.
 // The download itself (latest release of main, manifest, SHA-256, cache) is github-release.mjs, shared with the
-// toolkit; this file is what is specific to ArtCraft: the four engines and how each is unpacked.
+// Sigrid; this file is what is specific to ArtCraft: the four engines and how each is unpacked.
 // Resolves to { tag, dir }, or null (no network, no release): the caller then falls back to a local artcraft-web.
 import { rmSync } from 'node:fs';
 import { join } from 'node:path';

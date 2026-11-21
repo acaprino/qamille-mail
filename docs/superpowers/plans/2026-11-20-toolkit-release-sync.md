@@ -1,5 +1,7 @@
 # Release del toolkit e `toolkit:sync` in Qamille: piano di implementazione
 
+> Dal 2026-11-21 il toolkit si chiama Sigrid (`acaprino/sigrid`, `@acaprino/sigrid`) e lo script è `sigrid:sync`; il resto di questo documento è rimasto com'era.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** `acaprino/toolkit` pubblica una release verificabile a ogni merge di `develop` in `main`, e Qamille la scarica, la controlla e la mette in `desktop/vendor/toolkit/` con `npm run toolkit:sync`, senza login.

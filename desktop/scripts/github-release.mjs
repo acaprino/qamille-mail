@@ -1,5 +1,5 @@
 // The latest GitHub release of a public repository, used only when its tag is on the repository's main branch,
-// downloaded and unpacked into <cache>/<tag>/. Shared by sync-artcraft (acaprino/artcraft-web) and sync-toolkit.
+// downloaded and unpacked into <cache>/<tag>/. Shared by sync-artcraft (acaprino/artcraft-web) and sync-sigrid.
 // Qamille always takes the latest release of the repository's main, with no pin of its own. The repository is
 // public: plain HTTPS, no sign-in (GH_TOKEN or GITHUB_TOKEN, when set, only lifts GitHub's rate limit).
 // A release is a manifest.json ({ packages: [{ file, sha256, ... }] }) and the package files it lists. Every

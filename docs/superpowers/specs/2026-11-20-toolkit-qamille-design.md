@@ -1,5 +1,7 @@
 # Qamille sul toolkit condiviso: design
 
+> Dal 2026-11-21 il toolkit si chiama Sigrid (`acaprino/sigrid`, `@acaprino/sigrid`) e lo script è `sigrid:sync`; il resto di questo documento è rimasto com'era.
+
 Bozza del 2026-11-20, da approvare. Riguarda tre repository:
 - il toolkit, nel repository ufficiale `acaprino/toolkit` (pubblico, MIT, creato il 2026-11-20; checkout locale in `D:\Projects\toolkit`). È l'unica fonte del toolkit: nessun'altra copia conta;
 - Ethel, che lo usa oggi;

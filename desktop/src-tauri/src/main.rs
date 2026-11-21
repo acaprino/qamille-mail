@@ -15,6 +15,10 @@ mod background_rules;
 // phase 3, Task 2: modules
 
 // phase 3, Task 3: modules
+mod notifications;
+mod notify_rules;
+mod taskbar;
+mod taskbar_rules;
 
 // phase 3, Task 4: modules
 
@@ -97,6 +101,8 @@ fn main() {
     let started = tauri::Builder::default()
         // Started again while it runs (also hidden in the tray or minimized): the window comes back.
         .plugin(tauri_plugin_single_instance::init(background::second_instance))
+        // Windows notifications, sent from Rust only (notifications.rs): no permission for the page.
+        .plugin(tauri_plugin_notification::init())
         // Tauri 2.12 turns an `Err` returned from `.setup` into a panic, and a panic there ends the
         // process (exit code 101): a release build (no console) would end without a word. Both are
         // said here instead (audit Q2).
@@ -251,6 +257,7 @@ fn main() {
             semantic_search,
             index_mail,
             indexing_status,
+            notifications::notifications_get, notifications::notifications_set,
             configure_indexing,
             search_model_installed,
             search_model_status,

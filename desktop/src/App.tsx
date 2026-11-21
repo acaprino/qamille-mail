@@ -33,6 +33,7 @@ import { captureActive, flushMeetingDrafts, meetingCall, requestMeetingOpen, typ
 import { installWindowCloseHandler, registerCloseGuard } from './lib/window-close';
 import { paintWindowBackground } from './lib/native-window';
 import { installWindowShell, windowAppearance, zoomWindow } from './lib/window-shell';
+import { installNotificationOpen } from './lib/notification-open';
 import Icon from './ds/primitives/Icon';
 import UndoStack from './components/UndoStack';
 import { refreshActivity } from './lib/activity-center';
@@ -1568,6 +1569,15 @@ export default function App() {
       ),
     );
     unsubscribers.push(installWindowShell());
+    // A click on a Windows notification (lib/notification-open.ts): Rust brought the window back.
+    unsubscribers.push(
+      installNotificationOpen({
+        openMail: (id) => (navigate('Inbox'), void open(id)),
+        openDrafts: () => navigate('Drafts'),
+        openAccounts: () => (navigate('Settings'), void tick().then(() => settingsPanel.current?.showSection('Accounts'))),
+        openServer: () => (navigate('Settings'), void tick().then(() => settingsPanel.current?.showSection('Compute'))),
+      }),
+    );
     void installWindowCloseHandler(notify)
       .then((unsubscribe) => (disposed ? unsubscribe() : unsubscribers.push(unsubscribe)))
       .catch((error) => notify(errorText(error), true));

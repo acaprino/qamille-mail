@@ -914,6 +914,11 @@ export async function previewCommand(
           : null,
       }));
     }
+    // Windows notifications (components/NotificationSettings.tsx): the preview shows none.
+    case 'notifications_get':
+      return { enabled: false, new_mail: true, scheduled_send: true, sign_in: true, portable: true, supported: false };
+    case 'notifications_set':
+      return;
     case 'set_include_spam_trash': {
       const account = store.accounts.find((a) => a.id === Number(args.accountId));
       if (!account) throw new Error('Account not found');

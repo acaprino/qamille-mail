@@ -2,6 +2,7 @@
 //! to a one-time local address, and the code is exchanged using PKCE. Qamille never sees the
 //! Google password. Only the refresh token is stored, in the portable credential vault.
 
+use crate::application::AppError;
 use crate::model::Account;
 use crate::secret;
 use serde_json::Value;
@@ -174,12 +175,28 @@ fn agent() -> ureq::Agent {
     ureq::Agent::config_builder().timeout_global(Some(Duration::from_secs(30))).http_status_as_error(false).build().into()
 }
 
+/// What Google's refusal of a sign-in says (`invalid_grant`: the refresh token was revoked, or expired,
+/// every 7 days for a project in Testing mode). `access_token` returns it as text, which the IMAP and
+/// SMTP errors carry on; `provider_error` reads it back as the code `sign_in_expired`.
+pub const SIGN_IN_EXPIRED: &str = "Google no longer accepts this sign-in. Please sign in with Google again. With a project in Testing mode this happens every 7 days.";
+
+/// The error of a mail provider call whose failure travels as text: `sign_in_expired` when it carries
+/// Google's refusal of the sign-in (`SIGN_IN_EXPIRED`, also inside "IMAP login: …"), else `external`.
+/// The mail sync tells a sign-in to renew from a network error by this code.
+pub fn provider_error(message: String) -> AppError {
+    if message.contains(SIGN_IN_EXPIRED) {
+        AppError::new("sign_in_expired", message)
+    } else {
+        AppError::external(message)
+    }
+}
+
 fn parse_tokens(status: u16, v: &Value) -> Result<Tokens, String> {
     if status >= 400 || v["access_token"].as_str().is_none() {
         let code = v["error"].as_str().unwrap_or("unknown_error");
         let text = v["error_description"].as_str().unwrap_or("");
         return Err(match code {
-            "invalid_grant" => "Google no longer accepts this sign-in. Please sign in with Google again. With a project in Testing mode this happens every 7 days.".to_string(),
+            "invalid_grant" => SIGN_IN_EXPIRED.to_string(),
             "invalid_client" => "Google couldn't verify this version of Qamille. Contact the app developer.".to_string(),
             _ => format!("Google refused the sign-in: {code} {text}"),
         });
@@ -490,6 +507,10 @@ mod tests {
     fn token_errors_say_what_to_do() {
         let e = parse_tokens(400, &serde_json::json!({"error": "invalid_grant"})).unwrap_err();
         assert!(e.contains("sign in with Google again"));
+        // The refusal keeps its code through the text of an IMAP or SMTP error.
+        assert_eq!(provider_error(format!("IMAP login: {e}")).code, "sign_in_expired");
+        assert_eq!(provider_error(e).code, "sign_in_expired");
+        assert_eq!(provider_error("IMAP connect: timed out".into()).code, "external");
         assert!(parse_tokens(401, &serde_json::json!({"error": "invalid_client"})).unwrap_err().contains("Contact the app developer"));
     }
 

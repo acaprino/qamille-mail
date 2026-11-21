@@ -13,6 +13,8 @@ tauri-build = { version = "2", features = [] }
 qamille = { path = "../../app", default-features = false }
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-single-instance = "2"
+# Windows notifications, sent from Rust only (src/notifications.rs); the page gets no permission of the plugin.
+tauri-plugin-notification = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # common-controls-v6: task dialogs, whose buttons say what they do (recovery.rs); the manifest Tauri embeds already asks for Common Controls 6.

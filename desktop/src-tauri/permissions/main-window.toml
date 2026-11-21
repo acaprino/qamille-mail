@@ -159,6 +159,8 @@ permissions = [
   "allow-semantic-search",
   "allow-index-mail",
   "allow-indexing-status",
+  "allow-notifications-get",
+  "allow-notifications-set",
   "allow-configure-indexing",
   "allow-search-model-installed",
   "allow-search-model-status",

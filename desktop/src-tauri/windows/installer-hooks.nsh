@@ -7,8 +7,8 @@
 ; manual upgrade, "uninstall before installing": the same uninstaller, with its confirm page, but
 ; without /UPDATE ($UpdateMode is empty) and about to be followed by the new version. So
 ; $UpdateMode <> 1 does not mean that Qamille is going away: what an uninstall removes and an upgrade
-; must keep is also put back by the app at its next start (refresh_autostart in
-; app/src/infrastructure/mcp_config.rs).
+; must keep is also put back by the app at its next start (put_back_after_upgrade in
+; desktop/src-tauri/src/background.rs, for the start at sign-in).
 
 !macro NSIS_HOOK_PREUNINSTALL
   Push $0
@@ -30,13 +30,20 @@
 !macro NSIS_HOOK_POSTUNINSTALL
   Push $0
 
-  ; Remove the file that starts the worker at sign-in (the same path as startup_launcher() in
-  ; app/src/infrastructure/mcp_config.rs, which also reads %APPDATA%): left behind, it makes Windows
-  ; Script Host report an error at every sign-in. This runs only once the uninstall went through, never
-  ; before the "Qamille is running" step, where it can still be cancelled. An /UPDATE keeps it. A manual
-  ; upgrade removes it too (see the top of this file) and the new version writes it again at its first
-  ; start, if the setting is on.
+  ; Remove what starts Qamille at sign-in, so nothing starts or reports an error once it is gone. This
+  ; runs only once the uninstall went through, never before the "Qamille is running" step, where it can
+  ; still be cancelled. An /UPDATE keeps it; a manual upgrade removes it too, and the new version puts
+  ; the entry back at its first start if it was on (see the top of this file).
+  ; - The Run value that Settings > General writes for the installed Professional (its fixed name comes
+  ;   from autostart_entry_name in desktop/src-tauri/src/background_rules.rs), and its twin where Task
+  ;   Manager keeps its switch. Only HKCU: the app never writes the machine-wide entry.
+  ; - The worker's startup file of the versions before the Run value (startup_launcher() in
+  ;   app/src/infrastructure/mcp_config.rs, which also reads %APPDATA%): left behind, it makes Windows
+  ;   Script Host report an error at every sign-in. The app migrates it when it starts; an install that
+  ;   never started this version may still have it.
   ${If} $UpdateMode <> 1
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "Qamille"
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run" "Qamille"
     ReadEnvStr $0 APPDATA
     ${If} $0 != ""
       Delete "$0\Microsoft\Windows\Start Menu\Programs\Startup\Qamille-worker.vbs"

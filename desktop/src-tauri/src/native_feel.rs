@@ -22,10 +22,39 @@ pub const DARK_GROUND: Color = Color(0x12, 0x16, 0x1e, 0xff);
 /// Settings (or the system theme) first, so the first frame is never the other
 /// theme's colour before the page has drawn.
 pub fn show_main_window(window: &WebviewWindow) {
+    prepare_main_window(window);
+    let _ = window.show();
+}
+
+/// Everything `show_main_window` does but showing: theme, zoom, position (`window_shell`) and
+/// background. A start at sign-in stops here, in the tray; `background::restore` shows it later.
+pub fn prepare_main_window(window: &WebviewWindow) {
     if crate::window_shell::apply_startup_preferences(window) {
         let _ = window.set_background_color(Some(DARK_GROUND));
     }
-    let _ = window.show();
+}
+
+/// Tells WebView2 whether its window is on screen (`ICoreWebView2Controller::SetIsVisible`): hiding
+/// or minimizing the host window does not, and a webview told it is hidden stops drawing, slows its
+/// timers and reports `document.visibilityState` "hidden". `background.rs` calls it when the window
+/// goes to the tray or is minimized, and with `true` before the window shows again.
+pub fn set_webview_visible(window: &WebviewWindow, visible: bool) {
+    #[cfg(windows)]
+    {
+        let label = window.label().to_owned();
+        let result = window.with_webview(move |webview| {
+            // SAFETY: the controller belongs to this live webview and is used on the thread that owns
+            // it, which is where `with_webview` runs.
+            if let Err(error) = unsafe { webview.controller().SetIsVisible(visible) } {
+                report(&format!("could not tell the webview of {label} it is {}: {error}", if visible { "visible" } else { "hidden" }));
+            }
+        });
+        if let Err(error) = result {
+            report(&format!("webview {} unavailable to show or hide: {error}", window.label()));
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = (window, visible);
 }
 
 /// The `on_navigation` hook of every window: only the app's own page stays in

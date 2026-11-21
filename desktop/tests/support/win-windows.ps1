@@ -3,6 +3,7 @@
 #   windows <pid>             JSON list of the visible top-level windows of the process
 #   menu <hwnd>               JSON list of the system menu entries of the window
 #   post <hwnd> <msg> <wparam> posts the message (WM_SYSCOMMAND to a window, WM_COMMAND to a dialog)
+#   foreground 0              the window in the foreground, as a number
 param([Parameter(Mandatory)] [string]$Action, [Parameter(Mandatory)] [long]$Target, [long]$Message = 0, [long]$WParam = 0)
 $ErrorActionPreference = 'Stop'
 Add-Type -TypeDefinition @'
@@ -24,6 +25,7 @@ public static class QamilleWindows {
   [DllImport("user32.dll")] static extern uint GetMenuItemID(IntPtr menu, int position);
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetMenuStringW(IntPtr menu, uint item, StringBuilder text, int size, uint flags);
   [DllImport("user32.dll")] public static extern bool PostMessageW(IntPtr hwnd, uint message, IntPtr wparam, IntPtr lparam);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
   static string Text(IntPtr hwnd, bool cls) {
     var text = new StringBuilder(256);
     if (cls) GetClassNameW(hwnd, text, 256); else GetWindowTextW(hwnd, text, 256);
@@ -57,5 +59,6 @@ switch ($Action) {
   'windows' { ConvertTo-Json -Compress -InputObject @([QamilleWindows]::Windows([uint32]$Target)) }
   'menu' { ConvertTo-Json -Compress -InputObject @([QamilleWindows]::Menu([IntPtr]$Target)) }
   'post' { [void][QamilleWindows]::PostMessageW([IntPtr]$Target, [uint32]$Message, [IntPtr]$WParam, [IntPtr]::Zero); 'posted' }
+  'foreground' { [QamilleWindows]::GetForegroundWindow().ToInt64() }
   default { throw "unknown action $Action" }
 }

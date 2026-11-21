@@ -443,15 +443,18 @@ function nshMacro(text, name) {
   return found[1];
 }
 
-check("17. the installer removes the worker's startup and, when asked, the data (audit Q23)", () => {
+check("17. the installer removes the start at sign-in, the old worker's startup file and, when asked, the data (audit Q22 Q23)", () => {
   const nsis = JSON.parse(read('src-tauri/tauri.professional.conf.json')).bundle?.windows?.nsis;
   const hooksPath = nsis?.installerHooks?.replace(/^\.\//, '');
   assert.equal(hooksPath, 'windows/installer-hooks.nsh', 'the Professional installer must take its hooks from windows/installer-hooks.nsh');
   const hooks = read(`src-tauri/${hooksPath}`);
 
-  // What the app writes, read from the code that writes it: the startup file and the data folder.
+  // What the app writes, read from the code that writes it: the Run entry of the installed
+  // Professional, the old worker's startup file (versions before phase 3) and the data folder.
+  const entryName = rustItem(read('src-tauri/src/background_rules.rs'), 'pub fn autostart_entry_name(').match(/if installed \{ "([^"]+)"\.to_owned\(\) \}/);
+  assert.ok(entryName, 'autostart_entry_name no longer gives the installed Professional a fixed name: change this check and the hook together');
   const launcher = rustItem(read('../app/src/infrastructure/mcp_config.rs'), 'fn startup_launcher()');
-  assert.match(launcher, /env::var_os\("APPDATA"\)/, 'the startup file is still placed under %APPDATA%');
+  assert.match(launcher, /env::var_os\("APPDATA"\)/, 'the old startup file is still looked for under %APPDATA%');
   const written = launcher.match(/\.join\("(Microsoft\/Windows\/[^"]*\.vbs)"\)/);
   assert.ok(written, 'startup_launcher no longer joins a .vbs path: change this check and the hook together');
   const startupFile = written[1].replaceAll('/', '\\');
@@ -468,17 +471,26 @@ check("17. the installer removes the worker's startup and, when asked, the data 
   assert.match(before, /\$\$_\.CommandLine\s+-match\s+'\(\^\|\\s\)--worker\(\\s\|\$\$\)'/, 'a process must be matched on --worker as a whole argument');
   assert.match(before, /Stop-Process\s+-Id\s+\$\$_\.ProcessId/, 'the matching processes must be stopped');
   // Nothing is deleted before the uninstaller's "Qamille is running" step: cancelling there leaves
-  // Qamille installed, and it must keep its startup file and its data.
-  assert.ok(!/\b(Delete|RMDir)\b/i.test(before) && !before.includes(startupFile), 'the hook that runs first must not delete anything');
+  // Qamille installed, and it must keep its start at sign-in and its data.
+  assert.ok(!/\b(Delete|DeleteRegValue|DeleteRegKey|RMDir)\b/i.test(before) && !before.includes(startupFile), 'the hook that runs first must not delete anything');
 
   const after = nshMacro(hooks, 'NSIS_HOOK_POSTUNINSTALL');
-  // The startup file goes only once the uninstall went through, and not on an /UPDATE. The Delete must
-  // sit inside the If $UpdateMode <> 1 block: no ${EndIf} between the two.
-  assert.match(after, /ReadEnvStr\s+\$\d\s+APPDATA/, 'the startup folder is found from %APPDATA%, as mcp_config.rs does');
+  // Each removal sits inside the If $UpdateMode <> 1 block (no ${EndIf} between the two): an /UPDATE keeps them.
+  const inUpdateBlock = (what) => new RegExp(`\\$\\{If\\}\\s+\\$UpdateMode\\s*<>\\s*1(?:(?!\\$\\{EndIf\\})[\\s\\S])*?${what}`);
+  const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  for (const key of ['Software\\Microsoft\\Windows\\CurrentVersion\\Run', 'Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run']) {
+    assert.match(
+      after,
+      inUpdateBlock(`DeleteRegValue\\s+HKCU\\s+"${escape(key)}"\\s+"${escape(entryName[1])}"`),
+      `the uninstall must remove "${entryName[1]}" from HKCU\\${key}, and not on an /UPDATE`,
+    );
+  }
+  assert.ok(!/HKLM/.test(after), 'the app writes its start at sign-in only for the current user');
+  assert.match(after, /ReadEnvStr\s+\$\d\s+APPDATA/, 'the old startup folder is found from %APPDATA%, as mcp_config.rs does');
   assert.match(
     after,
-    new RegExp(`\\$\\{If\\}\\s+\\$UpdateMode\\s*<>\\s*1(?:(?!\\$\\{EndIf\\})[\\s\\S])*?Delete\\s+"\\$\\d\\\\${startupFile.replaceAll('\\', '\\\\')}"`),
-    `${startupFile} must be deleted after the uninstall, and not on an /UPDATE`,
+    inUpdateBlock(`Delete\\s+"\\$\\d\\\\${escape(startupFile)}"`),
+    `${startupFile} of an earlier version must be deleted after the uninstall, and not on an /UPDATE`,
   );
   // The template's "Delete app data" only empties %APPDATA%\<identifier> and %LOCALAPPDATA%\<identifier>,
   // where Qamille keeps nothing: its data and credentials.key sit beside the program.
@@ -488,18 +500,8 @@ check("17. the installer removes the worker's startup and, when asked, the data 
     'the data folder must go only when the box is ticked, never on an /UPDATE, and never from an empty $INSTDIR',
   );
   assert.ok(!/RMDir\s+\/r\s+"\$INSTDIR"/.test(after), 'only the data folder is removed recursively, never the install folder');
-
-  // A manual upgrade runs the old uninstaller without /UPDATE, so it removes the startup file too: the
-  // app writes it again when it starts, with automatic startup on, never while it is off.
-  const refresh = rustItem(read('../app/src/infrastructure/mcp_config.rs'), 'pub fn refresh_autostart()');
-  assert.match(refresh, /refresh_autostart_at\(/, 'refresh_autostart must do the work of refresh_autostart_at');
-  const decision = rustItem(read('../app/src/infrastructure/mcp_config.rs'), 'fn launcher_refresh(');
-  assert.match(decision, /if !autostart \{\s*return None;\s*\}/, 'a launcher must never be written while automatic startup is off');
-  assert.match(
-    rustItem(read('src-tauri/src/main.rs'), 'fn setup_app('),
-    /if !demo \{(?:(?!\n    \})[\s\S])*?mcp_config::refresh_autostart\(\)/,
-    'setup_app must refresh the worker startup file when the app starts (not in the demo)',
-  );
+  // The worker's startup file is never written again: nothing in the app puts it back.
+  assert.ok(!/refresh_autostart/.test(hooks), 'the hooks no longer point to refresh_autostart, which is gone');
 });
 
 check("18. the calendar sheet's end-of-session step never calls the provider (rule 15, audit Q6)", () => {
@@ -521,6 +523,101 @@ check("18. the calendar sheet's end-of-session step never calls the provider (ru
 });
 
 // phase 3, Task 1: checks 19-20
+check('19. the close button hides, and one restore path brings the window back (rule 26)', () => {
+  const main = read('src-tauri/src/main.rs');
+  const background = read('src-tauri/src/background.rs');
+  // A second start, the tray, a notification and a mail link all come back through background::restore.
+  assert.match(main, /\.plugin\(tauri_plugin_single_instance::init\(background::second_instance\)\)/, 'the single-instance callback must be background::second_instance');
+  assert.match(rustItem(background, 'pub fn second_instance('), /\brestore\(app\)/, 'a second start restores the window');
+  // The close button hides only while hides_on_close() says so; otherwise the page's guards decide.
+  const events = main.slice(main.indexOf('.on_window_event('), main.indexOf('.invoke_handler('));
+  assert.match(
+    events,
+    /tauri::WindowEvent::CloseRequested \{ api, \.\. \} => \{\s*if background::hides_on_close\(\) \{\s*api\.prevent_close\(\);\s*background::hide\(window\.app_handle\(\)\);?\s*\} else \{\s*recovery::close_requested\(window\.app_handle\(\)\);?\s*\}/,
+    'CloseRequested must prevent the close and hide only when background::hides_on_close(), and else go to recovery::close_requested',
+  );
+  assert.equal((main.match(/prevent_close\(\)/g) ?? []).length, 1, 'main.rs prevents a close in one place only');
+  assert.match(events, /tauri::WindowEvent::Resized\(_\) => background::window_resized\(window\)/, 'a minimized window pauses its webview (background::window_resized)');
+  assert.match(rustItem(read('src-tauri/src/recovery.rs'), 'pub fn close_seen('), /!crate::background::hides_on_close\(\)/, 'close_seen tells the page not to close when Rust only hid the window');
+  assert.match(read('src/lib/window-close.ts'), /await call<boolean>\('close_seen'\)/, 'the page waits for close_seen before running its guards');
+  // The webview is visible before the window shows, then the window comes to the front, on screen.
+  const restore = rustItem(background, 'pub fn restore(');
+  const at = (part) => {
+    const index = restore.indexOf(part);
+    assert.ok(index >= 0, `restore: no ${part}`);
+    return index;
+  };
+  assert.ok(at('set_webview_visible(') < at('.show()') && restore.slice(at('set_webview_visible('), at('.show()')).includes('true'), 'restore makes the webview visible before show');
+  assert.ok(at('.show()') < at('.unminimize()') && at('.unminimize()') < at('.set_focus()'), 'restore: show, then unminimize, then set_focus');
+  assert.match(restore, /recovery::offer_reload_if_not_ready\(/, 'the first restore offers the reload the hidden window did not ask for');
+  // Nothing else shows the main window: a reload or a dialog never pulls it out of the tray.
+  const allowed = { 'native_feel.rs': 'pub fn show_main_window(', 'background.rs': 'pub fn restore(' };
+  const shows = (text) => (text.match(/\b[A-Za-z_]\w*\.show\(\)/g) ?? []).length;
+  for (const file of fs.readdirSync(path.join(desktop, 'src-tauri/src'), { recursive: true }).filter((f) => f.endsWith('.rs'))) {
+    const text = read(path.join('src-tauri/src', file)).replace(/(^|\s)\/\/.*$/gm, '$1');
+    if (!shows(text)) continue;
+    const owner = allowed[path.basename(file)];
+    assert.ok(owner, `${file} shows a window (.show()): only native_feel::show_main_window and background::restore may`);
+    assert.equal(shows(rustItem(text, owner)), shows(text), `${file}: .show() outside ${owner}`);
+  }
+  // The tray: Show and Quit; Quit closes the window through the page's guards, never app.exit.
+  assert.match(background, /MenuItem::with_id\(\s*app,\s*"show",/, 'the tray menu has "show"');
+  assert.match(background, /MenuItem::with_id\(\s*app,\s*"quit",/, 'the tray menu has "quit"');
+  assert.match(background, /"show" => restore\(app\),\s*"quit" => quit\(app\),/, 'the tray menu items call restore and quit');
+  const quit = rustItem(background, 'pub fn quit(');
+  assert.ok(quit.includes('QUITTING.store(true') && /\.close\(\)/.test(quit) && !/\.exit\(/.test(quit), 'quit raises QUITTING and calls close(), never exit');
+  const shell = read('src-tauri/src/window_shell.rs');
+  assert.match(
+    rustItem(shell, 'fn add_reload_entry('),
+    /AppendMenuW\(menu, MF_STRING, crate::background_rules::SC_APP_QUIT as usize, quit_label\(italian\)\);\s*let _ = AppendMenuW\(menu, MF_SEPARATOR/,
+    'the system menu offers «Esci da Qamille» right under «Chiudi»',
+  );
+  assert.match(
+    shell,
+    /WM_SYSCOMMAND if \(wparam\.0 as u32 & 0xFFF0\) == crate::background_rules::SC_APP_QUIT => \{[^}]*crate::background::quit\(&?app\)/,
+    'Esci in the system menu calls background::quit',
+  );
+  // A hidden window never asks "Qamille non si è aperto" by itself: the 15 s watch reads is_visible() first.
+  const watch = rustItem(read('src-tauri/src/recovery.rs'), 'pub fn watch_startup(');
+  assert.ok(watch.indexOf('is_visible()') >= 0 && watch.indexOf('is_visible()') < watch.indexOf('ask_once('), 'watch_startup asks only after reading is_visible()');
+});
+
+check('20. start at sign-in is Qamille in the tray, written by the OS entry, never a VBS (rule 27, audit Q22)', () => {
+  const cargo = read('src-tauri/Cargo.toml');
+  assert.match(cargo, /^tauri-plugin-autostart = "2"$/m, 'Cargo.toml must depend on tauri-plugin-autostart 2');
+  assert.match(cargo, /^tauri = \{ version = "2", features = \[[^\]]*"tray-icon"/m, 'tauri needs the tray-icon feature');
+  const main = read('src-tauri/src/main.rs');
+  const single = main.indexOf('.plugin(tauri_plugin_single_instance::init(');
+  const autostart = main.indexOf('.plugin(\n            tauri_plugin_autostart::Builder::new()');
+  assert.ok(single >= 0 && autostart > single && autostart < main.indexOf('.setup('), 'the autostart plugin is registered right after single-instance');
+  assert.match(
+    main.slice(autostart),
+    /^\.plugin\(\s*tauri_plugin_autostart::Builder::new\(\)\s*\.arg\(background::AUTOSTART_ARG\)\s*\.app_name\(/,
+    'the entry starts Qamille with AUTOSTART_ARG, under its own name',
+  );
+  const background = read('src-tauri/src/background.rs');
+  assert.match(background, /background_rules::autostart_entry_name\(installed\(\),/, 'the entry name comes from autostart_entry_name');
+  const setup = rustItem(main, 'fn setup_app(');
+  assert.match(
+    setup,
+    /if background_rules::starts_hidden\(&args\) \{\s*native_feel::prepare_main_window\(&main_window\);\s*native_feel::set_webview_visible\(&main_window, false\);?\s*\} else \{\s*native_feel::show_main_window\(&main_window\);?\s*\}/,
+    'a start with AUTOSTART_ARG prepares the window and leaves it in the tray',
+  );
+  assert.match(setup, /if !demo \{(?:(?!\n    \})[\s\S])*?background::migrate_legacy_launcher\(/, 'setup_app migrates the old worker startup file, never in the demo');
+  // A manual upgrade runs the old uninstaller without /UPDATE, which removes the entry: the installed
+  // Professional puts it back at its next start, only if the person had turned it on in Qamille.
+  assert.match(rustItem(background, 'pub fn migrate_legacy_launcher('), /put_back_after_upgrade\(/, 'the startup pass puts the entry back after a manual upgrade');
+  assert.match(rustItem(background, 'fn put_back_after_upgrade('), /if !installed\(\) \|\| !preferences\(\)\.start_at_sign_in/, 'only for the installed Professional, and only when it was turned on in Qamille');
+  // The app writes no startup file any more, and the page reaches start at sign-in only through app commands.
+  const mcp = read('../app/src/infrastructure/mcp_config.rs');
+  assert.ok(!/launcher_content|refresh_autostart|set_autostart/.test(mcp), 'mcp_config.rs must not write a startup file (launcher_content, refresh_autostart, set_autostart)');
+  for (const file of ['capabilities/main.json', 'capabilities/reminder.json']) {
+    assert.ok(!JSON.parse(read(`src-tauri/${file}`)).permissions.some((p) => /^(autostart|core:tray|core:menu):/.test(p)), `${file}: no autostart, tray or menu permission for the page`);
+  }
+  assert.ok(!/@tauri-apps\/plugin-autostart/.test(read('package.json')), 'no autostart package for the page');
+  // auto-launch writes the machine-wide entry when it can (HKLM first): an elevated Qamille refuses.
+  assert.match(rustItem(background, 'pub async fn autostart_set('), /elevated\(\)/, 'autostart_set refuses to turn it on while elevated');
+});
 
 // phase 3, Task 2: check 21
 

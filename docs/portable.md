@@ -13,10 +13,18 @@ Gli allegati aggiunti alle bozze vengono copiati in data e rientrano nel limite
 di spazio dell'account. Le copie senza più riferimenti vengono rimosse; i file
 originali scelti dall'utente restano intatti.
 
-Per trasferire l'app, chiudila e copia **l'intera cartella Qamille**, compresa
-la cartella data. Usa una cartella in cui puoi scrivere. Per le integrazioni
-con altri programmi e per l'avvio automatico di Windows, riapplica la relativa
-configurazione dopo lo spostamento.
+Per trasferire l'app, chiudila con **Esci** (dal menu dell'icona nell'area di
+notifica: la X la lascia aperta lì) e copia **l'intera cartella Qamille**,
+compresa la cartella data. Usa una cartella in cui puoi scrivere. Per le
+integrazioni con altri programmi riapplica la relativa configurazione dopo lo
+spostamento.
+
+**Avvio all'accesso** (Impostazioni → Generali → Windows, spento per default):
+Windows avvia questa copia nell'area di notifica. Ogni copia ha la sua voce, con
+il nome della cartella e un codice della sua cartella data, che si vede e si
+spegne anche in Gestione attività → App di avvio. La voce nomina l'eseguibile di
+questa cartella: prima di spostare o cancellare la copia spegni l'avvio
+all'accesso, poi riaccendilo dalla nuova posizione.
 
 Le credenziali sono cifrate in data/credentials.json; data/credentials.key è la
 chiave necessaria per riaprirle anche su un altro computer. Chi possiede entrambi

@@ -762,6 +762,20 @@ export async function previewCommand(
       store.settings.meeting_engine = meetingEngine(store.settings.meeting_engine);
       return;
     }
+    // Background presence (src-tauri/src/background.rs): a browser has no tray and no sign-in entry.
+    case 'close_to_tray_get':
+      return true;
+    case 'close_to_tray_set':
+    case 'restore_main_window':
+      return;
+    case 'autostart_status':
+    case 'autostart_set':
+      return { enabled: false, supported: false };
+    // The undo queue at quit (lib/undo-close.ts): the preview sends nothing, so nothing is left.
+    case 'undo_send_now':
+      return { remaining: 0 };
+    case 'undo_quit_anyway':
+      return true;
     case 'list_events':
       return structuredClone(store.events);
     case 'save_event': {

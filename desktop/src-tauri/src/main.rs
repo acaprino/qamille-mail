@@ -50,6 +50,7 @@ fn main() {
     // Started by a restart after WebView2 failed (recovery.rs): the old process
     // must be gone before this one takes the workspace lock.
     recovery::wait_for_previous_instance();
+    background::take_restart_state();
     let demo = runtime::demo_requested(std::env::var_os("QAMILLE_DEMO").as_deref());
     // Before the first read of the data folder: an update that renamed the app's folder
     // from Qemille or Sparklone brings its workspace along.
@@ -91,18 +92,9 @@ fn main() {
         window_config.background_color = Some(native_feel::DARK_GROUND);
     }
     context.config_mut().app.windows[0].create = false;
-    // Start at sign-in: one entry per copy, named after the identifier built above (Q22).
-    let autostart_entry = background::autostart_entry(&context.config().identifier);
     let started = tauri::Builder::default()
         // Started again while it runs (also hidden in the tray or minimized): the window comes back.
         .plugin(tauri_plugin_single_instance::init(background::second_instance))
-        // Called only from Rust, through the autostart_* commands: the page gets no plugin permission.
-        .plugin(
-            tauri_plugin_autostart::Builder::new()
-                .arg(background::AUTOSTART_ARG)
-                .app_name(autostart_entry)
-                .build(),
-        )
         // Tauri 2.12 turns an `Err` returned from `.setup` into a panic, and a panic there ends the
         // process (exit code 101): a release build (no console) would end without a word. Both are
         // said here instead (audit Q2).
@@ -361,9 +353,10 @@ fn setup_app(
     native_feel::harden_webview(&main_window, "index.html");
     window_shell::attach_main(&main_window);
     background::install(app)?;
-    // Started by Windows at sign-in: ready in the tray, and shown by the first restore.
+    // Started by Windows at sign-in: ready in the tray, and shown by the first restore. A restart
+    // comes back as the window was.
     let args: Vec<String> = std::env::args().collect();
-    if background_rules::starts_hidden(&args) {
+    if background_rules::stays_hidden(&args, background::restarted_hidden()) {
         native_feel::prepare_main_window(&main_window);
         native_feel::set_webview_visible(&main_window, false);
     } else {

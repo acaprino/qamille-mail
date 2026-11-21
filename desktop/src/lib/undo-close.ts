@@ -27,12 +27,19 @@ export function createUndoQueueGuard(call: Call): CloseGuard {
 }
 
 /** Its session-end step: only when the session really ends (`last`), since while Windows only asks
- *  another app can still cancel, and a send cannot be taken back. Nobody can answer then: what did
- *  not leave in time goes at the next start. */
+ *  another app can still cancel, and a send cannot be taken back. It only makes the queue due and
+ *  returns: the steps after it (the recording stop) must not wait for the network inside the ~8 s
+ *  Windows gives. `settleUndoQueue` waits once every step ran. */
 export function createUndoQueueSessionEnd(call: Call): SessionEndStep {
   return async (last) => {
     if (!last) return true;
-    await call<SendResult>('undo_send_now', { waitMs: SESSION_END_WAIT_MS });
+    await call<SendResult>('undo_send_now', { waitMs: 0 });
     return true;
   };
+}
+
+/** At session end, after every step: what is left of Windows' wait goes to the queue. Nobody can
+ *  answer then: what did not leave in time goes at the next start. */
+export async function settleUndoQueue(call: Call): Promise<void> {
+  await call<SendResult>('undo_send_now', { waitMs: SESSION_END_WAIT_MS });
 }

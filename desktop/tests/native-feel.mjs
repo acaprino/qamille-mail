@@ -560,12 +560,30 @@ check('19. the close button hides, and one restore path brings the window back (
     assert.ok(owner, `${file} shows a window (.show()): only native_feel::show_main_window and background::restore may`);
     assert.equal(shows(rustItem(text, owner)), shows(text), `${file}: .show() outside ${owner}`);
   }
-  // The tray: Show and Quit; Quit closes the window through the page's guards, never app.exit.
-  assert.match(background, /MenuItem::with_id\(\s*app,\s*"show",/, 'the tray menu has "show"');
-  assert.match(background, /MenuItem::with_id\(\s*app,\s*"quit",/, 'the tray menu has "quit"');
-  assert.match(background, /"show" => restore\(app\),\s*"quit" => quit\(app\),/, 'the tray menu items call restore and quit');
+  // The tray: Show and Quit, with ids of its own (every menu event reaches every handler, the row menu's
+  // too); Quit closes the window through the page's guards, never app.exit.
+  assert.match(background, /MenuItem::with_id\(\s*app,\s*"tray:show",/, 'the tray menu has "tray:show"');
+  assert.match(background, /MenuItem::with_id\(\s*app,\s*"tray:quit",/, 'the tray menu has "tray:quit"');
+  assert.match(background, /"tray:show" => restore\(app\),\s*"tray:quit" => quit\(app\),\s*_ => \{\}/, 'the tray menu calls restore and quit, and ignores ids it does not own');
   const quit = rustItem(background, 'pub fn quit(');
   assert.ok(quit.includes('QUITTING.store(true') && /\.close\(\)/.test(quit) && !/\.exit\(/.test(quit), 'quit raises QUITTING and calls close(), never exit');
+  const recovery = read('src-tauri/src/recovery.rs');
+  // «Attendi» on «Qamille non si chiude», or Esc: «Esci» is over, so the next X hides again.
+  assert.match(
+    rustItem(recovery, 'pub fn close_requested('),
+    /== Some\(false\);\s*if close \{[^}]*\} else \{\s*crate::background::close_settled\(\);?\s*\}/,
+    'waiting on «Qamille non si chiude» lowers QUITTING (background::close_settled)',
+  );
+  // The recording question during «Esci» from the tray: the window comes back with it.
+  const confirm = rustItem(read('src-tauri/src/commands/meetings.rs'), 'pub async fn meeting_confirm_close(');
+  assert.ok(/background::restore\(/.test(confirm) && confirm.indexOf('background::restore(') < confirm.indexOf('MessageDialog'), 'meeting_confirm_close restores the window before asking');
+  // Session end: every step first (the recording stops without waiting for the queue), then the queue
+  // gets the rest of the time, then Windows may go on.
+  assert.match(
+    read('src/lib/window-close.ts'),
+    /if \(last\) void saving\.then\(\(\) => undoQueue\?\.settle\(\)\)\.finally\(\(\) => call\('session_end_ready'\)/,
+    'at session end the queue is waited for after the other steps, before session_end_ready',
+  );
   const shell = read('src-tauri/src/window_shell.rs');
   assert.match(
     rustItem(shell, 'fn add_reload_entry('),
@@ -577,32 +595,45 @@ check('19. the close button hides, and one restore path brings the window back (
     /WM_SYSCOMMAND if \(wparam\.0 as u32 & 0xFFF0\) == crate::background_rules::SC_APP_QUIT => \{[^}]*crate::background::quit\(&?app\)/,
     'Esci in the system menu calls background::quit',
   );
-  // A hidden window never asks "Qamille non si è aperto" by itself: the 15 s watch reads is_visible() first.
-  const watch = rustItem(read('src-tauri/src/recovery.rs'), 'pub fn watch_startup(');
-  assert.ok(watch.indexOf('is_visible()') >= 0 && watch.indexOf('is_visible()') < watch.indexOf('ask_once('), 'watch_startup asks only after reading is_visible()');
+  // A hidden window never asks "Qamille non si è aperto" by itself: the 15 s watch and a page that did
+  // not load read is_visible() first (the load's watch then asks at the first restore).
+  for (const head of ['pub fn watch_startup(', 'pub fn page_not_loaded(']) {
+    const body = rustItem(recovery, head);
+    assert.ok(body.indexOf('is_visible()') >= 0 && body.indexOf('is_visible()') < body.indexOf('ask_once('), `${head.slice(7, -1)} asks only after reading is_visible()`);
+  }
 });
 
-check('20. start at sign-in is Qamille in the tray, written by the OS entry, never a VBS (rule 27, audit Q22)', () => {
+check('20. start at sign-in is Qamille in the tray, an HKCU Run value Qamille writes quoted, never a VBS (rule 27, audit Q22)', () => {
   const cargo = read('src-tauri/Cargo.toml');
-  assert.match(cargo, /^tauri-plugin-autostart = "2"$/m, 'Cargo.toml must depend on tauri-plugin-autostart 2');
   assert.match(cargo, /^tauri = \{ version = "2", features = \[[^\]]*"tray-icon"/m, 'tauri needs the tray-icon feature');
-  const main = read('src-tauri/src/main.rs');
-  const single = main.indexOf('.plugin(tauri_plugin_single_instance::init(');
-  const autostart = main.indexOf('.plugin(\n            tauri_plugin_autostart::Builder::new()');
-  assert.ok(single >= 0 && autostart > single && autostart < main.indexOf('.setup('), 'the autostart plugin is registered right after single-instance');
-  assert.match(
-    main.slice(autostart),
-    /^\.plugin\(\s*tauri_plugin_autostart::Builder::new\(\)\s*\.arg\(background::AUTOSTART_ARG\)\s*\.app_name\(/,
-    'the entry starts Qamille with AUTOSTART_ARG, under its own name',
-  );
+  // auto-launch (the autostart plugin's backend) writes the path unquoted, and HKLM when it may.
+  assert.ok(!/tauri-plugin-autostart|auto-launch/.test(cargo + read('src-tauri/Cargo.lock')), 'no autostart plugin: Qamille writes its own entry');
+  const rules = read('src-tauri/src/background_rules.rs');
+  assert.match(rustItem(rules, 'pub fn run_command('), /format!\("\\"\{\w+\}\\" \{AUTOSTART_ARG\}"\)/, 'the Run value is "<exe>" --autostart, the executable in quotes');
   const background = read('src-tauri/src/background.rs');
   assert.match(background, /background_rules::autostart_entry_name\(installed\(\),/, 'the entry name comes from autostart_entry_name');
+  assert.match(background, /background_rules::workspace_tag\(/, 'the entry name carries the stable tag of the data folder');
+  const tagCode = ['pub fn workspace_tag(', 'pub fn fnv1a64('].map((head) => rustItem(rules, head)).join('') + rustItem(background, 'fn autostart_entry(');
+  assert.ok(/fnv1a64\(/.test(tagCode) && !/DefaultHasher|Hasher/.test(tagCode), 'the tag is FNV-1a, not DefaultHasher, which changes between Rust releases');
+  const startup = rustItem(background, 'mod startup {');
+  assert.match(startup, /const RUN: &str = r"Software\\Microsoft\\Windows\\CurrentVersion\\Run";/, 'the entry lives in the Run key');
+  assert.match(startup, /const APPROVED: &str = r"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";/, 'Task Manager\'s switch is its twin under StartupApproved');
+  assert.ok(/HKEY_CURRENT_USER/.test(startup) && !/HKEY_LOCAL_MACHINE/.test(background), 'only for the current user, never machine-wide');
+  assert.match(rustItem(background, 'fn turn_on('), /background_rules::run_command\(/, 'turning it on writes run_command');
+  assert.match(rustItem(background, 'pub async fn autostart_set('), /\bturn_on\(\)/, 'the switch in Settings turns it on through turn_on');
+  const main = read('src-tauri/src/main.rs');
   const setup = rustItem(main, 'fn setup_app(');
   assert.match(
     setup,
-    /if background_rules::starts_hidden\(&args\) \{\s*native_feel::prepare_main_window\(&main_window\);\s*native_feel::set_webview_visible\(&main_window, false\);?\s*\} else \{\s*native_feel::show_main_window\(&main_window\);?\s*\}/,
-    'a start with AUTOSTART_ARG prepares the window and leaves it in the tray',
+    /if background_rules::stays_hidden\(&args, background::restarted_hidden\(\)\) \{\s*native_feel::prepare_main_window\(&main_window\);\s*native_feel::set_webview_visible\(&main_window, false\);?\s*\} else \{\s*native_feel::show_main_window\(&main_window\);?\s*\}/,
+    'a start with AUTOSTART_ARG prepares the window and leaves it in the tray; a restart comes back as it was',
   );
+  // A restart keeps the arguments of the first start: it says whether the window was on screen.
+  assert.match(main, /recovery::wait_for_previous_instance\(\);\s*background::take_restart_state\(\);/, 'main reads the restart state before any thread starts');
+  assert.match(rustItem(read('src-tauri/src/recovery.rs'), 'fn restart_app('), /crate::background::before_restart\(app\);[\s\S]*request_restart\(\)/, 'a restart says first whether the window was hidden');
+  // Windows has the last word, also when Settings shows the switch: off in Task Manager stays off after an upgrade.
+  assert.match(rustItem(background, 'fn status('), /follow_windows\(\)/, 'reading the state for Settings follows Windows');
+  assert.match(rustItem(background, 'fn follow_windows('), /set_start_at_sign_in\(enabled\)/, 'what Windows has is what Qamille remembers');
   assert.match(setup, /if !demo \{(?:(?!\n    \})[\s\S])*?background::migrate_legacy_launcher\(/, 'setup_app migrates the old worker startup file, never in the demo');
   // A manual upgrade runs the old uninstaller without /UPDATE, which removes the entry: the installed
   // Professional puts it back at its next start, only if the person had turned it on in Qamille.
@@ -615,8 +646,6 @@ check('20. start at sign-in is Qamille in the tray, written by the OS entry, nev
     assert.ok(!JSON.parse(read(`src-tauri/${file}`)).permissions.some((p) => /^(autostart|core:tray|core:menu):/.test(p)), `${file}: no autostart, tray or menu permission for the page`);
   }
   assert.ok(!/@tauri-apps\/plugin-autostart/.test(read('package.json')), 'no autostart package for the page');
-  // auto-launch writes the machine-wide entry when it can (HKLM first): an elevated Qamille refuses.
-  assert.match(rustItem(background, 'pub async fn autostart_set('), /elevated\(\)/, 'autostart_set refuses to turn it on while elevated');
 });
 
 // phase 3, Task 2: check 21

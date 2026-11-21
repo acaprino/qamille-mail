@@ -13,13 +13,17 @@
 //!   `close_settled` lowers `QUITTING` again.
 //! - Everything that brings the window back comes through `restore`: the tray, a second start,
 //!   notifications, mail links.
-//! - Start at sign-in is the OS entry the autostart plugin writes, with `AUTOSTART_ARG`: such a start
-//!   stays in the tray (`main.rs`). Its state is always read from Windows, which also sees the switch
-//!   of Task Manager. It replaces the old worker's startup file (`migrate_legacy_launcher`).
+//! - Start at sign-in is a value Qamille writes under `HKCU\…\CurrentVersion\Run` (`startup`):
+//!   `"<exe>" --autostart`, the path in quotes, never machine-wide. Such a start stays in the tray
+//!   (`main.rs`). Its state is always read from Windows, Task Manager's switch included. It replaces
+//!   the old worker's startup file (`migrate_legacy_launcher`).
+//! - A restart keeps the arguments of the first start: `before_restart` says whether the window was
+//!   hidden, so a window on screen comes back on screen.
 //!
 //! Preferences live in `data/background.json`, a file of their own.
 #![cfg_attr(not(windows), allow(dead_code, unused_variables))]
 
+#[allow(unused_imports, reason = "phase 3, Task 4: a start with a mailto: link always shows the window")]
 pub use crate::background_rules::AUTOSTART_ARG;
 use crate::background_rules::{self, CloseAction, LegacyLauncher};
 use qamille::application::{AppError, AppResult};
@@ -30,9 +34,10 @@ use std::sync::{Mutex, OnceLock};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, Wry};
-use tauri_plugin_autostart::ManagerExt;
 
 const TRAY_ID: &str = "main";
+/// Set for the process a restart starts (`before_restart`): "1" when the window was hidden.
+const RESTART_HIDDEN: &str = "QAMILLE_RESTART_HIDDEN";
 
 /// «Esci» is closing the window: the close goes through the page's guards instead of hiding.
 static QUITTING: AtomicBool = AtomicBool::new(false);
@@ -40,6 +45,8 @@ static QUITTING: AtomicBool = AtomicBool::new(false);
 static MINIMIZED: AtomicBool = AtomicBool::new(false);
 /// The name of this copy's start-at-sign-in entry (`autostart_entry`).
 static ENTRY: OnceLock<String> = OnceLock::new();
+/// This start is a restart: whether the window was hidden then (`take_restart_state`).
+static RESTARTED_HIDDEN: OnceLock<Option<bool>> = OnceLock::new();
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 struct Preferences {
@@ -187,15 +194,43 @@ pub fn installed() -> bool {
     })
 }
 
-/// The name of this copy's start-at-sign-in entry, from the app identifier `main.rs` built (with
-/// the hash of the data folder): «Qamille» when installed, else the folder and the hash (Q22).
-pub fn autostart_entry(identifier: &str) -> String {
-    let folder = std::env::current_exe()
-        .ok()
-        .and_then(|exe| exe.parent().and_then(|folder| folder.file_name()).map(|name| name.to_string_lossy().into_owned()))
-        .unwrap_or_default();
-    let tag = background_rules::workspace_tag(identifier).unwrap_or("00000000");
-    ENTRY.get_or_init(|| background_rules::autostart_entry_name(installed(), &folder, tag)).clone()
+/// The name of this copy's start-at-sign-in entry: «Qamille» when installed, else the folder of the
+/// executable and the stable tag of the data folder (`workspace_tag`), so every copy has its own (Q22).
+fn autostart_entry() -> &'static str {
+    ENTRY.get_or_init(|| {
+        let folder = std::env::current_exe()
+            .ok()
+            .and_then(|exe| exe.parent().and_then(|folder| folder.file_name()).map(|name| name.to_string_lossy().into_owned()))
+            .unwrap_or_default();
+        let data = qamille::model::Store::data_dir();
+        let data = data.canonicalize().unwrap_or(data);
+        background_rules::autostart_entry_name(installed(), &folder, &background_rules::workspace_tag(&data.to_string_lossy()))
+    })
+}
+
+/// Just before Qamille restarts itself (`recovery::restart_app`; an updater must call it too): the
+/// new process gets the arguments of this one, `AUTOSTART_ARG` included, so it is told whether the
+/// window was hidden. A window on screen comes back on screen, one in the tray stays there.
+pub fn before_restart(app: &AppHandle) {
+    let hidden = app.get_webview_window("main").is_some_and(|window| !window.is_visible().unwrap_or(true));
+    // SAFETY: as `recovery::restart_app` sets QAMILLE_RESTART_AFTER: right before the restart, for the
+    // next process only, which reads it at its start (`take_restart_state`).
+    unsafe { std::env::set_var(RESTART_HIDDEN, if hidden { "1" } else { "0" }) };
+}
+
+/// First thing in `main`, before any thread: whether this start is a restart, and how the window was.
+pub fn take_restart_state() {
+    let state = std::env::var(RESTART_HIDDEN).ok().map(|value| value == "1");
+    if state.is_some() {
+        // SAFETY: called at the start of `main`, before any other thread exists.
+        unsafe { std::env::remove_var(RESTART_HIDDEN) };
+    }
+    let _ = RESTARTED_HIDDEN.set(state);
+}
+
+/// `Some(hidden)` when this start is a restart (`before_restart`), else `None`.
+pub fn restarted_hidden() -> Option<bool> {
+    RESTARTED_HIDDEN.get().copied().flatten()
 }
 
 struct TrayMenu {
@@ -211,8 +246,9 @@ fn tray_labels(italian: bool) -> (&'static str, &'static str) {
 /// Qamille» and «Esci» on the right button. A left click brings the window back.
 pub fn install(app: &tauri::App) -> tauri::Result<()> {
     let (show_text, quit_text) = tray_labels(crate::window_shell::italian());
-    let show = MenuItem::with_id(app, "show", show_text, true, None::<&str>)?;
-    let quit_item = MenuItem::with_id(app, "quit", quit_text, true, None::<&str>)?;
+    // Ids of its own: every menu event reaches every handler, the native row menu's too.
+    let show = MenuItem::with_id(app, "tray:show", show_text, true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, "tray:quit", quit_text, true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &quit_item])?;
     let mut tray = TrayIconBuilder::with_id(TRAY_ID)
         .tooltip("Qamille")
@@ -224,8 +260,8 @@ pub fn install(app: &tauri::App) -> tauri::Result<()> {
             }
         })
         .on_menu_event(|app, event| match event.id.as_ref() {
-            "show" => restore(app),
-            "quit" => quit(app),
+            "tray:show" => restore(app),
+            "tray:quit" => quit(app),
             _ => {}
         });
     if let Some(icon) = app.default_window_icon() {
@@ -283,35 +319,139 @@ fn autostart_supported(app: &AppHandle) -> bool {
     !tauri::is_dev() && !app.config().identifier.ends_with(".preview")
 }
 
-/// An elevated Qamille (UAC off, or «Esegui come amministratore»): auto-launch writes the
-/// machine-wide `HKLM\…\Run` when it can, which would start this copy for every user of the PC.
-fn elevated() -> bool {
+/// The start-at-sign-in entry, in the registry of the current user only: the value under `Run` that
+/// Windows starts at sign-in, and its twin under `StartupApproved\Run`, where Task Manager and
+/// Settings > Apps > Startup keep their switch (`background_rules::startup_approved`). The keys are
+/// parameters so that the tests use a scratch key of their own.
+pub(crate) mod startup {
+    use crate::background_rules::{APPROVED_ON, startup_approved};
+
+    pub const RUN: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
+    pub const APPROVED: &str = r"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
+
+    pub struct StartupKeys<'a> {
+        pub run: &'a str,
+        pub approved: &'a str,
+    }
+    /// Windows' own keys, under `HKEY_CURRENT_USER`.
+    pub const WINDOWS: StartupKeys<'static> = StartupKeys { run: RUN, approved: APPROVED };
+
     #[cfg(windows)]
-    return unsafe { windows::Win32::UI::Shell::IsUserAnAdmin() }.as_bool();
-    #[cfg(not(windows))]
-    false
+    mod win {
+        use windows::Win32::Foundation::ERROR_FILE_NOT_FOUND;
+        use windows::Win32::System::Registry::{
+            HKEY_CURRENT_USER, REG_ROUTINE_FLAGS, REG_VALUE_TYPE, RegDeleteKeyValueW, RegGetValueW, RegSetKeyValueW,
+        };
+        use windows::core::HSTRING;
+
+        pub fn read(key: &str, name: &str, kind: REG_ROUTINE_FLAGS) -> Option<Vec<u8>> {
+            let (key, name) = (HSTRING::from(key), HSTRING::from(name));
+            let mut size = 0u32;
+            // SAFETY: the strings live across both calls, and the buffer has the size the first call gave.
+            unsafe {
+                RegGetValueW(HKEY_CURRENT_USER, &key, &name, kind, None, None, Some(&mut size)).ok().ok()?;
+                let mut data = vec![0u8; size as usize];
+                RegGetValueW(HKEY_CURRENT_USER, &key, &name, kind, None, Some(data.as_mut_ptr().cast()), Some(&mut size)).ok().ok()?;
+                data.truncate(size as usize);
+                Some(data)
+            }
+        }
+
+        /// Creates the key if it is missing (`RegSetKeyValueW`).
+        pub fn write(key: &str, name: &str, kind: REG_VALUE_TYPE, data: &[u8]) -> windows::core::Result<()> {
+            let (key, name) = (HSTRING::from(key), HSTRING::from(name));
+            // SAFETY: `data` lives across the call and its length is the one passed.
+            unsafe { RegSetKeyValueW(HKEY_CURRENT_USER, &key, &name, kind.0, Some(data.as_ptr().cast()), data.len() as u32).ok() }
+        }
+
+        /// A value, or a key, that is not there is already removed.
+        pub fn delete(key: &str, name: &str) -> windows::core::Result<()> {
+            let (key, name) = (HSTRING::from(key), HSTRING::from(name));
+            // SAFETY: the strings live across the call.
+            let status = unsafe { RegDeleteKeyValueW(HKEY_CURRENT_USER, &key, &name) };
+            if status == ERROR_FILE_NOT_FOUND { Ok(()) } else { status.ok() }
+        }
+    }
+
+    /// The command of the entry, as Windows will run it.
+    pub fn command(keys: &StartupKeys, name: &str) -> Option<String> {
+        #[cfg(windows)]
+        {
+            let bytes = win::read(keys.run, name, windows::Win32::System::Registry::RRF_RT_REG_SZ)?;
+            let wide: Vec<u16> = bytes.chunks_exact(2).map(|pair| u16::from_le_bytes([pair[0], pair[1]])).collect();
+            return Some(String::from_utf16_lossy(&wide).trim_end_matches('\0').to_owned());
+        }
+        #[cfg(not(windows))]
+        None
+    }
+
+    /// The entry's twin under `StartupApproved\Run`, if there is one.
+    pub fn approval(keys: &StartupKeys, name: &str) -> Option<Vec<u8>> {
+        #[cfg(windows)]
+        return win::read(keys.approved, name, windows::Win32::System::Registry::RRF_RT_REG_BINARY);
+        #[cfg(not(windows))]
+        None
+    }
+
+    /// Task Manager's switch for the entry (Qamille writes it on, as Task Manager does).
+    pub fn write_approval(keys: &StartupKeys, name: &str, twin: &[u8]) -> windows::core::Result<()> {
+        #[cfg(windows)]
+        return win::write(keys.approved, name, windows::Win32::System::Registry::REG_BINARY, twin);
+        #[cfg(not(windows))]
+        Ok(())
+    }
+
+    /// Writes the entry and turns its switch on: an entry turned off in Task Manager runs again.
+    pub fn enable(keys: &StartupKeys, name: &str, command: &str) -> windows::core::Result<()> {
+        #[cfg(windows)]
+        {
+            let mut data: Vec<u8> = command.encode_utf16().chain([0]).flat_map(u16::to_le_bytes).collect();
+            data.shrink_to_fit();
+            win::write(keys.run, name, windows::Win32::System::Registry::REG_SZ, &data)?;
+        }
+        write_approval(keys, name, &APPROVED_ON)
+    }
+
+    /// Removes the entry and its twin, as the uninstaller does.
+    pub fn disable(keys: &StartupKeys, name: &str) -> windows::core::Result<()> {
+        #[cfg(windows)]
+        {
+            win::delete(keys.run, name)?;
+            win::delete(keys.approved, name)?;
+        }
+        Ok(())
+    }
+
+    /// Whether the entry exists, on or off.
+    pub fn present(keys: &StartupKeys, name: &str) -> bool {
+        command(keys, name).is_some()
+    }
+
+    /// Whether Windows starts it at the next sign-in.
+    pub fn enabled(keys: &StartupKeys, name: &str) -> bool {
+        present(keys, name) && startup_approved(approval(keys, name).as_deref())
+    }
 }
 
-/// Whether this copy's value exists under `HKCU\…\Run`, on or off: Task Manager turns an entry off
-/// in its twin under `StartupApproved` and leaves the value.
-fn entry_present() -> bool {
-    let Some(name) = ENTRY.get() else { return false };
-    #[cfg(windows)]
-    unsafe {
-        use windows::Win32::System::Registry::{HKEY_CURRENT_USER, RRF_RT_REG_SZ, RegGetValueW};
-        return RegGetValueW(
-            HKEY_CURRENT_USER,
-            windows::core::w!("Software\\Microsoft\\Windows\\CurrentVersion\\Run"),
-            &windows::core::HSTRING::from(name.as_str()),
-            RRF_RT_REG_SZ,
-            None,
-            None,
-            None,
-        )
-        .is_ok();
+/// Turns this copy's entry on: `"<exe>" --autostart`, under its name, for the current user.
+fn turn_on() -> Result<(), String> {
+    let exe = std::env::current_exe().map_err(|error| error.to_string())?;
+    let command = background_rules::run_command(&exe.to_string_lossy());
+    startup::enable(&startup::WINDOWS, autostart_entry(), &command).map_err(|error| error.to_string())
+}
+
+/// Windows has the last word: when this copy's entry exists, whether it is on (Task Manager's switch
+/// included) is what Qamille remembers, so an entry turned off there stays off after an upgrade.
+/// `None` when there is no entry.
+fn follow_windows() -> Option<bool> {
+    if !startup::present(&startup::WINDOWS, autostart_entry()) {
+        return None;
     }
-    #[cfg(not(windows))]
-    false
+    let enabled = startup::enabled(&startup::WINDOWS, autostart_entry());
+    if enabled != preferences().start_at_sign_in {
+        set_start_at_sign_in(enabled);
+    }
+    Some(enabled)
 }
 
 /// Once at start, off the main thread and never in the demo (`main.rs`): the worker's startup file
@@ -328,9 +468,7 @@ pub fn migrate_legacy_launcher(app: &AppHandle) {
             let this = std::env::current_exe().map(|exe| exe.display().to_string()).unwrap_or_default();
             let exists = background_rules::launcher_target(&content).is_some_and(|target| std::path::Path::new(&target).is_file());
             match background_rules::legacy_launcher(Some(&content), &this, exists) {
-                // Elevated, the entry would go machine-wide: the next ordinary start migrates it.
-                LegacyLauncher::Adopt if elevated() => {}
-                LegacyLauncher::Adopt => match app.autolaunch().enable() {
+                LegacyLauncher::Adopt => match turn_on() {
                     Ok(()) => {
                         set_start_at_sign_in(true);
                         remove_legacy(&path);
@@ -353,7 +491,7 @@ pub fn migrate_legacy_launcher(app: &AppHandle) {
         }
         _ => {}
     }
-    put_back_after_upgrade(app);
+    put_back_after_upgrade();
 }
 
 fn remove_legacy(path: &std::path::Path) {
@@ -367,22 +505,17 @@ fn remove_legacy(path: &std::path::Path) {
 /// uninstaller removes it also on a manual upgrade («uninstall before installing»), and only if it
 /// was turned on in Qamille; a portable copy has no uninstaller, so a missing entry was removed on
 /// purpose.
-fn put_back_after_upgrade(app: &AppHandle) {
-    if entry_present() {
-        if let Ok(enabled) = app.autolaunch().is_enabled()
-            && enabled != preferences().start_at_sign_in
-        {
-            set_start_at_sign_in(enabled);
-        }
+fn put_back_after_upgrade() {
+    if follow_windows().is_some() {
         return;
     }
-    if !installed() || !preferences().start_at_sign_in || elevated() {
+    if !installed() || !preferences().start_at_sign_in {
         if !installed() && preferences().start_at_sign_in {
             set_start_at_sign_in(false);
         }
         return;
     }
-    if let Err(error) = app.autolaunch().enable() {
+    if let Err(error) = turn_on() {
         crate::native_feel::report(&format!("start at sign-in was not put back after the upgrade: {error}"));
     }
 }
@@ -396,11 +529,8 @@ pub struct AutostartStatus {
 
 fn status(app: &AppHandle) -> AutostartStatus {
     let supported = autostart_supported(app);
-    let enabled = supported
-        && app.autolaunch().is_enabled().unwrap_or_else(|error| {
-            crate::native_feel::report(&format!("could not read start at sign-in: {error}"));
-            false
-        });
+    // Read from Windows, and remembered as Windows has it (a switch turned off in Task Manager).
+    let enabled = supported && follow_windows().unwrap_or(false);
     AutostartStatus { enabled, supported }
 }
 
@@ -419,14 +549,11 @@ pub async fn autostart_set(app: AppHandle, enabled: bool) -> AppResult<Autostart
             words("Questa copia di Qamille non può avviarsi all'accesso.", "This copy of Qamille cannot start at sign-in."),
         ));
     }
-    if enabled && elevated() {
-        return Err(AppError::validation(words(
-            "Qamille è aperto come amministratore: l'avvio all'accesso varrebbe per tutti gli utenti del computer. Riapri Qamille normalmente per attivarlo.",
-            "Qamille is running as administrator: start at sign-in would apply to every user of this computer. Open Qamille normally to turn it on.",
-        )));
-    }
-    let manager = app.autolaunch();
-    let result = if enabled { manager.enable() } else { manager.disable() };
+    let result = if enabled {
+        turn_on()
+    } else {
+        startup::disable(&startup::WINDOWS, autostart_entry()).map_err(|error| error.to_string())
+    };
     result.map_err(|error| AppError::external(format!("{} {error}", words("Windows non ha accettato la modifica:", "Windows did not accept the change:"))))?;
     set_start_at_sign_in(enabled);
     Ok(status(&app))
@@ -446,4 +573,79 @@ pub fn close_to_tray_set(on: bool) {
 #[tauri::command]
 pub fn restore_main_window(app: AppHandle) {
     restore(&app);
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::startup::{self, StartupKeys};
+    use crate::background_rules::{APPROVED_ON, run_command};
+
+    /// A key of its own under `HKCU\Software`, removed with everything in it when the test ends:
+    /// the tests never touch Windows' own `Run` key, nor the entries of the owner's copies.
+    struct Scratch {
+        run: String,
+        approved: String,
+        root: String,
+    }
+    impl Scratch {
+        fn new(test: &str) -> Self {
+            let root = format!(r"Software\Qamille tests\startup-{test}-{}", std::process::id());
+            Self { run: format!(r"{root}\Run"), approved: format!(r"{root}\StartupApproved\Run"), root }
+        }
+        fn keys(&self) -> StartupKeys<'_> {
+            StartupKeys { run: &self.run, approved: &self.approved }
+        }
+    }
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            use windows::Win32::System::Registry::{HKEY_CURRENT_USER, RegDeleteKeyW, RegDeleteTreeW};
+            unsafe {
+                let _ = RegDeleteTreeW(HKEY_CURRENT_USER, &windows::core::HSTRING::from(self.root.as_str()));
+                // The parent goes with the last test: it cannot be deleted while another test's key is in it.
+                let _ = RegDeleteKeyW(HKEY_CURRENT_USER, windows::core::w!(r"Software\Qamille tests"));
+            }
+        }
+    }
+
+    const NAME: &str = "Qamille (Qamille Portable, 6a5c8aa2)";
+
+    #[test]
+    fn the_entry_is_written_quoted_and_reads_back_on() {
+        let scratch = Scratch::new("write");
+        let keys = scratch.keys();
+        assert!(!startup::present(&keys, NAME) && !startup::enabled(&keys, NAME));
+        // The keys do not exist yet: turning it on creates them.
+        startup::enable(&keys, NAME, &run_command(r"D:\Apps\Qamille Portable\Qamille.exe")).unwrap();
+        assert_eq!(startup::command(&keys, NAME).as_deref(), Some(r#""D:\Apps\Qamille Portable\Qamille.exe" --autostart"#));
+        assert_eq!(startup::approval(&keys, NAME), Some(APPROVED_ON.to_vec()));
+        assert!(startup::present(&keys, NAME) && startup::enabled(&keys, NAME));
+        // Another copy's entry is another value.
+        assert!(!startup::present(&keys, "Qamille"));
+    }
+
+    #[test]
+    fn the_task_manager_switch_is_honoured_and_turning_it_on_again_clears_it() {
+        let scratch = Scratch::new("switch");
+        let keys = scratch.keys();
+        startup::enable(&keys, NAME, &run_command(r"C:\Qamille\Qamille.exe")).unwrap();
+        // What Task Manager writes when the entry is turned off there.
+        startup::write_approval(&keys, NAME, &[0x03, 0, 0, 0, 0x10, 0x5c, 0x3f, 0x7a, 0x2e, 0x1d, 0xdb, 0x01]).unwrap();
+        assert!(startup::present(&keys, NAME), "the value stays: Task Manager only flips its switch");
+        assert!(!startup::enabled(&keys, NAME));
+        startup::enable(&keys, NAME, &run_command(r"C:\Qamille\Qamille.exe")).unwrap();
+        assert!(startup::enabled(&keys, NAME));
+    }
+
+    #[test]
+    fn turning_it_off_removes_both_values_and_twice_is_fine() {
+        let scratch = Scratch::new("off");
+        let keys = scratch.keys();
+        startup::disable(&keys, NAME).unwrap();
+        startup::enable(&keys, NAME, &run_command(r"C:\Qamille\Qamille.exe")).unwrap();
+        startup::disable(&keys, NAME).unwrap();
+        assert_eq!(startup::command(&keys, NAME), None);
+        assert_eq!(startup::approval(&keys, NAME), None);
+        assert!(!startup::present(&keys, NAME) && !startup::enabled(&keys, NAME));
+        startup::disable(&keys, NAME).unwrap();
+    }
 }

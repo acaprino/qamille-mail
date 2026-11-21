@@ -1,7 +1,7 @@
 //! The pure rules of Qamille's background presence (`background.rs`): whether the close button
-//! hides, whether a start stays in the tray, the name of the start-at-sign-in entry, and what to do
-//! with the startup file of the old background worker. No Tauri and no Windows here, so the rules
-//! are tested with `rustc --edition 2024 --test src/background_rules.rs`.
+//! hides, whether a start stays in the tray, the name and the command of the start-at-sign-in entry,
+//! Task Manager's switch, and what to do with the startup file of the old background worker. No Tauri
+//! and no Windows here, so the rules are tested with `rustc --edition 2024 --test src/background_rules.rs`.
 
 /// The argument the start-at-sign-in entry passes: such a start stays in the tray.
 pub const AUTOSTART_ARG: &str = "--autostart";
@@ -30,6 +30,12 @@ pub fn starts_hidden(args: &[String]) -> bool {
         && !given.iter().any(|arg| arg.get(..7).is_some_and(|scheme| scheme.eq_ignore_ascii_case("mailto:")))
 }
 
+/// A start that is a restart (`background::before_restart`) comes back as the window was, since a
+/// restart keeps the arguments of the first start, `AUTOSTART_ARG` included. Otherwise `starts_hidden`.
+pub fn stays_hidden(args: &[String], restarted_hidden: Option<bool>) -> bool {
+    restarted_hidden.unwrap_or_else(|| starts_hidden(args))
+}
+
 /// The name of the value under `HKCU\…\CurrentVersion\Run`. The installed Professional has one fixed
 /// name, which its uninstaller removes; each portable copy names its folder and `tag`
 /// (`workspace_tag`), so two copies, even in folders of the same name, never share an entry (Q22).
@@ -37,12 +43,38 @@ pub fn autostart_entry_name(installed: bool, folder: &str, tag: &str) -> String 
     if installed { "Qamille".to_owned() } else { format!("Qamille ({folder}, {tag})") }
 }
 
-/// The first 8 hex digits of the per-data-folder hash that `main.rs` appends to the app identifier
-/// (`.workspace` followed by 16 digits), the same in every start of one copy.
-pub fn workspace_tag(identifier: &str) -> Option<&str> {
-    let (_, hash) = identifier.rsplit_once(".workspace")?;
-    let digits = hash.get(..16)?;
-    digits.bytes().all(|b| b.is_ascii_hexdigit()).then(|| &digits[..8])
+/// FNV-1a, 64 bits: a hash that never changes between builds (the standard library's does not promise
+/// that), so a copy keeps the name of its entry across updates.
+pub fn fnv1a64(bytes: &[u8]) -> u64 {
+    bytes.iter().fold(0xcbf2_9ce4_8422_2325, |hash, &byte| (hash ^ u64::from(byte)).wrapping_mul(0x0000_0100_0000_01b3))
+}
+
+/// 8 hex digits for a data folder (its canonical path; Windows paths ignore case): the same in every
+/// start and every version of one copy, different for another copy.
+pub fn workspace_tag(data_dir: &str) -> String {
+    format!("{:016x}", fnv1a64(data_dir.to_lowercase().as_bytes()))[..8].to_owned()
+}
+
+/// The command of the Run value: the executable in quotes, then `AUTOSTART_ARG`. Unquoted, Windows
+/// would try every prefix of a path with spaces as a program (`D:\Apps\Qamille.exe` for
+/// `D:\Apps\Qamille Portable\Qamille.exe`), and anyone may create files at the root of a data drive.
+/// A verbatim path (`\\?\`) is written plainly.
+pub fn run_command(exe: &str) -> String {
+    let exe = match exe.strip_prefix(r"\\?\") {
+        Some(rest) => rest.strip_prefix(r"UNC\").map_or_else(|| rest.to_owned(), |share| format!(r"\\{share}")),
+        None => exe.to_owned(),
+    };
+    format!("\"{exe}\" {AUTOSTART_ARG}")
+}
+
+/// The twin of the Run value under `StartupApproved\Run` that Qamille writes when it turns the entry
+/// on: what Task Manager writes for an entry turned on there.
+pub const APPROVED_ON: [u8; 12] = [0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+/// Whether Windows runs the entry, from its twin: none means on; Task Manager and Settings > Apps >
+/// Startup turn it off with an odd first byte (0x03, then when), on again with an even one (0x02, 0x06).
+pub fn startup_approved(twin: Option<&[u8]>) -> bool {
+    twin.and_then(|bytes| bytes.first()).is_none_or(|first| first & 1 == 0)
 }
 
 /// «Esci da Qamille» in the system menu (Alt+Space), under «Chiudi»: it quits even while the close
@@ -142,11 +174,60 @@ mod tests {
     }
 
     #[test]
-    fn the_tag_is_the_first_eight_digits_of_the_workspace_identifier() {
-        assert_eq!(workspace_tag("app.qamille.desktop.workspace0123456789abcdef"), Some("01234567"));
-        assert_eq!(workspace_tag("app.qamille.desktop.workspace0123456789abcdef.preview"), Some("01234567"));
-        assert_eq!(workspace_tag("app.qamille.desktop"), None);
-        assert_eq!(workspace_tag("app.qamille.desktop.workspace012"), None);
+    fn the_tag_is_a_stable_hash_of_the_data_folder() {
+        // FNV-1a 64, the published test vectors: the same in every Rust release, unlike DefaultHasher.
+        assert_eq!(fnv1a64(b""), 0xcbf29ce484222325);
+        assert_eq!(fnv1a64(b"a"), 0xaf63dc4c8601ec8c);
+        assert_eq!(fnv1a64(b"foobar"), 0x85944171f73967e8);
+        // One copy's tag, pinned: a future build must give the entry the same name.
+        assert_eq!(workspace_tag(r"\\?\D:\Software\Qamille\data"), "6a5c8aa2");
+        // Windows paths ignore case.
+        assert_eq!(workspace_tag(r"\\?\d:\software\QAMILLE\DATA"), "6a5c8aa2");
+        assert_ne!(workspace_tag(r"\\?\D:\Software\Qamille-Professional\data"), "6a5c8aa2");
+        assert_eq!(workspace_tag(r"\\?\D:\Software\Qamille-Professional\data").len(), 8);
+    }
+
+    #[test]
+    fn the_run_command_quotes_the_executable() {
+        // Unquoted, Windows would try `D:\Apps\Qamille.exe` first, a file anyone may plant on a data drive.
+        assert_eq!(run_command(r"D:\Apps\Qamille Portable\Qamille.exe"), r#""D:\Apps\Qamille Portable\Qamille.exe" --autostart"#);
+        assert_eq!(run_command(r"C:\Qamille\Qamille.exe"), r#""C:\Qamille\Qamille.exe" --autostart"#);
+        assert_eq!(run_command(r"\\server\share\Qamille\Qamille.exe"), r#""\\server\share\Qamille\Qamille.exe" --autostart"#);
+        // A verbatim path is written the way Explorer and Task Manager show paths.
+        assert_eq!(run_command(r"\\?\D:\Apps\Qamille\Qamille.exe"), r#""D:\Apps\Qamille\Qamille.exe" --autostart"#);
+        assert_eq!(run_command(r"\\?\UNC\server\share\Qamille.exe"), r#""\\server\share\Qamille.exe" --autostart"#);
+        // A Windows path has no quotes of its own: the two are the command's, around the whole path.
+        for exe in [r"D:\Apps\Qamille Portable\Qamille.exe", r"\\server\share\Qamille.exe"] {
+            let command = run_command(exe);
+            assert_eq!(command.matches('"').count(), 2, "{command}");
+            assert!(command.starts_with('"') && command.ends_with(&format!("\" {AUTOSTART_ARG}")), "{command}");
+        }
+    }
+
+    #[test]
+    fn task_manager_switch_decides_whether_the_entry_runs() {
+        // No twin, or the one Qamille writes when it turns the entry on: it runs.
+        assert!(startup_approved(None));
+        assert!(startup_approved(Some(&APPROVED_ON)));
+        assert!(startup_approved(Some(&[0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])));
+        assert!(startup_approved(Some(&[])));
+        // Turned off in Task Manager or Settings > Apps > Startup: odd first byte, then when.
+        assert!(!startup_approved(Some(&[0x03, 0, 0, 0, 0x10, 0x5c, 0x3f, 0x7a, 0x2e, 0x1d, 0xdb, 0x01])));
+        assert!(!startup_approved(Some(&[0x07, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])));
+        assert_eq!(APPROVED_ON, [0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn a_restart_comes_back_as_the_window_was() {
+        let exe = r"C:\Apps\Qamille\Qamille.exe";
+        // Not a restart: the arguments decide.
+        assert!(stays_hidden(&args(&[exe, AUTOSTART_ARG]), None));
+        assert!(!stays_hidden(&args(&[exe]), None));
+        // A restart keeps the arguments of the first start: a window on screen comes back on screen,
+        // one in the tray stays there.
+        assert!(!stays_hidden(&args(&[exe, AUTOSTART_ARG]), Some(false)));
+        assert!(stays_hidden(&args(&[exe]), Some(true)));
+        assert!(stays_hidden(&args(&[exe, AUTOSTART_ARG]), Some(true)));
     }
 
     /// The file `mcp_config::launcher_content` wrote for an executable, byte for byte.

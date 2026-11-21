@@ -3,7 +3,8 @@
 // Node strips the type annotations of this dependency-free module.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createUndoQueueGuard, createUndoQueueSessionEnd, QUIT_WAIT_MS, SESSION_END_WAIT_MS } from '../src/lib/undo-close.ts';
+import { createCloseGuards } from '../src/lib/close-guards.ts';
+import { createUndoQueueGuard, createUndoQueueSessionEnd, QUIT_WAIT_MS, SESSION_END_WAIT_MS, settleUndoQueue } from '../src/lib/undo-close.ts';
 
 /** A fake backend: `answers` maps a command to a function of its arguments. Every call is logged. */
 function backend(answers) {
@@ -59,8 +60,25 @@ test('session end sends only when the session really ends', async () => {
   // Windows only asks: another app can still cancel, so nothing irreversible happens.
   assert.notEqual(await step(false), false);
   assert.deepEqual(fake.commands(), []);
-  // It ends: there is nobody to ask, and Windows waits about 8 s in all.
+  // It ends: the queue leaves now, without waiting here (the other steps still have to run).
   await step(true);
-  assert.deepEqual(fake.commands(), ['undo_send_now']);
-  assert.ok(fake.log[0].args.waitMs <= 5000 && fake.log[0].args.waitMs === SESSION_END_WAIT_MS);
+  assert.deepEqual(fake.log, [{ command: 'undo_send_now', args: { waitMs: 0 } }]);
+  // Then, once every step ran, the queue gets what is left of the ~8 s Windows waits.
+  await settleUndoQueue(fake.call);
+  assert.deepEqual(fake.log[1], { command: 'undo_send_now', args: { waitMs: SESSION_END_WAIT_MS } });
+  assert.ok(SESSION_END_WAIT_MS > 0 && SESSION_END_WAIT_MS <= 5000);
+});
+
+test('at session end the queue does not hold up the recording stop', async () => {
+  // The queue's guard comes first among the guards that run last (window-close.ts), so at «Esci» its
+  // question comes before the recording stops. At session end nobody answers: the recording first.
+  const started = Date.now();
+  const fake = backend({ undo_send_now: ({ waitMs }) => new Promise((resolve) => setTimeout(() => resolve({ remaining: 1 }), waitMs)) });
+  const guards = createCloseGuards();
+  const log = [];
+  guards.register('undo-queue', async () => true, { last: true, sessionEnd: createUndoQueueSessionEnd(fake.call) });
+  guards.register('meetings', async () => true, { last: true, sessionEnd: async () => log.push(['meeting_stop', Date.now() - started]) });
+  await guards.endSession(true);
+  assert.equal(log.length, 1);
+  assert.ok(log[0][1] < 200, `the recording stopped after ${log[0][1]} ms`);
 });

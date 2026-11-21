@@ -265,6 +265,11 @@ pub fn page_not_loaded(window: &WebviewWindow, status: i32) {
         chip_failed(window);
         return;
     }
+    // In the tray nothing asks by itself: the failed load never draws, so its 15 s watch leaves the
+    // question to the first restore (`offer_reload_if_not_ready`).
+    if !window.is_visible().unwrap_or(true) {
+        return;
+    }
     ask_once(window, move |window| {
         let text = if tauri::is_dev() {
             format!(
@@ -492,6 +497,10 @@ pub fn close_requested(app: &AppHandle) {
             if close {
                 finish_meetings_before_exit(window.app_handle());
                 let _ = window.destroy();
+            } else {
+                // «Attendi», or Esc: «Esci» is over until the person asks again, so the next X
+                // hides as usual instead of quitting.
+                crate::background::close_settled();
             }
         });
     });
@@ -528,6 +537,8 @@ fn exit_app(app: &AppHandle) {
 
 fn restart_app(app: &AppHandle) {
     finish_meetings_before_exit(app);
+    // The new process gets this one's arguments, `--autostart` too: it comes back as the window was.
+    crate::background::before_restart(app);
     // SAFETY: the variable is only read by the next process, at its start.
     unsafe { std::env::set_var(RESTART_AFTER, std::process::id().to_string()) };
     app.request_restart();

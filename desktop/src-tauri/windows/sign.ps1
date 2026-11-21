@@ -33,6 +33,21 @@ $secret = New-Object System.Security.SecureString
 foreach ($character in [char[]][string]$env:QAMILLE_SIGNING_PFX_PASSWORD) { $secret.AppendChar($character) }
 $secret.MakeReadOnly()
 
+# Stores left by a signature that was killed halfway (QamilleSigning<pid> of a process that is gone) go
+# first, with their certificates and keys. The store of a signature still running stays.
+$certificates = 'HKCU:\Software\Microsoft\SystemCertificates'
+Get-ChildItem -LiteralPath $certificates -ErrorAction SilentlyContinue | ForEach-Object {
+  if ($_.PSChildName -match '^QamilleSigning(\d+)$') {
+    $owner = [int]$Matches[1]
+    if ($owner -ne $PID -and -not (Get-Process -Id $owner -ErrorAction SilentlyContinue)) {
+      $stale = $_
+      Get-ChildItem -LiteralPath "Cert:\CurrentUser\$($stale.PSChildName)" -ErrorAction SilentlyContinue |
+        ForEach-Object { Remove-Item -LiteralPath $_.PSPath -DeleteKey -ErrorAction SilentlyContinue }
+      Remove-Item -LiteralPath $stale.PSPath -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
+}
+
 # A store of its own, never one that holds other certificates: everything in it goes afterwards. The
 # certificate drive does not create stores for the current user; opening one for writing does, and it
 # lives under HKCU\Software\Microsoft\SystemCertificates.

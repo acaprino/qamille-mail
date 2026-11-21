@@ -1120,6 +1120,13 @@ check('27. the updater runs only in an installed Professional built with its key
     'the certificate, its key and the store of this one signature are removed after it',
   );
   assert.match(scriptCode, /\$registry = "HKCU:\\Software\\Microsoft\\SystemCertificates\\\$store"/, 'the store removed is the one of this signature');
+  // A signature killed halfway leaves its store: the next one removes it, never the store of a signature still running.
+  const sweepStart = scriptCode.indexOf("$certificates = 'HKCU:\\Software\\Microsoft\\SystemCertificates'");
+  assert.ok(sweepStart >= 0 && sweepStart < scriptCode.indexOf('$opened = New-Object'), 'stale stores are swept before this signature makes its own');
+  const sweep = scriptCode.slice(sweepStart, scriptCode.indexOf('$opened = New-Object'));
+  assert.match(sweep, /QamilleSigning\(\\d\+\)/, 'only QamilleSigning<pid> stores are swept');
+  assert.match(sweep, /Get-Process -Id \$owner -ErrorAction SilentlyContinue/, 'a store whose signature is still running stays');
+  assert.match(sweep, /-DeleteKey[\s\S]*?Remove-Item -LiteralPath \$stale\.PSPath -Recurse/, 'a stale store goes with its certificates and their keys');
   // build-release.bat: without TAURI_SIGNING_PRIVATE_KEY and QAMILLE_SIGNING_PFX the installer's command is
   // the one of before, byte for byte.
   const bat = read('../build-release.bat');

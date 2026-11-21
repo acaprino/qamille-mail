@@ -658,6 +658,18 @@ export async function previewCommand(
         action: String(args.action),
         value: args.value ? String(args.value) : null,
       });
+    case 'show_row_menu': {
+      // No native menu here: keep what was asked and answer the entry the test prepared
+      // (`__previewRowMenu`, declared in lib/row-menu.ts). Without one, the menu closes unchosen.
+      const menu = (window.__previewRowMenu ??= { calls: [], choice: null });
+      type Shown = (typeof menu.calls)[number];
+      menu.calls.push({
+        items: structuredClone(args.items) as Shown['items'],
+        x: Number(args.x),
+        y: Number(args.y),
+      });
+      return menu.choice;
+    }
     case 'queue_draft_action': {
       const draft_id = Number(args.id);
       if (args.action === 'send') return queue({ kind: 'send_draft', draft_id });

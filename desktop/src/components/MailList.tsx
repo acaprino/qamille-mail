@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useIsPresent, useReducedMotion, type Variants } from 'motion/react';
-import { useEffect, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react';
 import Button from '../ds/primitives/Button';
 import Checkbox from '../ds/primitives/Checkbox';
 import Count from '../ds/primitives/Count';
@@ -52,6 +52,11 @@ export type MailListProps = {
   people?: PersonIndex;
   /** Spam or Trash is being fetched from the server for this view (W3.1). */
   fetchingFolder?: boolean;
+  /**
+   * A right-click, Shift+F10 or the Menu key on a row: the native menu (lib/row-menu.ts) at `at`, in
+   * CSS pixels of the page, for `rows`: every ticked row when the row is one of them, else the row.
+   */
+  rowMenu?: (id: number, at: { x: number; y: number }, rows: number[]) => void;
 };
 
 const order = ['Priority', 'New', 'Notifications', 'Newsletters', 'Pins', 'Seen'];
@@ -181,6 +186,7 @@ type RowProps = {
   open: (id: number) => void;
   prefetch: (id: number) => void;
   action: (id: number, action: string) => void;
+  openRowMenu: (event: MouseEvent<HTMLElement>, item: EmailSummary) => void;
 };
 
 // One row of the list and, when its conversation is open, the replies under it. It stays plain
@@ -208,6 +214,7 @@ function MailRow({
   open,
   prefetch,
   action,
+  openRowMenu,
 }: RowProps) {
   useStore(threadState);
   const present = useIsPresent();
@@ -260,8 +267,10 @@ function MailRow({
     ),
     style: { '--time-ch': when.length } as React.CSSProperties,
     'data-section': email.section.toLowerCase(),
+    'data-row-id': email.id,
     'aria-hidden': present ? undefined : true,
     inert: !present,
+    onContextMenu: (event: MouseEvent<HTMLElement>) => openRowMenu(event, email),
   };
   const content = (
     <>
@@ -426,6 +435,7 @@ export default function MailList({
   accounts = noAccounts,
   people = noPeople,
   fetchingFolder = false,
+  rowMenu,
 }: MailListProps) {
   useStore(groupState);
   useStore(threadState);
@@ -468,6 +478,19 @@ export default function MailList({
   });
   function check(id: number) {
     setChecked((list) => (list.includes(id) ? list.filter((value) => value !== id) : [...list, id]));
+  }
+  // The native menu of a row (docs/aspetto-nativo.md, rule 33). The row takes the event, so neither
+  // WebView2's menu nor the system menu opens on it. Shift+F10 and the Menu key send the same event
+  // without a button: Chromium says `pointerType` 'mouse' and `button` -1 (the specification, an
+  // empty `pointerType`). The menu then opens below the row, 16 px in, not at the pointer.
+  function openRowMenu(event: MouseEvent<HTMLElement>, item: EmailSummary) {
+    if (!rowMenu) return;
+    event.preventDefault();
+    const pointer = event.nativeEvent as PointerEvent;
+    const fromKeyboard = !pointer.pointerType || pointer.button < 0;
+    const box = event.currentTarget.getBoundingClientRect();
+    const at = fromKeyboard ? { x: box.left + 16, y: box.bottom } : { x: event.clientX, y: event.clientY };
+    rowMenu(item.id, at, checkedItems.includes(item.id) ? [...checkedItems] : [item.id]);
   }
   const grouped = view === 'Inbox' && mode === 'Smart' && !search;
   const groups = grouped
@@ -568,6 +591,7 @@ export default function MailList({
     open,
     prefetch,
     action,
+    openRowMenu,
   };
   const rows = groups.flatMap((group) => [
     ...(grouped

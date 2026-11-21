@@ -111,6 +111,7 @@ permissions = [
   "allow-print-mail",
   "allow-mail-action",
   "allow-queue-mail-action",
+  "allow-show-row-menu",
   "allow-queue-draft-action",
   "allow-undo-action",
   "allow-dismiss-action",

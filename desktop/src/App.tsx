@@ -46,6 +46,7 @@ import { configureRegional, configureRegionalWording, regionalLocale, regionalTi
 import { backendText, folderLabel, isItalian, setLanguageLocale, tr, useLanguage } from './lib/i18n';
 import { personIndex, type PersonIndex } from './lib/people';
 import { replyAllRecipients } from './lib/reply-all';
+import { rowMenuAction, rowMenuEntries, showRowMenu } from './lib/row-menu';
 import { patchExtraRead, repliesOf, threadState } from './lib/groups';
 import { useStore } from './lib/store';
 import { tick } from './lib/tick';
@@ -1183,6 +1184,45 @@ export default function App() {
       await refresh();
     }
   }
+  // The native menu of list rows (lib/row-menu.ts, docs/aspetto-nativo.md rule 33). `rowIds` are the
+  // rows it is for: the one right-clicked, or every ticked one. It acts without opening the row,
+  // through the paths the row and the reader use and with their locks; the focus is back on the row.
+  async function openRowMenu(id: number, at: { x: number; y: number }, rowIds: number[]) {
+    // The rows as the list holds them now, and the messages they stand for: a conversation row
+    // acts on every message of it the view holds, as its pin button does.
+    const listedRows = () =>
+      rowIds
+        .map((rowId) => s.page.items.find((item) => item.id === rowId))
+        .filter((row): row is EmailSummary => !!row);
+    const messagesOf = (rows: EmailSummary[]) => rows.flatMap((row) => (s.threads ? row.message_ids : [row.id]));
+    const rows = listedRows();
+    if (!rows.length) return;
+    const locked = messagesOf(rows).some((messageId) => s.busyIds.has(messageId) || shownOnly(messageId));
+    const choice = await showRowMenu(rowMenuEntries(rows, s.view, locked, tr), at);
+    const rowButton = (rowId: number) =>
+      document.querySelector<HTMLElement>(`.mail-row[data-row-id="${rowId}"] .mail-open`);
+    rowButton(id)?.focus();
+    if (!choice) return;
+    if (choice === 'reply' || choice === 'reply-all' || choice === 'forward') {
+      await compose(id, choice === 'forward', choice === 'reply-all');
+      return;
+    }
+    const command = rowMenuAction(choice);
+    // The list may have changed while the menu was open: a row that left is not acted on.
+    const messages = messagesOf(listedRows());
+    if (!command || !messages.length) return;
+    // Rows sent away leave the focus on the next row, as triage does; `action` moves it itself when
+    // the message on show is among them.
+    if (leavesList.includes(command.action) && !(s.selected && messages.includes(s.selected.id))) {
+      const listed = s.visibleOrder.filter((entry) => s.page.items.some((item) => item.id === entry));
+      const from = listed.indexOf(id);
+      const next = [...listed.slice(from + 1), ...listed.slice(0, Math.max(from, 0)).reverse()].find(
+        (entry) => !rowIds.includes(entry),
+      );
+      (next === undefined ? document.querySelector<HTMLElement>('.mail-list h1') : rowButton(next))?.focus();
+    }
+    await action(id, command.action, command.value, messages);
+  }
   async function restoreListFocus() {
     await tick();
     const active = document.activeElement;
@@ -1240,8 +1280,11 @@ export default function App() {
     // The control that asked for the composer, before the draft is made: that wait can move the focus.
     const opener = document.activeElement;
     try {
+      // A row's menu answers everyone without opening the message: its recipients are read first.
+      const message =
+        everyone && replyTo !== null && s.selected?.id !== replyTo ? await call<Email>('read_mail', { id: replyTo }) : null;
       let draft = await call<Draft>('create_draft', { accountId: s.accountId, replyTo, forward });
-      const selected = s.selected;
+      const selected = message ?? s.selected;
       if (everyone && selected && selected.id === replyTo) {
         const own = new Set((s.workspace?.accounts ?? []).map((account) => account.email.trim().toLowerCase()));
         draft = await call<Draft>('save_draft', {
@@ -1808,6 +1851,7 @@ export default function App() {
                       )
                     }
                     loadMore={() => void loadMail(true)}
+                    rowMenu={(id, at, rows) => void openRowMenu(id, at, rows)}
                   />
                   <Reader
                     dark={darkNow === 'dark'}

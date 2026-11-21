@@ -13,6 +13,9 @@ const QAMILLE_CLIENT: windows::core::GUID = windows::core::GUID::from_u128(0x54b
 #[cfg(windows)]
 const INTERNET_SOURCE: &str = "about:internet";
 
+/// Shown to the user through `backendText` (`desktop/src/lib/backend-text.ts` has the Italian).
+const REMOVED_BY_WINDOWS_SECURITY: &str = "Windows security removed the saved file. Check Windows Security.";
+
 /// Writes the file, then marks it as coming from the Internet zone. Only a failure to write the file, or
 /// Windows security removing it while it is marked, fails the save: a zone that cannot be written is
 /// reported to `native_feel::report` and the file stays.
@@ -26,8 +29,9 @@ fn save_downloaded_with(path: &Path, bytes: &[u8], zone: impl FnOnce(&Path) -> i
         native_feel::report(&format!("saved file left without its Internet zone: {error}"));
     }
     // Attachment Services hand the file to the antivirus and the attachment policy, which may delete it.
-    if !path.exists() {
-        return Err(io::Error::new(io::ErrorKind::NotFound, "Windows security removed the saved file"));
+    // Only a file known to be gone fails the save: a denied look is not a removal.
+    if matches!(path.try_exists(), Ok(false)) {
+        return Err(io::Error::new(io::ErrorKind::NotFound, REMOVED_BY_WINDOWS_SECURITY));
     }
     Ok(())
 }
@@ -41,7 +45,7 @@ fn mark_from_internet(path: &Path, source_url: Option<&str>) -> io::Result<()> {
             return Ok(());
         };
         // Writing the stream of a file the antivirus removed would bring it back, empty.
-        if !path.exists() {
+        if matches!(path.try_exists(), Ok(false)) {
             return Err(io::Error::other(format!("Attachment Services removed the file: {error}")));
         }
         native_feel::report(&format!("Attachment Services unavailable, writing Zone.Identifier: {error}"));
@@ -55,14 +59,21 @@ fn mark_from_internet(path: &Path, source_url: Option<&str>) -> io::Result<()> {
 }
 
 #[cfg(windows)]
-fn attachment_services(path: &Path, source_url: Option<&str>) -> windows::core::Result<()> {
+fn attachment_services(path: &Path, source_url: Option<&str>) -> io::Result<()> {
+    let _apartment = Apartment::enter();
+    // An empty or missing source makes Save fail or pick no zone: a mail attachment has no URL.
+    let source = source_url.filter(|url| !url.trim().is_empty()).unwrap_or(INTERNET_SOURCE);
+    // Turned into text while COM is still initialised: the error may hold an IErrorInfo, released
+    // when it drops, which must not happen after the apartment closes.
+    save_with_attachment_execute(path, source).map_err(|error| io::Error::other(error.to_string()))
+}
+
+#[cfg(windows)]
+fn save_with_attachment_execute(path: &Path, source: &str) -> windows::core::Result<()> {
     use windows::Win32::System::Com::{CLSCTX_INPROC_SERVER, CoCreateInstance};
     use windows::Win32::UI::Shell::{AttachmentServices, IAttachmentExecute};
     use windows::core::HSTRING;
 
-    let _apartment = Apartment::enter();
-    // An empty or missing source makes Save fail or pick no zone: a mail attachment has no URL.
-    let source = source_url.filter(|url| !url.trim().is_empty()).unwrap_or(INTERNET_SOURCE);
     unsafe {
         let execute: IAttachmentExecute = CoCreateInstance(&AttachmentServices, None, CLSCTX_INPROC_SERVER)?;
         execute.SetClientGuid(&QAMILLE_CLIENT)?;
@@ -134,10 +145,10 @@ mod tests {
     }
 
     #[cfg(windows)]
-    fn zone_stream(file: &Path) -> String {
+    fn zone_stream(file: &Path) -> io::Result<String> {
         let mut stream = file.as_os_str().to_owned();
         stream.push(":Zone.Identifier");
-        std::fs::read_to_string(stream).expect("Zone.Identifier stream")
+        std::fs::read_to_string(stream)
     }
 
     #[cfg(windows)]
@@ -147,7 +158,7 @@ mod tests {
         let file = scratch.0.join("invoice.docx");
         std::fs::write(&file, b"PK").expect("file");
         write_zone_identifier(&file).expect("zone");
-        assert!(zone_stream(&file).contains("ZoneId=3"));
+        assert!(zone_stream(&file).expect("Zone.Identifier stream").contains("ZoneId=3"));
         assert_eq!(std::fs::read(&file).expect("file"), b"PK");
     }
 
@@ -159,7 +170,13 @@ mod tests {
         std::fs::write(&file, b"PK").expect("file");
         // Called directly, not through `save_downloaded`, whose stream fallback would hide a COM failure.
         attachment_services(&file, None).expect("Attachment Services");
-        assert!(zone_stream(&file).contains("ZoneId=3"));
+        // With that policy on, Save succeeds and writes no zone: the machine, not the code, is the cause.
+        let policy = concat!(
+            r"is the policy 'Do not preserve zone information in file attachments' on? (Attachment Manager, ",
+            r"SaveZoneInformation=1 under Software\Microsoft\Windows\CurrentVersion\Policies\Attachments)",
+        );
+        let zone = zone_stream(&file).unwrap_or_else(|error| panic!("no Zone.Identifier stream ({error}): {policy}"));
+        assert!(zone.contains("ZoneId=3"), "zone {zone:?} is not the Internet: {policy}");
         assert_eq!(std::fs::read(&file).expect("file"), b"PK");
     }
 
@@ -189,7 +206,15 @@ mod tests {
             std::fs::remove_file(path)?;
             Err(io::Error::other("blocked"))
         };
-        assert!(save_downloaded_with(&file, b"MZ", antivirus).is_err());
+        let error = save_downloaded_with(&file, b"MZ", antivirus).expect_err("a removed file is not saved");
+        assert_eq!(error.to_string(), REMOVED_BY_WINDOWS_SECURITY);
         assert!(!file.exists());
+    }
+
+    #[test]
+    fn the_removed_file_message_has_its_italian() {
+        let texts = Path::new(env!("CARGO_MANIFEST_DIR")).join("../src/lib/backend-text.ts");
+        let texts = std::fs::read_to_string(texts).expect("backend-text.ts");
+        assert!(texts.contains(&format!("['{REMOVED_BY_WINDOWS_SECURITY}', ")), "reworded without its EXACT entry");
     }
 }

@@ -38,6 +38,16 @@ test('attachment visual preview messages are translated', () => {
   );
 });
 
+test('a saved attachment that Windows security removed is explained in both languages', () => {
+  // The Rust literal is REMOVED_BY_WINDOWS_SECURITY in src-tauri/src/zone.rs.
+  const removed = 'Windows security removed the saved file. Check Windows Security.';
+  assert.equal(
+    backendTextItalian(removed),
+    'La sicurezza di Windows ha rimosso il file salvato. Controlla Sicurezza di Windows.',
+  );
+  assert.equal(backendTextEnglish(removed), removed);
+});
+
 test('storage messages use the Italian button name and decimal comma', () => {
   assert.equal(
     backendTextItalian('Protected mail and drafts need 1.25 GB before the safety reserve. Choose a larger limit or Unlimited. No data was removed.'),

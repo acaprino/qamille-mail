@@ -104,6 +104,8 @@ function kindsOf(tree, node, out) {
 // INV-002 and INV-003: markup outside the module.
 for (const file of words(root, /\.tsx$/)) {
   if (file.startsWith(`${DS}${path.sep}`)) continue;
+  // src/ui is where the primitives live from now on (the Sigrid plan): its adapters and its own components write the markup.
+  if (file.startsWith(`${path.join(root, 'ui')}${path.sep}`)) continue;
   const rel = path.relative(root, file).replaceAll('\\', '/');
   const source = fs.readFileSync(file, 'utf8');
   const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);

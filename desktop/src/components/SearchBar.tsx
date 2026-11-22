@@ -431,7 +431,7 @@ export default function SearchBar({
                 <Button type="button" variant="secondary" disabled={!field.trim()} onClick={addPerson}>
                   {t('Aggiungi un’altra persona', 'Add another person')}
                 </Button>
-                <Button variant="primary" disabled={!field.trim() && !s.people.length}>
+                <Button type="submit" variant="primary" disabled={!field.trim() && !s.people.length}>
                   {t('Applica filtro', 'Apply filter')}
                 </Button>
               </div>
@@ -551,7 +551,7 @@ export default function SearchBar({
                     {t('Scegli un intervallo diverso', 'Choose a different range')}
                   </Button>
                 )}
-                <Button variant="primary" disabled={mode !== 'recent' && (!day || (mode === 'between' && !end))}>
+                <Button type="submit" variant="primary" disabled={mode !== 'recent' && (!day || (mode === 'between' && !end))}>
                   {t('Applica filtro', 'Apply filter')}
                 </Button>
               </div>
@@ -594,7 +594,7 @@ export default function SearchBar({
                 </label>
               ) : null}
               <div className="search-panel-actions">
-                <Button variant="primary" disabled={s.attachment === 'type' && !field}>
+                <Button type="submit" variant="primary" disabled={s.attachment === 'type' && !field}>
                   {t('Applica filtro', 'Apply filter')}
                 </Button>
               </div>
@@ -641,7 +641,7 @@ export default function SearchBar({
                 ))}
               </datalist>
               <div className="search-panel-actions">
-                <Button variant="primary" disabled={!field.trim()}>
+                <Button type="submit" variant="primary" disabled={!field.trim()}>
                   {t('Applica filtro', 'Apply filter')}
                 </Button>
               </div>

@@ -64,7 +64,7 @@ Sono diciassette componenti più l’icona. La loro forma è fissata: cambiare u
 
 | Primitiva | Basata su | Props | Lo stile sta in |
 |---|---|---|---|
-| `Button` | `<button>` (e `Tooltip` con `tip`) | `variant` (`primary`, `secondary`, `icon`, `text`); `className?`; `ref?`; `tip?`; `shortcut?`; gli attributi di `<button>` | `styles/system.css` |
+| `Button` | `Button` di Sigrid (`src/ui/Button.tsx`; `Tooltip` con `tip`) | `variant` (`primary`, `secondary`, `icon`, `text`); `className?`; `ref?`; `tip?`; `shortcut?`; gli attributi di `<button>`. Il tipo è `button` se non si dice altro: chi invia un modulo scrive `type="submit"`. `primary` con la classe `danger` è il distruttivo di Sigrid | — |
 | `Field` | `<label>` | `children` (etichetta e controllo); `className?`; gli attributi di `<label>` | `styles/system.css` |
 | `Modal` | Ark `Dialog`, modale | `size?` (`sm`, `md`, `lg`; predefinito `md`); `onClose?`; `aria-label?` o `aria-labelledby`; `className?`; `children`; gli attributi di `<div>` | `styles/ark/dialog.css` |
 | `SidePanel` | Ark `Dialog`, non modale | `onScrim` (obbligatoria); `narrow?`; `onClose?`; `onOpen?`; `ref?`; `aria-label?`; `className?`; `children`; gli attributi di `<div>` | `styles/ark/dialog.css` |

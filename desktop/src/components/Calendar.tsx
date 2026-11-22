@@ -1550,25 +1550,25 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
                   (s.confirmingDelete ? (
                     <>
                       <span className="confirm-text">{tr('Eliminare?', 'Delete?')}</span>
-                      <button type="button" className="danger-solid" disabled={s.busy} onClick={() => void remove()}>
+                      <Button type="button" variant="primary" className="danger" disabled={s.busy} onClick={() => void remove()}>
                         {tr('Elimina', 'Delete')}
-                      </button>
+                      </Button>
                       <Button type="button" variant="text" onClick={() => (s.confirmingDelete = false)}>
                         {tr('No', 'No')}
                       </Button>
                     </>
                   ) : (
-                    <button type="button" className="danger-text" disabled={s.busy} onClick={() => (s.confirmingDelete = true)}>
+                    <Button type="button" variant="text" className="danger" disabled={s.busy} onClick={() => (s.confirmingDelete = true)}>
                       <Icon name="trash" size={15} />
                       {tr('Elimina', 'Delete')}
-                    </button>
+                    </Button>
                   ))}
                 <span className="spacer"></span>
                 <Button type="button" variant="secondary" onClick={closeEditor}>
                   {readOnly ? tr('Chiudi', 'Close') : tr('Annulla', 'Cancel')}
                 </Button>
                 {!readOnly && (
-                  <Button variant="primary" disabled={s.busy || timeError}>
+                  <Button type="submit" variant="primary" disabled={s.busy || timeError}>
                     {s.busy ? tr('Salvataggio…', 'Saving…') : tr('Salva', 'Save')}
                   </Button>
                 )}

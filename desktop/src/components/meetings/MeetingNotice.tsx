@@ -4,7 +4,7 @@
 // else the state draws (`children`), then the buttons (`actions`) and a quiet `note` under them. The
 // progress of a job is the same card with a bar in it (MeetingProgress). The card fades and rises
 // in with a spring when the state appears (still under prefers-reduced-motion).
-import { motion, useReducedMotion } from 'motion/react';
+import { motion, useReducedMotion } from '../../ui/motion';
 import type { ReactNode } from 'react';
 import Icon from '../../ds/primitives/Icon';
 import { cn } from '../../lib/utils';

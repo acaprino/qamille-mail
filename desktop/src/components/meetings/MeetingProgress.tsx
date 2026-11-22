@@ -3,7 +3,7 @@
 // Sintesi tab, while the transcript next to it stays readable. It draws what the meeting says
 // now; the page re-reads the meeting, this does not ask for anything. The block fades in and the
 // bar grows with a spring (no movement under prefers-reduced-motion).
-import { motion, useReducedMotion } from 'motion/react';
+import { motion, useReducedMotion } from '../../ui/motion';
 import Button from '../../ds/primitives/Button';
 import { tr } from '../../lib/i18n';
 import type { MeetingJob } from '../../lib/meetings';

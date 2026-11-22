@@ -1,4 +1,3 @@
-import { MotionConfig } from 'motion/react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './styles.css';
@@ -22,12 +21,9 @@ function pageFailed(error: unknown) {
 }
 
 // No StrictMode: the root talks to the backend on mount, and its effects must run once.
-// SigridRoot: Sigrid's words and motion. MotionConfig: every Motion animation of Qamille's own (Tabs, NavList, Apple
-// Switch, rows) honours reduced motion, until the app's motion comes from Sigrid too.
+// SigridRoot: Sigrid's words and motion (it honours the system's reduced-motion setting).
 createRoot(document.getElementById('app')!, { onUncaughtError: pageFailed }).render(
   <SigridRoot>
-    <MotionConfig reducedMotion="user">
-      <App />
-    </MotionConfig>
+    <App />
   </SigridRoot>,
 );

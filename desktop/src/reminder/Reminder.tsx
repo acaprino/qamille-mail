@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
+import { motion, useReducedMotion } from '../ui/motion';
 import { listen } from '@tauri-apps/api/event';
 import { call, errorText } from '../lib/api';
 import { setLanguageLocale, tr, useLanguage } from '../lib/i18n';

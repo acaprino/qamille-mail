@@ -1,4 +1,4 @@
-import { motion, useIsPresent, useReducedMotion, type Variants } from 'motion/react';
+import { motion, useIsPresent, useReducedMotion, type Variants } from '../ui/motion';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import Button from '../ds/primitives/Button';
 import Tooltip from '../ds/primitives/Tooltip';

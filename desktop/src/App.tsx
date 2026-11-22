@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
-import { useReducedMotion } from 'motion/react';
+import { useReducedMotion } from './ui/motion';
 import Button from './ds/primitives/Button';
 import Toaster, { notify as showNotice, type NoticeAction } from './ds/primitives/Toaster';
 import { listen } from '@tauri-apps/api/event';

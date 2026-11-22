@@ -1,4 +1,4 @@
-import { AnimatePresence, motion, useIsPresent, useReducedMotion } from 'motion/react';
+import { AnimatePresence, motion, useIsPresent, useReducedMotion } from '../ui/motion';
 import { useEffect, useState } from 'react';
 import Button from '../ds/primitives/Button';
 import Count from '../ds/primitives/Count';

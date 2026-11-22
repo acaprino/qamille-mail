@@ -6,7 +6,7 @@
 // The rows of a group arrive and leave with Motion (AnimatePresence; the rows already there when a
 // group appears do not animate). The scroller is a Motion `layoutScroll` box so that a scrolled list
 // does not read as rows that moved.
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion } from '../../ui/motion';
 import { Fragment, type ReactNode } from 'react';
 import Button from '../../ds/primitives/Button';
 import Icon from '../../ds/primitives/Icon';

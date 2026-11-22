@@ -1,4 +1,4 @@
-import { AnimatePresence, motion, useIsPresent, useReducedMotion } from 'motion/react';
+import { AnimatePresence, motion, useIsPresent, useReducedMotion } from '../ui/motion';
 import { useEffect, useRef, type ChangeEvent, type ReactNode } from 'react';
 import Button from '../ds/primitives/Button';
 import Checkbox from '../ds/primitives/Checkbox';

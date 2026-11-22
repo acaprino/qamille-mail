@@ -13,9 +13,11 @@ Gli allegati aggiunti alle bozze vengono copiati in data e rientrano nel limite
 di spazio dell'account. Le copie senza più riferimenti vengono rimosse; i file
 originali scelti dall'utente restano intatti.
 
-Per trasferire l'app, chiudila con **Esci** (dal menu dell'icona nell'area di
-notifica: la X la lascia aperta lì) e copia **l'intera cartella Qamille**,
-compresa la cartella data. Usa una cartella in cui puoi scrivere. Per le
+Per trasferire l'app, spegni prima le voci che ha scritto in Windows («Prima di
+spostare o cancellare una copia», qui sotto), chiudila con **Esci** (dal menu
+dell'icona nell'area di notifica: la X la lascia aperta lì) e copia **l'intera
+cartella Qamille**, compresa la cartella data. Usa una cartella in cui puoi
+scrivere. Per le
 integrazioni con altri programmi riapplica la relativa configurazione dopo lo
 spostamento. Su un altro computer o con un altro utente di Windows le credenziali
 seguono «Spostare la cartella su un altro computer o utente», più sotto.
@@ -24,8 +26,16 @@ seguono «Spostare la cartella su un altro computer o utente», più sotto.
 Windows avvia questa copia nell'area di notifica. Ogni copia ha la sua voce, con
 il nome della cartella e un codice della sua cartella data, che si vede e si
 spegne anche in Gestione attività → App di avvio. La voce nomina l'eseguibile di
-questa cartella: prima di spostare o cancellare la copia spegni l'avvio
-all'accesso, poi riaccendilo dalla nuova posizione.
+questa cartella.
+
+**Prima di spostare o cancellare una copia**, in Impostazioni → Generali →
+Windows spegni quello che la copia ha scritto nel registro di Windows del tuo
+utente: l'avvio all'accesso, le **Notifiche di Windows** (accese, registrano il
+nome con cui Windows le mostra) e i link mailto (**Smetti**, se avevi scelto
+«Usa Qamille per i link mailto»). Ogni voce porta il codice della cartella data:
+in un'altra posizione la copia ha un codice nuovo e non può più togliere le voci
+di prima, che resterebbero in Windows. Poi, dalla nuova posizione, riaccendi
+quello che ti serve.
 
 Le credenziali (password e accessi di Google, degli account IMAP e del server)
 sono cifrate in data/credentials.json. La chiave che le apre è in

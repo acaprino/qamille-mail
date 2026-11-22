@@ -150,7 +150,9 @@ salva file: non dà un token, e la notifica non ha azioni.
    focus in un campo; lo zoom resta dopo il riavvio. Con "Dimensione del testo" di Windows al 150 %
    l'app parte al 150 % (non al 225 %: se succede, WebView2 applica già la scala da sé e va tolta).
 7. Alt+Spazio con il focus in un campo, e tasto destro sul titolo "Posta / …": menu di sistema.
-   "Sposta" + frecce sposta la finestra; "Chiudi" con Impostazioni modificate chiede se salvare.
+   "Sposta" + frecce sposta la finestra; "Chiudi" mette la finestra nell'area di notifica senza
+   chiedere niente (regola 26), "Esci da Qamille", subito sotto, con Impostazioni modificate chiede
+   se salvare.
    Tasto destro in un campo: ancora Taglia/Copia/Incolla.
 8. Windows 11: angoli arrotondati e ombra in chiaro e in scuro; si ridimensiona da appena fuori
    dal bordo; la scrollbar del lettore sul bordo destro scorre, non ridimensiona.
@@ -164,8 +166,8 @@ salva file: non dà un token, e la notifica non ha azioni.
     attiva della sidebar, focus e interruttori distinguibili.
 13. Con un promemoria visibile: Alt+Tab mostra una sola voce Qamille; Esc sul promemoria lo
     chiude; con l'Assistente vocale il promemoria viene letto.
-14. `node tests/webview-recovery-native.mjs` (Qamille chiuso; `QAMILLE_NATIVE_EXE` per un exe
-    diverso da `release/Qamille.exe`): termina il renderer e poi il processo browser di
+14. `node tests/webview-recovery-native.mjs` (Qamille chiuso con «Esci» dall'icona nell'area di
+    notifica; `QAMILLE_NATIVE_EXE` per un exe diverso da `release/Qamille.exe`): termina il renderer e poi il processo browser di
     WebView2 e controlla ricarica, limite, finestra di messaggio modale, riavvio e la voce
     "Ricarica la finestra".
 15. Passando su pulsanti, schede, interruttori e voci di menu il cursore resta la freccia; sui
@@ -206,14 +208,22 @@ salva file: non dà un token, e la notifica non ha azioni.
     `the page of main failed: …` va in `native.log`, e «Ricarica la finestra» (o Esc) ricarica la pagina.
 24. Ricarica con un salvataggio fallito (Q1): archivio in sola lettura, testo in una bozza, Alt+Spazio → «Ricarica la
     finestra»: compare «Non ricaricare / Ricarica comunque» e il testo resta.
-25. Editor aperti alla chiusura (Q6): un titolo in un evento nuovo, o un nome in un contatto nuovo, poi la X: Qamille
-    chiede prima di chiudere. Alla disconnessione il contatto si salva, l'evento no (non invia inviti senza conferma).
+25. Editor aperti alla chiusura (Q6): un titolo in un evento nuovo, o un nome in un contatto nuovo, poi la X: la
+    finestra va nell'area di notifica e l'editor resta com'era, senza domande. Poi «Esci» dal menu dell'icona: la
+    finestra torna in vista e Qamille chiede prima di chiudere. Alla disconnessione il contatto si salva, l'evento no
+    (non invia inviti senza conferma).
 26. Menu dei comandi (Q16): «Altre azioni» del lettore, dei contatti e di una riunione; le frecce passano da una voce
     all'altra, Esc torna al pulsante, l'Assistente vocale legge «voce di menu» e non «finestra di dialogo».
 27. Disinstallazione dell'edizione Professional (Q23, regola 25; serve `QAMILLE_SERVER` per costruire l'installatore):
-    installa, accendi l'avvio automatico del worker, disinstalla con «elimina i dati» spuntata: la cartella `data`
-    accanto al programma, nella cartella d'installazione, non c'è più (e con lei la cartella d'installazione, se non
-    resta altro), `Qamille-worker.vbs` non è nella cartella Esecuzione automatica e al successivo accesso Windows
-    Script Host non dà errori. Un aggiornamento (con `/UPDATE` e «Disinstalla prima di installare») tiene l'avvio automatico
-    dopo il primo avvio della versione nuova, e annullare la disinstallazione a «Qamille è in esecuzione» non lo toglie.
+    installa, accendi «Avvia Qamille all'accesso a Windows» in Impostazioni → Generali → Windows (regola 27; l'avvio
+    automatico del worker non c'è più), chiudi Qamille con «Esci» dal menu dell'icona nell'area di notifica (la X lo
+    lascia aperto lì, e la disinstallazione si ferma a «Qamille è in esecuzione»), disinstalla con «elimina i dati»
+    spuntata: la cartella `data` accanto al programma, nella cartella d'installazione, non c'è più (e con lei la
+    cartella d'installazione, se non resta altro), il valore «Qamille» sotto `HKCU\…\CurrentVersion\Run` e il suo
+    gemello sotto `StartupApproved\Run` non ci sono più (Gestione attività → App di avvio non mostra Qamille), e al
+    successivo accesso non parte niente. Un `Qamille-worker.vbs` di una versione precedente, lasciato nella cartella
+    Esecuzione automatica, se ne va anche lui, e Windows Script Host non dà errori. Un aggiornamento con `/UPDATE` tiene
+    l'avvio all'accesso; uno con «Disinstalla prima di installare» lo toglie e il primo avvio della versione nuova lo
+    rimette (`put_back_after_upgrade`): in tutti e due i casi, al successivo accesso Qamille parte nell'area di
+    notifica, senza finestra. Annullare la disinstallazione a «Qamille è in esecuzione» non lo toglie.
     Nella cartella installata l'eseguibile ha il nome che usa l'hook (`${MAINBINARYNAME}`).

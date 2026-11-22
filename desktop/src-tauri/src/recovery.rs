@@ -596,8 +596,8 @@ fn stop_recording_and_jobs(app: &AppHandle) {
 
 /// Every action still undoable leaves now (`UndoService::send_now`); then waits, until
 /// `deadline`, for the queue to settle, or less when it stops moving for `UNDO_STALL` (no
-/// connection, or a failed start whose queue thread never ran). Unsent ones stay queued for the
-/// next start.
+/// connection, or a failed start whose queue thread never ran). Queued ones stay for the next
+/// start; one still on its way is cut off, and the next start marks it failed without retrying it.
 fn send_undo_queue(app: &AppHandle, deadline: Instant) {
     const UNDO_STALL: Duration = Duration::from_secs(5);
     let Some(state) = app.try_state::<DesktopState>() else { return };
@@ -608,12 +608,16 @@ fn send_undo_queue(app: &AppHandle, deadline: Instant) {
     let mut last = (usize::MAX, Instant::now());
     loop {
         match state.undo.unsettled() {
-            Ok(0) => return,
-            Ok(remaining) if Instant::now() >= deadline || (remaining == last.0 && last.1.elapsed() >= UNDO_STALL) => {
-                crate::native_feel::report(&format!("{remaining} queued action(s) not sent before exit: they go at the next start"));
+            Ok(left) if left.total() == 0 => return,
+            Ok(left) if Instant::now() >= deadline || (left.total() == last.0 && last.1.elapsed() >= UNDO_STALL) => {
+                crate::native_feel::report(&format!(
+                    "undo queue at exit: {} send(s) and {} action(s) queued for the next start, {} send(s) and {} action(s) cut off on their way (the next start marks them failed)",
+                    left.sends, left.actions, left.sending, left.confirming
+                ));
                 return;
             }
-            Ok(remaining) => {
+            Ok(left) => {
+                let remaining = left.total();
                 if remaining != last.0 {
                     last = (remaining, Instant::now());
                 }

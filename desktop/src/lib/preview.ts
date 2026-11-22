@@ -786,7 +786,7 @@ export async function previewCommand(
       return { enabled: false, supported: false };
     // The undo queue at quit (lib/undo-close.ts): the preview sends nothing, so nothing is left.
     case 'undo_send_now':
-      return { remaining: 0 };
+      return { remaining: 0, sends: 0, sending: 0, actions: 0, confirming: 0 };
     case 'undo_quit_anyway':
       return true;
     case 'list_events':

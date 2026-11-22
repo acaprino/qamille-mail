@@ -87,15 +87,59 @@ pub fn startup_approved(twin: Option<&[u8]>) -> bool {
 /// button only hides. Below 0xF000 and a multiple of 16, like `shell_rules::SC_APP_RELOAD`.
 pub const SC_APP_QUIT: u32 = 0x5C20;
 
-/// The question when «Esci» finds actions of the undo queue that did not leave
-/// (`commands::undo::undo_quit_anyway`), with what happens if the person quits anyway.
-pub fn unsent_text(italian: bool, remaining: u32) -> String {
-    match (italian, remaining) {
-        (true, 1) => "1 messaggio non è ancora partito (nessuna connessione). Se esci, partirà al prossimo avvio di Qamille.".into(),
-        (true, n) => format!("{n} messaggi non sono ancora partiti (nessuna connessione). Se esci, partiranno al prossimo avvio di Qamille."),
-        (false, 1) => "1 message has not been sent yet (no connection). If you quit, it will be sent the next time Qamille starts.".into(),
-        (false, n) => format!("{n} messages have not been sent yet (no connection). If you quit, they will be sent the next time Qamille starts."),
+/// What «Esci» found left in the undo queue (`UndoService::unsettled` in the `app` crate), by what
+/// quitting does to it. Queued rows stay in the queue and the next start carries them out; a row
+/// on its way dies with the process and the next start marks it failed, never retrying it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct QueueLeft {
+    /// Sends still queued (no connection, or credentials the vault cannot open).
+    pub sends: u32,
+    /// Sends on their way to the provider.
+    pub sending: u32,
+    /// Other actions still queued: archive, trash, move, a schedule, a discarded draft.
+    pub actions: u32,
+    /// Other actions being confirmed by the provider.
+    pub confirming: u32,
+}
+impl QueueLeft {
+    pub fn total(&self) -> u32 {
+        self.sends.saturating_add(self.sending).saturating_add(self.actions).saturating_add(self.confirming)
     }
+}
+
+/// The question when «Esci» finds actions of the undo queue that did not leave
+/// (`commands::undo::undo_quit_anyway`): one line per kind, each saying what quitting anyway does to
+/// it. What quitting may lose comes before what merely waits, and the sends before the actions.
+pub fn unsent_text(italian: bool, left: QueueLeft) -> String {
+    let sending = match (italian, left.sending) {
+        (_, 0) => None,
+        (true, 1) => Some("1 messaggio è in invio: uscendo potrebbe non partire, controlla Inviati.".to_owned()),
+        (true, n) => Some(format!("{n} messaggi sono in invio: uscendo potrebbero non partire, controlla Inviati.")),
+        (false, 1) => Some("1 message is being sent: if you quit it may not leave, check Sent.".to_owned()),
+        (false, n) => Some(format!("{n} messages are being sent: if you quit they may not leave, check Sent.")),
+    };
+    let sends = match (italian, left.sends) {
+        (_, 0) => None,
+        (true, 1) => Some("1 messaggio non è ancora partito. Se esci, partirà al prossimo avvio di Qamille.".to_owned()),
+        (true, n) => Some(format!("{n} messaggi non sono ancora partiti. Se esci, partiranno al prossimo avvio di Qamille.")),
+        (false, 1) => Some("1 message has not been sent yet. If you quit, it will be sent the next time Qamille starts.".to_owned()),
+        (false, n) => Some(format!("{n} messages have not been sent yet. If you quit, they will be sent the next time Qamille starts.")),
+    };
+    let confirming = match (italian, left.confirming) {
+        (_, 0) => None,
+        (true, 1) => Some("1 azione sulla posta è in corso: uscendo potrebbe non completarsi, controlla la casella.".to_owned()),
+        (true, n) => Some(format!("{n} azioni sulla posta sono in corso: uscendo potrebbero non completarsi, controlla la casella.")),
+        (false, 1) => Some("1 mail action is in progress: if you quit it may not complete, check the mailbox.".to_owned()),
+        (false, n) => Some(format!("{n} mail actions are in progress: if you quit they may not complete, check the mailbox.")),
+    };
+    let actions = match (italian, left.actions) {
+        (_, 0) => None,
+        (true, 1) => Some("1 azione sulla posta non è ancora stata completata. Se esci, verrà completata al prossimo avvio di Qamille.".to_owned()),
+        (true, n) => Some(format!("{n} azioni sulla posta non sono ancora state completate. Se esci, verranno completate al prossimo avvio di Qamille.")),
+        (false, 1) => Some("1 mail action has not been completed yet. If you quit, it will be completed the next time Qamille starts.".to_owned()),
+        (false, n) => Some(format!("{n} mail actions have not been completed yet. If you quit, they will be completed the next time Qamille starts.")),
+    };
+    [sending, sends, confirming, actions].into_iter().flatten().collect::<Vec<_>>().join("\n")
 }
 
 /// What to do with `Qamille-worker.vbs`, the startup file of the old background worker, now that
@@ -262,23 +306,41 @@ mod tests {
     }
 
     #[test]
-    fn the_quit_question_says_how_many_did_not_leave() {
+    fn the_quit_question_says_what_quitting_does_to_each_kind_of_action() {
+        let left = |sends, sending, actions, confirming| QueueLeft { sends, sending, actions, confirming };
+        // A queued send stays in the queue, and the next start sends it. Not always for want of a
+        // connection: credentials the vault cannot open hold it too.
+        assert_eq!(unsent_text(true, left(1, 0, 0, 0)), "1 messaggio non è ancora partito. Se esci, partirà al prossimo avvio di Qamille.");
+        assert_eq!(unsent_text(true, left(3, 0, 0, 0)), "3 messaggi non sono ancora partiti. Se esci, partiranno al prossimo avvio di Qamille.");
+        assert_eq!(unsent_text(false, left(1, 0, 0, 0)), "1 message has not been sent yet. If you quit, it will be sent the next time Qamille starts.");
+        assert_eq!(unsent_text(false, left(2, 0, 0, 0)), "2 messages have not been sent yet. If you quit, they will be sent the next time Qamille starts.");
+        // A send already on its way is cut off by the quit, and the next start does not send it again.
+        assert_eq!(unsent_text(true, left(0, 1, 0, 0)), "1 messaggio è in invio: uscendo potrebbe non partire, controlla Inviati.");
+        assert_eq!(unsent_text(true, left(0, 2, 0, 0)), "2 messaggi sono in invio: uscendo potrebbero non partire, controlla Inviati.");
+        assert_eq!(unsent_text(false, left(0, 1, 0, 0)), "1 message is being sent: if you quit it may not leave, check Sent.");
+        assert_eq!(unsent_text(false, left(0, 2, 0, 0)), "2 messages are being sent: if you quit they may not leave, check Sent.");
+        // An archive or a move is an action, not a message.
+        assert_eq!(unsent_text(true, left(0, 0, 1, 0)), "1 azione sulla posta non è ancora stata completata. Se esci, verrà completata al prossimo avvio di Qamille.");
+        assert_eq!(unsent_text(true, left(0, 0, 4, 0)), "4 azioni sulla posta non sono ancora state completate. Se esci, verranno completate al prossimo avvio di Qamille.");
+        assert_eq!(unsent_text(false, left(0, 0, 1, 0)), "1 mail action has not been completed yet. If you quit, it will be completed the next time Qamille starts.");
+        assert_eq!(unsent_text(false, left(0, 0, 4, 0)), "4 mail actions have not been completed yet. If you quit, they will be completed the next time Qamille starts.");
+        assert_eq!(unsent_text(true, left(0, 0, 0, 1)), "1 azione sulla posta è in corso: uscendo potrebbe non completarsi, controlla la casella.");
+        assert_eq!(unsent_text(true, left(0, 0, 0, 2)), "2 azioni sulla posta sono in corso: uscendo potrebbero non completarsi, controlla la casella.");
+        assert_eq!(unsent_text(false, left(0, 0, 0, 1)), "1 mail action is in progress: if you quit it may not complete, check the mailbox.");
+        assert_eq!(unsent_text(false, left(0, 0, 0, 2)), "2 mail actions are in progress: if you quit they may not complete, check the mailbox.");
+        // Several kinds at once: one line each, what may be lost first, the sends before the actions.
         assert_eq!(
-            unsent_text(true, 1),
-            "1 messaggio non è ancora partito (nessuna connessione). Se esci, partirà al prossimo avvio di Qamille."
+            unsent_text(true, left(1, 1, 2, 1)),
+            [
+                "1 messaggio è in invio: uscendo potrebbe non partire, controlla Inviati.",
+                "1 messaggio non è ancora partito. Se esci, partirà al prossimo avvio di Qamille.",
+                "1 azione sulla posta è in corso: uscendo potrebbe non completarsi, controlla la casella.",
+                "2 azioni sulla posta non sono ancora state completate. Se esci, verranno completate al prossimo avvio di Qamille.",
+            ]
+            .join("\n")
         );
-        assert_eq!(
-            unsent_text(true, 3),
-            "3 messaggi non sono ancora partiti (nessuna connessione). Se esci, partiranno al prossimo avvio di Qamille."
-        );
-        assert_eq!(
-            unsent_text(false, 1),
-            "1 message has not been sent yet (no connection). If you quit, it will be sent the next time Qamille starts."
-        );
-        assert_eq!(
-            unsent_text(false, 2),
-            "2 messages have not been sent yet (no connection). If you quit, they will be sent the next time Qamille starts."
-        );
+        assert_eq!(left(1, 1, 2, 1).total(), 5);
+        assert_eq!(QueueLeft::default().total(), 0);
     }
 
     #[test]

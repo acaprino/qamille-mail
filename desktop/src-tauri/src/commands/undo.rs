@@ -1,5 +1,8 @@
 use crate::runtime::{DesktopState, blocking};
-use qamille::{application::AppResult, domain::undo::UndoAction};
+use qamille::{
+    application::{AppResult, undo::Unsettled},
+    domain::undo::UndoAction,
+};
 use serde::Serialize;
 use std::time::{Duration, Instant};
 use tauri::State;
@@ -34,6 +37,10 @@ const SEND_NOW_STEP: Duration = Duration::from_millis(200);
 pub struct UndoSendResult {
     /// The actions still not confirmed when the wait ended: 0 means everything left.
     pub remaining: u32,
+    /// The same actions by what quitting does to them (`sends`, `sending`, `actions`,
+    /// `confirming`): the page hands them to `undo_quit_anyway`, which words each.
+    #[serde(flatten)]
+    pub left: Unsettled,
 }
 
 /// Qamille is quitting (the undo queue's close guard, `lib/undo-close.ts`, audit Q8): every action
@@ -45,9 +52,9 @@ pub async fn undo_send_now(state: State<'_, DesktopState>, wait_ms: u32) -> AppR
         s.send_now()?;
         let deadline = Instant::now() + Duration::from_millis(u64::from(wait_ms.min(SEND_NOW_LIMIT_MS)));
         loop {
-            let remaining = s.unsettled()?;
-            if remaining == 0 || Instant::now() >= deadline {
-                return Ok(UndoSendResult { remaining: u32::try_from(remaining).unwrap_or(u32::MAX) });
+            let left = s.unsettled()?;
+            if left.total() == 0 || Instant::now() >= deadline {
+                return Ok(UndoSendResult { remaining: u32::try_from(left.total()).unwrap_or(u32::MAX), left });
             }
             std::thread::sleep(SEND_NOW_STEP);
         }
@@ -55,14 +62,26 @@ pub async fn undo_send_now(state: State<'_, DesktopState>, wait_ms: u32) -> AppR
     .await
 }
 
-/// «Esci» found actions that did not leave: a Windows question over the main window, like
-/// `meeting_confirm_close`. `true`: quit anyway, they go at the next start. Esc and the X keep
-/// Qamille open, the harmless choice.
+/// «Esci» found actions that did not leave (`left`, from `undo_send_now`): a Windows question over
+/// the main window, like `meeting_confirm_close`, saying what quitting does to each kind. `true`:
+/// quit anyway; what is queued goes at the next start, what is on its way may be lost (the next
+/// start marks it failed, never retries it). Esc and the X keep Qamille open, the harmless choice.
 #[tauri::command]
-pub async fn undo_quit_anyway(window: tauri::WebviewWindow, remaining: u32) -> AppResult<bool> {
+pub async fn undo_quit_anyway(window: tauri::WebviewWindow, left: Unsettled) -> AppResult<bool> {
+    let count = |n: usize| u32::try_from(n).unwrap_or(u32::MAX);
+    let left = crate::background_rules::QueueLeft {
+        sends: count(left.sends),
+        sending: count(left.sending),
+        actions: count(left.actions),
+        confirming: count(left.confirming),
+    };
+    if left.total() == 0 {
+        // Nothing to lose: no question with nothing in it.
+        return Ok(true);
+    }
     let italian = crate::window_shell::italian();
     let (stay, leave) = if italian { ("Resta aperto", "Esci comunque") } else { ("Stay open", "Quit anyway") };
-    let text = crate::background_rules::unsent_text(italian, remaining);
+    let text = crate::background_rules::unsent_text(italian, left);
     blocking(move || {
         Ok(rfd::MessageDialog::new()
             .set_parent(&window)

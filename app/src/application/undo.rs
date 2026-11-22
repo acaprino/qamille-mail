@@ -136,7 +136,20 @@ fn restore_events(store: &Store, operation: &UndoOperation) -> Vec<AppEvent> {
 /// `remote_applied_local_failed` is the provider having already executed the
 /// action: its message quotes a local failure that may read like a network
 /// one, and replaying it would apply the action twice.
+///
+/// The one exception for every operation is a vault refusal (`vault_*`: the
+/// credentials do not open on this Windows user, or cannot be read right now).
+/// The credentials are read before any provider contact (`ServiceContext::
+/// account`: the plan of a mail action, `validate_send` at the head of a
+/// delivery's enqueue, a remote draft's deletion), so nothing happened and a
+/// send may simply be attempted again: the row waits with the backoff, and
+/// [`UndoService::credentials_opened`] sends it once the vault opens. Should
+/// the vault shut after a delivery was claimed, the outbox records it
+/// uncertain and the next attempt answers `delivery_pending`, never a resend.
 fn is_retryable(operation: &UndoOperation, error: &AppError) -> bool {
+    if error.is_vault() {
+        return true;
+    }
     matches!(operation, UndoOperation::Mail { .. })
         && !matches!(
             error.code,
@@ -147,6 +160,28 @@ fn is_retryable(operation: &UndoOperation, error: &AppError) -> bool {
                 | "remote_applied_local_failed"
         )
         && connectivity::is_retryable_connect_error(&error.message)
+}
+
+/// What is left of the queue when Qamille is asked to quit ([`UndoService::unsettled`]), by
+/// what quitting does to it: a `Pending` row stays in the queue and the next start carries it out;
+/// a `Committing` one dies with the process, and startup recovery marks it failed without
+/// retrying it ([`UndoService::recover_interrupted`], INV-008). Only `SendDraft` sends a message:
+/// an archive, a move, a schedule or a discarded draft is an action.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Unsettled {
+    /// Sends still in the queue (no connection, credentials the vault cannot open): the next start sends them.
+    pub sends: usize,
+    /// Sends on their way to the provider: quitting may stop them, and nothing sends them again.
+    pub sending: usize,
+    /// Other actions still in the queue: the next start carries them out.
+    pub actions: usize,
+    /// Other actions being confirmed: quitting may interrupt them, and the next start reports them failed.
+    pub confirming: usize,
+}
+impl Unsettled {
+    pub fn total(&self) -> usize {
+        self.sends + self.sending + self.actions + self.confirming
+    }
 }
 
 #[derive(Clone)]
@@ -602,17 +637,54 @@ impl UndoService {
         }
         Ok(changed)
     }
-    /// The actions that have not reached the provider yet: `Pending` (undoable, due, or backing
-    /// off) and `Committing` (on their way). `Failed` rows are notices, not work.
-    pub fn unsettled(&self) -> AppResult<usize> {
+    /// The credentials vault opened (`vault_unlock`): every `Pending` action waiting for a retry
+    /// is attempted now instead of at the end of its backoff. One the vault held back (a
+    /// `vault_*` refusal, [`is_retryable`]) leaves at once; one backing off after a failed
+    /// connection gets an early attempt, harmless since neither reached the provider (the rule of
+    /// [`send_now`](Self::send_now)). Undo windows are left alone. Writes, and wakes the deadline
+    /// thread, only when a row changed. Returns how many rows it changed.
+    pub fn credentials_opened(&self) -> AppResult<usize> {
+        let now = self.context.clock.now_ms();
+        let waiting = |action: &UndoAction| {
+            action.status == UndoStatus::Pending && action.retry_at_ms.is_some_and(|at| at > now)
+        };
+        if !self.context.read_shared()?.undo_actions.iter().any(waiting) {
+            return Ok(0);
+        }
+        let changed = self.context.update_emails_with_events(&[], |store| {
+            let mut events = Vec::new();
+            for action in store.undo_actions.iter_mut().filter(|a| waiting(a)) {
+                action.retry_at_ms = Some(now);
+                // The notice's countdown ends: the next attempt is now.
+                events.push(AppEvent::UndoChanged { action: action.clone() });
+            }
+            Ok((events.len(), events))
+        })?;
+        if changed > 0 {
+            self.schedule_dirty.store(true, Ordering::SeqCst);
+            self.has_work.store(true, Ordering::SeqCst);
+            self.notify();
+        }
+        Ok(changed)
+    }
+    /// The actions that have not reached the provider yet, by what quitting does to them
+    /// ([`Unsettled`]): `Pending` rows (undoable, due, or backing off) stay queued, `Committing`
+    /// ones are on their way. `Failed` rows are notices, not work.
+    pub fn unsettled(&self) -> AppResult<Unsettled> {
         // Polled while Qamille waits to quit: the shared snapshot, never a copy of the store.
-        Ok(self
-            .context
-            .read_shared()?
-            .undo_actions
-            .iter()
-            .filter(|a| matches!(a.status, UndoStatus::Pending | UndoStatus::Committing))
-            .count())
+        let store = self.context.read_shared()?;
+        let mut left = Unsettled::default();
+        for action in &store.undo_actions {
+            let send = matches!(action.operation, UndoOperation::SendDraft { .. });
+            match (action.status, send) {
+                (UndoStatus::Pending, true) => left.sends += 1,
+                (UndoStatus::Committing, true) => left.sending += 1,
+                (UndoStatus::Pending, false) => left.actions += 1,
+                (UndoStatus::Committing, false) => left.confirming += 1,
+                (UndoStatus::Failed, _) => {}
+            }
+        }
+        Ok(left)
     }
     /// One full queue pass, shared by both entry points: drain the
     /// connectivity wakes, read the snapshot, `prepare` it, claim every due
@@ -1036,6 +1108,32 @@ mod tests {
         }
     }
 
+    #[test]
+    fn a_vault_refusal_is_retried_for_every_operation() {
+        // The vault refuses the credentials before any provider contact (`ServiceContext::account`,
+        // read before every remote step): nothing happened, so even a send may be attempted again.
+        for code in [
+            crate::application::error::vault_codes::LOCKED,
+            crate::application::error::vault_codes::FOREIGN,
+            crate::application::error::vault_codes::UNAVAILABLE,
+            crate::application::error::vault_codes::STORAGE,
+            crate::application::error::vault_codes::DAMAGED,
+        ] {
+            let refusal = AppError::new(code, "The credentials key belongs to another Windows user or another computer.");
+            for operation in [
+                UndoOperation::Mail { email_id: 1, action: "archive".into(), value: None },
+                UndoOperation::SendDraft { draft_id: 2 },
+                UndoOperation::DiscardDraft { draft_id: 3 },
+                UndoOperation::ScheduleDraft { draft_id: 4, send_at: 5 },
+            ] {
+                assert!(is_retryable(&operation, &refusal), "{code} {operation:?}");
+            }
+        }
+        // Not a code that merely mentions the vault.
+        let send = UndoOperation::SendDraft { draft_id: 2 };
+        assert!(!is_retryable(&send, &AppError::external("vault_locked")));
+    }
+
     fn row(id: u64, email_id: u64, status: UndoStatus, expires_at_ms: i64) -> UndoAction {
         UndoAction {
             id,
@@ -1258,14 +1356,27 @@ mod tests {
         }
 
         #[test]
-        fn unsettled_counts_pending_and_committing() {
+        fn unsettled_tells_queued_sends_from_sends_on_their_way_and_from_other_actions() {
+            let draft = |id, operation, status| UndoAction { operation, ..row(id, 0, status, NOW - 1) };
             let (undo, _, _) = service(vec![
                 row(1, 10, UndoStatus::Pending, NOW + 20_000),
                 row(2, 11, UndoStatus::Committing, NOW - 1),
                 row(3, 12, UndoStatus::Failed, NOW - 1),
+                draft(4, UndoOperation::SendDraft { draft_id: 20 }, UndoStatus::Pending),
+                draft(5, UndoOperation::SendDraft { draft_id: 21 }, UndoStatus::Pending),
+                draft(6, UndoOperation::SendDraft { draft_id: 22 }, UndoStatus::Committing),
+                draft(7, UndoOperation::SendDraft { draft_id: 23 }, UndoStatus::Failed),
+                // Scheduling and discarding a draft send nothing: they are actions like an archive.
+                draft(8, UndoOperation::ScheduleDraft { draft_id: 24, send_at: NOW }, UndoStatus::Pending),
+                draft(9, UndoOperation::DiscardDraft { draft_id: 25 }, UndoStatus::Committing),
             ]);
-            assert_eq!(undo.unsettled().unwrap(), 2);
-            assert_eq!(service(vec![]).0.unsettled().unwrap(), 0);
+            let left = undo.unsettled().unwrap();
+            // Queued rows stay for the next start; rows on their way are cut off by a quit and
+            // startup recovery fails them, never retries them (INV-008).
+            assert_eq!(left, Unsettled { sends: 2, sending: 1, actions: 2, confirming: 2 });
+            assert_eq!(left.total(), 7);
+            assert_eq!(service(vec![]).0.unsettled().unwrap(), Unsettled::default());
+            assert_eq!(Unsettled::default().total(), 0);
         }
     }
 

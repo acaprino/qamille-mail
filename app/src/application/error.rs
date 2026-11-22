@@ -48,6 +48,12 @@ impl AppError {
     pub fn storage(message: impl Into<String>) -> Self {
         Self::new("storage", message)
     }
+    /// The credentials vault refused (`vault_codes`): the credentials do not open on this Windows
+    /// user, or cannot be read right now. It answers before any provider is contacted, so the work
+    /// that needed them can wait for the vault instead of failing (scheduler, undo queue).
+    pub fn is_vault(&self) -> bool {
+        self.code.starts_with("vault_")
+    }
 }
 impl std::fmt::Display for AppError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

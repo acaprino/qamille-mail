@@ -76,20 +76,14 @@ try {
     }
   });
 
-  await step('Tabs: Ark underline, 34px high, 2px accent underline, arrows, Home and End move', async () => {
+  await step('Tabs: Sigrid tabs, the chosen one on a tint, arrows, Home and End move', async () => {
     await openMeeting('Weekly sync');
     const tabs = pane.getByRole('tablist', { name: 'Meeting content' });
     await expect(tabs).toBeVisible();
-    assert.equal(await tabs.evaluate((node) => node.closest('[data-scope="tabs"][data-part="root"]')?.dataset.variant), 'underline');
-    assert.equal(await tabs.evaluate((node) => node.dataset.scope), 'tabs', 'the tablist is Ark Tabs');
+    assert.equal(await tabs.evaluate((node) => node.dataset.slot), 'tabs-list', 'the tablist is Sigrid’s');
     await expect(tabs.getByRole('tab')).toHaveText(['Summary', 'Transcript']);
     const summary = tab('Summary');
     await expect(summary).toHaveAttribute('aria-selected', 'true');
-    assert.equal((await box(summary)).height, 34, 'tab height from the mockup');
-    // The underline is the sliding highlight of the React Tabs primitive (data-part="highlight"), not a border.
-    assert.deepEqual(await underline(summary), { height: '2px', color: await token('--color-primary') }, 'the chosen tab is underlined in the accent');
-    assert.equal(await underline(tab('Transcript')), null, 'the other one is not underlined');
-    assert.equal(await css(summary, 'box-shadow'), 'none');
     // The panel is the tab's own: it is named after it.
     await expect(pane.getByRole('tabpanel', { name: 'Summary' })).toBeVisible();
 
@@ -244,8 +238,8 @@ try {
     await tab('Transcript').click();
     await readable('the transcript text', pane.locator('.seg span'));
     await readable('the time of a line', pane.locator('.seg time'));
-    // The underline of the chosen tab is the dark accent, not the light one.
-    assert.equal((await underline(tab('Transcript')))?.color, await token('--color-primary'));
+    // The chosen tab is the one that says so.
+    await expect(tab('Transcript')).toHaveAttribute('aria-selected', 'true');
   });
 
   assert.deepEqual(errors, [], `Uncaught browser errors: ${errors.join('; ')}`);

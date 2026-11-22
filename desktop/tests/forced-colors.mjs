@@ -57,7 +57,7 @@ try {
     });
 
     await step(`${colorScheme}: the active page in the sidebar has a highlighted edge`, async () => {
-      const active = page.locator('.sidebar nav button.active').first();
+      const active = page.locator('.sidebar nav [aria-current="page"]').first();
       await expect(active).toHaveCount(1);
       const s = await style(active, 'outline-style', 'outline-width', 'outline-color');
       assert.ok(visibleLine(s['outline-width'], s['outline-style']), `active nav outline: ${JSON.stringify(s)}`);

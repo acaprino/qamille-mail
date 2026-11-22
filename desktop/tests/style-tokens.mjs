@@ -21,6 +21,16 @@ const ALLOWED = [
     why: 'calendar identity palette, one color per calendar',
   })),
   { file: 'components/Calendar', text: 'calc(var(--radius-md) - 2px', why: 'inner radius derived from a token' },
+  // Sigrid names its palette's eighteen colours by their hexadecimal value: the names Qamille gives them in each
+  // language are keyed by it (src/ui/words.ts). They are lookup keys, never drawn.
+  ...[
+    '#e34432', '#ee6449', '#e8772e', '#a0714a', '#f5a623', '#9bb53a', '#78a271', '#2f9e6e', '#6b9fa0',
+    '#1fa3b4', '#297abc', '#6b7a8f', '#4452c4', '#7b68ee', '#a35fd0', '#c64fb5', '#e5659a', '#b83a58',
+  ].map((text) => ({
+    file: 'ui/words',
+    text,
+    why: 'the key of a colour name in Sigrid’s palette, never drawn',
+  })),
   // Google's «G» on the «Sign in with Google» buttons: Google's branding fixes its four colours.
   ...['#EA4335', '#4285F4', '#FBBC05', '#34A853'].map((text) => ({
     file: 'ds/primitives/GoogleMark',

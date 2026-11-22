@@ -233,9 +233,9 @@ try {
     const page = await open('__c16b-signin', signIn('{ pending: false, error: "Synthetic failure" }'));
     const dialog = page.getByRole('dialog', { name: 'Sign in with Google', exact: true });
     await expect(dialog.getByRole('alert')).toContainText('Synthetic failure');
-    assert.equal(await css(dialog.getByRole('alert'), 'color'), await resolved(page, 'color', '--danger'));
+    assert.equal(await css(dialog.getByRole('alert'), 'color'), await resolved(page, 'color', '--color-destructive'));
     const retry = dialog.getByRole('button', { name: 'Try again', exact: true });
-    assert.equal(await css(retry, 'background-color'), await resolved(page, 'background-color', '--accent'));
+    assert.equal(await css(retry, 'background-color'), await resolved(page, 'background-color', '--color-primary'));
     await dialog.getByRole('button', { name: 'How to set up Google sign-in', exact: true }).click();
     assert.deepEqual(await page.evaluate(() => window.calls), ['setup']);
     await page.context().close();

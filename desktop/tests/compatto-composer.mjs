@@ -91,10 +91,10 @@ try {
     await page.close();
   });
 
-  await step('RecipientsInput: the box rests on --border-strong (R16)', async () => {
+  await step('RecipientsInput: the box rests on --color-input (R16)', async () => {
     const page = await gallery();
     const control = page.locator('[data-scope="tags-input"][data-part="control"]');
-    assert.equal(await css(control, 'border-top-color'), await resolved(page, 'border-top-color', '--border-strong'));
+    assert.equal(await css(control, 'border-top-color'), await resolved(page, 'border-top-color', '--color-input'));
     await page.close();
   });
 
@@ -225,13 +225,13 @@ try {
   };
   const to = () => panel.getByRole('combobox', { name: 'To', exact: true });
 
-  await step('The window has --radius-xl, a --border border and the --shadow shadow', async () => {
+  await step('The window has --radius-xl, a --color-line border and the --elevation-lg shadow', async () => {
     await open();
     assert.equal(await css(panel, 'border-top-left-radius'), await resolved(page, 'border-top-left-radius', '--radius-xl'));
     assert.equal(await css(panel, 'border-bottom-left-radius'), await resolved(page, 'border-bottom-left-radius', '--radius-xl'));
-    assert.equal(await css(panel, 'border-top-color'), await resolved(page, 'border-top-color', '--border'));
+    assert.equal(await css(panel, 'border-top-color'), await resolved(page, 'border-top-color', '--color-line'));
     assert.equal(await css(panel, 'border-top-width'), '1px');
-    assert.equal(await css(panel, 'box-shadow'), await resolved(page, 'box-shadow', '--shadow'));
+    assert.equal(await css(panel, 'box-shadow'), await resolved(page, 'box-shadow', '--elevation-lg'));
   });
 
   await step('The controls are 32px high', async () => {

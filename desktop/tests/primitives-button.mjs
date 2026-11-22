@@ -1,5 +1,5 @@
 // Button primitive (spec 2026-11-08 ark-compatto §8, Task 3): the optional tip and shortcut, which
-// make the button the trigger of a Tooltip, and the Compatto measures (height from --control-height,
+// make the button the trigger of a Tooltip, and the Compatto measures (height from --control-md,
 // radius from --radius-md). The primitive is mounted alone through tests/support/mount.mjs.
 // Synthetic data only.
 import { chromium, expect } from '@playwright/test';

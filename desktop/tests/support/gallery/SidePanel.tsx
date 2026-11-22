@@ -39,7 +39,7 @@ export default function SidePanelSection() {
         <output aria-label="Close count">{closes}</output>
         <output aria-label="Open count">{opened}</output>
       </div>
-      <div style={{ position: 'relative', height: 420, border: '1px solid var(--border)' }}>
+      <div style={{ position: 'relative', height: 420, border: '1px solid var(--color-line)' }}>
         <p style={{ padding: 12 }}>The pane behind the panel.</p>
         {open && (
           <SidePanel

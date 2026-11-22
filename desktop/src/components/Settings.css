@@ -4,14 +4,14 @@
   }
   & .google-setup-help p,
   & .google-config-help {
-    color: var(--muted);
+    color: var(--color-ink-mute);
     font-size: var(--text-xs);
     line-height: 1.65;
     margin: 8px 0 3px;
   }
   & .google-setup-help .text-button {
     padding: 0;
-    color: var(--accent-text);
+    color: var(--color-accent);
     text-decoration: underline;
     text-underline-offset: 3px;
     text-align: left;

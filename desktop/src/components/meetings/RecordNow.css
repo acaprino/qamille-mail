@@ -18,7 +18,7 @@
     margin: 0;
     font-size: var(--text-xs);
     line-height: 1.4;
-    color: var(--muted);
+    color: var(--color-ink-mute);
   }
   & .record-sources svg {
     flex: none;
@@ -51,5 +51,5 @@
   margin: -4px 0 0;
   font-size: var(--text-xs);
   text-align: right;
-  color: var(--muted);
+  color: var(--color-ink-mute);
 }

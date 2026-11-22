@@ -9,13 +9,13 @@
   }
   /* A text field is as high as the buttons beside it (the design system's field is a little taller). */
   & .menu-form .field input {
-    height: var(--control-height);
+    height: var(--control-md);
     padding-top: 0;
     padding-bottom: 0;
   }
   & .menu-text {
     margin: 0 0 16px;
     line-height: 1.5;
-    color: var(--text-secondary);
+    color: var(--color-ink-soft);
   }
 }

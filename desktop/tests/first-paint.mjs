@@ -11,7 +11,7 @@ const desktop = path.resolve(import.meta.dirname, '..');
 fs.mkdirSync(path.join(desktop, '.cache'), { recursive: true });
 const outDir = fs.mkdtempSync(path.join(desktop, '.cache', 'first-paint-'));
 
-// Compatto's page colour in each scheme: the --ground of src/theme/compatto.css (Sigrid's paper).
+// Compatto's page colour in each scheme: the --color-paper of src/theme/compatto.css (Sigrid's paper).
 const GROUND = { light: 'rgb(246, 247, 249)', dark: 'rgb(18, 22, 30)' };
 
 let server;

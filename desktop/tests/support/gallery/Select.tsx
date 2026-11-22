@@ -54,7 +54,7 @@ export default function SelectSection({ props = {} }: { props?: Record<string, a
           {body}
         </Modal>
       ) : props.panel ? (
-        <div style={{ position: 'relative', height: 320, border: '1px solid var(--border)' }}>
+        <div style={{ position: 'relative', height: 320, border: '1px solid var(--color-line)' }}>
           <SidePanel aria-label="Preferences" onScrim={close}>
             {body}
           </SidePanel>

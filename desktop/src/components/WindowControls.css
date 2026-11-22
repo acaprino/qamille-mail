@@ -23,8 +23,8 @@
 .window-controls .icon-button[data-caption='hover'],
 .window-controls .icon-button[data-caption='pressed'] {
   background: var(--hover);
-  color: var(--text);
+  color: var(--color-ink);
 }
 .window-controls .icon-button[data-caption='pressed'] {
-  background: var(--border);
+  background: var(--color-line);
 }

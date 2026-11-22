@@ -104,7 +104,7 @@ fn main() {
     // Shown by `native_feel::show_main_window` once painted in the system theme.
     window_config.visible = false;
     // The webview is created with the first frame's colour (WebView2 takes it
-    // at creation, before any page): the dark --ground when Qamille starts dark.
+    // at creation, before any page): the dark --color-paper when Qamille starts dark.
     if window_shell::starts_dark() {
         window_config.background_color = Some(native_feel::DARK_GROUND);
     }

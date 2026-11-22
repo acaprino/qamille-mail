@@ -39,10 +39,10 @@ await step('the app takes its typeface from Sigrid and declares none of its own'
   assert.match(reminder, /vendor\/sigrid\/src\/styles\/fonts\.css/, "the reminder window must import Sigrid's fonts.css");
 });
 
-await step("--font-text and --font-title follow --font-sans of Sigrid, which starts with IBM Plex Sans", () => {
+await step("The app reads --font-sans of Sigrid, which starts with IBM Plex Sans, and keeps no font token of its own", () => {
   const generated = fs.readFileSync(path.join(desktop, 'src', 'theme', 'compatto.css'), 'utf8');
   for (const token of ['--font-text', '--font-title']) {
-    assert.match(generated, new RegExp(`${token}:\\s*var\\(--font-sans\\);`), `${token} must be an alias of --font-sans`);
+    assert.ok(!generated.includes(`${token}:`), `${token} is gone: CSS reads --font-sans`);
   }
   const theme = fs.readFileSync(path.join(desktop, 'vendor', 'sigrid', 'src', 'styles', 'theme.css'), 'utf8');
   assert.match(theme, /--font-sans:\s*"IBM Plex Sans"/, '--font-sans must start with IBM Plex Sans');
@@ -102,13 +102,13 @@ try {
   await step('the title font resolves to IBM Plex Sans too', async () => {
     const families = await page.evaluate(() => {
       const probe = document.createElement('h1');
-      probe.style.fontFamily = 'var(--font-title)';
+      probe.style.fontFamily = 'var(--font-sans)';
       document.body.append(probe);
       const family = getComputedStyle(probe).fontFamily;
       probe.remove();
       return family;
     });
-    assert.ok(families.startsWith('"IBM Plex Sans"'), `--font-title resolves to ${families}`);
+    assert.ok(families.startsWith('"IBM Plex Sans"'), `--font-sans resolves to ${families}`);
   });
 
   await step('the browser renders the text with the platform font IBM Plex Sans', async () => {

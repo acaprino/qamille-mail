@@ -111,7 +111,7 @@ try {
   // (f) The grey From / To / Date box, three names and "and 37 more".
   const header = page.locator('.message-sender');
   assert.equal(await css(header, 'background-color'), 'rgb(246, 247, 249)');
-  assert.equal(await css(header, 'border-top-color'), await token(page, '--border-soft'));
+  assert.equal(await css(header, 'border-top-color'), await token(page, '--color-paper-2'));
   assert.equal(await css(header, 'border-top-width'), '1px');
   assert.equal(await css(header, 'border-top-left-radius'), '6px');
   const text = (await header.innerText()).replace(/\s+/g, ' ');

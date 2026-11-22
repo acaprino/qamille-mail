@@ -1,5 +1,5 @@
-// Task 15 of the Ark Compatto plan: Contacts, measured in computed values (rows of --control-height,
-// hairlines --border-soft, Ark Select and Checkbox, Modal md/sm) and driven by role and accessible name.
+// Task 15 of the Ark Compatto plan: Contacts, measured in computed values (rows of --control-md,
+// hairlines --color-paper-2, Ark Select and Checkbox, Modal md/sm) and driven by role and accessible name.
 // Sample data only. Run: node scripts/test-browser.mjs compatto-contacts
 import { expect } from '@playwright/test';
 import assert from 'node:assert/strict';
@@ -31,10 +31,10 @@ const trigger = (scope, name) => scope.getByRole('combobox', { name, exact: true
 try {
   await page.getByRole('navigation', { name: 'Workspace' }).getByRole('button', { name: 'Contacts' }).click();
   await expect(row('Ada Lovelace')).toHaveCount(1);
-  const soft = await token('--border-soft');
+  const soft = await token('--color-paper-2');
   const controlHeight = 32;
 
-  await step('List rows are one --control-height tall and separated by --border-soft hairlines', async () => {
+  await step('List rows are one --control-md tall and separated by --color-paper-2 hairlines', async () => {
     const rows = await list().getByRole('button').all();
     assert.ok(rows.length > 3, 'sample data has several contacts');
     for (const one of rows) assert.equal((await height(one)), controlHeight);
@@ -42,7 +42,7 @@ try {
     assert.equal(await css(list().getByRole('listitem').nth(1), 'border-top-width'), '1px');
   });
 
-  await step('Toolbar controls are --control-height and the filters are Ark Select and Checkbox', async () => {
+  await step('Toolbar controls are --control-md and the filters are Ark Select and Checkbox', async () => {
     await expect(page.locator('.contacts-page select')).toHaveCount(0);
     const filters = page.locator('.contacts-filters');
     const book = trigger(filters, 'Filter by address book');
@@ -62,7 +62,7 @@ try {
     await page.keyboard.press('Escape');
   });
 
-  await step('The inline detail takes rows of --control-height with --border-soft hairlines', async () => {
+  await step('The inline detail takes rows of --control-md with --color-paper-2 hairlines', async () => {
     await row('Ada Lovelace').click();
     const facts = page.locator('.contact-facts');
     const first = facts.locator('dt').first();
@@ -91,7 +91,7 @@ try {
     await expect(dialog).toHaveCount(0);
   });
 
-  await step('Duplicates rows are --control-height with --border-soft hairlines', async () => {
+  await step('Duplicates rows are --control-md with --color-paper-2 hairlines', async () => {
     await page.getByRole('button', { name: /^Duplicates/ }).click();
     const panel = page.getByRole('region', { name: 'Duplicates' });
     const member = panel.getByRole('article').first().getByRole('listitem').first();
@@ -130,7 +130,7 @@ try {
     await dialog.getByRole('button', { name: 'Cancel' }).click();
   });
 
-  await step('Settings: the Contacts section uses Ark Checkbox and --control-height rows', async () => {
+  await step('Settings: the Contacts section uses Ark Checkbox and --control-md rows', async () => {
     await page.goto(process.env.QAMILLE_PREVIEW_URL ?? 'http://127.0.0.1:1420');
     await page.locator('.compose-main').waitFor();
     await page.getByRole('button', { name: 'Alex Personal workspace' }).click();

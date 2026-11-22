@@ -47,7 +47,7 @@ export default function PopoverSection() {
         </Popover>
         <output aria-label="Picked">{picked}</output>
       </div>
-      <div style={{ position: 'relative', height: 300, marginTop: 12, border: '1px solid var(--border)' }}>
+      <div style={{ position: 'relative', height: 300, marginTop: 12, border: '1px solid var(--color-line)' }}>
         {panel && (
           <SidePanel narrow aria-label="Side details" onScrim={() => setPanel(false)} onClose={() => setPanel(false)}>
             <div className="side-panel-body">

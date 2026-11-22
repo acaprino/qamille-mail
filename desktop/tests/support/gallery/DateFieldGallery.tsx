@@ -28,7 +28,7 @@ export default function DateFieldGallery({ props = {} }: { props?: Record<string
           {field}
         </Modal>
       ) : props.panel ? (
-        <div style={{ position: 'relative', height: 320, border: '1px solid var(--border)' }}>
+        <div style={{ position: 'relative', height: 320, border: '1px solid var(--color-line)' }}>
           <SidePanel aria-label="Due" onScrim={close}>
             {field}
           </SidePanel>

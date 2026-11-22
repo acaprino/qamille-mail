@@ -206,7 +206,7 @@ try {
     await expect(page.locator('.calendar-day')).toHaveCount(7);
   });
 
-  await step('the selected day of the calendar shows a focus ring in --on-accent', async () => {
+  await step('the selected day of the calendar shows a focus ring in --color-primary-foreground', async () => {
     await page.getByRole('button', { name: 'New event', exact: true }).click();
     const again = page.getByRole('dialog', { name: 'New event' });
     await again.getByRole('button', { name: 'Open calendar' }).first().click();
@@ -220,7 +220,7 @@ try {
     });
     const onAccent = await page.evaluate(() => {
       const probe = document.createElement('i');
-      probe.style.color = 'var(--on-accent)';
+      probe.style.color = 'var(--color-primary-foreground)';
       document.body.append(probe);
       const colour = getComputedStyle(probe).color;
       probe.remove();

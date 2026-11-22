@@ -5,7 +5,7 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  background: var(--surface);
+  background: var(--color-raised);
 
   & .audio-note {
     display: flex;
@@ -14,7 +14,7 @@
     margin: 12px 28px 0;
     padding: 8px 12px;
     font-size: var(--text-sm);
-    color: var(--body-text);
+    color: var(--color-ink);
     background: var(--summary-bg);
     border: 1px solid var(--summary-border);
     border-radius: var(--radius-lg);
@@ -30,7 +30,7 @@
   & .detail-tabs {
     margin-top: 10px;
     padding: 0 28px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--color-line);
   }
   & .detail-body {
     flex: 1;
@@ -44,6 +44,6 @@
   & .confirm-text {
     margin: 0 0 16px;
     line-height: 1.5;
-    color: var(--text-secondary);
+    color: var(--color-ink-soft);
   }
 }

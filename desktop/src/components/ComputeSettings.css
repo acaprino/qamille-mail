@@ -21,22 +21,22 @@
   justify-content: space-between;
   gap: 12px;
   padding: 6px 10px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-line);
   border-radius: var(--radius-sm);
 }
 .server-ca summary {
   cursor: default;
-  color: var(--muted);
+  color: var(--color-ink-mute);
 }
 .compute-danger {
   margin-top: 16px;
   padding-top: 12px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--color-line);
 }
 .compute-danger .danger:not(.primary),
 .compute-account .danger:not(.primary),
 button.danger:not(.primary) {
-  color: var(--danger);
+  color: var(--color-destructive);
 }
 .server-models {
   display: grid;
@@ -52,7 +52,7 @@ button.danger:not(.primary) {
 }
 .compute-alert {
   padding: 8px 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-line);
   border-radius: var(--radius-sm);
 }
 .compute-alert p {
@@ -71,7 +71,7 @@ button.danger:not(.primary) {
   gap: 12px;
   width: 100%;
   margin: 0;
-  color: var(--muted);
+  color: var(--color-ink-mute);
   font-size: var(--text-xs);
 }
 .or-divider::before,
@@ -79,7 +79,7 @@ button.danger:not(.primary) {
   content: '';
   flex: 1;
   height: 1px;
-  background: var(--border);
+  background: var(--color-line);
 }
 /* «Forgot password?» on the line of the Password label, at its right end. */
 .field-with-link {
@@ -90,7 +90,7 @@ button.danger:not(.primary) {
   top: 0;
   right: 0;
   padding: 0 2px;
-  color: var(--accent-text);
+  color: var(--color-accent);
   font-size: var(--text-xs);
   font-weight: 500;
   line-height: inherit;
@@ -98,7 +98,7 @@ button.danger:not(.primary) {
 .device-name-line,
 .sign-in-switch {
   margin: 0 0 14px;
-  color: var(--muted);
+  color: var(--color-ink-mute);
   font-size: var(--text-xs);
 }
 .device-name-line {
@@ -114,13 +114,13 @@ button.danger:not(.primary) {
   white-space: nowrap;
 }
 .device-name-line strong {
-  color: var(--text-secondary);
+  color: var(--color-ink-soft);
   font-weight: 500;
 }
 .device-name-line .text-button,
 .sign-in-switch .text-button {
   padding: 0 2px;
-  color: var(--accent-text);
+  color: var(--color-accent);
   font-size: var(--text-xs);
   font-weight: 600;
 }
@@ -164,10 +164,10 @@ button.danger:not(.primary) {
 .compute-usage progress {
   flex: 1 1 8rem;
   height: 6px;
-  accent-color: var(--accent);
+  accent-color: var(--color-primary);
 }
 .compute-usage li[data-exhausted='true'] progress {
-  --progress-fill: var(--danger);
+  --progress-fill: var(--color-destructive);
 }
 .compute-plans {
   display: grid;
@@ -182,7 +182,7 @@ button.danger:not(.primary) {
   justify-content: space-between;
   gap: 12px;
   padding: 8px 10px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-line);
   border-radius: var(--radius-sm);
 }
 .mailbox-sync-notice,
@@ -191,7 +191,7 @@ button.danger:not(.primary) {
   gap: 8px;
   margin: 8px 0;
   padding: 8px 10px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-line);
   border-radius: var(--radius-sm);
 }
 .mailbox-sync-notice p,

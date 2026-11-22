@@ -13,12 +13,12 @@
     margin: 0 0 12px;
   }
   & .google-sign-in-help {
-    color: var(--text-secondary);
+    color: var(--color-ink-soft);
     font-size: var(--text-sm);
   }
   /* The warning sign says it failed; the message itself reads as text. */
   & .google-dialog-heading.failed svg {
-    color: var(--danger);
+    color: var(--color-destructive);
   }
   & .google-sign-in-error {
     overflow-wrap: anywhere;
@@ -26,7 +26,7 @@
   /* A link in the text: it starts on the text's edge. */
   & .google-help-link {
     padding: 0;
-    color: var(--accent-text);
+    color: var(--color-accent);
     text-decoration: underline;
     text-underline-offset: 3px;
     text-align: left;

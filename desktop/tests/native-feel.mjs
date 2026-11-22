@@ -1210,6 +1210,27 @@ check('27. the updater runs only in an installed Professional built with its key
   assert.match(read('src/App.tsx'), /<UpdateNotice [^\n]*\/>\n\s*<Toaster /, 'App.tsx shows it beside the Toaster');
 });
 
+// Task 9: the first maximized show blinked (tao's show() rewrites the style without WS_VISIBLE).
+check('28. the first maximized show is cloaked by DWM only through a guard that always uncloaks (rule 29)', () => {
+  const shell = read('src-tauri/src/window_shell.rs');
+  const code = shell.replace(/(^|\s)\/\/.*$/gm, '$1');
+  // DWMWA_CLOAK is set in one place: the guard's own setter.
+  assert.equal((code.match(/DwmSetWindowAttribute\(\s*hwnd,\s*DWMWA_CLOAK\b/g) ?? []).length, 1, 'DWMWA_CLOAK is set only by set_cloak');
+  const setter = rustItem(shell, 'fn set_cloak(');
+  assert.ok(!/\bpub\b/.test(setter.slice(0, setter.indexOf('fn set_cloak('))), 'set_cloak stays private to the win module: only the guard calls it');
+  assert.equal((code.match(/\bset_cloak\(/g) ?? []).length, 3, 'set_cloak is defined once and called twice: on by Cloak::on, off by its Drop');
+  // On only when DWM took it: a failed cloak gives no guard, and the show is the one of before.
+  const on = rustItem(shell, 'pub fn on(hwnd: HWND)');
+  assert.match(on, /set_cloak\(hwnd,\s*true\)\.then\(/, 'Cloak::on returns a guard only when DWM cloaked the window');
+  assert.match(rustItem(shell, 'impl Drop for Cloak {'), /set_cloak\(self\.0,\s*false\)/, 'dropping the guard uncloaks the window');
+  // show_main holds the guard for the whole first maximized show, the fallback show() + maximize() included.
+  const show = rustItem(shell, 'pub fn show_main(');
+  assert.match(show, /let _cloak\b[^;]*Cloak::on\b/, 'show_main binds the guard to a name (`let _ =` would uncloak at once)');
+  assert.ok(!/let _ = [^;]*Cloak::on\b/.test(show), 'never `let _ = Cloak::on(…)`');
+  assert.ok(show.search(/Cloak::on\b/) >= 0 && show.search(/Cloak::on\b/) < show.search(/\bshow_maximized\b/), 'the window is cloaked before the Win32 maximize');
+  assert.ok(!/\bset_cloak\(|DWMWA_CLOAK/.test(show), 'show_main never cloaks or uncloaks by hand');
+});
+
 if (failures.length) {
   console.error(`\n${failures.length} native-feel check(s) failed. See docs/aspetto-nativo.md.`);
   process.exit(1);

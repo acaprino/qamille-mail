@@ -220,30 +220,23 @@ fn pending_show() -> std::sync::MutexGuard<'static, Option<Placement>> {
 /// flag (the maximize button) would hide the window. tao's `show()` itself, still thinking the window
 /// hidden, rewrites its style without `WS_VISIBLE` and shows it again: the window would vanish for a
 /// frame or two (seen on the exe: 16-44 ms). So DWM keeps it out of sight (cloaked: composed, never
-/// on screen) from before the Win32 show until tao is told, and it appears once, maximized.
+/// on screen) for the whole first maximized show, the fallback below included, and it appears once,
+/// maximized. The cloak is a guard (`win::Cloak`) that uncloaks when it goes, on every way out of
+/// here: a window left cloaked would be on screen and invisible. If DWM refuses the cloak there is
+/// no guard, and the show is the one of before.
 pub fn show_main(window: &WebviewWindow) {
     let path = placement::first_show(&mut pending_show());
     #[cfg(windows)]
-    if path == ShowPath::Maximized
-        && let Ok(hwnd) = window.hwnd()
-    {
-        let cloaked = win::cloak(hwnd, true);
-        let shown = win::show_maximized(hwnd);
-        if shown {
-            let _ = window.show();
-            // Safety net: if tao does not see the window maximized after the Win32 call, maximize it
-            // through tao, so its state and the maximize button stay right.
-            if !window.is_maximized().unwrap_or(true) {
-                let _ = window.maximize();
-            }
+    let _cloak = if path == ShowPath::Maximized { window.hwnd().ok().and_then(win::Cloak::on) } else { None };
+    #[cfg(windows)]
+    if path == ShowPath::Maximized && window.hwnd().is_ok_and(win::show_maximized) {
+        let _ = window.show();
+        // Safety net: if tao does not see the window maximized after the Win32 call, maximize it
+        // through tao, so its state and the maximize button stay right.
+        if !window.is_maximized().unwrap_or(true) {
+            let _ = window.maximize();
         }
-        // Always, whatever happened above: a window left cloaked would be on screen and invisible.
-        if cloaked {
-            win::cloak(hwnd, false);
-        }
-        if shown {
-            return;
-        }
+        return;
     }
     let _ = window.show();
     if path == ShowPath::Maximized {
@@ -585,12 +578,29 @@ mod win {
     /// it on the monitor the rectangle is on, and un-maximizing returns to that rectangle. Whether it
     /// worked, or the window is as it was.
     /// DWM's cloak on the window (`DWMWA_CLOAK`): on, the window is composed but not shown. Whether
-    /// DWM took it.
-    pub fn cloak(hwnd: HWND, on: bool) -> bool {
+    /// DWM took it. Only `Cloak` calls it, so that every cloak has its uncloak.
+    fn set_cloak(hwnd: HWND, on: bool) -> bool {
         use windows::Win32::Graphics::Dwm::{DWMWA_CLOAK, DwmSetWindowAttribute};
         let value = BOOL::from(on);
         // SAFETY: `value` lives across the call, and the size passed is its own.
         unsafe { DwmSetWindowAttribute(hwnd, DWMWA_CLOAK, (&raw const value).cast(), std::mem::size_of::<BOOL>() as u32).is_ok() }
+    }
+
+    /// The window cloaked by DWM for as long as the guard lives (`show_main`), uncloaked when it is
+    /// dropped: a return, the end of the function, a panic unwinding through it.
+    pub struct Cloak(HWND);
+
+    impl Cloak {
+        /// `None` when DWM did not cloak the window: there is nothing to uncloak.
+        pub fn on(hwnd: HWND) -> Option<Self> {
+            set_cloak(hwnd, true).then(|| Self(hwnd))
+        }
+    }
+
+    impl Drop for Cloak {
+        fn drop(&mut self) {
+            set_cloak(self.0, false);
+        }
     }
 
     pub fn show_maximized(hwnd: HWND) -> bool {

@@ -14,7 +14,7 @@ export function shortcutIgnored(target: EventTarget | null): boolean {
 // A dialog, popover or menu owns the keys while it holds the focus, and an open modal dialog owns
 // them wherever the focus is: E in a confirmation must not archive the message behind it.
 const LAYERS = '[role="dialog"],[role="alertdialog"],[role="menu"]';
-const OPEN_MODAL = '[aria-modal="true"][data-state="open"]';
+const OPEN_MODAL = '[aria-modal="true"][data-state="open"],[role="dialog"][aria-modal="true"][data-open]';
 
 export function shortcutCoveredByLayer(target: EventTarget | null, doc: Document = document): boolean {
   if (target instanceof Element && target.closest(LAYERS)) return true;

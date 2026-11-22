@@ -166,13 +166,8 @@
   }
   /* The preview is a Modal drawn in a Portal, outside #app: print it alone. */
   body:has(.mail-print-preview) #app,
-  body:has(.mail-print-preview) [data-scope='dialog'][data-part='backdrop'] {
+  body:has(.mail-print-preview) [data-slot='dialog-overlay'] {
     display: none !important;
-  }
-  body:has(.mail-print-preview) [data-scope='dialog'][data-part='positioner'] {
-    position: static !important;
-    display: block !important;
-    padding: 0 !important;
   }
   .mail-print-preview {
     position: static !important;

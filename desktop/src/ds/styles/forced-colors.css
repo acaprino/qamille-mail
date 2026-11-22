@@ -169,7 +169,8 @@
   }
 
   /* Task 14: dialog. A dialog and a panel float over the page with a shadow: an edge separates them. */
-  [data-scope='dialog'][data-part='content'] {
+  [data-slot='dialog-content'],
+  [data-slot='sheet-content'] {
     border: 1px solid CanvasText;
   }
 

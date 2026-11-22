@@ -146,6 +146,8 @@ Qamille, per decisione del proprietario, non ha librerie proprie di comportament
 
 - **R18. `Select`: una voce disattivata (`disabled`), `aria-required` e un'etichetta visibile.** Il `Select` di Qamille li ha (`ui/Select.tsx`): una voce `disabled` e `aria-required="true"` (la rubrica obbligatoria nel modulo del contatto) oggi non arrivano, e l'etichetta visibile è un `<label>` che scrive Qamille.
 
+- **R19. `Sheet`: dire perché si chiude (Esc o clic fuori) e riempire un riquadro.** `onOpenChange` del `Sheet` non dice il motivo: il pannello laterale di Qamille chiama `onClose` per l'Esc e `onScrim` per il clic fuori, e oggi li fa uguali. Oggi riempie il riquadro in cui sta (lista o lettore); il `Sheet` si apre sul bordo della finestra.
+
 ## Global Constraints
 
 > **Regola del proprietario (2026-11-22, prevale su tutto ciò che segue): «lavora direttamente in develop», «no worktrees».**

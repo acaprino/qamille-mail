@@ -83,11 +83,12 @@ test('shortcutCoveredByLayer: a focused dialog, popover or menu, or any open mod
         menu: at('<div role="menu"><div role="menuitem" id="t">x</div></div>'),
         // The focus is on the page (e.g. <body>) while a modal confirmation is open over it.
         openModal: at('<div role="dialog" aria-modal="true" data-state="open"></div><button id="t">x</button>'),
+        sigridModal: at('<div role="dialog" aria-modal="true" data-open></div><button id="t">x</button>'),
         closedModal: at('<div role="dialog" aria-modal="true" data-state="closed" hidden></div><button id="t">x</button>'),
         nonModalOutside: at('<div role="dialog" aria-modal="false" data-state="open"></div><button id="t">x</button>'),
       };
     });
-    for (const name of ['sidePanel', 'popover', 'menu', 'openModal']) assert.equal(result[name], true, `${name} must cover the page`);
+    for (const name of ['sidePanel', 'popover', 'menu', 'openModal', 'sigridModal']) assert.equal(result[name], true, `${name} must cover the page`);
     for (const name of ['plain', 'closedModal', 'nonModalOutside']) assert.equal(result[name], false, `${name} must not cover the page`);
   } finally {
     await browser.close();

@@ -136,7 +136,20 @@ fn restore_events(store: &Store, operation: &UndoOperation) -> Vec<AppEvent> {
 /// `remote_applied_local_failed` is the provider having already executed the
 /// action: its message quotes a local failure that may read like a network
 /// one, and replaying it would apply the action twice.
+///
+/// The one exception for every operation is a vault refusal (`vault_*`: the
+/// credentials do not open on this Windows user, or cannot be read right now).
+/// The credentials are read before any provider contact (`ServiceContext::
+/// account`: the plan of a mail action, `validate_send` at the head of a
+/// delivery's enqueue, a remote draft's deletion), so nothing happened and a
+/// send may simply be attempted again: the row waits with the backoff, and
+/// [`UndoService::credentials_opened`] sends it once the vault opens. Should
+/// the vault shut after a delivery was claimed, the outbox records it
+/// uncertain and the next attempt answers `delivery_pending`, never a resend.
 fn is_retryable(operation: &UndoOperation, error: &AppError) -> bool {
+    if error.is_vault() {
+        return true;
+    }
     matches!(operation, UndoOperation::Mail { .. })
         && !matches!(
             error.code,
@@ -624,6 +637,36 @@ impl UndoService {
         }
         Ok(changed)
     }
+    /// The credentials vault opened (`vault_unlock`): every `Pending` action waiting for a retry
+    /// is attempted now instead of at the end of its backoff. One the vault held back (a
+    /// `vault_*` refusal, [`is_retryable`]) leaves at once; one backing off after a failed
+    /// connection gets an early attempt, harmless since neither reached the provider (the rule of
+    /// [`send_now`](Self::send_now)). Undo windows are left alone. Writes, and wakes the deadline
+    /// thread, only when a row changed. Returns how many rows it changed.
+    pub fn credentials_opened(&self) -> AppResult<usize> {
+        let now = self.context.clock.now_ms();
+        let waiting = |action: &UndoAction| {
+            action.status == UndoStatus::Pending && action.retry_at_ms.is_some_and(|at| at > now)
+        };
+        if !self.context.read_shared()?.undo_actions.iter().any(waiting) {
+            return Ok(0);
+        }
+        let changed = self.context.update_emails_with_events(&[], |store| {
+            let mut events = Vec::new();
+            for action in store.undo_actions.iter_mut().filter(|a| waiting(a)) {
+                action.retry_at_ms = Some(now);
+                // The notice's countdown ends: the next attempt is now.
+                events.push(AppEvent::UndoChanged { action: action.clone() });
+            }
+            Ok((events.len(), events))
+        })?;
+        if changed > 0 {
+            self.schedule_dirty.store(true, Ordering::SeqCst);
+            self.has_work.store(true, Ordering::SeqCst);
+            self.notify();
+        }
+        Ok(changed)
+    }
     /// The actions that have not reached the provider yet, by what quitting does to them
     /// ([`Unsettled`]): `Pending` rows (undoable, due, or backing off) stay queued, `Committing`
     /// ones are on their way. `Failed` rows are notices, not work.
@@ -1063,6 +1106,32 @@ mod tests {
         ] {
             assert!(!is_retryable(&mail, &definitive), "{}", definitive.message);
         }
+    }
+
+    #[test]
+    fn a_vault_refusal_is_retried_for_every_operation() {
+        // The vault refuses the credentials before any provider contact (`ServiceContext::account`,
+        // read before every remote step): nothing happened, so even a send may be attempted again.
+        for code in [
+            crate::application::error::vault_codes::LOCKED,
+            crate::application::error::vault_codes::FOREIGN,
+            crate::application::error::vault_codes::UNAVAILABLE,
+            crate::application::error::vault_codes::STORAGE,
+            crate::application::error::vault_codes::DAMAGED,
+        ] {
+            let refusal = AppError::new(code, "The credentials key belongs to another Windows user or another computer.");
+            for operation in [
+                UndoOperation::Mail { email_id: 1, action: "archive".into(), value: None },
+                UndoOperation::SendDraft { draft_id: 2 },
+                UndoOperation::DiscardDraft { draft_id: 3 },
+                UndoOperation::ScheduleDraft { draft_id: 4, send_at: 5 },
+            ] {
+                assert!(is_retryable(&operation, &refusal), "{code} {operation:?}");
+            }
+        }
+        // Not a code that merely mentions the vault.
+        let send = UndoOperation::SendDraft { draft_id: 2 };
+        assert!(!is_retryable(&send, &AppError::external("vault_locked")));
     }
 
     fn row(id: u64, email_id: u64, status: UndoStatus, expires_at_ms: i64) -> UndoAction {

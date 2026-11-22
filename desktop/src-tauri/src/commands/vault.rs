@@ -1,10 +1,11 @@
 //! The key of the credentials (phase 3, Task 7): where it stands, the transfer passphrase that
 //! opens it on another Windows user or computer, and starting over when it does not open here.
 //! The passphrase goes straight to `secret`, which wipes it after use; it is never logged.
-use crate::runtime::blocking;
+use crate::runtime::{DesktopState, blocking};
 use qamille::application::AppResult;
 use qamille::infrastructure::gateways::vault_error;
 use qamille::infrastructure::secret::{self, VaultStatus};
+use tauri::State;
 
 #[tauri::command]
 pub async fn vault_status() -> AppResult<VaultStatus> {
@@ -22,9 +23,22 @@ pub async fn vault_remove_transfer_passphrase() -> AppResult<VaultStatus> {
     blocking(|| secret::remove_transfer_passphrase().map_err(vault_error)).await
 }
 
+/// The credentials open: what the vault held back leaves now, not at its next recheck. Scheduled
+/// sends and the undo queue's sends and actions waited for it (a `vault_*` refusal holds them,
+/// never fails them), and none of them reached a provider.
 #[tauri::command]
-pub async fn vault_unlock(passphrase: String) -> AppResult<VaultStatus> {
-    blocking(move || secret::unlock_with_transfer_passphrase(passphrase).map_err(vault_error)).await
+pub async fn vault_unlock(state: State<'_, DesktopState>, passphrase: String) -> AppResult<VaultStatus> {
+    let (scheduler, undo) = (state.scheduler.clone(), state.undo.clone());
+    blocking(move || {
+        let status = secret::unlock_with_transfer_passphrase(passphrase).map_err(vault_error)?;
+        scheduler.credentials_opened();
+        if let Err(error) = undo.credentials_opened() {
+            // The vault is open either way: the queue's own backoff still retries what it holds.
+            crate::native_feel::report(&format!("the undo queue was not woken after the vault opened: {}", error.message));
+        }
+        Ok(status)
+    })
+    .await
 }
 
 /// The credentials that do not open here go to a folder of their own in the data folder, never

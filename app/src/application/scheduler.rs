@@ -1,9 +1,14 @@
 use super::{AppResult, ServiceContext, drafts::DraftService, events::AppEvent};
 use std::{
-    collections::HashSet,
-    sync::{Arc, Condvar, Mutex},
+    collections::{HashMap, HashSet},
+    sync::{Arc, Condvar, Mutex, MutexGuard},
     time::Duration,
 };
+
+/// How long a scheduled send that the credentials vault refused waits before the vault is asked
+/// again, unless it opens first ([`SchedulerService::credentials_opened`]). The overdue `send_at`
+/// alone would be a deadline in the past, and the scheduler thread would spin on it.
+const VAULT_RECHECK_MS: i64 = 60_000;
 
 /// Writers that create or move a deadline announce it here, so the scheduler
 /// thread sleeps exactly until the next deadline instead of polling at a fixed
@@ -22,12 +27,18 @@ pub fn note_schedule_change() {
 }
 
 /// Timing belongs to the host; the use case is deterministic and has no UI loop.
-/// Failed scheduled sends are disarmed to avoid repeated SMTP attempts.
+/// Failed scheduled sends are disarmed to avoid repeated SMTP attempts. A send
+/// the credentials vault refuses never failed: it stays armed and is held.
 #[derive(Clone)]
 pub struct SchedulerService {
     context: Arc<ServiceContext>,
     drafts: DraftService,
     failed: Arc<Mutex<HashSet<u64>>>,
+    /// Scheduled sends the vault refused (`vault_*`: credentials of another
+    /// Windows user or computer, a key Windows cannot open right now), by draft,
+    /// with the instant the vault is asked again. Their `send_at` stays as it
+    /// was: nothing reached the provider, and they leave once the vault opens.
+    held: Arc<Mutex<HashMap<u64, i64>>>,
 }
 impl SchedulerService {
     pub fn new(context: Arc<ServiceContext>, drafts: DraftService) -> Self {
@@ -35,6 +46,26 @@ impl SchedulerService {
             context,
             drafts,
             failed: Arc::new(Mutex::new(HashSet::new())),
+            held: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+    /// Never lost to a poisoned lock: a held send missing here would be an
+    /// overdue deadline, and the scheduler thread would spin on it.
+    fn held(&self) -> MutexGuard<'_, HashMap<u64, i64>> {
+        self.held.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+    /// The credentials vault opened (`vault_unlock`): the sends it held back are
+    /// due now instead of at their recheck. Wakes the scheduler thread when
+    /// there was one.
+    pub fn credentials_opened(&self) {
+        let released = {
+            let mut held = self.held();
+            let any = !held.is_empty();
+            held.clear();
+            any
+        };
+        if released {
+            note_schedule_change();
         }
     }
     /// The earliest deadline the scheduler must act on, in milliseconds:
@@ -43,22 +74,24 @@ impl SchedulerService {
     /// alone (INV-005).
     pub fn next_deadline(&self) -> AppResult<Option<i64>> {
         let store = self.context.read_shared()?;
+        let held = self.held().clone();
         let mut best: Option<i64> = None;
-        let mut consider = |seconds: i64| {
-            let ms = seconds.saturating_mul(1000);
+        let mut consider_ms = |ms: i64| {
             best = Some(best.map_or(ms, |current: i64| current.min(ms)));
         };
+        let ms = |seconds: i64| seconds.saturating_mul(1000);
         for email in &store.emails {
             if let Some(at) = email.snoozed_until {
-                consider(at);
+                consider_ms(ms(at));
             }
             if let Some(at) = email.reminder_at {
-                consider(at);
+                consider_ms(ms(at));
             }
         }
         for draft in &store.drafts {
             if let Some(at) = draft.send_at {
-                consider(at);
+                // A send the vault holds back is due at its recheck, never at its past time.
+                consider_ms(held.get(&draft.id).map_or(ms(at), |&recheck| recheck.max(ms(at))));
             }
         }
         for delivery in &store.outbox {
@@ -67,7 +100,7 @@ impl SchedulerService {
                 crate::domain::outbox::DeliveryStatus::Queued
                     | crate::domain::outbox::DeliveryStatus::Scheduled
             ) {
-                consider(delivery.send_at);
+                consider_ms(ms(delivery.send_at));
             }
         }
         Ok(best)
@@ -146,12 +179,17 @@ impl SchedulerService {
     }
     /// Outbox deliveries and scheduled sends that came due. A send failure
     /// disarms the draft and reports it; the wake half already ran, so the
-    /// failure skips nothing (review 3.3 requirement).
+    /// failure skips nothing (review 3.3 requirement). A send the credentials
+    /// vault refuses is held instead, armed and without a notice (`held`).
     pub fn send_due(&self) -> AppResult<Vec<String>> {
         super::mcp_outbox::tick(self.context.clone())?;
         let now = self.context.clock.now();
+        let now_ms = self.context.clock.now_ms();
         let snapshot = self.context.read()?;
         let mut notices = Vec::new();
+        // A held send whose draft is gone, or no longer scheduled, is forgotten.
+        self.held()
+            .retain(|id, _| snapshot.drafts.iter().any(|d| d.id == *id && d.send_at.is_some()));
         for draft in snapshot
             .drafts
             .iter()
@@ -171,6 +209,16 @@ impl SchedulerService {
             {
                 continue;
             }
+            if self.held().get(&draft.id).is_some_and(|&recheck| recheck > now_ms) {
+                continue;
+            }
+            // The credentials before the claim: while the vault cannot open them
+            // the send is held, still armed, with no event and no notice.
+            if self.drafts.validate_send(draft.id).is_err_and(|error| error.is_vault()) {
+                self.held().insert(draft.id, now_ms + VAULT_RECHECK_MS);
+                continue;
+            }
+            self.held().remove(&draft.id);
             // Persist the claim before contacting SMTP. A crash or an ambiguous
             // network failure must not trigger another automatic send on restart.
             let claimed = self.context.update_with_events(|store| {
@@ -193,6 +241,14 @@ impl SchedulerService {
                 continue;
             }
             if let Err(e) = self.drafts.send(draft.id) {
+                // The vault shut between the check and the send. It refused before
+                // any provider contact (`validate_send` heads the delivery's enqueue):
+                // the claim is undone and the send held, as above. A claim that
+                // cannot be undone falls through to the failure: never a silent disarm.
+                if e.is_vault() && self.rearm(draft.id, draft.send_at).is_ok() {
+                    self.held().insert(draft.id, now_ms + VAULT_RECHECK_MS);
+                    continue;
+                }
                 if let Ok(mut failed) = self.failed.lock() {
                     failed.insert(draft.id);
                 }
@@ -209,6 +265,19 @@ impl SchedulerService {
             }
         }
         Ok(notices)
+    }
+    /// Puts back the schedule a claim cleared, unless the draft was scheduled
+    /// again or removed meanwhile. The drafts list follows (`DraftsChanged`,
+    /// the same event as the claim's): the send is armed again, not failed.
+    fn rearm(&self, id: u64, send_at: Option<i64>) -> AppResult<()> {
+        self.context.update_with_events(|store| {
+            let Some(current) = store.drafts.iter_mut().find(|d| d.id == id && d.send_at.is_none()) else {
+                return Ok(((), Vec::new()));
+            };
+            current.send_at = send_at;
+            current.updated = self.context.clock.now().max(current.updated + 1);
+            Ok(((), vec![AppEvent::DraftsChanged { ids: vec![id] }]))
+        })
     }
     /// One pass: wakes first (committed even if the send half fails), then
     /// deliveries and scheduled sends.

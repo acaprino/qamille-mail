@@ -16,8 +16,8 @@ body{margin:0;padding:16px;font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans
 img{max-width:100%;height:auto}
 pre{white-space:pre-wrap}
 a{color:#2563eb}
-html[data-theme="dark"]{color-scheme:dark;filter:invert(1) hue-rotate(180deg)}
-html[data-theme="dark"] img,html[data-theme="dark"] video,html[data-theme="dark"] svg{filter:invert(1) hue-rotate(180deg)}`;
+html[data-scheme="dark"]{color-scheme:dark;filter:invert(1) hue-rotate(180deg)}
+html[data-scheme="dark"] img,html[data-scheme="dark"] video,html[data-scheme="dark"] svg{filter:invert(1) hue-rotate(180deg)}`;
 
 /**
  * Sanitize received HTML and wrap it for display.
@@ -31,7 +31,7 @@ export function messageDocument(html: string, allowRemote: boolean, dark = false
     FORBID_ATTR: ['action', 'formaction'],
   });
   const parsed = new DOMParser().parseFromString(clean, 'text/html');
-  parsed.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  parsed.documentElement.dataset.scheme = dark ? 'dark' : 'light';
   const images = allowRemote ? 'data: cid: https: http:' : 'data: cid:';
   const fonts = allowRemote ? 'data: https:' : 'data:';
   const policy = parsed.createElement('meta');

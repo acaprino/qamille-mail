@@ -38,7 +38,7 @@ Nell’app si usano le primitive React. Ognuna produce HTML con le classi di `sy
 - Un’icona da sola non basta come nome: ogni controllo a sola icona ha `aria-label`. `tip` si mette solo ai pulsanti a sola icona, e `shortcut` solo con una scorciatoia che esiste davvero.
 - Le classi di Tailwind che i componenti di unlumen scrivono sui propri nodi (`relative inline-flex rounded-full…`) non sono un’API: regole di pagina e test scelgono sulle classi di questa guida, su ruoli e nomi e su `data-scope`/`data-part`.
 - Prendi ogni colore, ombra, raggio, livello e dimensione del testo da un token (ADR-0009), nel CSS con `var(--…)` e nelle utility con i nomi di `tailwind.css`. Nell’app un valore letterale nel CSS o nel TSX fa fallire `desktop/tests/style-tokens.mjs`.
-- Imposta il tema con `data-theme="light"` o `data-theme="dark"` sull’elemento `html`. Senza attributo vale il chiaro.
+- Imposta il tema con `data-scheme="light"` o `data-scheme="dark"` sull’elemento `html`. Senza attributo vale il chiaro.
 
 ```tsx
 import Button from '../ds/primitives/Button';
@@ -657,7 +657,7 @@ Per aggiungere un componente:
 
 ## Tailwind
 
-Tailwind CSS v4 entra con `@tailwindcss/vite`; `styles/tailwind.css` importa il tema e le utility, non il preflight: la base resta `system.css`, e il contenuto delle email ricevute conserva i valori del browser. `tw-animate-css` aggiunge le classi d’animazione che i componenti di unlumen usano. La variante `dark:` vale dentro `[data-theme='dark']`.
+Tailwind CSS v4 entra con `@tailwindcss/vite`; `styles/tailwind.css` importa il tema e le utility, non il preflight: la base resta `system.css`, e il contenuto delle email ricevute conserva i valori del browser. `tw-animate-css` aggiunge le classi d’animazione che i componenti di unlumen usano. La variante `dark:` vale dentro `[data-scheme='dark']`.
 
 Ogni nome di colore è quello di unlumen e shadcn, e punta a un token di `theme.css`, quindi una classe e una regola di pagina dicono sempre la stessa cosa, nei due temi (ADR-0011 v3, decisione 4; RA-005). La tavolozza propria di Tailwind è spenta (`--color-*: initial`): esistono solo questi nomi.
 

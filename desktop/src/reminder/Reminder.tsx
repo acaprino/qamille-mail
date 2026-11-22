@@ -107,7 +107,7 @@ export default function Reminder() {
     const colorScheme = window.matchMedia('(prefers-color-scheme: dark)');
     const paint = () => {
       s.systemDark = colorScheme.matches;
-      document.documentElement.dataset.theme = resolvedAppearance(s.appearance, s.systemDark);
+      document.documentElement.dataset.scheme = resolvedAppearance(s.appearance, s.systemDark);
     };
     const appearanceChanged = (event: StorageEvent) => {
       if (event.key === 'qamille:appearance') {

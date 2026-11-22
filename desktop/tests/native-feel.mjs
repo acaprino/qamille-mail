@@ -120,14 +120,14 @@ check('3. the startup script picks the same theme as the app', () => {
     };
     context.window = { matchMedia: (q) => ({ matches: q === '(prefers-color-scheme: dark)' && systemDark }), ...context };
     vm.runInNewContext(script, context);
-    assert.equal(dataset.theme, want, `saved=${saved} systemDark=${systemDark}`);
+    assert.equal(dataset.scheme, want, `saved=${saved} systemDark=${systemDark}`);
   }
 });
 
 check('4. native window backgrounds match --ground in theme.css (what html, body and .app-shell paint)', () => {
   const theme = stripComments(read('src/ds/tokens/theme.css'));
   const light = theme.match(/:root\s*\{[^}]*?--ground:\s*([^;]+);/);
-  const dark = theme.match(/:root\[data-theme='dark'\]\s*\{[^}]*?--ground:\s*([^;]+);/);
+  const dark = theme.match(/:root\[data-scheme='dark'\]\s*\{[^}]*?--ground:\s*([^;]+);/);
   assert.ok(light && dark, 'theme.css must define --ground for :root and dark');
   const conf = JSON.parse(read('src-tauri/tauri.conf.json'));
   assert.equal(hex(conf.app.windows[0].backgroundColor), hex(light[1]), 'tauri.conf.json backgroundColor ≠ light --ground');

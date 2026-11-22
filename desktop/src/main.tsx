@@ -9,7 +9,7 @@ import { call, desktop } from './lib/api';
 import { installBrowserGuards } from './lib/browser-guards';
 import { SigridRoot } from './ui/SigridRoot';
 
-document.documentElement.dataset.theme = resolvedAppearance(appearancePreference(), systemPrefersDark());
+document.documentElement.dataset.scheme = resolvedAppearance(appearancePreference(), systemPrefersDark());
 installBrowserGuards();
 
 // With no error boundary, an error while rendering or in an effect makes React remove the whole

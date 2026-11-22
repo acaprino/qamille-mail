@@ -99,7 +99,7 @@
   --window-close: #c42b1c;
   --on-window-close: #fff;
 }
-:root[data-theme='dark'] {
+:root[data-scheme='dark'] {
   color-scheme: dark;
   /* The Compatto look in the dark: the same structure as the light block, the indigo accent lightened.
      Two steps of depth: the sidebar and the ground (the darker one, shared with the top bar), and the sheet

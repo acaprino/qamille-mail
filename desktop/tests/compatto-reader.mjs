@@ -28,7 +28,7 @@ async function open({ width = 1440, height = 900, theme = 'light' } = {}) {
   );
   await page.goto(previewUrl);
   await expect(page.locator('.message-title')).toHaveText(first.subject);
-  if (theme === 'dark') await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'));
+  if (theme === 'dark') await page.evaluate(() => (document.documentElement.dataset.scheme = 'dark'));
   return page;
 }
 const token = (page, name) =>

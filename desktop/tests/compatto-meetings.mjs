@@ -181,7 +181,7 @@ try {
   });
 
   await step('Dark theme: the list sub-row, the header, the summary, the tabs and the transcript read at 4.5:1', async () => {
-    await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'));
+    await page.evaluate(() => (document.documentElement.dataset.scheme = 'dark'));
     await page.evaluate(() => {
       const canvas = document.createElement('canvas');
       canvas.width = canvas.height = 1;

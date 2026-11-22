@@ -1503,7 +1503,7 @@ export default function App() {
   const darkNow = dark();
   const italianNow = isItalian();
   useLayoutEffect(() => {
-    document.documentElement.dataset.theme = darkNow;
+    document.documentElement.dataset.scheme = darkNow;
     saveAppearance(s.appearance);
     void paintWindowBackground();
     void windowAppearance(s.appearance, italianNow);

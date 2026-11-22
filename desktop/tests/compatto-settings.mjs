@@ -103,11 +103,11 @@ try {
   await section('General');
   await content.getByRole('combobox', { name: 'Appearance', exact: true }).click();
   await page.getByRole('option', { name: 'Dark' }).click();
-  await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
+  await page.waitForFunction(() => document.documentElement.dataset.scheme === 'dark');
   await content.getByRole('combobox', { name: 'Appearance', exact: true }).click();
   await page.getByRole('option', { name: 'Automatic (system)' }).click();
   await page.emulateMedia({ colorScheme: 'light' });
-  await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
+  await page.waitForFunction(() => document.documentElement.dataset.scheme === 'light');
   console.log('PASS Appearance applies from the Select');
 
   // (e) Assistant and Signatures.

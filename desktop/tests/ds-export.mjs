@@ -90,7 +90,7 @@ function runExport(dir) {
 const themeText = fs.readFileSync(path.join(root, 'src/ds/tokens/theme.css'), 'utf8').replace(/\r\n/g, '\n');
 function themeTokens() {
   const block = (re) => [...(themeText.match(re)?.[1] ?? '').matchAll(/--([\w-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]);
-  return { light: block(/:root \{([\s\S]*?)\n\}/), dark: new Map(block(/:root\[data-theme='dark'\] \{([\s\S]*?)\n\}/)) };
+  return { light: block(/:root \{([\s\S]*?)\n\}/), dark: new Map(block(/:root\[data-scheme='dark'\] \{([\s\S]*?)\n\}/)) };
 }
 
 function checkTokens(tree, label) {

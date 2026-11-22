@@ -31,7 +31,7 @@ const open = async (route, body, { theme = 'light', size = { width: 1280, height
   if (init) await page.addInitScript(init);
   await page.route(`**/${route}`, (r) => r.fulfill({ contentType: 'text/html', body }));
   await page.goto(`${base}/${route}`);
-  if (theme === 'dark') await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'));
+  if (theme === 'dark') await page.evaluate(() => (document.documentElement.dataset.scheme = 'dark'));
   return page;
 };
 const css = (locator, property) =>

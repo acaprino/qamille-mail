@@ -1,5 +1,5 @@
 // Reads the custom properties of desktop/src/ds/tokens/theme.css by block: `light` is the :root
-// block, `dark` the :root[data-theme='dark'] block. Pure file reads, no browser.
+// block, `dark` the :root[data-scheme='dark'] block. Pure file reads, no browser.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -15,8 +15,8 @@ function declarations(block) {
 export function readThemes(file = THEME_CSS) {
   const css = fs.readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   const light = css.match(/(?:^|\n):root\s*\{([^}]*)\}/);
-  const dark = css.match(/:root\[data-theme=['"]dark['"]\]\s*\{([^}]*)\}/);
+  const dark = css.match(/:root\[data-scheme=['"]dark['"]\]\s*\{([^}]*)\}/);
   if (!light) throw new Error(`${file}: no :root block`);
-  if (!dark) throw new Error(`${file}: no :root[data-theme='dark'] block`);
+  if (!dark) throw new Error(`${file}: no :root[data-scheme='dark'] block`);
   return { light: declarations(light[1]), dark: declarations(dark[1]) };
 }

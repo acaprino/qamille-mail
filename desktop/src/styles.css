@@ -268,13 +268,6 @@
   text-align: left;
 }
 /* The N is shown on the sidebar's button (the mockup); the other buttons leave it to the list's footer. */
-.compose-main kbd {
-  padding: 0 6px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--color-primary-foreground) 20%, transparent);
-  color: var(--color-primary-foreground);
-}
 .reader-reply kbd {
   display: none;
 }
@@ -418,18 +411,6 @@
 }
 .profile > [data-icon] {
   color: var(--color-sidebar-mute);
-}
-.user-avatar {
-  width: 24px;
-  height: 24px;
-}
-/* On the dark column the user is a small square like the accounts, not a light chip. */
-.sidebar .user-avatar {
-  border-radius: var(--radius-sm);
-  background: var(--color-sidebar-selected);
-  color: var(--color-sidebar-selected-ink);
-  font-size: var(--text-2xs);
-  font-weight: 600;
 }
 .main-shell {
   position: relative;
@@ -1397,10 +1378,6 @@
   justify-content: center;
   gap: 7px;
   font-size: var(--text-2xs);
-}
-.reader-footer kbd {
-  font-size: var(--text-2xs);
-  padding: 0 3px;
 }
 .reader-empty {
   display: flex;
@@ -2641,8 +2618,8 @@
   background: var(--priority-bg);
   font-weight: 600;
 }
-/* The checkbox of a row is the native one, styled by tokens (rows stay plain markup, spec 7.6). It takes
-   the gutter of the unread dot when the pointer or the keyboard is on the row, or when it is ticked. */
+/* The checkbox of a row is Sigrid's (a button with role checkbox and data-state). It takes the gutter of the unread dot
+   when the pointer or the keyboard is on the row, or when it is ticked. */
 .mail-check {
   position: absolute;
   top: 7px;
@@ -2658,33 +2635,30 @@
 }
 .mail-check .mail-checkbox {
   position: static;
-  width: 16px;
-  height: 16px;
   margin: 0;
-  accent-color: var(--color-primary);
 }
 .mail-row:has(> .mail-open:hover) .mail-check,
 .mail-check:hover,
 .mail-check:focus-within,
-.mail-check:has(:checked) {
+.mail-check:has([data-state='checked']) {
   opacity: 1;
 }
 .mail-row:has(> .mail-open:hover) .unread-dot,
 .mail-row:has(.mail-check:hover) .unread-dot,
 .mail-row:has(.mail-check:focus-within) .unread-dot,
-.mail-row:has(.mail-checkbox:checked) .unread-dot {
+.mail-row:has(.mail-checkbox[data-state='checked']) .unread-dot {
   visibility: hidden;
 }
 /* While rows are being chosen, every row shows its box on the edge of the selection bar's own box, and the
    text moves over to make room instead of running into it. */
-.mail-list:has(.mail-checkbox:checked) .mail-check {
+.mail-list:has(.mail-checkbox[data-state='checked']) .mail-check {
   left: 8px;
   opacity: 1;
 }
-.mail-list:has(.mail-checkbox:checked) .mail-open {
+.mail-list:has(.mail-checkbox[data-state='checked']) .mail-open {
   padding-left: 36px;
 }
-.mail-list:has(.mail-checkbox:checked) .unread-dot {
+.mail-list:has(.mail-checkbox[data-state='checked']) .unread-dot {
   visibility: hidden;
 }
 /* The heading that takes the focus when no row is selected (restoreListFocus), or the Drafts page's when the
@@ -2820,7 +2794,6 @@
 /* One --control-md row (Compatto): the name, what the name does not already say, the address books at
    the end. The name keeps its room first; the address gives way, then the last book's name. */
 .contact-row { display: flex; align-items: center; gap: 10px; width: 100%; height: var(--control-md); padding: 0 12px; text-align: left; background: var(--color-raised); }
-.contact-row .account-avatar { flex: none; width: 22px; height: 22px; font-size: var(--text-2xs); }
 .contact-row:hover { background: var(--hover); }
 .contact-row.active { background: var(--color-selected); }
 .contact-main { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; font-size: var(--text-sm); }
@@ -2840,7 +2813,6 @@
 .contact-detail header { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
 .contact-detail h2 { font-size: var(--text-xl); margin: 0; }
 .contact-detail h3 { font-size: var(--text-sm); margin: 18px 0 6px; color: var(--color-ink-soft); }
-.account-avatar.large { width: 48px; height: 48px; font-size: var(--text-base); }
 .contact-detail-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
 .contact-facts { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 0; margin: 0; font-size: var(--text-sm); }
 .contact-facts dt, .contact-facts dd { display: flex; align-items: center; min-height: var(--control-md); border-top: 1px solid var(--color-paper-2); }

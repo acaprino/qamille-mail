@@ -94,12 +94,11 @@ try {
     assert.ok(luminance(fill) < 0.3, `account square ${i} is not a light chip (${fill})`);
     assert.ok(contrast(fill, ink) >= 4.5, `account square ${i} text is legible (${fill} on ${ink})`);
   }
-  const user = sidebar.locator('.user-avatar');
+  const user = sidebar.locator('[data-slot="avatar"]');
   const [userFill, userInk] = [await css(user, 'background-color'), await css(user, 'color')];
   assert.ok(luminance(userFill) < 0.3, `the user square is not a light chip (${userFill})`);
   assert.ok(contrast(userFill, userInk) >= 4.5, 'the user initial is legible');
-  assert.equal(await css(user, 'border-top-left-radius'), '4px');
-  console.log('PASS Account and user avatars are small coloured squares with legible initials');
+  console.log('PASS Account avatars are small coloured squares and the user avatar is Sigrid’s, with legible initials');
 
   // (g) Collapse sidebar: a hint, not a title; the name stays; the hint opens on focus.
   const collapse = sidebar.getByRole('button', { name: 'Collapse sidebar' });

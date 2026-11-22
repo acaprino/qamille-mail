@@ -1,5 +1,4 @@
 import { useEffect } from 'react';
-import { motion, useReducedMotion } from '../ui/motion';
 import { listen } from '@tauri-apps/api/event';
 import { call, errorText } from '../lib/api';
 import { setLanguageLocale, tr, useLanguage } from '../lib/i18n';
@@ -44,7 +43,6 @@ function when(relative: Relative): string {
 
 export default function Reminder() {
   useLanguage();
-  const reduceMotion = useReducedMotion();
   const s = useReactive(() => ({
     view: { chips: [], recording: false, dark: false, locale: '', time_zone: '' } as ReminderView,
     appearance: appearancePreference() as Appearance,
@@ -149,15 +147,11 @@ export default function Reminder() {
         {s.announcement}
       </p>
       {s.view.chips.map((chip) => (
-        // The chip drops in on a short spring; it moves, it does not scale, so its 52px stay put.
-        <motion.section
+        <section
           key={chip.key}
           className="chip"
           data-chip={chip.key}
           aria-label={tr(`Promemoria: ${name(chip)}`, `Reminder: ${name(chip)}`)}
-          initial={reduceMotion ? false : { opacity: 0, y: -6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 32 }}
         >
           <span className="live" aria-hidden="true"></span>
           <div className="text">
@@ -208,7 +202,7 @@ export default function Reminder() {
               </button>
             </div>
           )}
-        </motion.section>
+        </section>
       ))}
     </>
   );

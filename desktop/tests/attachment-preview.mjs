@@ -30,7 +30,7 @@ async function waitForServer() {
 let browser;
 try {
   await waitForServer();
-  browser = await chromium.launch({ channel: 'msedge', headless: true });
+  browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1200, height: 900 } });
   await context.addInitScript(
     ({ good, bad }) => {

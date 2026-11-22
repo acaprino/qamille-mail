@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 
 const base = process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:1420';
 const shots = process.env.QAMILLE_SHOTS;
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1280, height: 860 } });
 const page = await context.newPage();
 const errors = [];
@@ -57,7 +57,7 @@ try {
     });
 
     await step(`${colorScheme}: the active page in the sidebar has a highlighted edge`, async () => {
-      const active = page.locator('.sidebar nav button.active').first();
+      const active = page.locator('.sidebar nav [aria-current="page"]').first();
       await expect(active).toHaveCount(1);
       const s = await style(active, 'outline-style', 'outline-width', 'outline-color');
       assert.ok(visibleLine(s['outline-width'], s['outline-style']), `active nav outline: ${JSON.stringify(s)}`);

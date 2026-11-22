@@ -1,4 +1,4 @@
-import { AnimatePresence, motion, useIsPresent, useReducedMotion, type Variants } from '../ui/motion';
+import { Item, Presence, useIsPresent } from '../ui/motion';
 import { useEffect, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react';
 import Button from '../ui/Button';
 import Checkbox from '../ui/Checkbox';
@@ -62,31 +62,6 @@ export type MailListProps = {
 const order = ['Priority', 'New', 'Notifications', 'Newsletters', 'Pins', 'Seen'];
 const noAccounts: Account[] = [];
 const noPeople: PersonIndex = new Map();
-// More rows than this arriving or leaving at once is a new list, not a change in it: no motion.
-const BULK = 5;
-// Past this many rows the list does not animate positions (each animated row is measured).
-const LAYOUT_LIMIT = 200;
-
-// A row comes in by opening to its height, on a critically damped spring (a height never
-// overshoots below zero). A row that goes is lifted out of the flow at once (AnimatePresence
-// `popLayout`): the rows under it close the gap straight away, as they always did, so a control the
-// reader is reaching for is where it was at once, and the row fades out where it was. A whole list
-// that is replaced (`instant`) goes without motion.
-const openSpring = { type: 'spring', stiffness: 700, damping: 53, restDelta: 1 } as const;
-const rowVariants: Variants = {
-  enter: { height: 0, opacity: 0, overflow: 'hidden' },
-  shown: {
-    height: 'auto',
-    opacity: 1,
-    transition: { height: openSpring, opacity: { duration: 0.15 } },
-    transitionEnd: { overflow: 'visible' },
-  },
-  gone: (exit: { instant: boolean } | undefined) =>
-    exit?.instant
-      ? { opacity: 0, transition: { duration: 0 } }
-      : { opacity: 0, overflow: 'hidden', transition: { opacity: { duration: 0.16, ease: 'easeOut' } } },
-};
-
 // The time at the right of the first line. It is always the short form (the full one is its title):
 // the arrow of a conversation sits just left of it, and the row knows how wide the time is in
 // characters (--time-ch) so the arrow can find its place without measuring.
@@ -122,16 +97,12 @@ function GroupHeading({
   unread,
   collapsed,
   toggle,
-  moving,
-  quiet,
 }: {
   title: string;
   count: number;
   unread: boolean;
   collapsed: boolean;
   toggle: (title: string) => void;
-  moving: boolean;
-  quiet: boolean;
 }) {
   const present = useIsPresent();
   const own = {
@@ -153,22 +124,15 @@ function GroupHeading({
       </span>
     </>
   );
-  return moving ? (
-    <motion.button {...own} variants={rowVariants} initial={quiet ? false : 'enter'} animate="shown" exit="gone">
+  return (
+    <Item as="button" closes {...own}>
       {content}
-    </motion.button>
-  ) : (
-    <button {...own}>{content}</button>
+    </Item>
   );
 }
 
 type RowProps = {
   email: EmailSummary;
-  /** Motion is on (no reduced motion): the row is a motion element. */
-  moving: boolean;
-  /** The row came with many others at once: it shows at once. */
-  quiet: boolean;
-  layoutKey: string | undefined;
   selected: number | null;
   checked: boolean;
   tabRow: number | null;
@@ -194,9 +158,6 @@ type RowProps = {
 // technology and inert, so nothing finds or reaches a message that has left.
 function MailRow({
   email,
-  moving,
-  quiet,
-  layoutKey,
   selected,
   checked,
   tabRow,
@@ -275,9 +236,8 @@ function MailRow({
   const content = (
     <>
       <label className="mail-check">
-        <input
+        <Checkbox
           className="mail-checkbox"
-          type="checkbox"
           tabIndex={tab}
           aria-label={`${t('Seleziona', 'Select')} ${email.subject || t('(Senza oggetto)', '(No subject)')}`}
           checked={checked}
@@ -382,21 +342,9 @@ function MailRow({
 
   return (
     <>
-      {moving ? (
-        <motion.div
-          {...rowProps}
-          variants={rowVariants}
-          initial={quiet ? false : 'enter'}
-          animate="shown"
-          exit="gone"
-          layout={layoutKey !== undefined ? 'position' : undefined}
-          layoutDependency={layoutKey}
-        >
-          {content}
-        </motion.div>
-      ) : (
-        <div {...rowProps}>{content}</div>
-      )}
+      <Item closes {...rowProps}>
+        {content}
+      </Item>
       {present && threadOpen && (
         <ThreadReplies
           row={email}
@@ -439,7 +387,6 @@ export default function MailList({
 }: MailListProps) {
   useStore(groupState);
   useStore(threadState);
-  const still = useReducedMotion();
   // The reader's own addresses: one person, named "you".
   const self = new Set(accounts.map((account) => account.email.trim().toLowerCase()));
   const [mode, setMode] = useState('Smart');
@@ -539,42 +486,7 @@ export default function MailList({
     reconcileThreads(page.items);
   }, [page.items]);
 
-  // Which rows arrived and left since the last commit: a few are new mail or mail sent away and
-  // move; many at once are a new list (another folder, a search, "Load more") and do not.
-  const shownIds = shownItems.map(rowKey);
-  const committed = useRef<Set<string>>(new Set());
-  const before = committed.current;
-  const now = new Set(shownIds);
-  const arrived = shownIds.filter((id) => !before.has(id)).length;
-  let left = 0;
-  for (const id of before) if (!now.has(id)) left += 1;
-  const quietArrival = before.size === 0 || arrived > BULK;
-  // A group the reader opens or closes shows or hides its rows at once: that is not mail moving.
-  const collapsedBefore = useRef(groupState.collapsed);
-  const opened = new Set(collapsedBefore.current.filter((title) => !groupState.collapsed.includes(title)));
-  const closed = groupState.collapsed.some((title) => !collapsedBefore.current.includes(title));
-  // Rows still on their way out read this again on later renders: it keeps the last removal's answer.
-  const lastExit = useRef(false);
-  const instantExit = left > 0 ? closed || left > BULK || left === before.size : lastExit.current;
-  useEffect(() => {
-    committed.current = now;
-    collapsedBefore.current = groupState.collapsed;
-    lastExit.current = instantExit;
-  });
-  const moving = !still;
-  // Rows that move (a pinned row that changes group, new mail above) slide to their place. A
-  // removal is left out: the rows close the gap at once (see rowVariants).
-  const lastLayout = useRef('');
-  const layoutKey =
-    moving && shownItems.length <= LAYOUT_LIMIT ? (left > 0 ? lastLayout.current : shownIds.join(',')) : undefined;
-  useEffect(() => {
-    lastLayout.current = layoutKey ?? '';
-  });
-
   const rowProps = {
-    moving,
-    quiet: quietArrival,
-    layoutKey,
     selected,
     tabRow,
     threads,
@@ -603,8 +515,6 @@ export default function MailList({
             unread={group.items.some((e) => !e.read)}
             collapsed={groupState.collapsed.includes(group.title)}
             toggle={toggle}
-            moving={moving}
-            quiet={quietArrival}
           />,
         ]
       : []),
@@ -616,7 +526,6 @@ export default function MailList({
             email={email}
             checked={checkedItems.includes(email.id)}
             {...rowProps}
-            quiet={quietArrival || opened.has(group.title)}
           />
         ))),
   ]);
@@ -747,7 +656,7 @@ export default function MailList({
         </div>
       )}
       {/* Positioned, so that a row on its way out stays in place inside the scrolled list. */}
-      <div className="mail-scroll" style={moving ? { position: 'relative' } : undefined}>
+      <div className="mail-scroll">
         {loading && !page.items.length && (
           <div className="loading-lines">
             <span></span>
@@ -755,19 +664,8 @@ export default function MailList({
             <span></span>
           </div>
         )}
-        {moving ? (
-          // A change of view, account, mode or display is a new list: it starts over, without motion.
-          <AnimatePresence
-            key={`${selectionScope}:${mode}`}
-            initial={false}
-            mode="popLayout"
-            custom={{ instant: instantExit }}
-          >
-            {rows}
-          </AnimatePresence>
-        ) : (
-          rows
-        )}
+        {/* A change of view, account, mode or display is a new list: it starts over, without motion. */}
+        <Presence key={`${selectionScope}:${mode}`}>{rows}</Presence>
         {!loading && !items.length && (
           <div className="empty-list">
             <Icon name={search ? 'search' : caughtUp ? 'check' : 'mail'} size={30} />

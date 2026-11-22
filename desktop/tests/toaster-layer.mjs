@@ -7,7 +7,7 @@ import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 
 const base = process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:1420';
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 try {
   const page = await browser.newPage({ locale: 'en-US', viewport: { width: 1280, height: 860 } });
   await page.goto(base);

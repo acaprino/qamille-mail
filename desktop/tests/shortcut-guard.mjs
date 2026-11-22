@@ -11,7 +11,7 @@ import { chromium } from '@playwright/test';
 const base = process.env.QAMILLE_PREVIEW_URL;
 
 test('shortcutIgnored: editing and widget targets are ignored, the page is not', { skip: !base && 'QAMILLE_PREVIEW_URL not set' }, async () => {
-  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   try {
     const page = await browser.newPage();
     await page.route('**/__guard', (route) => route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body></body></html>' }));
@@ -61,7 +61,7 @@ test('shortcutIgnored: editing and widget targets are ignored, the page is not',
 });
 
 test('shortcutCoveredByLayer: a focused dialog, popover or menu, or any open modal, keeps the keys from the page', { skip: !base && 'QAMILLE_PREVIEW_URL not set' }, async () => {
-  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   try {
     const page = await browser.newPage();
     await page.route('**/__guard', (route) => route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body></body></html>' }));
@@ -96,7 +96,7 @@ test('shortcutCoveredByLayer: a focused dialog, popover or menu, or any open mod
 });
 
 test('arrowsMoveMail: only the page, the list and the reader move the open message', { skip: !base && 'QAMILLE_PREVIEW_URL not set' }, async () => {
-  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   try {
     const page = await browser.newPage();
     await page.route('**/__guard', (route) => route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body></body></html>' }));
@@ -155,7 +155,7 @@ test('isAppChord: Ctrl or Meta without Alt, so AltGr (Ctrl+Alt on Windows) is no
 // The window-wide keyboard() of App.tsx, in the preview with the sample mailbox: where the arrows
 // act, which chords count, and what Esc does in the search field.
 test('App keyboard(): arrows only from the page, the list or the reader; AltGr is not a chord; Esc clears the search', { skip: !base && 'QAMILLE_PREVIEW_URL not set' }, async () => {
-  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   try {
     const page = await browser.newPage({ locale: 'en-US', viewport: { width: 1440, height: 900 } });
     const errors = [];

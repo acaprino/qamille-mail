@@ -77,7 +77,7 @@ try {
     if (i === 59) throw new Error(`Preview did not start: ${output}`);
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
-  browser = await chromium.launch({ channel: 'msedge', headless: true });
+  browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   const page = await open();
 
   // Minor groups start closed, and a closed group never hides that it holds something unread.

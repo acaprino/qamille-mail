@@ -15,8 +15,7 @@
   flex: 1;
   cursor: default;
 }
-.selection-toolbar input,
-.mail-checkbox {
+.selection-toolbar input {
   width: 15px;
   height: 15px;
   accent-color: var(--color-primary);
@@ -41,13 +40,13 @@
   left: 8px;
   margin: 0;
 }
-.mail-row:has(.mail-checkbox:checked) {
+.mail-row:has(.mail-checkbox[data-state='checked']) {
   box-shadow: inset 2px 0 var(--color-primary);
   /* Lighter than the open message's --color-selected: a ticked row and the open one are told apart by more than
      the colour of their edge. */
   background: color-mix(in srgb, var(--color-primary) 5%, var(--color-raised));
 }
-.mail-row.selected:has(.mail-checkbox:checked) {
+.mail-row.selected:has(.mail-checkbox[data-state='checked']) {
   background: var(--color-selected);
 }
 .message-output-actions {

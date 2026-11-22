@@ -174,15 +174,6 @@ h3 {
   font-size: var(--text-sm);
   font-weight: 600;
 }
-kbd {
-  font: inherit;
-  font-size: var(--text-2xs);
-  color: var(--color-ink-mute);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-sm);
-  padding: 1px 5px;
-  white-space: nowrap;
-}
 .muted {
   color: var(--color-ink-mute);
 }
@@ -199,16 +190,6 @@ kbd {
 }
 .checkbox-row[data-disabled] {
   opacity: 0.5;
-}
-
-.avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  flex-shrink: 0;
-  font-weight: 600;
-  font-size: var(--text-xs);
 }
 
 /* Task 9: field (the Sigrid plan: only Task 9 touches this section, which ends at the next blank line) */

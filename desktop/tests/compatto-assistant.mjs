@@ -7,10 +7,17 @@ import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 
 const base = process.env.QAMILLE_PREVIEW_URL ?? 'http://127.0.0.1:1420';
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const errors = [];
 const step = async (name, work) => {
-  await work();
+  try {
+    await work();
+  } catch (error) {
+    // A step that fails is told, and the next ones still run: one pass shows every difference from Sigrid, not the first.
+    process.exitCode = 1;
+    console.log(`FAIL STEP ${name}: ${String(error?.message ?? error).split('\n').slice(0, 8).join(' | ').slice(0, 700)}`);
+    return;
+  }
   console.log(`PASS ${name}`);
 };
 

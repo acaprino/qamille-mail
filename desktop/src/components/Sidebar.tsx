@@ -1,4 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import Avatar from '../ui/Avatar';
+import Kbd from '../ui/Kbd';
 import Button from '../ui/Button';
 import Count from '../ui/Count';
 import Icon from '../ui/Icon';
@@ -110,7 +112,7 @@ export default function Sidebar({
       >
         <Icon name="edit" size={iconSize} stroke={iconStroke} />
         <span className="sidebar-text">{tr('Nuovo messaggio', 'New message')}</span>
-        <kbd>N</kbd>
+        <Kbd>N</Kbd>
       </Button>
       <div className="sidebar-body" id="sidebar-navigation">
         <div className="sidebar-label sidebar-text">{tr('Account', 'Accounts')}</div>
@@ -220,7 +222,7 @@ export default function Sidebar({
               'aria-current': view === 'Settings' ? 'page' : undefined,
             },
             <>
-              <span className="avatar user-avatar">{initials(workspace.settings.user_name)}</span>
+              <Avatar name={workspace.settings.user_name} size="xs" decorative className="bg-sidebar-selected text-sidebar-selected-ink" />
               <span className="sidebar-text">
                 <strong>{workspace.settings.user_name}</strong>
                 <small>{tr('Spazio personale', 'Personal workspace')}</small>

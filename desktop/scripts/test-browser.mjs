@@ -92,7 +92,7 @@ try {
     console.log(`${passed ? 'ok  ' : 'FAIL'} ${name} (${seconds}s)${timedOut ? ' TIMED OUT after 300 s' : ''}`);
     if (!passed) {
       failures.push(name);
-      console.log(text.split('\n').filter((line) => line.trim()).slice(-25).join('\n'));
+      console.log(text.split('\n').filter((line) => line.trim()).slice(-90).join('\n'));
     }
   }
 } finally {

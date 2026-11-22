@@ -92,6 +92,19 @@ const ENGLISH: Words = {
     restore: 'Restore',
     close: 'Close',
   },
+  steps: {
+    done: 'done',
+    current: 'current step',
+    upcoming: 'not started',
+    error: 'failed',
+    summary: (position, total) => `Step ${position} of ${total}`,
+  },
+  progress: {
+    value: (value, max) => `${Math.round((value / max) * 100)}%`,
+    indeterminate: 'In progress',
+    complete: 'Complete',
+    error: 'Failed',
+  },
   combobox: {
     empty: 'No results',
     trigger: 'Show the options',
@@ -224,6 +237,19 @@ const ITALIAN: Words = {
     maximize: 'Ingrandisci',
     restore: 'Ripristina',
     close: 'Chiudi',
+  },
+  steps: {
+    done: 'completato',
+    current: 'passaggio corrente',
+    upcoming: 'non iniziato',
+    error: 'non riuscito',
+    summary: (position, total) => `Passaggio ${position} di ${total}`,
+  },
+  progress: {
+    value: (value, max) => `${Math.round((value / max) * 100)}%`,
+    indeterminate: 'In corso',
+    complete: 'Completato',
+    error: 'Non riuscito',
   },
   combobox: {
     empty: 'Nessun risultato',

@@ -85,7 +85,7 @@ const TEXT = {
   },
 };
 
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const errors = [];
 async function open(vault, locale, server) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale });

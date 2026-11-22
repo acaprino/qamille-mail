@@ -50,7 +50,7 @@ async function waitForServer() {
 let browser;
 try {
   await waitForServer();
-  browser = await chromium.launch({ channel: 'msedge', headless: true });
+  browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1200, height: 900 } });
   const pageErrors = [];
   await context.route(`${url}/**`, async (route) => {
@@ -64,7 +64,7 @@ try {
     window.previewParentClosed = 0;
     window.cspViolations = [];
     document.addEventListener('securitypolicyviolation', (event) =>
-      window.cspViolations.push(`${event.violatedDirective} ${event.blockedURI}`),
+      window.cspViolations.push(`${event.violatedDirective} ${event.blockedURI} ${event.sourceFile}:${event.lineNumber} ${String(event.sample).slice(0, 120)}`),
     );
     window.__TAURI_INTERNALS__ = {
       invoke(command, args = {}) {

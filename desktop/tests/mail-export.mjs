@@ -24,7 +24,7 @@ const foreign = {
   body: 'OTHER ACCOUNT MUST NOT PRINT',
 };
 fixture.emails.push(reply, foreign);
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const page = await browser.newPage({
   locale: 'en-US',
   viewport: { width: 1440, height: 900 },
@@ -112,7 +112,7 @@ try {
   await page.getByRole('button', { name: 'Close print preview' }).click();
   // The bar's checkbox is the Checkbox primitive: its input is hidden, the drawn box is what takes the click.
   await page.getByRole('checkbox', { name: 'Select loaded messages' }).check({ force: true });
-  assert.equal(await checkboxes.count(), await page.locator('.mail-checkbox:checked').count());
+  assert.equal(await checkboxes.count(), await page.locator('.mail-checkbox[data-state="checked"]').count());
   await page.getByRole('tab', { name: 'Unread', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Download .mbox' })).toHaveCount(0);
   await checkboxes.first().check();

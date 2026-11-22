@@ -1,4 +1,3 @@
-import { AnimatePresence } from '../ui/motion';
 import { useEffect, useRef, useState } from 'react';
 import Button from '../ui/Button';
 import Icon from '../ui/Icon';
@@ -199,7 +198,7 @@ export default function ComposerDock(props: ComposerDockProps) {
 
   return (
     <>
-      <AnimatePresence>
+      <>
         {drafts.map((draft) => {
           const generation = generationOf(draft.id);
           return (
@@ -220,7 +219,7 @@ export default function ComposerDock(props: ComposerDockProps) {
             />
           );
         })}
-      </AnimatePresence>
+      </>
 
       <footer ref={dock} className="composer-dock" aria-label={tr('Bozze aperte', 'Open drafts')}>
         {/* The drafts open here, not all the saved ones the sidebar counts: the two numbers say different things. */}

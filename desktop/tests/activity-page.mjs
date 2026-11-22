@@ -9,7 +9,7 @@ const previewUrl = process.env.QAMILLE_PREVIEW_URL;
 const skip = !previewUrl ? { skip: 'set QAMILLE_PREVIEW_URL to run the preview steps' } : {};
 
 async function withPage(run) {
-  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   const errors = [];

@@ -16,7 +16,7 @@ first.to = Array.from({ length: 40 }, (_, i) => `person${String(i + 1).padStart(
 first.to[4] = 'alex@studio-example.com';
 first.cc = Array.from({ length: 6 }, (_, i) => `copy${i + 1}@example.test`);
 
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const errors = [];
 
 async function open({ width = 1440, height = 900, theme = 'light' } = {}) {

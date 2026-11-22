@@ -14,7 +14,7 @@ const root = path.resolve(import.meta.dirname, '..');
 const sample = JSON.parse(await fs.readFile(path.join(root, 'src/lib/sample.json'), 'utf8'));
 
 const ACCENT = 'rgb(79, 70, 229)';
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const errors = [];
 
 async function open({ fixture = sample, size = { width: 1440, height: 900 }, locale = 'en-US', threads = false } = {}) {
@@ -107,23 +107,22 @@ try {
   assert.equal(await style(selected, 'background-color'), 'rgb(219, 225, 255)', 'the selected row is the selection tint of Sigrid');
   console.log('PASS A row has two lines, no avatar, a 6px accent dot and an accent time when unread');
 
-  // ---- the checkbox stays native and per row; the selection bar uses the Checkbox ----
-  const check = page.locator('.mail-row').nth(1).locator('input.mail-checkbox');
-  assert.equal(await check.evaluate((node) => node.type), 'checkbox', 'the row checkbox is a native input');
+  // ---- the checkbox is Sigrid's, per row, and so is the selection bar's ----
+  const check = page.locator('.mail-row').nth(1).locator('.mail-checkbox');
+  assert.equal(await check.getAttribute('role'), 'checkbox', 'the row checkbox is Sigrid\u2019s');
   await page.locator('.mail-row').nth(1).hover();
   await check.check();
   const toolbar = page.locator('.selection-toolbar');
   await expect(toolbar).toBeVisible();
-  assert.equal(await toolbar.locator('input[type=checkbox]').count(), 1, 'one input in the bar: the hidden input of the Checkbox');
-  assert.equal(await toolbar.locator('[data-scope="checkbox"][data-part="root"]').count(), 1, 'and it is Ark');
+  assert.equal(await toolbar.locator('[role="checkbox"]').count(), 1, 'one checkbox in the bar: Sigrid\u2019s');
   const all = page.getByRole('checkbox', { name: 'Select loaded messages' });
   await expect(all).not.toBeChecked();
-  assert.equal(await toolbar.locator('[data-scope="checkbox"][data-part="control"]').getAttribute('data-state'), 'indeterminate', 'some, not all: mixed');
+  assert.equal(await toolbar.locator('[role="checkbox"]').getAttribute('data-state'), 'indeterminate', 'some, not all: mixed');
   await all.check({ force: true });
-  assert.equal(await page.locator('.mail-checkbox:checked').count(), await page.locator('.mail-checkbox').count(), 'ticking the bar ticks every row');
+  assert.equal(await page.locator('.mail-checkbox[data-state="checked"]').count(), await page.locator('.mail-checkbox').count(), 'ticking the bar ticks every row');
   await page.getByRole('button', { name: 'Clear', exact: true }).click();
   await expect(toolbar).toHaveCount(0);
-  console.log('PASS The row checkbox is native and the selection bar uses Checkbox');
+  console.log('PASS The row checkbox and the selection bar use Sigrid\u2019s Checkbox');
   await page.context().close();
 
   // ---- a conversation: replies on the same edge, the open-conversation ground, the arrows ----

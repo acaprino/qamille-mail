@@ -1,5 +1,5 @@
-import { motion, useIsPresent, useReducedMotion, type Variants } from '../ui/motion';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
+import { useLand } from '../ui/motion';
 import Button from '../ui/Button';
 import Tooltip from '../ui/Tooltip';
 import DateField from '../ui/DateField';
@@ -54,21 +54,11 @@ const plainHtml = (text: string) =>
 const withPending = (list: string | undefined, typed: string) =>
   [(list ?? '').trim(), ...splitRecipients(typed)].filter(Boolean).join(', ');
 
-// The window opens by fading in where it stands (a slide would move its frame out of the place the
-// layout gives it while it settles) and, minimized or closed, sinks towards the dock as it fades.
-const spring = { type: 'spring', stiffness: 400, damping: 32 } as const;
-const variants: Variants = {
-  open: { opacity: 1, y: 0, transition: { opacity: spring, y: { duration: 0 } } },
-  closed: { opacity: 0, y: 24, transition: spring },
-};
-
 export default function Composer(props: ComposerProps) {
   const { initial, workspace, active, windowClosing, minimize } = props;
   // The callbacks and flags as they are now, for timers, awaits and the handle given to the dock.
   const p = useRef(props);
   p.current = props;
-  const still = useReducedMotion();
-  const present = useIsPresent();
 
   const s = useReactive(() => ({
     draft: copy(initial),
@@ -418,32 +408,20 @@ export default function Composer(props: ComposerProps) {
     await queue('discard', null, false);
   }
 
-  // Minimized, the panel stays drawn (out of the accessibility tree) until it has sunk away, then it
-  // is hidden; opened again it shows at once. Without motion it hides at once.
-  const [gone, setGone] = useState(!active);
-  if (active && gone) setGone(false);
-  const hidden = still ? !active : !active && gone;
-  const leaving = !present || (!active && !hidden);
+  // Minimized, the panel is hidden at once; opened again it settles into place.
+  const hidden = !active;
+  useLand(panel, active, active);
   const fileName = (path: string) => path.split(/[\\/]/).pop();
 
   return (
-    <motion.div
+    <div
       ref={panel}
       id={`compose-panel-${draft.id}`}
       className={cn('composer-panel', s.dropDepth > 0 && 'mail-drop')}
       role="tabpanel"
       tabIndex={-1}
       hidden={hidden}
-      aria-hidden={leaving ? true : undefined}
       aria-labelledby={`compose-tab-${draft.id}`}
-      style={leaving ? { pointerEvents: 'none' } : undefined}
-      variants={variants}
-      initial={still ? false : 'closed'}
-      animate={still ? undefined : active ? 'open' : 'closed'}
-      exit={!still && active ? 'closed' : undefined}
-      onAnimationComplete={(definition) => {
-        if (definition === 'closed' && !p.current.active) setGone(true);
-      }}
       onFocus={(event) => {
         if (
           event.target instanceof HTMLElement &&
@@ -752,6 +730,6 @@ export default function Composer(props: ComposerProps) {
           <Icon name="trash" size={18} />
         </Button>
       </footer>
-    </motion.div>
+    </div>
   );
 }

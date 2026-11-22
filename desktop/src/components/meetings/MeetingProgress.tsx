@@ -3,8 +3,9 @@
 // Sintesi tab, while the transcript next to it stays readable. It draws what the meeting says
 // now; the page re-reads the meeting, this does not ask for anything. The block fades in and the
 // bar grows with a spring (no movement under prefers-reduced-motion).
-import { motion, useReducedMotion } from '../../ui/motion';
 import Button from '../../ui/Button';
+import Progress from '../../ui/Progress';
+import { useAppear } from '../../ui/motion';
 import { tr } from '../../lib/i18n';
 import type { MeetingJob } from '../../lib/meetings';
 import MeetingNotice from './MeetingNotice';
@@ -17,10 +18,8 @@ export type MeetingProgressProps = {
   oncancel: () => void;
 };
 
-const spring = { type: 'spring', stiffness: 400, damping: 32 } as const;
-
 export default function MeetingProgress({ job, compact = false, busy = false, oncancel }: MeetingProgressProps) {
-  const still = useReducedMotion();
+  const appear = useAppear();
   const transcribing = job.kind === 'transcribe';
   const heading = transcribing
     ? tr('Sto trascrivendo la riunione', 'Transcribing the meeting')
@@ -31,22 +30,7 @@ export default function MeetingProgress({ job, compact = false, busy = false, on
     : tr('Sintesi…', 'Summarizing…');
   const name = transcribing ? tr('Trascrizione', 'Transcription') : tr('Sintesi', 'Summary');
 
-  const bar = (
-    <div
-      className="bar"
-      role="progressbar"
-      aria-label={name}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={job.progress}
-    >
-      <motion.span
-        initial={false}
-        animate={{ width: `${job.progress}%` }}
-        transition={still ? { duration: 0 } : spring}
-      />
-    </div>
-  );
+  const bar = <Progress value={job.progress} aria-label={name} size="sm" />;
   const cancel = (
     <Button variant="secondary" aria-busy={busy ? 'true' : undefined} onClick={oncancel}>
       {tr('Annulla', 'Cancel')}
@@ -54,17 +38,12 @@ export default function MeetingProgress({ job, compact = false, busy = false, on
   );
 
   return compact ? (
-    <motion.div
-      className="inline meeting-progress"
-      initial={still ? false : { opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={spring}
-    >
+    <div ref={appear} className="inline meeting-progress">
       <h3>{heading}</h3>
       <p className="phase">{phase}</p>
       {bar}
       <div>{cancel}</div>
-    </motion.div>
+    </div>
   ) : (
     <MeetingNotice title={heading} actions={cancel} className="meeting-progress">
       <p className="phase">{phase}</p>

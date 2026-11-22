@@ -20,7 +20,7 @@ const BLOCKED = 'Installa il modello di trascrizione in Impostazioni.';
 
 let browser;
 before(async () => {
-  if (previewUrl) browser = await chromium.launch({ channel: 'msedge', headless: true });
+  if (previewUrl) browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 });
 after(async () => {
   await browser?.close();

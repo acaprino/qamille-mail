@@ -38,7 +38,7 @@ const INNER = {
 const LABEL = { date: 'Due date', datetime: 'Reminder', combobox: 'Owner', chips: 'To' };
 
 expect.configure({ timeout: 4000 });
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1280, height: 900 } });
 const failures = [];
 const defects = [];

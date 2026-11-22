@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { chromium } from '@playwright/test';
 
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'en-US' });
 const page = await context.newPage();
 const errors = [];

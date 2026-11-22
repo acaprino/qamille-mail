@@ -28,7 +28,7 @@
   .mail-row.selected,
   .reply-row.selected,
   .contact-row.active,
-  .sidebar nav button.active,
+  .sidebar nav [aria-current='page'],
   .settings-nav button.active,
   .composer-tab.active,
   .attachment.active,
@@ -185,6 +185,5 @@
     border: 1px solid CanvasText;
   }
 
-  /* Task 17: nav. No rule of its own yet: the sidebar's rows (.sidebar nav button.active, .nav-count) are in the
-     app's rules above. */
+  /* The sidebar's rows are Sigrid's NavItem: the current one carries aria-current, which the rule above draws. */
 }

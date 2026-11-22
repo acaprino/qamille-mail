@@ -13,14 +13,19 @@ export type CheckboxProps = {
   'aria-label'?: string;
   onChange?: (checked: boolean) => void;
   children?: ReactNode;
+  /** The class of the box (the app's rows place it by their own rules). */
+  className?: string;
+  tabIndex?: number;
 };
 
-export default function Checkbox({ checked, indeterminate = false, disabled = false, 'aria-label': ariaLabel, onChange, children }: CheckboxProps) {
+export default function Checkbox({ checked, indeterminate = false, disabled = false, 'aria-label': ariaLabel, onChange, children, className, tabIndex }: CheckboxProps) {
   const box = (
     <SigridCheckbox
       checked={indeterminate ? 'indeterminate' : checked}
       disabled={disabled}
       aria-label={ariaLabel}
+      className={className}
+      {...(tabIndex !== undefined ? { tabIndex } : {})}
       onCheckedChange={(next) => onChange?.(next === true)}
     />
   );

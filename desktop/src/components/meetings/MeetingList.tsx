@@ -3,10 +3,8 @@
 // drawn) or, while there is something in the search field, the results in their place. It holds
 // no data of its own: the shell loads, selects and searches, this draws and reports.
 //
-// The rows of a group arrive and leave with Motion (AnimatePresence; the rows already there when a
-// group appears do not animate). The scroller is a Motion `layoutScroll` box so that a scrolled list
-// does not read as rows that moved.
-import { AnimatePresence, motion } from '../../ui/motion';
+// The rows of a group arrive and leave with Sigrid's motion (`Presence` and `Item` of ui/motion).
+import { Presence } from '../../ui/motion';
 import { Fragment, type ReactNode } from 'react';
 import Button from '../../ui/Button';
 import Icon from '../../ui/Icon';
@@ -173,7 +171,7 @@ export default function MeetingList({
                 {labels[name]}
               </h2>
               <ul className="items">
-                <AnimatePresence initial={false}>
+                <Presence>
                   {groups[name].map((row) => (
                     <MeetingRowItem
                       key={row.key}
@@ -191,7 +189,7 @@ export default function MeetingList({
                       ontranscribe={ontranscribe}
                     />
                   ))}
-                </AnimatePresence>
+                </Presence>
               </ul>
             </div>
           ) : null,
@@ -243,9 +241,7 @@ export default function MeetingList({
         </div>
       </header>
 
-      <motion.div className="list-scroll" layoutScroll>
-        {content}
-      </motion.div>
+      <div className="list-scroll">{content}</div>
     </section>
   );
 }

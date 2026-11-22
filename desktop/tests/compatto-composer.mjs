@@ -10,7 +10,14 @@ import { openApp, css, box } from './support/compatto.mjs';
 
 const results = [];
 const step = async (name, work) => {
-  await work();
+  try {
+    await work();
+  } catch (error) {
+    // A step that fails is told, and the next ones still run: one pass shows every difference from Sigrid, not the first.
+    process.exitCode = 1;
+    console.log(`FAIL STEP ${name}: ${String(error?.message ?? error).split('\n').slice(0, 8).join(' | ').slice(0, 700)}`);
+    return;
+  }
   results.push(name);
   console.log(`PASS ${name}`);
 };
@@ -31,7 +38,7 @@ const resolved = (page, property, token) =>
   );
 
 // ---------- RecipientsInput alone (gallery) ----------
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const context = await browser.newContext({ locale: 'en-US', viewport: { width: 900, height: 700 } });
 const gallery = async (props = {}) => {
   const page = await context.newPage();

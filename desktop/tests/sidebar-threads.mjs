@@ -39,7 +39,7 @@ if (process.argv.includes('--write-fixture')) {
 const native = process.env.QAMILLE_CDP;
 const browser = native
   ? await chromium.connectOverCDP(native)
-  : await chromium.launch({ channel: 'msedge', headless: true });
+  : await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const page = native
   ? browser.contexts()[0].pages()[0]
   : await browser.newPage({ locale: 'en-US', viewport: { width: 1440, height: 1000 } });

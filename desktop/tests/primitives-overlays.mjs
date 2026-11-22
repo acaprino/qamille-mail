@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { mountGallery } from './support/mount.mjs';
 
 const base = process.env.QAMILLE_PREVIEW_URL ?? 'http://127.0.0.1:1420';
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const errors = [];
 const watch = (page) => page.on('pageerror', (error) => errors.push(error.message));
 const count = (page, name) => page.locator(`output[aria-label="${name}"]`).textContent();

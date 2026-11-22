@@ -29,7 +29,7 @@
     font-weight: 600;
   }
   & li strong {
-    font-size: var(--text-md);
+    font-size: var(--text-sm);
   }
   & li p {
     margin: 6px 0 9px;

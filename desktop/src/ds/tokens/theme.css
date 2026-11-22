@@ -1,10 +1,5 @@
 :root {
   color-scheme: light;
-  --text-md: var(--text-sm);
-  --text-lg: 15px;
-  --text-xl: 18px;
-  --text-2xl: 20px;
-  --text-3xl: 26px;
   --radius-full: 999px;
   --radius-sheet: 14px;
   --on-accent-soft: #e6ecff;

@@ -26,7 +26,7 @@ section.calendar-page .cal-rail {
   scrollbar-width: thin;
 }
 section.calendar-page .rail-title {
-  font-size: var(--text-lg);
+  font-size: var(--text-base);
   font-weight: 600;
   line-height: 36px;
   margin: 0 0 -6px;
@@ -159,7 +159,7 @@ section.calendar-page .calendar-toolbar {
 }
 section.calendar-page .week-title {
   margin: 0 0 0 8px;
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
   font-weight: 600;
   letter-spacing: -0.01em;
   white-space: nowrap;
@@ -509,7 +509,7 @@ section.calendar-page .title-input {
   border-bottom: 1px solid var(--border);
   border-radius: 0;
   background: transparent;
-  font-size: var(--text-2xl);
+  font-size: var(--text-xl);
   font-weight: 600;
   letter-spacing: -0.01em;
 }

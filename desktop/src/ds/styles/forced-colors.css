@@ -103,8 +103,9 @@
     border-color: GrayText;
   }
 
-  /* Task 5: tabs. The current tab: a highlighted edge. */
-  [data-scope='tabs'] [data-part='trigger'][data-selected] {
+  /* Task 5: tabs (Sigrid's, and the strip of drafts). The current tab: a highlighted edge. */
+  [data-slot='tabs-trigger'][data-selected],
+  [role='tab'][aria-selected='true'] {
     outline: 2px solid Highlight;
     outline-offset: -2px;
   }

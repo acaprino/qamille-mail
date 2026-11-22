@@ -2,7 +2,8 @@ import { AnimatePresence } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import Button from '../ds/primitives/Button';
 import Icon from '../ds/primitives/Icon';
-import Tabs, { type TabItem } from '../ds/primitives/Tabs';
+import DraftTabs from '../ui/DraftTabs';
+import type { TabItem } from '../ui/Tabs';
 import { desktop, errorText } from '../lib/api';
 import type { ComposerHandle, ComposerState } from '../lib/composer';
 import { tr } from '../lib/i18n';
@@ -214,11 +215,9 @@ export default function ComposerDock(props: ComposerDockProps) {
           <strong>{drafts.length}</strong>
         </span>
         <div className="composer-tabs">
-          <Tabs
+          <DraftTabs
             value={activeId === null ? '' : String(activeId)}
             items={tabItems}
-            variant="plain"
-            activation="manual"
             aria-label={tr('Schede delle bozze', 'Draft tabs')}
             ids={{ trigger: (id) => `compose-tab-${id}`, content: (id) => `compose-panel-${id}` }}
             onPick={pick}

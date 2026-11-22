@@ -142,6 +142,8 @@ Qamille, per decisione del proprietario, non ha librerie proprie di comportament
 - **R15. Un `dist` che si riduca in fase di build (tree-shaking).** `dist/index.js` è un file di 2,3 MB e circa 1,7 MB restano nel pacchetto anche importando solo `WordsProvider` e `MotionProvider`: il pezzo condiviso caricato all'avvio, dalla finestra principale e dal promemoria, passa da 338 kB a 1186 kB (JavaScript totale da 1836 a 2685 kB). Il Task 21 misura l'avvio sull'exe.
 - **R16. Niente `cursor-not-allowed` e `cursor-progress` nelle parti** (`checkbox`, `input`, `radio-group`, `select`, `switch`, `textarea`, `file-drop`). Un'app Windows tiene la freccia (`docs/aspetto-nativo.md`, regola 3). Finché ci sono, `system.css` tiene la freccia su di esse (`[class*='cursor-not-allowed']`) e il controllo 29 di `native-feel.mjs` ammette solo i file di oggi.
 
+- **R17. `Tabs`: gli attributi del chiamante su una scheda, un pulsante accanto alla scheda e un clic sulla scheda già scelta.** La fascia delle bozze aperte sopra il compositore (`ui/DraftTabs.tsx`) ne ha bisogno: una scheda per bozza con icona, titolo e segno di modifiche non salvate, un pulsante che la chiude, `aria-expanded`, `onFocus`. Anche gli id di scheda e pannello (`ids`) che oggi si impostano dopo il disegno (`ui/Tabs.tsx`). Con questo Qamille userebbe `Tabs` di Sigrid anche lì e butterebbe `DraftTabs`.
+
 ## Global Constraints
 
 > **Regola del proprietario (2026-11-22, prevale su tutto ciò che segue): «lavora direttamente in develop», «no worktrees».**

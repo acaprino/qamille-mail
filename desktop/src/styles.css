@@ -2012,7 +2012,8 @@
   overflow-x: auto;
   scrollbar-width: thin;
 }
-.composer-tabs [data-scope='tabs'][data-part='list'] {
+.composer-tabs [role='tablist'] {
+  display: flex;
   align-items: center;
   gap: 6px;
   padding: 4px;
@@ -2036,18 +2037,22 @@
 .composer-tab.save-error {
   border-color: var(--danger);
 }
-.composer-tab > [role='tab'][data-part='trigger'] {
+.composer-tab > [role='tab'] {
   display: flex;
   align-items: center;
   gap: 7px;
   min-width: 0;
   flex: 1;
   padding: 8px 7px 8px 10px;
+  font: inherit;
   font-size: var(--text-2xs);
+  color: inherit;
   text-align: left;
+  background: transparent;
+  border: 0;
   border-radius: var(--radius-sm);
 }
-.composer-tab > [role='tab'][data-part='trigger'] > span:first-of-type {
+.composer-tab > [role='tab'] > span:first-of-type {
   /* min-width: a flex item does not shrink below its text otherwise, and the ellipsis never shows. */
   min-width: 0;
   white-space: nowrap;

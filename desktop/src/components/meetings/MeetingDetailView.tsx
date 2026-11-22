@@ -197,7 +197,6 @@ export default function MeetingDetailView({
           <Tabs
             value={tab}
             onChange={(value) => ontab(value === 'transcript' ? 'transcript' : 'summary')}
-            variant="underline"
             aria-label={tr('Contenuto della riunione', 'Meeting content')}
             items={[
               { value: 'summary', label: tr('Sintesi', 'Summary') },

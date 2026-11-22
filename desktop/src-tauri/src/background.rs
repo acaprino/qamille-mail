@@ -155,9 +155,31 @@ fn tray_notice(app: &AppHandle) {
 }
 
 /// The one way back to the window: the tray, a second start, a notification, a mail link, a guard
-/// that kept the window during «Esci». The webview is told it is visible before the window shows, so
-/// the first frame is the page, then the window leaves the taskbar and comes to the front.
+/// that kept the window during «Esci». The work runs on the main thread (`restore_on_main`): called
+/// from another thread (a toast's click, an async command, the close watch), the Win32 show of a
+/// maximized first show (`window_shell::show_main`) would run at once while `SetIsVisible` and tao's
+/// `show()` wait in the event loop, and the window would show one frame of its ground. The caller
+/// waits for it, so its next step (a question, the page's open event) comes with the window in view;
+/// on the main thread Tauri runs it at once.
 pub fn restore(app: &AppHandle) {
+    let (done, finished) = std::sync::mpsc::channel();
+    let handle = app.clone();
+    let sent = app.run_on_main_thread(move || {
+        restore_on_main(&handle);
+        let _ = done.send(());
+    });
+    if sent.is_ok() {
+        // Bounded: an event loop held by a modal loop of its own never keeps the caller for long.
+        let _ = finished.recv_timeout(RESTORE_WAIT);
+    }
+}
+
+/// How long `restore` waits for the main thread.
+const RESTORE_WAIT: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// `restore`, on the main thread. The webview is told it is visible before the window shows, so the
+/// first frame is the page, then the window leaves the taskbar and comes to the front.
+fn restore_on_main(app: &AppHandle) {
     let Some(window) = app.get_webview_window("main") else { return };
     crate::native_feel::set_webview_visible(&window, true);
     // `show_main` opens a maximized saved placement maximized, the first time (rule 29).

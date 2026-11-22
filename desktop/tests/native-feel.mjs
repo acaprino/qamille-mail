@@ -547,8 +547,20 @@ check('19. the close button hides, and one restore path brings the window back (
   assert.match(events, /tauri::WindowEvent::Resized\(_\) => background::window_resized\(window\)/, 'a minimized window pauses its webview (background::window_resized)');
   assert.match(rustItem(read('src-tauri/src/recovery.rs'), 'pub fn close_seen('), /!crate::background::hides_on_close\(\)/, 'close_seen tells the page not to close when Rust only hid the window');
   assert.match(read('src/lib/window-close.ts'), /await call<boolean>\('close_seen'\)/, 'the page waits for close_seen before running its guards');
+  // All of it on the main thread: from another thread (a toast's click, an async command, the close
+  // watch) the Win32 show of a maximized first show would run at once while SetIsVisible and tao's
+  // show() are posted, and the window would show one frame of its ground. `restore` sends the work
+  // there and waits for it, bounded, so the caller's next step (a question, the page's open event)
+  // comes with the window in view.
+  const entry = rustItem(background, 'pub fn restore(');
+  assert.match(entry, /\.run_on_main_thread\(move \|\| \{\s*restore_on_main\(&\w+\);/, 'restore runs restore_on_main through run_on_main_thread');
+  assert.match(entry, /\.recv_timeout\(/, 'restore waits for the main thread, and not for ever');
+  const code = background.replace(/(^|\s)\/\/.*$/gm, '$1');
+  assert.equal((code.match(/\brestore_on_main\(/g) ?? []).length, 2, 'restore_on_main is defined once and called only by restore');
+  const confirmClose = rustItem(read('src-tauri/src/commands/meetings.rs'), 'pub async fn meeting_confirm_close(');
+  assert.match(confirmClose, /blocking\(move \|\| \{\s*crate::background::restore\(/, 'meeting_confirm_close waits for the window off the async runtime');
   // The webview is visible before the window shows, then the window comes to the front, on screen.
-  const restore = rustItem(background, 'pub fn restore(');
+  const restore = rustItem(background, 'fn restore_on_main(');
   const at = (part) => {
     const index = restore.indexOf(part);
     assert.ok(index >= 0, `restore: no ${part}`);
@@ -563,7 +575,7 @@ check('19. the close button hides, and one restore path brings the window back (
   // `window_shell::show_main` is the only `.show()` of a window; native_feel::show_main_window and
   // background::restore are the only callers of `show_main`.
   const allowed = { 'window_shell.rs': 'pub fn show_main(' };
-  const callers = { 'native_feel.rs': 'pub fn show_main_window(', 'background.rs': 'pub fn restore(' };
+  const callers = { 'native_feel.rs': 'pub fn show_main_window(', 'background.rs': 'fn restore_on_main(' };
   const shows = (text) => (text.match(/\b[A-Za-z_]\w*\.show\(\)/g) ?? []).length;
   const calls = (text) => (text.match(/\bshow_main\(/g) ?? []).length;
   for (const file of fs.readdirSync(path.join(desktop, 'src-tauri/src'), { recursive: true }).filter((f) => f.endsWith('.rs'))) {
@@ -691,7 +703,7 @@ check('21. the saved placement is applied before the first show and only on a co
   // The first show, from a normal start and from background::restore, is one function.
   const showMain = rustItem(feel, 'pub fn show_main_window(');
   assert.ok(showMain.search(/\bprepare_main_window\(/) >= 0 && showMain.search(/\bprepare_main_window\(/) < showMain.search(/\bshow_main\(/), 'show_main_window prepares, then shows with window_shell::show_main');
-  assert.match(rustItem(read('src-tauri/src/background.rs'), 'pub fn restore('), /\bwindow_shell::show_main\(/, 'background::restore shows with window_shell::show_main');
+  assert.match(rustItem(read('src-tauri/src/background.rs'), 'fn restore_on_main('), /\bwindow_shell::show_main\(/, 'background::restore shows with window_shell::show_main, on the main thread');
   const show = rustItem(shell, 'pub fn show_main(');
   assert.match(show, /\bplacement::first_show\(/, 'show_main asks placement::first_show how to show');
   assert.match(show, /ShowPath::Maximized/, 'show_main has a maximized path');

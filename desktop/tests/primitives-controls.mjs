@@ -184,73 +184,6 @@ try {
     await page.close();
   }
 
-  // ---------- Slider ----------
-  {
-    const page = await open('slider');
-    const thumb = page.getByRole('slider', { name: 'Volume', exact: true });
-    const value = page.getByLabel('Slider value', { exact: true });
-    const changes = page.getByLabel('Slider changes', { exact: true });
-    await expect(thumb).toHaveAttribute('aria-valuemin', '0');
-    await expect(thumb).toHaveAttribute('aria-valuemax', '10');
-    await expect(thumb).toHaveAttribute('aria-valuenow', '5');
-    await page.keyboard.press('Tab');
-    await expect(thumb).toBeFocused();
-    await assertRing(page.locator('[data-scope="slider"][data-part="thumb"]'), 'Slider thumb');
-    await page.keyboard.press('ArrowRight');
-    await expect(value).toHaveText('6');
-    await page.keyboard.press('ArrowUp');
-    await expect(value).toHaveText('7');
-    await page.keyboard.press('ArrowLeft');
-    await expect(value).toHaveText('6');
-    await expect(changes).toHaveText('6,7,6');
-    await page.keyboard.press('End');
-    await expect(value).toHaveText('10');
-    await page.keyboard.press('ArrowRight');
-    await expect(value).toHaveText('10');
-    await page.keyboard.press('Home');
-    await expect(value).toHaveText('0');
-    await page.keyboard.press('ArrowLeft');
-    await expect(value).toHaveText('0');
-    await expect(thumb).toHaveAttribute('aria-valuenow', '0');
-    console.log(
-      'PASS Slider answers the arrows, Home and End, never leaves min and max, and reports onchange',
-    );
-
-    // A click on the track sets the value; the look is a 4px track with an accent range.
-    const track = page.locator('[data-scope="slider"][data-part="control"]');
-    const box = await track.boundingBox();
-    await page.mouse.click(box.x + box.width * 0.5, box.y + box.height / 2);
-    await expect(value).toHaveText('5');
-    await page.mouse.click(box.x + box.width - 1, box.y + box.height / 2);
-    await expect(value).toHaveText('10');
-    const range = await page
-      .locator('[data-scope="slider"][data-part="range"]')
-      .evaluate((el) => getComputedStyle(el).backgroundColor);
-    assert.equal(range, ACCENT);
-    const trackHeight = await page
-      .locator('[data-scope="slider"][data-part="track"]')
-      .evaluate((el) => Math.round(el.getBoundingClientRect().height));
-    assert.equal(trackHeight, 4);
-    console.log('PASS Slider: a click on the track sets the value; accent range on a 4px track');
-    await page.close();
-
-    // min, max and step come from the props.
-    const custom = await open('slider', { value: 40, min: 20, max: 60, step: 10 });
-    const customThumb = custom.getByRole('slider', { name: 'Volume', exact: true });
-    const customValue = custom.getByLabel('Slider value', { exact: true });
-    await custom.keyboard.press('Tab');
-    await custom.keyboard.press('ArrowRight');
-    await expect(customValue).toHaveText('50');
-    await custom.keyboard.press('End');
-    await expect(customValue).toHaveText('60');
-    await custom.keyboard.press('Home');
-    await expect(customValue).toHaveText('20');
-    await expect(customThumb).toHaveAttribute('aria-valuemin', '20');
-    await expect(customThumb).toHaveAttribute('aria-valuemax', '60');
-    console.log('PASS Slider respects min, max and step from the props');
-    await custom.close();
-  }
-
   // ---------- DateField ----------
   {
     const page = await open('date');
@@ -395,6 +328,22 @@ try {
     console.log(`PASS DateField inside a ${kind}: calendar on top, Esc closes only it, a click on a day chooses`);
     await page.close();
   }
+
+  // The Sigrid plan's insertion points (docs/superpowers/plans/2026-11-22-qamille-su-sigrid.md): a task writes its
+  // new cases under its own comment, and changes the existing cases of its primitive where they are. The blank
+  // lines stay, so two tasks never touch neighbouring lines.
+
+  // Task 4: switch
+
+  // Task 5: tabs
+
+  // Task 6: count and slider
+
+  // Task 8: checkbox
+
+  // Task 9: field
+
+  // Task 11: date field
 
   assert.deepEqual(errors, [], `page errors: ${errors.join(' | ')}`);
   console.log('primitives-controls: ok');

@@ -1,4 +1,4 @@
-import { motion, useIsPresent, useReducedMotion, type Variants } from 'motion/react';
+import { motion, useIsPresent, useReducedMotion, type Variants } from '../ui/motion';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import Button from '../ds/primitives/Button';
 import Tooltip from '../ds/primitives/Tooltip';
@@ -17,8 +17,9 @@ import type { Draft, UndoAction, Workspace } from '../lib/types';
 import { cn } from '../lib/utils';
 import RecipientInput, { splitRecipients } from './contacts/RecipientInput';
 import RichEditor, { type RichEditorHandle } from './RichEditor';
-import { imeComposing } from '../ds/ime';
+import { imeComposing } from '../lib/ime';
 import './Composer.css';
+import { Input } from '../ui/Input';
 
 // The status value is a stable key: the dock compares it, so only its label is translated.
 export function saveStatusLabel(status: string): string {
@@ -597,7 +598,7 @@ export default function Composer(props: ComposerProps) {
         )}
         <label className="field-row">
           <span>{tr('Oggetto', 'Subject')}</span>
-          <input
+          <Input
             aria-label={tr('Oggetto', 'Subject')}
             value={draft.subject}
             onChange={(event) => {
@@ -679,7 +680,7 @@ export default function Composer(props: ComposerProps) {
             value={s.scheduleDay}
             onChange={(value) => (s.scheduleDay = value)}
           />
-          <input
+          <Input
             className="time-field"
             type="time"
             aria-label={tr('Ora di invio', 'Send time')}

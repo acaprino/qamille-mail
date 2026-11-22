@@ -14,9 +14,9 @@ Il sistema visivo è un modulo interno, `desktop/src/ds/`, non un pacchetto. L�
 |---|---|
 | `tokens/theme.css` | Tutti i token, nei due temi, con i valori di «Compatto»; in più `--accent-pro` e `--ring`, i nomi che leggono i componenti di unlumen, con lo stesso indaco di `--accent`. È la sola fonte dei valori. |
 | `styles/system.css` | Base (corpo, titoli, campi, focus) e regole di sistema: pulsanti e campo. Importa `theme.css`, `ark.css` e `tailwind.css` e dichiara il carattere IBM Plex Sans. |
-| `styles/tailwind.css` | Tailwind v4 (tema e utility, niente preflight) e `tw-animate-css`; i nomi di colore di unlumen e shadcn mappati sui token, la tavolozza propria di Tailwind spenta. Vedi «Tailwind». |
+| `styles/tailwind.css` | Tailwind v4 (tema e utility, niente preflight) e `tw-animate-css`, con il tema, i caratteri e le misure di Sigrid e i valori di Qamille per loro (`src/theme/compatto.css`, generato). Vedi «Tailwind». |
 | `styles/ark.css` | In testa gli `@import` di `styles/nav.css` e di `styles/ark/*.css`, poi le regole del suggerimento. Importato da `system.css`. Vedi «Le regole di `ark.css`». |
-| `styles/nav.css` | Le regole proprie di `NavList` e `Count`: `.nav-hover`, `.nav-active-bar`, `.count-digits`. |
+| `styles/nav.css` | Le regole proprie di `NavList` e `Count`: `.nav-hover`, `.nav-active-bar`. |
 | `styles/ark/*.css` | L’aspetto delle parti delle primitive, un file per primitiva: `dialog`, `popover`, `menu`, `select`, `checkbox`, `switch`, `tabs`, `slider`, `date-picker`, `recipients`, `toast`. |
 | `primitives/` | I componenti React (`.tsx`): `Button`, `Field`, `Modal`, `SidePanel`, `Popover`, `Menu`, `Tooltip`, `Select`, `Checkbox`, `Switch`, `Tabs`, `Slider`, `DateField`, `RecipientsInput`, `Toaster`, `Icon`, `Count`, `NavList`. |
 | `unlumen/` | I componenti di unlumen UI copiati nel progetto, con il loro `README.md` che annota le modifiche. Vedi «I componenti di unlumen». |
@@ -38,7 +38,7 @@ Nell’app si usano le primitive React. Ognuna produce HTML con le classi di `sy
 - Un’icona da sola non basta come nome: ogni controllo a sola icona ha `aria-label`. `tip` si mette solo ai pulsanti a sola icona, e `shortcut` solo con una scorciatoia che esiste davvero.
 - Le classi di Tailwind che i componenti di unlumen scrivono sui propri nodi (`relative inline-flex rounded-full…`) non sono un’API: regole di pagina e test scelgono sulle classi di questa guida, su ruoli e nomi e su `data-scope`/`data-part`.
 - Prendi ogni colore, ombra, raggio, livello e dimensione del testo da un token (ADR-0009), nel CSS con `var(--…)` e nelle utility con i nomi di `tailwind.css`. Nell’app un valore letterale nel CSS o nel TSX fa fallire `desktop/tests/style-tokens.mjs`.
-- Imposta il tema con `data-theme="light"` o `data-theme="dark"` sull’elemento `html`. Senza attributo vale il chiaro.
+- Imposta il tema con `data-scheme="light"` o `data-scheme="dark"` sull’elemento `html`. Senza attributo vale il chiaro.
 
 ```tsx
 import Button from '../ds/primitives/Button';
@@ -64,23 +64,22 @@ Sono diciassette componenti più l’icona. La loro forma è fissata: cambiare u
 
 | Primitiva | Basata su | Props | Lo stile sta in |
 |---|---|---|---|
-| `Button` | `<button>` (e `Tooltip` con `tip`) | `variant` (`primary`, `secondary`, `icon`, `text`); `className?`; `ref?`; `tip?`; `shortcut?`; gli attributi di `<button>` | `styles/system.css` |
-| `Field` | `<label>` | `children` (etichetta e controllo); `className?`; gli attributi di `<label>` | `styles/system.css` |
+| `Button` | `Button` di Sigrid (`src/ui/Button.tsx`; `Tooltip` con `tip`) | `variant` (`primary`, `secondary`, `icon`, `text`); `className?`; `ref?`; `tip?`; `shortcut?`; gli attributi di `<button>`. Il tipo è `button` se non si dice altro: chi invia un modulo scrive `type="submit"`. `primary` con la classe `danger` è il distruttivo di Sigrid | — |
+| `Field` | `<label>` con il testo e il controllo; il controllo è `Input` o `Textarea` di Sigrid (`src/ui/Input.tsx`) | gli attributi di `<label>`; `className?` | `.field` in `styles/system.css` (solo lo spazio sotto) |
 | `Modal` | Ark `Dialog`, modale | `size?` (`sm`, `md`, `lg`; predefinito `md`); `onClose?`; `aria-label?` o `aria-labelledby`; `className?`; `children`; gli attributi di `<div>` | `styles/ark/dialog.css` |
 | `SidePanel` | Ark `Dialog`, non modale | `onScrim` (obbligatoria); `narrow?`; `onClose?`; `onOpen?`; `ref?`; `aria-label?`; `className?`; `children`; gli attributi di `<div>` | `styles/ark/dialog.css` |
 | `Popover` | Ark `Popover` | `trigger` (un elemento); `label`; `tip?`; `open?`; `onOpenChange?`; `className?`; `children` | `styles/ark/popover.css` |
 | `Menu` | Ark `Menu` | `trigger` (un elemento); `label`; `items` (`{ value, label, onSelect, destructive?, disabled?, shortcut?, icon?, group?, checked?, title? }[]`); `tip?`; `open?`; `onOpenChange?` | `styles/ark/menu.css` |
 | `Tooltip` | Ark `Tooltip` | `text`; `shortcut?`; `children` (l’unico elemento che fa da attivatore) | `styles/ark.css` |
 | `Select` | Ark `Select` | `value` (`''` = niente); `onChange?`; `items` (`{ value, label, disabled? }[]`); `label?` o `aria-label`; `placeholder?`; `aria-required?`; `aria-invalid?`; `disabled?`; `className?` | `styles/ark/select.css` |
-| `Checkbox` | Ark `Checkbox` | `checked`; `onChange?`; `indeterminate?`; `disabled?`; `aria-label?`; `children` (etichetta) | `styles/ark/checkbox.css` |
-| `Switch` | Apple Switch di unlumen | `checked`; `onChange?`; `disabled?`; `aria-label?`; `children` (etichetta) | `styles/ark/switch.css` e `unlumen/apple-switch.tsx` |
+| `Checkbox` | `Checkbox` di Sigrid (`src/ui/Checkbox.tsx`: la casella è un pulsante con `role="checkbox"`, la riga con l’etichetta è un `<label>`) | `checked`; `onChange?`; `indeterminate?`; `disabled?`; `aria-label?`; `children` (etichetta) | `.checkbox-row` in `styles/system.css` |
+| `Switch` | `Switch` di Sigrid (`src/ui/Switch.tsx`) | `checked`; `onChange?`; `disabled?`; `aria-label?`; `children` (etichetta) | — |
 | `Tabs` | Ark `Tabs` e Motion | `value`; `onChange?`; `items` (`{ value, label, count?, className?, props? }[]`); `aria-label`; `variant?` (`underline`, `segment`, `plain`); `activation?` (`automatic`, `manual`); `ids?`; `onPick?`; `tab?`; `after?` | `styles/ark/tabs.css` |
-| `Slider` | Ark `Slider` | `value`; `onChange?`; `min`; `max`; `step?` (1); `aria-label` | `styles/ark/slider.css` |
 | `DateField` | Ark `DatePicker` | `value` (`'YYYY-MM-DD'` o `''`); `onChange?`; `aria-label`; `min?`; `max?`; `locale?` (`en-US`); `disabled?`; `translations?` | `styles/ark/date-picker.css` |
 | `RecipientsInput` | Ark `TagsInput` e `Combobox` | `value?` (`string[]`); `onChange?`; `suggestions`; `aria-label`; `onQuery?`; `invalid?`; `placeholder?`; `disabled?`; `inputRef?`; `pending?`; `onPendingChange?`; `translations?`; `listTranslations?`; `suggestionsLabel?`; `className?` | `styles/ark/recipients.css` |
 | `Toaster` | Ark `Toast` | `label`; `closeLabel`; l’esportazione `notify(message, error?, actions?)` mostra un avviso, con al massimo due azioni (`NoticeAction = { label, run }`) | `styles/ark/toast.css` |
 | `Icon` | SVG | `name`; `size?` (20); `stroke?` (1,7) | `primitives/Icon.tsx` |
-| `Count` | Animate Digits di unlumen | `value` (`number` o `string`); `className?` | `styles/nav.css` (`.count-digits`) |
+| `Count` | `Count` di Sigrid (`src/ui/Count.tsx`) | `value` (`number` o `string`); `className?` | — |
 | `NavList` / `NavItem` | Sidebar 001 di unlumen, Motion | `NavList`: `group?` (`'nav'`); `className?`; gli attributi di `<nav>`. `NavItem`: `active?`; `hint?`; `className?`; gli attributi di `<button>` | `styles/nav.css` (`.nav-hover`, `.nav-active-bar`) |
 
 ### Button
@@ -448,27 +447,6 @@ Con `tab`, `after` e `onPick`, come nelle schede delle bozze:
 </div>
 ```
 
-### Slider
-
-Un cursore a un solo valore, per esempio la posizione del player delle riunioni. `value` è il valore e `onChange` riceve ognuno; `min` e `max` sono obbligatori, `step` vale 1, `aria-label` è obbligatorio. Sinistra e Giù abbassano, Destra e Su alzano di `step`; PagSu e PagGiù di dieci passi; Home e Fine vanno a `min` e `max`; il valore non esce mai da lì. Traccia di 4px in `border-strong`, tratto in `accent`, pomello di 16px (fondo `surface`, bordo di 2px in `accent`) che porta il contorno del focus, staccato di 2px.
-
-```tsx
-import Slider from '../ds/primitives/Slider';
-
-const [position, setPosition] = useState(0);
-
-<Slider aria-label="Posizione nella registrazione" min={0} max={3600} step={5} value={position} onChange={setPosition} />
-```
-
-```html
-<div data-scope="slider" data-part="root">
-  <div data-scope="slider" data-part="control">
-    <div data-scope="slider" data-part="track"><div data-scope="slider" data-part="range"></div></div>
-    <div data-scope="slider" data-part="thumb" role="slider" aria-label="Posizione nella registrazione" aria-valuemin="0" aria-valuemax="3600" aria-valuenow="0" tabindex="0"><input hidden /></div>
-  </div>
-</div>
-```
-
 ### DateField
 
 Un campo data: una casella di testo che accetta una data scritta e un pulsante che apre un calendario. `value` è la stringa `'YYYY-MM-DD'`, o `''` per nessuna data, ed è l’unica cosa che attraversa il confine; `onChange` riceve la nuova. Il testo mostra la data come la scrive `locale` (giorno per primo per `it-IT`, mese per primo per `en-US`); scrivendo si accetta quella forma e quella ISO. Il testo scritto si legge con Invio e quando il focus esce: una data vera chiama `onChange` (riportata dentro `min`..`max` se fuori), il testo vuoto la svuota, il resto (`2026-13-40`) è rifiutato e la casella torna all’ultima data buona, con `aria-invalid` finché è sbagliata (bordo `danger`). `min` e `max` limitano i giorni; `disabled` blocca casella e pulsante. Il calendario non va in un portale: resta dentro il campo, quindi fa parte del `Modal` o del `SidePanel` che lo contiene (trappola del focus, Esc), e `fixed` evita che il corpo scorrevole di un dialog lo tagli. Ha le viste giorno, mese e anno, in un riquadro di 252px con raggio `radius-lg` e ombra `shadow`; oggi è in `accent-text`, il giorno scelto è pieno di `accent` (e col focus il suo contorno è in `on-accent`, perché uno in `accent` sparirebbe). `translations` (la forma di Ark: i nomi dei pulsanti del calendario e le lettere del segnaposto) li scrive nella lingua dell’app; senza, sono in inglese: l’app lo passa dalla sua lingua. Alto `control-height`. I campi dell’ora restano `<input type="time">` nativi di classe `time-field`.
@@ -581,7 +559,7 @@ import Icon from '../ds/primitives/Icon';
 
 ### Count
 
-Un numero che cambia sul posto: i conteggi della barra laterale, i totali. È Animate Digits di unlumen (`unlumen/animate-digits.tsx`): ogni cifra che cambia scorre su una molla, sfocata e un poco rimpicciolita mentre entra, e le cifre che non cambiano restano ferme. `value` è il numero (o un testo), `className` le classi di pagina (`nav-count` nella barra laterale). Il testo dell'elemento sono le sole cifre correnti (quelle che escono sono `aria-hidden`), quindi testo e nome accessibile sono il numero semplice. Con `prefers-reduced-motion` la primitiva rende il solo numero, senza Motion. Il colore, la dimensione e le cifre tabellari vengono dalla classe di pagina; `.count-digits` (in `styles/nav.css`) mette le celle in fila. Non usarlo per un numero che non cambia sotto gli occhi: per quello basta il testo.
+Un numero che cambia sul posto: i conteggi della barra laterale, i totali. È `Count` di Sigrid (`src/ui/Count.tsx`): il testo e il nome accessibile sono il numero, e le cifre non scorrono. `value` è il numero (o un testo), `className` le classi di passo (`nav-count`).
 
 ```tsx
 import Count from '../ds/primitives/Count';
@@ -589,13 +567,6 @@ import Count from '../ds/primitives/Count';
 {!!workspace.counts.Inbox && <Count value={workspace.counts.Inbox} className="nav-count" />}
 ```
 
-```html
-<span class="count-digits nav-count">
-  <span class="inline-flex items-center tabular-nums">…una cella per cifra, animata (1, 2)…</span>
-</span>
-<!-- con prefers-reduced-motion -->
-<span class="nav-count">12</span>
-```
 
 ### NavList e NavItem
 
@@ -642,7 +613,6 @@ unlumen UI è un registro di componenti nello stile di shadcn/ui (React, Tailwin
 | File | Da unlumen | A cosa serve |
 |---|---|---|
 | `apple-switch.tsx` | Apple Switch | Il controllo di `Switch`. Modificato: la misura `xs` (la geometria dello switch di «Compatto»: binario di 32×18px, pallino di 14px) e il tono `app` (spento `muted`, acceso `accent`, pallino `on-accent`, alone `accent-pro`). |
-| `animate-digits.tsx` | Animate Digits | Le cifre di `Count`. |
 
 I componenti Pro di unlumen (Motion Tabs Menu, Sidebar 002, Animated Input) richiedono una licenza e non sono inclusi. Al loro posto `Tabs` riprende l’evidenza scorrevole delle primitive libere di unlumen (`tabs`, `highlight`) con un `layoutId` di Motion; `Switch` non ha l’Animated Input. Non copiare codice Pro nel repository.
 
@@ -657,35 +627,11 @@ Per aggiungere un componente:
 
 ## Tailwind
 
-Tailwind CSS v4 entra con `@tailwindcss/vite`; `styles/tailwind.css` importa il tema e le utility, non il preflight: la base resta `system.css`, e il contenuto delle email ricevute conserva i valori del browser. `tw-animate-css` aggiunge le classi d’animazione che i componenti di unlumen usano. La variante `dark:` vale dentro `[data-theme='dark']`.
+Tailwind CSS v4 entra con `@tailwindcss/vite`; `styles/tailwind.css` importa il tema e le utility, non il preflight: la base resta `system.css`, e il contenuto delle email ricevute conserva i valori del browser. `tw-animate-css` aggiunge le classi d’animazione che i componenti di unlumen usano. La variante `dark:` vale dentro `[data-scheme='dark']`.
 
-Ogni nome di colore è quello di unlumen e shadcn, e punta a un token di `theme.css`, quindi una classe e una regola di pagina dicono sempre la stessa cosa, nei due temi (ADR-0011 v3, decisione 4; RA-005). La tavolozza propria di Tailwind è spenta (`--color-*: initial`): esistono solo questi nomi.
+I nomi di colore (`bg-paper`, `text-ink`, `bg-raised`, `bg-primary`…) sono quelli del tema di Sigrid (`vendor/sigrid/src/styles/theme.css`, importato da `tailwind.css`), con i valori di «Compatto» di `src/theme/compatto.css`; la tavolozza propria di Tailwind è spenta (`--color-*: initial`) prima che Sigrid nomini la sua. La vecchia mappa dei nomi di unlumen e shadcn sui token di Qamille non c’è più: le regole di pagina leggono i token di Qamille (alias dei token di Sigrid), le classi di Tailwind leggono quelli di Sigrid, e i due dicono lo stesso colore. Tailwind genera anche le classi che Sigrid scrive nei suoi sorgenti (`@source` su `vendor/sigrid/src`).
 
-| Nome di Tailwind | Token |
-|---|---|
-| `background`, `card`, `popover` | `--surface` |
-| `foreground`, `card-foreground`, `popover-foreground`, `secondary-foreground`, `accent-foreground` | `--text` |
-| `primary` | `--accent` |
-| `primary-foreground` | `--on-accent` |
-| `secondary`, `muted` | `--hover` |
-| `muted-foreground` | `--muted` |
-| `accent` | `--selection` |
-| `accent-pro` | `--accent-pro` |
-| `destructive` | `--danger` |
-| `border` | `--border` |
-| `input` | `--border-strong` |
-| `ring` | `--ring` |
-| `ground` | `--ground` |
-| `sidebar` | `--sidebar` |
-| `sidebar-foreground` | `--sidebar-text` |
-| `sidebar-accent` | `--sidebar-active` |
-
-Anche `font-sans` (`--font-text`) e `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-xl` (`--radius-*`) leggono i token. Attenzione ai nomi che si incrociano: l’`accent` dell’app è l’indaco per agire e in Tailwind si chiama `primary`; `bg-accent` di Tailwind è `--selection`; `accent-pro` e `ring` sono lo stesso indaco di `--accent`; `muted` di Tailwind è un fondo (`--hover`), il testo attenuato dell’app è `text-muted-foreground`.
-
-- I nomi di classe che esistono restano: le regole di pagina, i test e questa guida li usano. Non riscrivere in utility una regola di `styles.css`.
-- Le utility servono per markup nuovo e per i componenti di unlumen. `system.css`, `styles.css` e il CSS dei componenti non stanno in un layer, quindi vincono sulle utility (che stanno nel layer `utilities`): una utility su un elemento che una regola di pagina già stila può non vedersi.
-- Usa solo i nomi della tabella. Non usare la tavolozza propria di Tailwind (`bg-red-500`) né valori arbitrari (`bg-[#…]`, `rounded-[3px]`, `text-[13px]`): `style-tokens.mjs` legge i valori nel CSS e nel TSX, non riconosce i nomi di classe, quindi qui il controllo è tuo.
-- Unisci le classi con `cn` di `cn.ts`, che lascia vincere l’ultima utility in conflitto.
+Il cursore resta la freccia: Sigrid ha ancora `cursor-not-allowed` e `cursor-progress` sui controlli disattivati (richiesta R16), e `system.css` tiene la freccia su di essi (regola 3, controllo 29 di `native-feel.mjs`).
 
 ## Le regole di `ark.css`
 
@@ -706,7 +652,7 @@ Anche `font-sans` (`--font-text`) e `rounded-sm`, `rounded-md`, `rounded-lg`, `r
 
 ## Colore
 
-I valori sono in `tokens/theme.css`; qui i ruoli. La tavolozza è quella di «Compatto»; i componenti di unlumen non portano colori propri e leggono questi token (INV-008).
+I colori di Sigrid sono calcolati dal suo motore dei temi a partire dai parametri di «Compatto» (`src/theme/compatto.ts`) e scritti in `src/theme/compatto.css` (`npm run theme:css`, file generato: non si modifica a mano). I nomi di Qamille per i token che Sigrid possiede (`ground`, `surface`, `text`, `muted`, `border`, `accent`, `selection`, `sidebar*`, `danger`, `success`…) sono alias di quelli di Sigrid in quel file; in `tokens/theme.css` restano solo i token che esistono solo in Qamille (priorità, etichette, avatar, scala dei titoli, raggi, livelli, movimento). La tabella prima/dopo dei valori che sono cambiati è in `tests/tokens-compatto.mjs`. Qui i ruoli. I componenti di unlumen non portano colori propri e leggono questi token (INV-008). I valori citati sotto sono quelli di «Compatto» prima del passaggio a Sigrid dove non diversamente detto.
 
 - **Un solo accento**: l’indaco `accent` (`#4f46e5` nel chiaro, schiarito in `#9a9cf8` nello scuro), con `accent-hover` in hover e `on-accent` per il testo sopra (bianco nel chiaro, quasi nero nello scuro); `accent-text` per testo in accento su `surface` (`#4338ca`; `#aeb0fa` nello scuro), `selection` e `badge`. Serve solo a non letti, selezione, azione principale e conteggi: è il riempimento del pulsante primario, della casella spuntata, del giorno scelto, del tratto del cursore, della barra della scheda scelta, dell’interruttore acceso e del marchio, e il colore del focus. Non introdurre un secondo colore d’azione.
 - **I nomi di unlumen**: `accent-pro` e `ring` sono i colori che leggono i componenti di unlumen (l’alone di Apple Switch, `bg-accent-pro` e `ring-ring` di Tailwind) e valgono lo stesso indaco di `accent` nei due temi. Non sono un secondo accento: non dargli un valore diverso.
@@ -724,7 +670,7 @@ Ogni token entra in entrambi i temi quando il valore scuro differisce. Il tema s
 
 ## Tipografia
 
-Un solo carattere, **IBM Plex Sans** (licenza OFL), variabile (pesi 100–700) e incluso come due file woff2 (latino e latino esteso) in `desktop/public/fonts/ibm-plex-sans/` con `OFL.txt`: l’app è offline e la CSP ha `font-src 'self'`; nessuna dipendenza npm per il carattere. Si dichiara in `system.css` come `IBM Plex Sans`, con `Segoe UI` e `system-ui` di riserva. `font-text` e `font-title` restano due token ma puntano allo stesso carattere: usa `font-text` salvo per titoli (`h1`, `h2`) e marchio, dove si scrive `font-title`.
+Un solo carattere, **IBM Plex Sans** (licenza OFL), quello di Sigrid: i pesi 400, 500 e 600 (latino e latino esteso) più Inter per i glifi fuori dal latino, in `fonts.css` di Sigrid, che Vite impacchetta come file dell’app (l’app è offline e la CSP ha `font-src 'self'`). Qamille non porta file di caratteri propri; i pesi 550, 650 e 700 sono diventati 500 e 600. `--font-text` e `--font-title` sono alias di `--font-sans` di Sigrid. Quanto segue sul carattere variabile e sui due file woff2 in `public/fonts` è superato. Si dichiara in `system.css` come `IBM Plex Sans`, con `Segoe UI` e `system-ui` di riserva. `font-text` e `font-title` restano due token ma puntano allo stesso carattere: usa `font-text` salvo per titoli (`h1`, `h2`) e marchio, dove si scrive `font-title`.
 
 La scala, in `text-2xs`…`text-3xl`: 11,5, 12,5, 13,5, 14, 15, 18, 20 e 26 px. La base è `text-sm` (13,5px, interlinea 1,5), impostata su `body` con il testo levigato (`-webkit-font-smoothing: antialiased`). Il corpo del messaggio è `text-md` con interlinea 1,6 e al massimo 760px di larghezza; il riassunto AI `text-md`; il titolo del messaggio (`h2`) `text-2xl`, peso 600, spaziatura -0,4px (`h1`: `text-3xl`, peso 650, -1px). Pesi: 400 per il testo, 500 per le etichette dei campi e la voce attiva della barra laterale, 600 per titoli, pulsanti e scheda scelta, 700 per il mittente di un messaggio non letto. Non scendere sotto `text-2xs`.
 

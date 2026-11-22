@@ -6,6 +6,7 @@ import { backendText, tr } from '../lib/i18n';
 import type { Answer } from '../lib/types';
 import type { MeetingHit } from '../lib/meetings';
 import { clockTime } from '../lib/meetings';
+import { Input } from '../ui/Input';
 
 export type AssistantProps = {
   openMail: (id: number) => void;
@@ -146,7 +147,7 @@ export default function Assistant({ openMail, openMeeting }: AssistantProps) {
         }}
       >
         <Icon name="spark" size={20} />
-        <input
+        <Input
           aria-label={tr('Chiedi al tuo assistente', 'Ask your assistant')}
           value={question}
           onChange={(e) => setQuestion(e.currentTarget.value)}

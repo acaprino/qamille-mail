@@ -121,10 +121,12 @@ export default function Sidebar({
             onClick={() => selectAccount(null)}
             aria-label={tr('Tutti gli account', 'All accounts')}
             aria-pressed={accountId === null}
+            icon={
+              <span className="account-avatar all-accounts">
+                <Icon name="inbox" size={12} stroke={iconStroke} />
+              </span>
+            }
           >
-            <span className="account-avatar all-accounts">
-              <Icon name="inbox" size={12} stroke={iconStroke} />
-            </span>
             <span className="sidebar-text">{tr('Tutti gli account', 'All accounts')}</span>
           </NavItem>
           {workspace.accounts.map((account) => (
@@ -136,13 +138,15 @@ export default function Sidebar({
               aria-label={collapsed ? tr(`Passa a ${account.name}`, `Switch to ${account.name}`) : undefined}
               title={collapsed ? undefined : `${account.name} · ${account.email}`}
               aria-pressed={accountId === account.id}
+              icon={
+                <span
+                  className="account-avatar"
+                  style={{ '--account-color': `rgb(${account.color.slice(0, 3).join(' ')})` } as React.CSSProperties}
+                >
+                  {initials(account.name)}
+                </span>
+              }
             >
-              <span
-                className="account-avatar"
-                style={{ '--account-color': `rgb(${account.color.slice(0, 3).join(' ')})` } as React.CSSProperties}
-              >
-                {initials(account.name)}
-              </span>
               <span className="account-details sidebar-text">
                 <strong>{account.name}</strong>
                 <small>{account.email}</small>
@@ -158,11 +162,10 @@ export default function Sidebar({
               active={view === id}
               onClick={() => navigate(id)}
               aria-label={collapsed ? folderLabel(id) : undefined}
-              aria-current={view === id ? 'page' : undefined}
+              icon={<Icon name={icon} size={iconSize} stroke={iconStroke} />}
+              end={!!workspace.counts[id] && <Count value={workspace.counts[id]} className="nav-count" />}
             >
-              <Icon name={icon} size={iconSize} stroke={iconStroke} />
               <span className="sidebar-text">{folderLabel(id)}</span>
-              {!!workspace.counts[id] && <Count value={workspace.counts[id]} className="nav-count" />}
             </NavItem>
           ))}
         </NavList>
@@ -177,9 +180,8 @@ export default function Sidebar({
               active={view === `label:${label}`}
               onClick={() => navigate(`label:${label}`)}
               aria-label={label}
-              aria-current={view === `label:${label}` ? 'page' : undefined}
+              icon={<span className="label-dot" style={{ '--dot': `var(--label-${(i % 5) + 1})` } as React.CSSProperties} />}
             >
-              <span className="label-dot" style={{ '--dot': `var(--label-${(i % 5) + 1})` } as React.CSSProperties} />
               <span className="sidebar-text">{label}</span>
             </NavItem>
           ))}
@@ -194,11 +196,10 @@ export default function Sidebar({
               active={view === id}
               onClick={() => navigate(id)}
               aria-label={collapsed ? folderLabel(id) : undefined}
-              aria-current={view === id ? 'page' : undefined}
+              icon={<Icon name={icon} size={iconSize} stroke={iconStroke} />}
+              end={id === 'Assistant' ? <span className="ai-badge">AI</span> : undefined}
             >
-              <Icon name={icon} size={iconSize} stroke={iconStroke} />
               <span className="sidebar-text">{folderLabel(id)}</span>
-              {id === 'Assistant' && <span className="ai-badge">AI</span>}
             </NavItem>
           ))}
         </NavList>

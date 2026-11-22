@@ -122,12 +122,12 @@ try {
   console.log('PASS release executable exposes the Appearance select');
   await combo.click();
   await page.getByRole('option', { name: /^(Dark|Scuro)$/ }).click();
-  await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
+  await page.waitForFunction(() => document.documentElement.dataset.scheme === 'dark');
   await combo.click();
   await page.getByRole('option', { name: /^(Automatic \(system\)|Automatico \(come Windows\))$/ }).click();
-  await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
+  await page.waitForFunction(() => document.documentElement.dataset.scheme === 'dark');
   await page.emulateMedia({ colorScheme: 'light' });
-  await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
+  await page.waitForFunction(() => document.documentElement.dataset.scheme === 'light');
   console.log('PASS release executable follows the system theme in Automatic mode');
 
   // ---- overlays: each one must open in the real webview without a CSP violation ----
@@ -141,7 +141,7 @@ try {
   await fs.mkdir(path.join(root, 'checks/compatto'), { recursive: true });
   for (const scheme of ['light', 'dark']) {
     await page.emulateMedia({ colorScheme: scheme });
-    await page.waitForFunction((want) => document.documentElement.dataset.theme === want, scheme);
+    await page.waitForFunction((want) => document.documentElement.dataset.scheme === want, scheme);
     const frame = await page.evaluate(() => {
       const box = (element) => { const r = element.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height }; };
       const sheet = document.querySelector('.workspace-content');

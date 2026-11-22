@@ -9,7 +9,7 @@
 // (layout) when the rows above it change, and fades out when it leaves. While it fades out it is
 // only a picture: no `data-row-key`, inert and hidden from the accessibility tree, so the row that
 // took its place (the same meeting in another group) is the only one the page and its tests find.
-import { motion, useIsPresent, useReducedMotion } from 'motion/react';
+import { motion, useIsPresent, useReducedMotion } from '../../ui/motion';
 import type { ReactNode } from 'react';
 import Button from '../../ds/primitives/Button';
 import Icon from '../../ds/primitives/Icon';

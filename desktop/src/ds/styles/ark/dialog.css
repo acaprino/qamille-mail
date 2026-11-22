@@ -1,52 +1,6 @@
-/* The rules for the parts are in :where(), so they have no specificity: a page class on the primitive
-   (print.css, .contact-dialog) overrides them the way it overrode .modal.
-   Modal and SidePanel (ADR-0008, ADR-0011), both on Ark UI Dialog. Ark writes data-scope, data-part and
-   data-state; the primitives add data-variant ("modal" or "side"), data-size and data-narrow to tell the
-   two apart. A modal draws in a Portal over everything on --z-modal; a side panel fills its pane
-   (the nearest positioned ancestor) on --z-panel. */
+/* Helpers for what goes inside a window and a side panel (Sigrid draws the window, `Modal`, and the sheet, `SidePanel`): the
+   row of actions, the one that sticks to the foot when the window scrolls, the bar and the body of a panel. */
 
-/* Modal: asks for a decision before continuing. */
-:where([data-scope='dialog'][data-part='backdrop'][data-variant='modal']) {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-modal);
-  background: var(--scrim);
-  animation: dialog-veil-in var(--motion-panel) var(--ease-out);
-}
-:where([data-scope='dialog'][data-part='positioner'][data-variant='modal']) {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-modal);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-}
-:where([data-scope='dialog'][data-part='content'][data-variant='modal']) {
-  width: min(var(--modal-md), calc(100vw - 48px));
-  max-height: calc(100vh - 48px);
-  padding: 22px;
-  overflow: auto;
-  overscroll-behavior: contain;
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow);
-  outline: none;
-  animation: dialog-in var(--motion-panel) var(--ease-out);
-}
-:where([data-scope='dialog'][data-part='content'][data-variant='modal'][data-size='sm']) {
-  width: min(var(--modal-sm), calc(100vw - 48px));
-}
-:where([data-scope='dialog'][data-part='content'][data-variant='modal'][data-size='lg']) {
-  width: min(var(--modal-lg), calc(100vw - 48px));
-}
-/* In :where() too: a dialog that lays its title out in a row with an icon sets its own margin. */
-:where([data-scope='dialog'][data-part='content'][data-variant='modal']) h2 {
-  margin: 0 0 12px;
-  font-size: var(--text-xl);
-}
 .modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -59,7 +13,7 @@
    small window): it sticks to the bottom edge and the content scrolls under it. The negative margins
    stretch its fill over the dialog's 22px padding without moving the buttons; the shadow masks the
    content scrolling just above them and paints nothing when the dialog fits. */
-:where([data-scope='dialog'][data-part='content'][data-variant='modal'])
+:where([data-slot='dialog-content'])
   :is(
     .modal-actions,
     .contact-actions,
@@ -86,7 +40,7 @@
 /* Not motion: the hairline follows the scroll position and never moves by itself, so it stays when
    the system asks for reduced motion (styles.css turns every animation off then). */
 @media (prefers-reduced-motion: reduce) {
-  :where([data-scope='dialog'][data-part='content'][data-variant='modal'])
+  :where([data-slot='dialog-content'])
     :is(
       .modal-actions,
       .contact-actions,
@@ -110,47 +64,8 @@
   }
 }
 
-/* Side panel: looks at or edits one thing without leaving the view; not modal. */
-:where([data-scope='dialog'][data-part='positioner'][data-variant='side']) {
-  position: absolute;
-  inset: 0;
-  z-index: var(--z-panel);
-  display: flex;
-  justify-content: flex-end;
-}
-:where([data-scope='dialog'][data-part='backdrop'][data-variant='side']) {
-  position: absolute;
-  inset: 0;
-  pointer-events: auto;
-  background: var(--scrim-soft);
-  cursor: default;
-}
-:where([data-scope='dialog'][data-part='content'][data-variant='side']) {
-  position: relative;
-  width: min(var(--panel-wide), 78%);
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  color: var(--text);
-  background: var(--surface);
-  border-left: 1px solid var(--border);
-  box-shadow: var(--shadow);
-  outline: none;
-  animation: side-panel-in var(--motion-panel) var(--ease-out);
-}
-:where([data-scope='dialog'][data-part='content'][data-variant='side'][data-narrow]) {
-  width: min(var(--panel-narrow), 100%);
-}
-@media (max-width: 1180px) {
-  :where([data-scope='dialog'][data-part='content'][data-variant='side']) {
-    width: 100%;
-  }
-  :where([data-scope='dialog'][data-part='content'][data-variant='side'][data-narrow]) {
-    width: min(var(--panel-narrow), 100%);
-  }
-}
 /* One side inset for a panel's title, its body and its footer (--panel-pad-x): the three start on one edge. */
-:where([data-scope='dialog'][data-part='content'][data-variant='side']) {
+:where([data-slot='sheet-content']) {
   --panel-pad-x: 20px;
 }
 .side-panel-bar {
@@ -184,28 +99,4 @@
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
-}
-
-@keyframes dialog-veil-in {
-  from {
-    opacity: 0;
-  }
-}
-@keyframes dialog-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.98);
-  }
-}
-@keyframes side-panel-in {
-  from {
-    transform: translateX(24px);
-    opacity: 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  :where([data-scope='dialog'][data-part='backdrop']),
-  :where([data-scope='dialog'][data-part='content']) {
-    animation: none;
-  }
 }

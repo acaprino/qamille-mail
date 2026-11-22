@@ -1,62 +1,31 @@
-@import './nav.css';
-@import './ark/toast.css';
-@import './ark/recipients.css';
-@import './ark/select.css';
-@import './ark/checkbox.css';
-@import './ark/switch.css';
-@import './ark/tabs.css';
-@import './ark/slider.css';
-@import './ark/date-picker.css';
+/* The Sigrid plan (docs/superpowers/plans/2026-11-22-qamille-su-sigrid.md): one block per primitive, under its
+   task's comment and apart from the others by a blank line. A task removes or rewrites only its own block (the
+   comment and its lines, never the blank lines around it), so two tasks never touch neighbouring lines. The imports
+   keep this order, and stay before every rule, as CSS asks. */
+
+/* Task 17: nav */
+
+/* Task 10: toast (drawn by Sigrid: no rules of its own) */
+
+/* Task 15: recipients (drawn by Sigrid's ChipsInput: the box around it is in styles.css) */
+
+/* Task 12: select (drawn by Sigrid: no rules of its own) */
+
+/* Task 8: checkbox (drawn by Sigrid: the row's own rule is in system.css) */
+
+/* Task 4: switch (drawn by Sigrid: no rules of its own) */
+
+/* Task 5: tabs (drawn by Sigrid: no rules of its own) */
+
+/* Task 6: count and slider (Count is Sigrid's, the Slider is gone: nothing used it) */
+
+/* Task 11: date-picker (drawn by Sigrid: no rules of its own) */
+
+/* Task 14: dialog and side panel (drawn by Sigrid: only the helpers for what goes inside them) */
 @import './ark/dialog.css';
-@import './ark/popover.css';
-@import './ark/menu.css';
+
+/* Task 13: popover, menu and tooltip (drawn by Sigrid: no rules of their own) */
 
 /* The look of the Ark UI parts (ADR-0011). Ark gives the behavior and writes data-scope, data-part and
    data-state on every part; the rules here select on those, so nothing needs a class of its own.
    Every value is a token. Layers stay on the ladder of theme.css, portals included. */
-
-/* Tooltip: the hint of a Button with `tip`. A dark chip over any ground, in the sidebar's colors. */
-[data-scope='tooltip'][data-part='positioner'] {
-  z-index: var(--z-toast);
-}
-[data-scope='tooltip'][data-part='content'] {
-  z-index: var(--z-toast);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  max-width: 280px;
-  padding: 4px 8px;
-  color: var(--sidebar-text-active);
-  background: var(--sidebar);
-  border: 1px solid var(--sidebar-active);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-2xs);
-  line-height: 1.4;
-}
-/* The entry animation only while open: a closing tip then has no animation, so Ark's presence unmounts it
-   at once (with the animation on every state, a closed tip stayed on screen next to the new one). */
-[data-scope='tooltip'][data-part='content'][data-state='open'] {
-  animation: tooltip-in var(--motion-panel) var(--ease-out);
-}
-[data-scope='tooltip'][data-part='content'][hidden] {
-  display: none;
-}
-[data-scope='tooltip'][data-part='content'][data-instant] {
-  animation: none;
-}
-[data-scope='tooltip'][data-part='content'] kbd {
-  padding: 0 4px;
-  line-height: 1.4;
-  color: var(--sidebar-muted);
-  border-color: var(--sidebar-active);
-}
-@keyframes tooltip-in {
-  from {
-    opacity: 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  [data-scope='tooltip'][data-part='content'] {
-    animation: none;
-  }
-}

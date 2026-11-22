@@ -100,12 +100,12 @@ try {
     await page.getByRole('heading', { name: 'Settings', exact: true }).waitFor();
     await page.getByRole('combobox', { name: 'Appearance', exact: true }).click();
     await page.getByRole('option', { name: 'Dark', exact: true }).click();
-    await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
+    await page.waitForFunction(() => document.documentElement.dataset.scheme === 'dark');
     await page.screenshot({ path: '../checks/tauri-dark.png' });
     await page.getByRole('combobox', { name: 'Appearance', exact: true }).click();
     await page.getByRole('option', { name: 'Automatic (system)', exact: true }).click();
     await page.emulateMedia({ colorScheme: 'light' });
-    await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
+    await page.waitForFunction(() => document.documentElement.dataset.scheme === 'light');
   });
   await step('Calendar event persists', async () => {
     await page.getByRole('button', { name: 'Calendar', exact: true }).click();

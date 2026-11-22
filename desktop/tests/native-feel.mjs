@@ -90,7 +90,8 @@ check('2. fields, editors and reading content stay selectable', () => {
   // Rule 3: no hand cursor on the app's controls, in any stylesheet or Tailwind class.
   const dir = path.join(desktop, 'src');
   for (const file of fs.readdirSync(dir, { recursive: true }).filter((f) => /\.(css|tsx)$/.test(f))) {
-    const text = stripComments(fs.readFileSync(path.join(dir, file), 'utf8'));
+    // The one place that names Sigrid's cursor classes is the rule that keeps the arrow on them (check 29).
+    const text = stripComments(fs.readFileSync(path.join(dir, file), 'utf8')).replaceAll(/\[class\*='cursor-(?:not-allowed|progress)'\]/g, '');
     assert.ok(!/cursor:\s*(pointer|not-allowed)|\bcursor-(pointer|not-allowed)\b/.test(text), `${file}: a hand or "not allowed" cursor on a control (docs/aspetto-nativo.md rule 3)`);
   }
 });
@@ -120,15 +121,17 @@ check('3. the startup script picks the same theme as the app', () => {
     };
     context.window = { matchMedia: (q) => ({ matches: q === '(prefers-color-scheme: dark)' && systemDark }), ...context };
     vm.runInNewContext(script, context);
-    assert.equal(dataset.theme, want, `saved=${saved} systemDark=${systemDark}`);
+    assert.equal(dataset.scheme, want, `saved=${saved} systemDark=${systemDark}`);
   }
 });
 
-check('4. native window backgrounds match --ground in theme.css (what html, body and .app-shell paint)', () => {
-  const theme = stripComments(read('src/ds/tokens/theme.css'));
-  const light = theme.match(/:root\s*\{[^}]*?--ground:\s*([^;]+);/);
-  const dark = theme.match(/:root\[data-theme='dark'\]\s*\{[^}]*?--ground:\s*([^;]+);/);
-  assert.ok(light && dark, 'theme.css must define --ground for :root and dark');
+check('4. native window backgrounds match --ground, which is the paper of Sigrid in src/theme/compatto.css (what html, body and .app-shell paint)', () => {
+  // --ground is an alias of --color-paper (compatto.css, generated from Sigrid's engine): the page colour of each scheme.
+  const theme = stripComments(read('src/theme/compatto.css'));
+  assert.match(theme, /--ground:\s*var\(--color-paper\);/, '--ground must be the paper of Sigrid');
+  const light = theme.match(/:root\[data-scheme='light'\]\s*\{[^}]*?--color-paper:\s*([^;]+);/);
+  const dark = theme.match(/:root\[data-scheme='dark'\]\s*\{[^}]*?--color-paper:\s*([^;]+);/);
+  assert.ok(light && dark, 'compatto.css must define --color-paper for light and dark');
   const conf = JSON.parse(read('src-tauri/tauri.conf.json'));
   assert.equal(hex(conf.app.windows[0].backgroundColor), hex(light[1]), 'tauri.conf.json backgroundColor ≠ light --ground');
   const rust = read('src-tauri/src/native_feel.rs').match(/DARK_GROUND: Color = Color\(0x(\w\w), 0x(\w\w), 0x(\w\w), 0xff\)/);
@@ -208,7 +211,7 @@ check('8. the custom title bar keeps what a Windows title bar does (audit F2 F4 
 
 // Node strips the type annotations of these dependency-free modules.
 const { externalAddress, fragmentOf, isHistoryButton, isStrayDrop, opensLinkElsewhere } = await import(pathToFileURL(path.join(desktop, 'src/lib/browser-guards.ts')).href);
-const { imeComposing } = await import(pathToFileURL(path.join(desktop, 'src/ds/ime.ts')).href);
+const { imeComposing } = await import(pathToFileURL(path.join(desktop, 'src/lib/ime.ts')).href);
 check("9. a failed page is the app's to answer, never WebView2's error page (rule 21)", () => {
   const rust = read('src-tauri/src/native_feel.rs');
   assert.match(rust, /SetIsBuiltInErrorPageEnabled\(false\)/, 'the WebView2 error page must stay off');
@@ -1229,6 +1232,32 @@ check('28. the first maximized show is cloaked by DWM only through a guard that 
   assert.ok(!/let _ = [^;]*Cloak::on\b/.test(show), 'never `let _ = Cloak::on(…)`');
   assert.ok(show.search(/Cloak::on\b/) >= 0 && show.search(/Cloak::on\b/) < show.search(/\bshow_maximized\b/), 'the window is cloaked before the Win32 maximize');
   assert.ok(!/\bset_cloak\(|DWMWA_CLOAK/.test(show), 'show_main never cloaks or uncloaks by hand');
+});
+
+// The Sigrid plan, Task 2: check 29.
+check('29. Sigrid draws no web cursor of its own: the pointer stays the arrow (rule 3)', () => {
+  // Sigrid's sources may name `cursor-not-allowed` and `cursor-progress` only where they do today (asked of Sigrid as R16),
+  // and Qamille's base keeps the arrow on them. `cursor-pointer` and every other cursor never appear.
+  const KNOWN = new Set([
+    'components/ui/checkbox.tsx',
+    'components/ui/input.tsx',
+    'components/ui/radio-group.tsx',
+    'components/ui/select.tsx',
+    'components/ui/switch.tsx',
+    'components/ui/textarea.tsx',
+    'internal/file-drop.tsx',
+  ]);
+  const home = path.join(desktop, 'vendor', 'sigrid', 'src');
+  const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => (entry.isDirectory() ? walk(path.join(dir, entry.name)) : [path.join(dir, entry.name)]));
+  for (const file of walk(home).filter((name) => /\.tsx?$/.test(name))) {
+    const cursors = [...fs.readFileSync(file, 'utf8').matchAll(/cursor-([a-z-]+)/g)].map((match) => match[1]);
+    if (!cursors.length) continue;
+    const name = path.relative(home, file).replaceAll('\\', '/');
+    for (const cursor of cursors) assert.ok(['not-allowed', 'progress', 'default'].includes(cursor), `${name} uses cursor-${cursor}: ask Sigrid to drop it`);
+    if (cursors.some((cursor) => cursor !== 'default')) assert.ok(KNOWN.has(name), `${name} is a new file with a web cursor: ask Sigrid to drop it`);
+  }
+  const system = stripComments(read('src/ds/styles/system.css'));
+  assert.match(system, /\[class\*='cursor-not-allowed'\],\s*\[class\*='cursor-progress'\]\s*\{\s*cursor:\s*default;/, "system.css must keep the arrow on Sigrid's disabled and busy controls");
 });
 
 if (failures.length) {

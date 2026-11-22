@@ -3,7 +3,7 @@
 // reads the status every second and publishes it on the capture bus, which the Meetings page
 // listens to. A click opens that meeting on the Meetings page. While it records, the microphone
 // breathes (Motion), still when the system asks for reduced motion.
-import { motion, useReducedMotion } from 'motion/react';
+import { motion, useReducedMotion } from '../../ui/motion';
 import { useEffect, useRef, useState } from 'react';
 import Icon from '../../ds/primitives/Icon';
 import { tr } from '../../lib/i18n';

@@ -162,7 +162,6 @@ export default function ActivityPage({ activities, accounts }: ActivityPageProps
       </div>
       <div className="feed-filters">
         <Tabs
-          variant="segment"
           value={state.filter}
           onChange={(value) => (state.filter = value as ActivityFilter)}
           items={filters}

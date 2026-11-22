@@ -1,0 +1,320 @@
+// The words Sigrid's components say by themselves (the name of a close button, «Page 2 of 5»), in the two languages of
+// the interface. Sigrid ships English placeholders and asks the app for the rest (`WordsProvider`).
+//
+// Each language is a complete `Words` literal, never a partial override or a spread of Sigrid's words: a key that a
+// Sigrid release adds then fails `tsc` here, and tests/sigrid-words.mjs, until it is written in both languages.
+// The `import type` leaves no trace at run time, so this module loads under plain Node (the test) and never pulls
+// Sigrid's bundle in by itself. Never call `tr()` inside: it reads the language when it is called, and the two
+// objects are constants, one per language, so `WordsProvider` always gets the same object for a language.
+import type { Words, WordsOverride } from '@acaprino/sigrid';
+
+const plural = (count: number, one: string, many: string) => (count === 1 ? `1 ${one}` : `${count} ${many}`);
+
+/** Sigrid's own English words, with Qamille's where Qamille says something else (none yet). */
+const ENGLISH: Words = {
+  common: {
+    close: 'Close',
+    undo: 'Undo',
+    notices: 'Notices',
+    error: 'Error',
+    keysTogether: (keys) => keys.join(' + '),
+    keysInSequence: (keys) => keys.join(' then '),
+  },
+  colors: {
+    group: 'Color',
+    names: {
+      '#e34432': 'Red',
+      '#ee6449': 'Coral',
+      '#e8772e': 'Orange',
+      '#a0714a': 'Brown',
+      '#f5a623': 'Amber',
+      '#9bb53a': 'Lime',
+      '#78a271': 'Green',
+      '#2f9e6e': 'Emerald',
+      '#6b9fa0': 'Teal',
+      '#1fa3b4': 'Turquoise',
+      '#297abc': 'Blue',
+      '#6b7a8f': 'Slate',
+      '#4452c4': 'Indigo',
+      '#7b68ee': 'Violet',
+      '#a35fd0': 'Orchid',
+      '#c64fb5': 'Magenta',
+      '#e5659a': 'Pink',
+      '#b83a58': 'Burgundy',
+    },
+    numbered: (position) => `Color ${position}`,
+  },
+  date: {
+    noDate: 'No date',
+    noDateTime: 'No date and time',
+    noRange: 'No dates',
+    clear: 'Clear the date',
+    clearRange: 'Clear the dates',
+    today: 'Today',
+    tomorrow: 'Tomorrow',
+    weekend: 'This weekend',
+    nextDays: (days) => `Next ${days} days`,
+    time: 'Time',
+    timeOfDay: 'Time of day',
+    done: 'Done',
+    calendar: 'Calendar',
+    previous: (span) => `Previous ${span}`,
+    next: (span) => `Next ${span}`,
+  },
+  duration: {
+    hours: 'hours',
+    minutes: 'minutes',
+    none: 'None',
+    short: (hours, minutes) => (hours > 0 && minutes > 0 ? `${hours}h ${minutes}m` : hours > 0 ? `${hours}h` : `${minutes}m`),
+  },
+  sidebar: {
+    collapse: 'Collapse the sidebar',
+    expand: 'Expand the sidebar',
+    search: 'Search the menu',
+    empty: 'No results',
+  },
+  search: {
+    clear: 'Clear the search',
+  },
+  list: {
+    unread: 'Unread',
+  },
+  palette: {
+    placeholder: 'Type a command',
+    empty: 'No command found',
+  },
+  shell: {
+    skip: 'Skip to the content',
+  },
+  window: {
+    minimize: 'Minimize',
+    maximize: 'Maximize',
+    restore: 'Restore',
+    close: 'Close',
+  },
+  combobox: {
+    empty: 'No results',
+    trigger: 'Show the options',
+  },
+  labels: {
+    remove: (label) => `Remove label ${label}`,
+    added: (label) => `Label ${label} added`,
+    pasted: (count) => `${plural(count, 'label', 'labels')} added`,
+    removed: (label) => `Label ${label} removed`,
+    selected: (label) => `Label ${label} selected. Delete or Backspace removes it.`,
+    noneSelected: 'No label selected',
+    count: (count) => plural(count, 'label', 'labels'),
+    removeAll: 'Remove all labels',
+    suggestions: 'Suggestions',
+    invalid: 'not valid',
+  },
+  kinds: { text: 'text', file: 'file', email: 'email', link: 'link' },
+  attachments: {
+    heading: 'Attachments',
+    count: (count) => plural(count, 'attachment', 'attachments'),
+    open: 'Open',
+    openNamed: (title) => `Open: ${title}`,
+    remove: 'Remove',
+    removeNamed: (title) => `Remove: ${title}`,
+    add: 'Add a file or a link',
+    addFile: 'Add a file',
+    dropHere: 'Drop here: it becomes an attachment',
+    hint: (limit) => `Drag a file or a link here, or press to choose one · at most ${limit}`,
+    link: 'Link',
+    pasteLink: 'Paste a link',
+    addLink: 'Add link',
+    badAddress: 'Type a web address, for example https://example.com',
+    textNotice: 'Files and links are added here: text is not an attachment.',
+    arriving: 'Arriving',
+    notUploaded: 'Not uploaded yet from the other device',
+    overLimit: (limit) => `Over the limit of ${limit}`,
+    fileOverLimit: (name, limit) => `“${name}” is over the limit of ${limit}: it was not added.`,
+    filesOverLimit: (count, limit) => `${count} files are over the limit of ${limit}: they were not added.`,
+  },
+  viewer: {
+    zoom: 'Zoom',
+    zoomOut: 'Zoom out',
+    zoomIn: 'Zoom in',
+    pages: 'Pages of the document',
+    page: (page, total) => `Page ${page} of ${total}`,
+    openOriginal: 'Open the original',
+  },
+  checklist: { done: 'Done: ', todo: 'To do: ' },
+};
+
+// The calendar's arrows follow lib/calendar-words.ts: the month view moves by months, the year view by years, the
+// decade view by a page of years.
+const ITALIAN: Words = {
+  common: {
+    close: 'Chiudi',
+    undo: 'Annulla',
+    notices: 'Notifiche',
+    error: 'Errore',
+    keysTogether: (keys) => keys.join(' + '),
+    keysInSequence: (keys) => keys.join(' poi '),
+  },
+  colors: {
+    group: 'Colore',
+    names: {
+      '#e34432': 'Rosso',
+      '#ee6449': 'Corallo',
+      '#e8772e': 'Arancione',
+      '#a0714a': 'Marrone',
+      '#f5a623': 'Ambra',
+      '#9bb53a': 'Lime',
+      '#78a271': 'Verde',
+      '#2f9e6e': 'Smeraldo',
+      '#6b9fa0': 'Verde acqua',
+      '#1fa3b4': 'Turchese',
+      '#297abc': 'Blu',
+      '#6b7a8f': 'Ardesia',
+      '#4452c4': 'Indaco',
+      '#7b68ee': 'Viola',
+      '#a35fd0': 'Orchidea',
+      '#c64fb5': 'Magenta',
+      '#e5659a': 'Rosa',
+      '#b83a58': 'Bordeaux',
+    },
+    numbered: (position) => `Colore ${position}`,
+  },
+  date: {
+    noDate: 'Nessuna data',
+    noDateTime: 'Nessuna data e ora',
+    noRange: 'Nessun intervallo',
+    clear: 'Togli la data',
+    clearRange: 'Togli le date',
+    today: 'Oggi',
+    tomorrow: 'Domani',
+    weekend: 'Questo fine settimana',
+    nextDays: (days) => `Prossimi ${days} giorni`,
+    time: 'Ora',
+    timeOfDay: 'Ora del giorno',
+    done: 'Fatto',
+    calendar: 'Calendario',
+    previous: (span) => (span === 'month' ? 'Mese precedente' : span === 'year' ? 'Anno precedente' : 'Pagina precedente'),
+    next: (span) => (span === 'month' ? 'Mese successivo' : span === 'year' ? 'Anno successivo' : 'Pagina successiva'),
+  },
+  duration: {
+    hours: 'ore',
+    minutes: 'minuti',
+    none: 'Nessuna',
+    short: (hours, minutes) => (hours > 0 && minutes > 0 ? `${hours}h ${minutes}m` : hours > 0 ? `${hours}h` : `${minutes}m`),
+  },
+  sidebar: {
+    collapse: 'Comprimi la barra laterale',
+    expand: 'Espandi la barra laterale',
+    search: 'Cerca nel menu',
+    empty: 'Nessun risultato',
+  },
+  search: {
+    clear: 'Cancella la ricerca',
+  },
+  list: {
+    unread: 'Non letto',
+  },
+  palette: {
+    placeholder: 'Scrivi un comando',
+    empty: 'Nessun comando trovato',
+  },
+  shell: {
+    skip: 'Vai al contenuto',
+  },
+  window: {
+    minimize: 'Riduci a icona',
+    maximize: 'Ingrandisci',
+    restore: 'Ripristina',
+    close: 'Chiudi',
+  },
+  combobox: {
+    empty: 'Nessun risultato',
+    trigger: 'Mostra le opzioni',
+  },
+  labels: {
+    remove: (label) => `Togli l’etichetta ${label}`,
+    added: (label) => `Etichetta ${label} aggiunta`,
+    pasted: (count) => (count === 1 ? '1 etichetta aggiunta' : `${count} etichette aggiunte`),
+    removed: (label) => `Etichetta ${label} tolta`,
+    selected: (label) => `Etichetta ${label} selezionata. Canc o Backspace la toglie.`,
+    noneSelected: 'Nessuna etichetta selezionata',
+    count: (count) => plural(count, 'etichetta', 'etichette'),
+    removeAll: 'Togli tutte le etichette',
+    suggestions: 'Suggerimenti',
+    invalid: 'non valida',
+  },
+  kinds: { text: 'testo', file: 'file', email: 'email', link: 'link' },
+  attachments: {
+    heading: 'Allegati',
+    count: (count) => plural(count, 'allegato', 'allegati'),
+    open: 'Apri',
+    openNamed: (title) => `Apri: ${title}`,
+    remove: 'Togli',
+    removeNamed: (title) => `Togli: ${title}`,
+    add: 'Aggiungi un file o un link',
+    addFile: 'Aggiungi un file',
+    dropHere: 'Rilascia qui: diventa un allegato',
+    hint: (limit) => `Trascina qui un file o un link, o premi per sceglierne uno · al massimo ${limit}`,
+    link: 'Link',
+    pasteLink: 'Incolla un link',
+    addLink: 'Aggiungi il link',
+    badAddress: 'Scrivi un indirizzo web, per esempio https://esempio.it',
+    textNotice: 'Qui si aggiungono file e link: il testo non è un allegato.',
+    arriving: 'In arrivo',
+    notUploaded: 'Non ancora caricato dall’altro dispositivo',
+    overLimit: (limit) => `Oltre il limite di ${limit}`,
+    fileOverLimit: (name, limit) => `“${name}” supera il limite di ${limit}: non è stato aggiunto.`,
+    filesOverLimit: (count, limit) => `${count} file superano il limite di ${limit}: non sono stati aggiunti.`,
+  },
+  viewer: {
+    zoom: 'Zoom',
+    zoomOut: 'Riduci',
+    zoomIn: 'Ingrandisci',
+    pages: 'Pagine del documento',
+    page: (page, total) => `Pagina ${page} di ${total}`,
+    openOriginal: 'Apri l’originale',
+  },
+  checklist: { done: 'Fatto: ', todo: 'Da fare: ' },
+};
+
+/** The words Sigrid says, in the interface language: always the same object for a language. */
+export function qamilleWords(italian: boolean): Words {
+  return italian ? ITALIAN : ENGLISH;
+}
+
+/**
+ * The words of the chips of the recipients' field (`labels`): a chip there is a person or an address, not a label, so the
+ * sentences say «recipient». A `WordsProvider` around the field gives them to Sigrid's ChipsInput, which merges them over the
+ * app's words.
+ */
+export function recipientWords(italian: boolean): WordsOverride {
+  return italian ? RECIPIENTS_ITALIAN : RECIPIENTS_ENGLISH;
+}
+
+const RECIPIENTS_ENGLISH: WordsOverride = {
+  labels: {
+    remove: (name) => `Remove ${name}`,
+    added: (name) => `${name} added`,
+    pasted: (count) => `Pasted ${count} recipients`,
+    removed: (name) => `${name} removed`,
+    selected: (name) => `${name} selected. Press Backspace or Delete to remove it.`,
+    noneSelected: 'No recipient selected',
+    count: (count) => (count === 1 ? '1 recipient' : `${count} recipients`),
+    removeAll: 'Remove all recipients',
+    suggestions: 'Suggestions',
+    invalid: 'not a valid address',
+  },
+};
+
+const RECIPIENTS_ITALIAN: WordsOverride = {
+  labels: {
+    remove: (name) => `Rimuovi ${name}`,
+    added: (name) => `${name} aggiunto`,
+    pasted: (count) => `Incollati ${count} destinatari`,
+    removed: (name) => `${name} rimosso`,
+    selected: (name) => `${name} selezionato. Backspace o Canc per rimuoverlo.`,
+    noneSelected: 'Nessun destinatario selezionato',
+    count: (count) => (count === 1 ? '1 destinatario' : `${count} destinatari`),
+    removeAll: 'Rimuovi tutti i destinatari',
+    suggestions: 'Suggerimenti',
+    invalid: 'indirizzo non valido',
+  },
+};

@@ -182,7 +182,7 @@ try {
     await choose(page.getByRole('combobox', { name: /^Undo time/ }), '10 seconds');
     await choose(page.getByRole('combobox', { name: 'Appearance', exact: true }), 'Dark');
     await page.getByRole('button', { name: 'Save changes' }).click();
-    await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
+    await page.waitForFunction(() => document.documentElement.dataset.scheme === 'dark');
     await open();
     await page.getByRole('button', { name: 'Done', exact: true }).click();
     const progress = notices.getByRole('progressbar');
@@ -197,7 +197,7 @@ try {
     await choose(page.getByRole('combobox', { name: /^Undo time/ }), '5 seconds');
     await choose(page.getByRole('combobox', { name: 'Appearance', exact: true }), 'Light');
     await page.getByRole('button', { name: 'Save changes' }).click();
-    await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
+    await page.waitForFunction(() => document.documentElement.dataset.scheme === 'light');
   });
   await step('Undo Send reopens the complete draft before delivery', async () => {
     await page.getByRole('button', { name: /^New message/ }).click();

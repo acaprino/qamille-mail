@@ -1,4 +1,3 @@
-import { MotionConfig } from 'motion/react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './styles.css';
@@ -7,8 +6,9 @@ import './ds/styles/forced-colors.css';
 import { appearancePreference, resolvedAppearance, systemPrefersDark } from './lib/appearance';
 import { call, desktop } from './lib/api';
 import { installBrowserGuards } from './lib/browser-guards';
+import { SigridRoot } from './ui/SigridRoot';
 
-document.documentElement.dataset.theme = resolvedAppearance(appearancePreference(), systemPrefersDark());
+document.documentElement.dataset.scheme = resolvedAppearance(appearancePreference(), systemPrefersDark());
 installBrowserGuards();
 
 // With no error boundary, an error while rendering or in an effect makes React remove the whole
@@ -21,9 +21,9 @@ function pageFailed(error: unknown) {
 }
 
 // No StrictMode: the root talks to the backend on mount, and its effects must run once.
-// MotionConfig: every Motion animation (Tabs, NavList, Apple Switch, rows) honours reduced motion.
+// SigridRoot: Sigrid's words and motion (it honours the system's reduced-motion setting).
 createRoot(document.getElementById('app')!, { onUncaughtError: pageFailed }).render(
-  <MotionConfig reducedMotion="user">
+  <SigridRoot>
     <App />
-  </MotionConfig>,
+  </SigridRoot>,
 );

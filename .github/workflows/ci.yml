@@ -70,7 +70,15 @@ jobs:
       - run: npm ci
       # The ArtCraft engines the app imports are downloaded, not committed (AGENTS.md, «Motori ArtCraft»).
       - run: npm run artcraft:sync
+      # Sigrid, the design system, the same way (AGENTS.md, «Sigrid»): the latest release of acaprino/sigrid's main.
+      # A new runner has no copy of its own, so without a release the job stops here. The token lifts GitHub's rate
+      # limit for an anonymous runner.
+      - run: npm run sigrid:sync
+        env:
+          GH_TOKEN: ${{ github.token }}
       - run: npm run check
+      # Qamille relies only on Sigrid: no file outside PENDING imports what Sigrid already carries.
+      - run: node --test tests/only-sigrid.mjs
       - run: npm run test:ds
       # Browser tests of the preview that guard the editions (Edge is on the Windows runner); the sign-in screens
       # they pass through are kept as an artifact, to be looked at.

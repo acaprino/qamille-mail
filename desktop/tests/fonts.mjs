@@ -1,13 +1,13 @@
-// The typeface of the app: IBM Plex Sans (variable, weight 100-700), self-hosted from public/fonts
-// (CSP font-src 'self'). Static checks on the files and the CSS, then one browser check that the
-// font is really loaded and is the one used to render the text.
+// The typeface of the app: IBM Plex Sans, the one Sigrid ships (weights 400, 500 and 600, latin and latin-ext, with
+// Inter for the glyphs outside Latin), bundled by Vite as files of the app (CSP font-src 'self'). Static checks on the
+// files and the CSS, then one browser check that the font is really loaded and is the one used to render the text.
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
 const desktop = path.resolve(import.meta.dirname, '..');
-const fontDir = path.join(desktop, 'public', 'fonts', 'ibm-plex-sans');
+const sigridFonts = path.join(desktop, 'vendor', 'sigrid', 'src', 'styles', 'fonts');
 const results = [];
 function step(name, work) {
   return Promise.resolve(work()).then(() => {
@@ -16,75 +16,41 @@ function step(name, work) {
   });
 }
 
-await step('the two woff2 files and the licence are in public/fonts/ibm-plex-sans', () => {
-  for (const name of ['IBMPlexSans-latin-wght.woff2', 'IBMPlexSans-latin-ext-wght.woff2']) {
-    const file = path.join(fontDir, name);
-    assert.ok(fs.existsSync(file), `${name} is missing`);
-    // A real woff2 starts with the signature "wOF2".
-    const head = fs.readFileSync(file).subarray(0, 4).toString('latin1');
-    assert.equal(head, 'wOF2', `${name} is not a woff2 file`);
-  }
-  assert.ok(fs.existsSync(path.join(fontDir, 'OFL.txt')), 'OFL.txt is missing');
-  assert.ok(
-    fs.existsSync(path.join(fontDir, 'README.txt')),
-    'README.txt (origin and version) is missing',
-  );
-});
-
-await step('system.css declares IBM Plex Sans, weight 100 700, with local urls only', () => {
-  const css = fs.readFileSync(path.join(desktop, 'src', 'ds', 'styles', 'system.css'), 'utf8');
-  const blocks = [...css.matchAll(/@font-face\s*\{([^}]*)\}/g)].map((match) => match[1]);
-  const plex = blocks.filter((block) => /font-family:\s*['"]IBM Plex Sans['"]\s*;/.test(block));
-  assert.equal(
-    plex.length,
-    2,
-    'expected two @font-face blocks for IBM Plex Sans (latin, latin-ext)',
-  );
-  for (const block of plex) {
-    assert.match(block, /font-weight:\s*100 700\s*;/, 'the weight range must be 100 700');
-    assert.match(block, /font-display:\s*swap\s*;/);
-    assert.match(block, /unicode-range:/);
-    const urls = [...block.matchAll(/url\(\s*['"]?([^'")]+)['"]?\s*\)/g)].map((match) => match[1]);
-    assert.ok(urls.length > 0, 'the block has no url()');
-    for (const url of urls) {
-      assert.ok(!/^https?:/i.test(url) && !url.startsWith('//'), `${url} is not a local file`);
-      assert.ok(
-        url.startsWith('/fonts/ibm-plex-sans/'),
-        `${url} is not under /fonts/ibm-plex-sans/`,
-      );
-      assert.ok(
-        fs.existsSync(path.join(desktop, 'public', url)),
-        `${url} does not exist in public/`,
-      );
+await step("Sigrid's Plex files (latin and latin-ext, 400, 500, 600) are real woff2 files", () => {
+  for (const weight of [400, 500, 600]) {
+    for (const range of ['latin', 'latin-ext']) {
+      const name = `ibm-plex-sans-${range}-${weight}.woff2`;
+      const file = path.join(sigridFonts, name);
+      assert.ok(fs.existsSync(file), `${name} is missing: run npm run sigrid:sync`);
+      assert.equal(fs.readFileSync(file).subarray(0, 4).toString('latin1'), 'wOF2', `${name} is not a woff2 file`);
     }
   }
-  // No @font-face of the app reaches a host.
-  assert.ok(
-    !blocks.some((block) => /url\(\s*['"]?https?:/i.test(block)),
-    'a @font-face points to a host',
-  );
 });
 
-await step('theme.css points --font-text and --font-title to IBM Plex Sans', () => {
-  const css = fs.readFileSync(path.join(desktop, 'src', 'ds', 'tokens', 'theme.css'), 'utf8');
-  for (const token of ['--font-text', '--font-title']) {
-    const match = css.match(new RegExp(`${token}:\\s*([^;]+);`));
-    assert.ok(match, `${token} is not declared`);
-    assert.ok(
-      match[1].trim().startsWith("'IBM Plex Sans'"),
-      `${token} must start with 'IBM Plex Sans', got ${match[1]}`,
-    );
+await step('the app takes its typeface from Sigrid and declares none of its own', () => {
+  const tailwind = fs.readFileSync(path.join(desktop, 'src', 'ds', 'styles', 'tailwind.css'), 'utf8');
+  assert.match(tailwind, /@import '[^']*vendor\/sigrid\/src\/styles\/fonts\.css';/, "tailwind.css must import Sigrid's fonts.css");
+  for (const file of ['src/ds/styles/system.css', 'src/reminder/reminder.css']) {
+    const css = fs.readFileSync(path.join(desktop, file), 'utf8');
+    assert.ok(!/@font-face/.test(css), `${file} declares a @font-face of its own`);
   }
+  assert.ok(!fs.existsSync(path.join(desktop, 'public', 'fonts')), 'public/fonts still holds a font of the app');
+  const reminder = fs.readFileSync(path.join(desktop, 'src', 'reminder', 'reminder.css'), 'utf8');
+  assert.match(reminder, /vendor\/sigrid\/src\/styles\/fonts\.css/, "the reminder window must import Sigrid's fonts.css");
 });
 
-await step('index.html preloads the latin file only', () => {
+await step("--font-text and --font-title follow --font-sans of Sigrid, which starts with IBM Plex Sans", () => {
+  const generated = fs.readFileSync(path.join(desktop, 'src', 'theme', 'compatto.css'), 'utf8');
+  for (const token of ['--font-text', '--font-title']) {
+    assert.match(generated, new RegExp(`${token}:\\s*var\\(--font-sans\\);`), `${token} must be an alias of --font-sans`);
+  }
+  const theme = fs.readFileSync(path.join(desktop, 'vendor', 'sigrid', 'src', 'styles', 'theme.css'), 'utf8');
+  assert.match(theme, /--font-sans:\s*"IBM Plex Sans"/, '--font-sans must start with IBM Plex Sans');
+});
+
+await step('index.html preloads no font: the files are hashed by the build', () => {
   const html = fs.readFileSync(path.join(desktop, 'index.html'), 'utf8');
-  const preloads = [...html.matchAll(/<link[^>]*rel="preload"[^>]*>/g)].map((match) => match[0]);
-  const fonts = preloads.filter((tag) => /as="font"/.test(tag));
-  assert.equal(fonts.length, 1, 'expected one font preload');
-  assert.match(fonts[0], /href="\/fonts\/ibm-plex-sans\/IBMPlexSans-latin-wght\.woff2"/);
-  assert.match(fonts[0], /type="font\/woff2"/);
-  assert.match(fonts[0], /crossorigin/);
+  assert.ok(!/<link[^>]*rel="preload"[^>]*as="font"/.test(html), 'index.html still preloads a font');
 });
 
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
@@ -98,7 +64,7 @@ try {
   page.on('pageerror', (e) => errors.push(e.message));
   const failed = [];
   page.on('requestfailed', (request) => {
-    if (request.url().includes('/fonts/')) failed.push(request.url());
+    if (/\.woff2(\?|$)/.test(request.url())) failed.push(request.url());
   });
   await page.goto(process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:1420');
   await page.locator('.compose-main').waitFor();
@@ -110,7 +76,7 @@ try {
         .filter((face) => face.family.replace(/['"]/g, '') === 'IBM Plex Sans')
         .map((face) => ({ weight: face.weight, status: face.status }));
       return {
-        check: document.fonts.check('13.5px "IBM Plex Sans"'),
+        check: document.fonts.check('14px "IBM Plex Sans"'),
         bodyFamily: getComputedStyle(document.body).fontFamily,
         faces,
       };
@@ -121,9 +87,10 @@ try {
       `body font-family is ${state.bodyFamily}`,
     );
     // document.fonts.check is also true when no @font-face matches, so the faces are counted too.
-    assert.equal(state.faces.length, 2, 'the document should hold two IBM Plex Sans faces');
-    assert.ok(
-      state.faces.every((face) => face.weight === '100 700'),
+    assert.equal(state.faces.length, 6, 'the document should hold six IBM Plex Sans faces (latin and latin-ext, three weights)');
+    assert.deepEqual(
+      [...new Set(state.faces.map((face) => face.weight))].sort(),
+      ['400', '500', '600'],
       `weights: ${JSON.stringify(state.faces)}`,
     );
     assert.ok(

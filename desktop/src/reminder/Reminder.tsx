@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
+import { motion, useReducedMotion } from '../ui/motion';
 import { listen } from '@tauri-apps/api/event';
 import { call, errorText } from '../lib/api';
 import { setLanguageLocale, tr, useLanguage } from '../lib/i18n';
@@ -107,7 +107,7 @@ export default function Reminder() {
     const colorScheme = window.matchMedia('(prefers-color-scheme: dark)');
     const paint = () => {
       s.systemDark = colorScheme.matches;
-      document.documentElement.dataset.theme = resolvedAppearance(s.appearance, s.systemDark);
+      document.documentElement.dataset.scheme = resolvedAppearance(s.appearance, s.systemDark);
     };
     const appearanceChanged = (event: StorageEvent) => {
       if (event.key === 'qamille:appearance') {

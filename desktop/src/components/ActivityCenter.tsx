@@ -7,7 +7,7 @@
 //    the history button of the footer.
 // The ring advances with the percent and nothing in the card moves on its own: the sidebar is not
 // the place to draw the eye. Errors are history rows, never card content (INV-009).
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from '../ui/motion';
 import { useEffect, useRef, useState } from 'react';
 import Count from '../ds/primitives/Count';
 import Icon from '../ds/primitives/Icon';
@@ -36,7 +36,7 @@ import { useStore } from '../lib/store';
 import { tick } from '../lib/tick';
 import { cn } from '../lib/utils';
 import type { Account, UndoAction } from '../lib/types';
-import { imeComposing } from '../ds/ime';
+import { imeComposing } from '../lib/ime';
 import './ActivityCenter.css';
 
 export type ActivityCenterProps = {

@@ -105,7 +105,7 @@ try {
       route.fulfill({ contentType: 'application/javascript', body: `export default ${JSON.stringify(fixture)};` }),
     );
     await page.goto(url);
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await expect(page.locator('html')).toHaveAttribute('data-scheme', 'dark');
     await expect(page.locator('.message-title')).toHaveText(subject);
     await page.evaluate(() => document.fonts.ready);
     await page.mouse.move(0, 0);

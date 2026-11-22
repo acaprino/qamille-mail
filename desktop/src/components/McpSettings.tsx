@@ -8,6 +8,7 @@ import { tr } from '../lib/i18n';
 import { useReactive } from '../lib/store';
 import type { Workspace } from '../lib/types';
 import AssistantInstallers from './AssistantInstallers';
+import { Input, Textarea } from '../ui/Input';
 
 type Profile = {
   access: 'ReadOnly' | 'Triage' | 'Send';
@@ -161,7 +162,7 @@ export default function McpSettings({ workspace, notify }: McpSettingsProps) {
           <>
             <Field>
               {tr('Profilo assistente', 'Assistant profile')}
-              <input
+              <Input
                 value={state.profileName}
                 onChange={(e) => {
                   state.profileName = e.currentTarget.value;
@@ -212,7 +213,7 @@ export default function McpSettings({ workspace, notify }: McpSettingsProps) {
                     'Calendari consentiti (uno per riga; vuoto = nessuno)',
                     'Allowed calendars (one per line; empty = none)',
                   )}
-                  <textarea
+                  <Textarea
                     rows={2}
                     value={state.calendars}
                     onChange={(e) => (state.calendars = e.currentTarget.value)}

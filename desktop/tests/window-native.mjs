@@ -91,7 +91,7 @@ try {
   await new Promise((resolve, reject) => { second.on('exit', resolve); second.on('error', reject); });
   await expect.poll(async () => (await mainWindowOf(child.pid))?.minimized).toBe(false);
   await page.getByRole('button', { name: 'Toggle dark appearance' }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('html')).toHaveAttribute('data-scheme', 'dark');
   await page.screenshot({ path: path.join(data, 'borderless-dark.png') });
   console.log('PASS minimize, restore on relaunch and dark appearance');
 

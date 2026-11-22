@@ -2,7 +2,7 @@
 // primitives and never writes their classes or a <dialog> by hand (INV-002) nor a native <select>,
 // checkbox or hand-made tablist (INV-003), and never imports @ark-ui (INV-007: only the module does);
 // a command menu is a Menu, never a Popover whose children are all buttons; inside the module,
-// nothing reaches into the app (INV-001). The .tsx files are read with TypeScript's own parser, so a
+// nothing reaches into the app (INV-001); only src/ui and src/theme import Sigrid (INV-009). The .tsx files are read with TypeScript's own parser, so a
 // comment or a string outside a className that mentions a class is not a violation.
 //   node tests/ds-usage.mjs
 import fs from 'node:fs';
@@ -104,6 +104,8 @@ function kindsOf(tree, node, out) {
 // INV-002 and INV-003: markup outside the module.
 for (const file of words(root, /\.tsx$/)) {
   if (file.startsWith(`${DS}${path.sep}`)) continue;
+  // src/ui is where the primitives live from now on (the Sigrid plan): its adapters and its own components write the markup.
+  if (file.startsWith(`${path.join(root, 'ui')}${path.sep}`)) continue;
   const rel = path.relative(root, file).replaceAll('\\', '/');
   const source = fs.readFileSync(file, 'utf8');
   const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
@@ -162,6 +164,73 @@ for (const file of words(root, /\.(tsx?|js)$/)) {
   });
 }
 
+// INV-009 (draft for ADR-0011 v4, plan docs/superpowers/plans/2026-11-22-qamille-su-sigrid.md): only src/ui and
+// src/theme import Sigrid, by its name or by a path into vendor/sigrid; the rest of the app goes through them. The
+// imports are read with TypeScript's parser: a comment or a string that names Sigrid is not an import.
+const SIGRID = '@acaprino/sigrid';
+const SIGRID_HOMES = ['ui/', 'theme/'];
+
+/** Every module specifier of a script, with its line: imports, re-exports, type imports, import() and require(). */
+function moduleSpecifiers(rel, source) {
+  const kind = rel.endsWith('x') ? ts.ScriptKind.TSX : /\.[cm]?js$/.test(rel) ? ts.ScriptKind.JS : ts.ScriptKind.TS;
+  const tree = ts.createSourceFile(rel, source, ts.ScriptTarget.Latest, true, kind);
+  const found = [];
+  const add = (node) => {
+    if (node && ts.isStringLiteralLike(node)) found.push({ specifier: node.text, line: tree.getLineAndCharacterOfPosition(node.getStart(tree)).line + 1 });
+  };
+  const visit = (node) => {
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) add(node.moduleSpecifier);
+    else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)) add(node.moduleReference.expression);
+    else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument)) add(node.argument.literal);
+    else if (ts.isCallExpression(node) && (node.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(node.expression) && node.expression.text === 'require'))) add(node.arguments[0]);
+    ts.forEachChild(node, visit);
+  };
+  visit(tree);
+  return found;
+}
+
+/** The INV-009 problems of `files` ({ rel, source }, rel relative to the src folder `base`). */
+function sigridOutsideItsHomes(files, base) {
+  const vendor = path.join(base, '..', 'vendor', 'sigrid');
+  const inVendor = (specifier, rel) => {
+    if (!specifier.startsWith('.')) return false;
+    const target = path.resolve(base, path.dirname(rel), specifier);
+    return target === vendor || target.startsWith(`${vendor}${path.sep}`);
+  };
+  return files.flatMap(({ rel, source }) =>
+    SIGRID_HOMES.some((home) => rel.startsWith(home))
+      ? []
+      : moduleSpecifiers(rel, source)
+          .filter(({ specifier }) => specifier === SIGRID || specifier.startsWith(`${SIGRID}/`) || inVendor(specifier, rel))
+          .map(({ specifier, line }) => `${rel}:${line}  imports ${specifier}: only src/ui and src/theme import Sigrid (INV-009)`),
+  );
+}
+
+// The check proves itself on files made up here, before it is trusted with the app's: if it stops catching one, the
+// script fails rather than passing on nothing.
+{
+  const base = path.join(desktop, 'inv-009-fixture', 'src');
+  const fixture = [
+    { rel: 'components/Bad.tsx', source: "import { Button } from '@acaprino/sigrid';\nexport default Button;\n" },
+    { rel: 'components/Lazy.tsx', source: "export const load = () => import('@acaprino/sigrid');\n" },
+    { rel: 'lib/sneaky.ts', source: "\nexport * from '../../vendor/sigrid/dist/index.js';\n" },
+    { rel: 'ds/primitives/Kind.ts', source: "export type Kind = import('@acaprino/sigrid').ButtonProps;\n" },
+    { rel: 'components/Note.tsx', source: "// '@acaprino/sigrid' is reached through src/ui.\nexport const name = '@acaprino/sigrid';\n" },
+    { rel: 'ui/Good.tsx', source: "export { WordsProvider } from '@acaprino/sigrid';\n" },
+    { rel: 'theme/good.ts', source: "import type { ThemeDef } from '@acaprino/sigrid';\nexport type T = ThemeDef;\n" },
+  ];
+  const expected = ['components/Bad.tsx:1', 'components/Lazy.tsx:1', 'lib/sneaky.ts:2', 'ds/primitives/Kind.ts:1'];
+  const caught = sigridOutsideItsHomes(fixture, base).map((problem) => problem.split('  ')[0]);
+  if (JSON.stringify(caught) !== JSON.stringify(expected)) problems.push(`INV-009 check is broken: on its fixture it reports ${JSON.stringify(caught)}, not ${JSON.stringify(expected)}`);
+}
+
+problems.push(
+  ...sigridOutsideItsHomes(
+    words(root, /\.(?:[cm]?[jt]sx?)$/).map((file) => ({ rel: path.relative(root, file).replaceAll('\\', '/'), source: fs.readFileSync(file, 'utf8') })),
+    root,
+  ),
+);
+
 // INV-001: the module depends on nothing of the app.
 for (const file of words(DS, /\.(tsx?|js|css)$/)) {
   const rel = path.relative(root, file).replaceAll('\\', '/');
@@ -172,7 +241,14 @@ for (const file of words(DS, /\.(tsx?|js|css)$/)) {
     if (target.startsWith('@tauri-apps')) problems.push(`${rel}:${index + 1}  imports ${target}: the module stays free of the shell`);
     if (target.startsWith('.')) {
       const resolved = path.resolve(path.dirname(file), target);
-      if (resolved !== DS && !resolved.startsWith(`${DS}${path.sep}`)) problems.push(`${rel}:${index + 1}  imports ${target}: the module does not reach into the app`);
+      // The one bridge of the move to Sigrid (the Sigrid plan, Tasks 2 to 20): the Tailwind entry takes Sigrid's theme and
+      // fonts and Qamille's parameters for them. It goes with src/ds at the end.
+      const bridge =
+        rel === 'ds/styles/tailwind.css' &&
+        [path.join(root, 'theme'), path.join(root, '..', 'vendor', 'sigrid')].some((home) => resolved.startsWith(`${home}${path.sep}`));
+      // The primitives drawn by Sigrid are re-exported from src/ui until src/ds goes (Task 20).
+      const reexport = rel.startsWith('ds/primitives/') && resolved.startsWith(`${path.join(root, 'ui')}${path.sep}`);
+      if (!bridge && !reexport && resolved !== DS && !resolved.startsWith(`${DS}${path.sep}`)) problems.push(`${rel}:${index + 1}  imports ${target}: the module does not reach into the app`);
     }
   });
 }
@@ -182,4 +258,4 @@ if (problems.length) {
   console.error(`\nFAIL ${problems.length} uses outside the visual system module (ADR-0011)`);
   process.exit(1);
 }
-console.log('PASS markup goes through the primitives and the module stands alone');
+console.log('PASS markup goes through the primitives, the module stands alone, and only src/ui and src/theme import Sigrid');

@@ -659,29 +659,6 @@ section.calendar-page .confirm-text {
   font-weight: 600;
   color: var(--danger);
 }
-section.calendar-page .danger-text,
-section.calendar-page .danger-solid {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: var(--control-height);
-  padding: 0 10px;
-  border-radius: var(--radius-md);
-  font-size: var(--text-xs);
-  font-weight: 600;
-}
-section.calendar-page .danger-text {
-  margin-left: -10px;
-  color: var(--danger);
-}
-section.calendar-page .danger-text:hover {
-  background: var(--danger-bg);
-}
-section.calendar-page .danger-solid {
-  background: var(--danger);
-  color: var(--surface);
-}
-
 @media (prefers-reduced-motion: reduce) {
   section.calendar-page .cal-row,
   section.calendar-page .cal-dot {

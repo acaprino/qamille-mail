@@ -267,7 +267,7 @@ try {
 
   if (shots) {
     await page.emulateMedia({ colorScheme: 'dark' });
-    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+    await page.evaluate(() => document.documentElement.setAttribute('data-scheme', 'dark'));
     await page.locator('.calendar-event').first().click();
     await page.waitForTimeout(400);
     await shot('3-edit-dark');

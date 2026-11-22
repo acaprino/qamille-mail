@@ -14,6 +14,7 @@ import { tr } from '../../lib/i18n';
 import { deleteMeeting, MeetingError, meetingCall, type MeetingDetail } from '../../lib/meetings';
 import { tick } from '../../lib/tick';
 import './MeetingMenu.css';
+import { Input } from '../../ui/Input';
 
 export type MeetingMenuProps = {
   detail: MeetingDetail;
@@ -139,7 +140,7 @@ export default function MeetingMenu({ detail, title, notify, onchange, ondeleted
           >
             <Field>
               <span>{tr('Nome', 'Name')}</span>
-              <input value={name} onChange={(event) => setName(event.target.value)} maxLength={300} autoComplete="off" />
+              <Input value={name} onChange={(event) => setName(event.target.value)} maxLength={300} autoComplete="off" />
             </Field>
             <div className="modal-actions">
               <Button type="button" variant="secondary" onClick={() => void close()}>

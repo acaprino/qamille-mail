@@ -11,6 +11,7 @@ import Field from '../ds/primitives/Field';
 import { call, errorText } from '../lib/api';
 import { backendText, tr } from '../lib/i18n';
 import { retryable, type VaultStatus } from '../lib/vault';
+import { Input } from '../ui/Input';
 
 type Props = {
   status: Exclude<VaultStatus, { state: 'ready' }>;
@@ -139,7 +140,7 @@ export default function VaultUnlock({ status, done, error, children }: Props) {
           <Field>
             {tr('Frase di trasferimento', 'Transfer passphrase')}
             {/* new-password: a password manager offers nothing saved for this field. */}
-            <input
+            <Input
               type="password"
               value={passphrase}
               autoComplete="new-password"

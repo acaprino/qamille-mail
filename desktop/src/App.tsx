@@ -1,12 +1,12 @@
 import { Suspense, lazy, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
-import { useReducedMotion } from 'motion/react';
+import { useReducedMotion } from './ui/motion';
 import Button from './ds/primitives/Button';
 import Toaster, { notify as showNotice, type NoticeAction } from './ds/primitives/Toaster';
 import { listen } from '@tauri-apps/api/event';
 import Sidebar from './components/Sidebar';
 import WindowControls from './components/WindowControls';
 import MailList from './components/MailList';
-import { imeComposing } from './ds/ime';
+import { imeComposing } from './lib/ime';
 import {
   arrowsMoveMail,
   isAppChord,
@@ -77,6 +77,7 @@ import type {
   Workspace,
   UndoAction,
 } from './lib/types';
+import { Input } from './ui/Input';
 
 // The composer dock is only needed once a draft is open: it is loaded on demand.
 const ComposerDock = lazy(() => import('./components/ComposerDock'));
@@ -1503,7 +1504,7 @@ export default function App() {
   const darkNow = dark();
   const italianNow = isItalian();
   useLayoutEffect(() => {
-    document.documentElement.dataset.theme = darkNow;
+    document.documentElement.dataset.scheme = darkNow;
     saveAppearance(s.appearance);
     void paintWindowBackground();
     void windowAppearance(s.appearance, italianNow);
@@ -1784,7 +1785,7 @@ export default function App() {
               {mailView && (
                 <div className="global-search">
                   <Icon name="search" size={18} />
-                  <input
+                  <Input
                     ref={searchElement}
                     value={s.searchInput}
                     onChange={(event) => {

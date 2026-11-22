@@ -10,6 +10,7 @@ import { regionalLocale } from '../lib/regional';
 import { useReactive } from '../lib/store';
 import type { Account, AccountStoragePolicy, AccountStorageStatus } from '../lib/types';
 import './AccountStorage.css';
+import { Input } from '../ui/Input';
 
 export type AccountStorageProps = {
   accounts: Account[];
@@ -220,7 +221,7 @@ export default function AccountStorage({ accounts, changed, notify }: AccountSto
                   <>
                     <Field>
                       {tr('Limite in GB', 'Limit in GB')}
-                      <input
+                      <Input
                         type="number"
                         aria-label={tr(
                           "Limite dell'archivio dell'account in GB",

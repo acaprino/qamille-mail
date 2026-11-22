@@ -13,7 +13,7 @@ export async function openApp({ theme = 'light', size = { width: 1440, height: 9
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(previewUrl);
   await page.locator('.compose-main').waitFor();
-  if (theme === 'dark') await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'));
+  if (theme === 'dark') await page.evaluate(() => (document.documentElement.dataset.scheme = 'dark'));
   return { browser, context, page, errors };
 }
 

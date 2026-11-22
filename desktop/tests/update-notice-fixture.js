@@ -5,7 +5,7 @@ import UpdateNotice from '../src/components/UpdateNotice.tsx';
 
 const parameters = new URLSearchParams(window.location.search);
 setLanguageChoice(parameters.get('lang') === 'it' ? 'it' : 'en');
-if (parameters.get('theme') === 'dark') document.documentElement.dataset.theme = 'dark';
+if (parameters.get('theme') === 'dark') document.documentElement.dataset.scheme = 'dark';
 window.noticeErrors = [];
 
 mount(UpdateNotice, {

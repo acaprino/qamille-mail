@@ -112,12 +112,12 @@
 
   /* Task 6: slider. No rule of its own. */
 
-  /* Task 8: checkbox. Checked is a filled box. */
-  [data-scope='checkbox'][data-part='control'] {
+  /* Task 8: checkbox (Sigrid's: a button with role=checkbox). Checked is a filled box. */
+  [role='checkbox'][data-slot='checkbox'] {
     border-color: ButtonText;
   }
-  [data-scope='checkbox'][data-part='control'][data-state='checked'],
-  [data-scope='checkbox'][data-part='control'][data-state='indeterminate'] {
+  [role='checkbox'][data-slot='checkbox'][aria-checked='true'],
+  [role='checkbox'][data-slot='checkbox'][aria-checked='mixed'] {
     forced-color-adjust: none;
     background: Highlight;
     border-color: Highlight;

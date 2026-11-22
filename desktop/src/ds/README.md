@@ -72,7 +72,7 @@ Sono diciassette componenti più l’icona. La loro forma è fissata: cambiare u
 | `Menu` | Ark `Menu` | `trigger` (un elemento); `label`; `items` (`{ value, label, onSelect, destructive?, disabled?, shortcut?, icon?, group?, checked?, title? }[]`); `tip?`; `open?`; `onOpenChange?` | `styles/ark/menu.css` |
 | `Tooltip` | Ark `Tooltip` | `text`; `shortcut?`; `children` (l’unico elemento che fa da attivatore) | `styles/ark.css` |
 | `Select` | Ark `Select` | `value` (`''` = niente); `onChange?`; `items` (`{ value, label, disabled? }[]`); `label?` o `aria-label`; `placeholder?`; `aria-required?`; `aria-invalid?`; `disabled?`; `className?` | `styles/ark/select.css` |
-| `Checkbox` | Ark `Checkbox` | `checked`; `onChange?`; `indeterminate?`; `disabled?`; `aria-label?`; `children` (etichetta) | `styles/ark/checkbox.css` |
+| `Checkbox` | `Checkbox` di Sigrid (`src/ui/Checkbox.tsx`: la casella è un pulsante con `role="checkbox"`, la riga con l’etichetta è un `<label>`) | `checked`; `onChange?`; `indeterminate?`; `disabled?`; `aria-label?`; `children` (etichetta) | `.checkbox-row` in `styles/system.css` |
 | `Switch` | `Switch` di Sigrid (`src/ui/Switch.tsx`) | `checked`; `onChange?`; `disabled?`; `aria-label?`; `children` (etichetta) | — |
 | `Tabs` | Ark `Tabs` e Motion | `value`; `onChange?`; `items` (`{ value, label, count?, className?, props? }[]`); `aria-label`; `variant?` (`underline`, `segment`, `plain`); `activation?` (`automatic`, `manual`); `ids?`; `onPick?`; `tab?`; `after?` | `styles/ark/tabs.css` |
 | `DateField` | Ark `DatePicker` | `value` (`'YYYY-MM-DD'` o `''`); `onChange?`; `aria-label`; `min?`; `max?`; `locale?` (`en-US`); `disabled?`; `translations?` | `styles/ark/date-picker.css` |

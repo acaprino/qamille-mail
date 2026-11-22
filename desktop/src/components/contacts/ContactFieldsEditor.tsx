@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
-import Button from '../../ds/primitives/Button';
-import Field from '../../ds/primitives/Field';
-import Icon from '../../ds/primitives/Icon';
+import Button from '../../ui/Button';
+import Field from '../../ui/Field';
+import Icon from '../../ui/Icon';
 import { tr } from '../../lib/i18n';
 import type { ContactFields, Labeled } from '../../lib/types';
 import { Input, Textarea } from '../../ui/Input';

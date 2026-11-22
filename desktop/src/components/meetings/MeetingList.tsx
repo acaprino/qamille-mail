@@ -8,8 +8,8 @@
 // does not read as rows that moved.
 import { AnimatePresence, motion } from '../../ui/motion';
 import { Fragment, type ReactNode } from 'react';
-import Button from '../../ds/primitives/Button';
-import Icon from '../../ds/primitives/Icon';
+import Button from '../../ui/Button';
+import Icon from '../../ui/Icon';
 import { desktop } from '../../lib/api';
 import { tr } from '../../lib/i18n';
 import type { CaptureSnapshot, MeetingHit } from '../../lib/meetings';

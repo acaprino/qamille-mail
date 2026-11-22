@@ -1,7 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react';
-import Button from '../../ds/primitives/Button';
-import Modal from '../../ds/primitives/Modal';
-import Select from '../../ds/primitives/Select';
+import Button from '../../ui/Button';
+import Modal from '../../ui/Modal';
+import Select from '../../ui/Select';
 import { errorText } from '../../lib/api';
 import { tr } from '../../lib/i18n';
 import type { BookView, ContactFields, ContactView } from '../../lib/types';

@@ -11,8 +11,8 @@
 // took its place (the same meeting in another group) is the only one the page and its tests find.
 import { motion, useIsPresent, useReducedMotion } from '../../ui/motion';
 import type { ReactNode } from 'react';
-import Button from '../../ds/primitives/Button';
-import Icon from '../../ds/primitives/Icon';
+import Button from '../../ui/Button';
+import Icon from '../../ui/Icon';
 import { backendText, tr } from '../../lib/i18n';
 import { captureActive, stateLabel, type CaptureSnapshot } from '../../lib/meetings';
 import { clockLabel, type MeetingRow } from '../../lib/meetings-view';

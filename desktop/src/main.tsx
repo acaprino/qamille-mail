@@ -2,7 +2,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import './styles.css';
 // Last: the Contrast-theme rules must win over every page rule (docs/aspetto-nativo.md).
-import './ds/styles/forced-colors.css';
+import './theme/forced-colors.css';
 import { appearancePreference, resolvedAppearance, systemPrefersDark } from './lib/appearance';
 import { call, desktop } from './lib/api';
 import { installBrowserGuards } from './lib/browser-guards';

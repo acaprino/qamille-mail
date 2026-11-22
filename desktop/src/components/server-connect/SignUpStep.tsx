@@ -2,8 +2,8 @@
 // code, password twice, optional username, device name. The server answers the same way whether
 // the email is free or already has an account; «Send the code again» after 60 s.
 import { useEffect, useState, type ReactNode } from 'react';
-import Button from '../../ds/primitives/Button';
-import Field from '../../ds/primitives/Field';
+import Button from '../../ui/Button';
+import Field from '../../ui/Field';
 import DeviceName from './DeviceName';
 import { call, errorText } from '../../lib/api';
 import { tr } from '../../lib/i18n';

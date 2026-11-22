@@ -1,4 +1,4 @@
-// The hairline above a Modal's last row of actions (ds/styles/ark/dialog.css, audit F17) follows the
+// The hairline above a Modal's last row of actions (ui/parts.css, audit F17) follows the
 // dialog's scroll: it tells that more content waits below. It is not motion, so it stays when the
 // system asks for reduced motion, which turns every other animation off (styles.css).
 // Run: node tests/modal-actions-edge.mjs (Vite preview on 127.0.0.1:1420). Synthetic sample data only.

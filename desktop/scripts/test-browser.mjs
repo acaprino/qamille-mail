@@ -20,12 +20,12 @@ const NODE_TEST = new Set([
   'sigrid-sync', 'sigrid-wiring', 'sigrid-words', 'theme-css', 'undo-notices', 'undo-close', 'mailto', 'row-menu', 'notification-open',
 ]);
 // Tools and checks that are not browser tests of the preview, or take arguments.
-// glance-scale also drives the built executable; ds-export runs two full exports (minutes each);
+// glance-scale also drives the built executable;
 // build-check and first-paint make a production build of their own (node tests/build-check.mjs, node tests/first-paint.mjs).
 // They are run by themselves, not here.
 const OTHERS = new Set([
-  'capture', 'style-tokens', 'ds-usage', 'visual-snapshot', 'visual-compare', 'release-theme-probe',
-  'glance-scale', 'ds-export', 'tokens-compatto', 'contrast', 'build-check', 'first-paint',
+  'capture', 'style-tokens', 'ui-usage', 'visual-snapshot', 'visual-compare', 'release-theme-probe',
+  'glance-scale', 'tokens-compatto', 'contrast', 'build-check', 'first-paint',
 ]);
 
 const all = fs

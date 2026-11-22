@@ -2,8 +2,8 @@ import { Fragment, useEffect, useImperativeHandle, useRef, useState, type Keyboa
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import DOMPurify from 'dompurify';
-import Icon from '../ds/primitives/Icon';
-import Tooltip from '../ds/primitives/Tooltip';
+import Icon from '../ui/Icon';
+import Tooltip from '../ui/Tooltip';
 import { tr } from '../lib/i18n';
 
 export type RichEditorHandle = {

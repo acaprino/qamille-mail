@@ -1,8 +1,8 @@
 // One section per primitive, chosen by `which` (see mount.mjs). Test code, so it lives under
 // tests/ and not in the ds module. A task that adds a primitive appends its section here.
 import { lazy, Suspense, useState } from 'react';
-import Button from '../../src/ds/primitives/Button';
-import Icon from '../../src/ds/primitives/Icon';
+import Button from '../../src/ui/Button';
+import Icon from '../../src/ui/Icon';
 import SelectSection from './gallery/Select';
 import CheckboxGallery from './gallery/CheckboxGallery';
 import DateFieldGallery from './gallery/DateFieldGallery';

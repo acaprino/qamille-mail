@@ -6,7 +6,7 @@
 // in with a spring when the state appears (still under prefers-reduced-motion).
 import { motion, useReducedMotion } from '../../ui/motion';
 import type { ReactNode } from 'react';
-import Icon from '../../ds/primitives/Icon';
+import Icon from '../../ui/Icon';
 import { cn } from '../../lib/utils';
 import './MeetingNotice.css';
 

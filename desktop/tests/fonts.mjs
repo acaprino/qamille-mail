@@ -28,9 +28,9 @@ await step("Sigrid's Plex files (latin and latin-ext, 400, 500, 600) are real wo
 });
 
 await step('the app takes its typeface from Sigrid and declares none of its own', () => {
-  const tailwind = fs.readFileSync(path.join(desktop, 'src', 'ds', 'styles', 'tailwind.css'), 'utf8');
+  const tailwind = fs.readFileSync(path.join(desktop, 'src', 'theme', 'tailwind.css'), 'utf8');
   assert.match(tailwind, /@import '[^']*vendor\/sigrid\/src\/styles\/fonts\.css';/, "tailwind.css must import Sigrid's fonts.css");
-  for (const file of ['src/ds/styles/system.css', 'src/reminder/reminder.css']) {
+  for (const file of ['src/theme/base.css', 'src/reminder/reminder.css']) {
     const css = fs.readFileSync(path.join(desktop, file), 'utf8');
     assert.ok(!/@font-face/.test(css), `${file} declares a @font-face of its own`);
   }

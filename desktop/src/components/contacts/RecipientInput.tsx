@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type Ref } from 'react';
-import RecipientsInput from '../../ds/primitives/RecipientsInput';
+import RecipientsInput from '../../ui/RecipientsInput';
 import { call } from '../../lib/api';
 import { tr } from '../../lib/i18n';
 import { validAddress } from '../../lib/mailto';

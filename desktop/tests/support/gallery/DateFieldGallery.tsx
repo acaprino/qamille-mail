@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import DateField from '../../../src/ds/primitives/DateField';
-import Modal from '../../../src/ds/primitives/Modal';
-import SidePanel from '../../../src/ds/primitives/SidePanel';
+import DateField from '../../../src/ui/DateField';
+import Modal from '../../../src/ui/Modal';
+import SidePanel from '../../../src/ui/SidePanel';
 
 export default function DateFieldGallery({ props = {} }: { props?: Record<string, any> }) {
   const [value, setValue] = useState<string>(props.value ?? '');

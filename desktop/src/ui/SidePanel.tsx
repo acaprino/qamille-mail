@@ -1,12 +1,12 @@
 // A panel from the side (looks at or edits one thing without leaving the view), drawn by Sigrid's Sheet in its non-modal
 // form: it does not trap the focus, and the rest of the page stays reachable. Esc, or a click outside, calls `onClose`
 // (or `onScrim` when there is none). The caller closes the panel by unmounting it, which gives the sheet no chance to
-// restore the focus: the panel puts it back on the element that had it when it opened (ds/focus-return.ts). `onOpen`
+// restore the focus: the panel puts it back on the element that had it when it opened (lib/focus-return.ts). `onOpen`
 // runs once it is showing, to place the focus (without it the first control gets it). The panel has its own bar with a
 // close button, so Sigrid's is off. The sheet opens at the edge of the window (it no longer fills the pane it sits in).
 import { useCallback, useRef, type CSSProperties, type HTMLAttributes, type Ref } from 'react';
 import { Sheet, SheetContent } from '@acaprino/sigrid';
-import { useReturnFocus } from '../ds/focus-return';
+import { useReturnFocus } from '../lib/focus-return';
 
 export type SidePanelProps = HTMLAttributes<HTMLDivElement> & {
   narrow?: boolean;

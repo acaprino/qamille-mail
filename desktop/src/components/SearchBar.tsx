@@ -1,10 +1,10 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { calendarWords as dateWords } from '../lib/calendar-words';
-import Button from '../ds/primitives/Button';
-import Tooltip from '../ds/primitives/Tooltip';
-import DateField from '../ds/primitives/DateField';
-import Icon from '../ds/primitives/Icon';
-import Select from '../ds/primitives/Select';
+import Button from '../ui/Button';
+import Tooltip from '../ui/Tooltip';
+import DateField from '../ui/DateField';
+import Icon from '../ui/Icon';
+import Select from '../ui/Select';
 import { call } from '../lib/api';
 import { backendText, isItalian, tr } from '../lib/i18n';
 import { regionalLocale, regionalTimeZone } from '../lib/regional';

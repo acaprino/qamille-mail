@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import Icon from '../ds/primitives/Icon';
+import Icon from '../ui/Icon';
 import { fullDate, shortDate } from '../lib/api';
 import { conversationOf, repliesLeft, repliesOf, threadState } from '../lib/groups';
 import { fixedBackendText, tr } from '../lib/i18n';

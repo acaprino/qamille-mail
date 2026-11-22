@@ -4,7 +4,7 @@
 // is, with the notice still here. Builds without the updater never announce anything, so the notice
 // never shows there.
 import { useEffect, useState } from 'react';
-import Button from '../ds/primitives/Button';
+import Button from '../ui/Button';
 import { call, desktop, errorText } from '../lib/api';
 import { tr } from '../lib/i18n';
 import './UpdateNotice.css';

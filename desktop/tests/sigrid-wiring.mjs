@@ -115,7 +115,7 @@ test('CI syncs Sigrid before the type check and checks the only-Sigrid rule', ()
   };
   const order = ['npm ci', 'npm run artcraft:sync', 'npm run sigrid:sync', 'npm run check', 'node --test tests/only-sigrid.mjs'].map(at);
   assert.deepEqual([...order].sort((a, b) => a - b), order, 'npm ci, artcraft:sync, sigrid:sync, check, only-sigrid: in this order');
-  assert.ok(order[2] < at('npm run test:ds') && order[2] < at('npm run test:browser -- onboarding-professional'), 'Sigrid is synced before every check that builds or serves the app');
+  assert.ok(order[2] < at('npm run test:ui') && order[2] < at('npm run test:browser -- onboarding-professional'), 'Sigrid is synced before every check that builds or serves the app');
   // GitHub's API answers an anonymous runner with a low rate limit: the job's token lifts it.
   assert.match(steps[order[2]], /^env:\n {2}GH_TOKEN: \$\{\{ github\.token \}\}$/m, 'the sigrid:sync step needs GH_TOKEN');
 });

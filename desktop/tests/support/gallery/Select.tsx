@@ -2,9 +2,9 @@
 // listener that stands for App.tsx's shortcut handler (same guard, shortcutIgnored): it counts
 // the keys the page would have acted on, so a test can see that a key typed in the list is not one.
 import { useEffect, useState } from 'react';
-import Modal from '../../../src/ds/primitives/Modal';
-import Select from '../../../src/ds/primitives/Select';
-import SidePanel from '../../../src/ds/primitives/SidePanel';
+import Modal from '../../../src/ui/Modal';
+import Select from '../../../src/ui/Select';
+import SidePanel from '../../../src/ui/SidePanel';
 import { shortcutIgnored } from '../../../src/lib/shortcut-guard';
 
 const items = [

@@ -1,5 +1,5 @@
 // Notices stay readable and closable while a Modal is open (native audit T14,
-// src/ds/primitives/Toaster.tsx). An open Ark Modal hides everything outside it (aria-hidden) except
+// src/ui/Toaster.tsx). An open Ark Modal hides everything outside it (aria-hidden) except
 // live regions at <body> level: the toast group is one, in its own Portal, so a notice raised from a
 // dialog (a failed save, an error) is announced and its close button works.
 // Run: node tests/toaster-layer.mjs (Vite preview on 127.0.0.1:1420). Synthetic sample data only.
@@ -54,7 +54,7 @@ try {
   const raise = (message, labels) =>
     page.evaluate(
       async ({ message, labels }) => {
-        const { notify } = await import('/src/ds/primitives/Toaster.tsx');
+        const { notify } = await import('/src/ui/Toaster.tsx');
         window.noticeRuns ??= [];
         notify(
           message,

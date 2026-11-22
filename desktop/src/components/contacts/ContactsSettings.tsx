@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
-import Button from '../../ds/primitives/Button';
-import Checkbox from '../../ds/primitives/Checkbox';
-import Field from '../../ds/primitives/Field';
-import Icon from '../../ds/primitives/Icon';
+import Button from '../../ui/Button';
+import Checkbox from '../../ui/Checkbox';
+import Field from '../../ui/Field';
+import Icon from '../../ui/Icon';
 import { call, errorText } from '../../lib/api';
 import { bookLabel, tr } from '../../lib/i18n';
 import { formatDateTime } from '../../lib/regional';

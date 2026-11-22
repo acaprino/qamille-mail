@@ -9,8 +9,8 @@
 // the place to draw the eye. Errors are history rows, never card content (INV-009).
 import { AnimatePresence, motion, useReducedMotion } from '../ui/motion';
 import { useEffect, useRef, useState } from 'react';
-import Count from '../ds/primitives/Count';
-import Icon from '../ds/primitives/Icon';
+import Count from '../ui/Count';
+import Icon from '../ui/Icon';
 import { backendText, tr } from '../lib/i18n';
 import { regionalLocale, regionalTimeZone } from '../lib/regional';
 import {

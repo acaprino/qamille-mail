@@ -8,10 +8,10 @@
 // closes it, and the recording that start began would otherwise disable the trigger under it
 // and throw the focus to the page.
 import { useRef, useState } from 'react';
-import Button from '../../ds/primitives/Button';
-import Field from '../../ds/primitives/Field';
-import Icon from '../../ds/primitives/Icon';
-import Popover from '../../ds/primitives/Popover';
+import Button from '../../ui/Button';
+import Field from '../../ui/Field';
+import Icon from '../../ui/Icon';
+import Popover from '../../ui/Popover';
 import { errorText } from '../../lib/api';
 import { tr } from '../../lib/i18n';
 import {

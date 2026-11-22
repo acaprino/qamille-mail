@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import Button from '../ds/primitives/Button';
+import Button from '../ui/Button';
 import { call, errorText } from '../lib/api';
 import { tr } from '../lib/i18n';
 import { useReactive } from '../lib/store';

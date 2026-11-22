@@ -1,7 +1,7 @@
 import { AnimatePresence } from '../ui/motion';
 import { useEffect, useRef, useState } from 'react';
-import Button from '../ds/primitives/Button';
-import Icon from '../ds/primitives/Icon';
+import Button from '../ui/Button';
+import Icon from '../ui/Icon';
 import { reportBottomRoom } from '../lib/bottom-room';
 import DraftTabs from '../ui/DraftTabs';
 import type { TabItem } from '../ui/Tabs';

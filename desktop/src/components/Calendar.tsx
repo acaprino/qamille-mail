@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { calendarWords as dateWords } from '../lib/calendar-words';
-import SidePanel from '../ds/primitives/SidePanel';
-import Button from '../ds/primitives/Button';
-import Select from '../ds/primitives/Select';
-import Checkbox from '../ds/primitives/Checkbox';
-import DateField from '../ds/primitives/DateField';
-import Icon from '../ds/primitives/Icon';
+import SidePanel from '../ui/SidePanel';
+import Button from '../ui/Button';
+import Select from '../ui/Select';
+import Checkbox from '../ui/Checkbox';
+import DateField from '../ui/DateField';
+import Icon from '../ui/Icon';
 import { call, desktop, errorText } from '../lib/api';
 import {
   calendarArgs,

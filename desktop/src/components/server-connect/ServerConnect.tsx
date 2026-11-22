@@ -4,8 +4,8 @@
 // this component's state only while the form is open.
 import { useEffect, useRef, useState } from 'react';
 import { useFocusAfterStep } from '../../lib/focus-after-step';
-import Button from '../../ds/primitives/Button';
-import Field from '../../ds/primitives/Field';
+import Button from '../../ui/Button';
+import Field from '../../ui/Field';
 import { call, errorText } from '../../lib/api';
 import { connectGoogle } from '../../lib/google-sign-in';
 import type { Account } from '../../lib/types';

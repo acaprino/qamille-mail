@@ -1,10 +1,10 @@
 import { AnimatePresence, motion, useIsPresent, useReducedMotion, type Variants } from '../ui/motion';
 import { useEffect, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react';
-import Button from '../ds/primitives/Button';
-import Checkbox from '../ds/primitives/Checkbox';
-import Count from '../ds/primitives/Count';
-import Icon from '../ds/primitives/Icon';
-import Tabs from '../ds/primitives/Tabs';
+import Button from '../ui/Button';
+import Checkbox from '../ui/Checkbox';
+import Count from '../ui/Count';
+import Icon from '../ui/Icon';
+import Tabs from '../ui/Tabs';
 import ThreadReplies from './ThreadReplies';
 import { call, fullDate, shortDate } from '../lib/api';
 import { markedParts } from '../lib/search';

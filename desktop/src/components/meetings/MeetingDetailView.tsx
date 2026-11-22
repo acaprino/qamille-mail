@@ -4,10 +4,10 @@
 // of its own: the shell reads the meeting and hands it in; every change goes back up through
 // `onchange` with the meeting as the backend returns it, so the list stays in step.
 import { useRef, useState } from 'react';
-import Button from '../../ds/primitives/Button';
-import Icon from '../../ds/primitives/Icon';
-import Modal from '../../ds/primitives/Modal';
-import Tabs from '../../ds/primitives/Tabs';
+import Button from '../../ui/Button';
+import Icon from '../../ui/Icon';
+import Modal from '../../ui/Modal';
+import Tabs from '../../ui/Tabs';
 import { errorText } from '../../lib/api';
 import { tr } from '../../lib/i18n';
 import { keepFocusInDetail } from '../../lib/meetings-focus';

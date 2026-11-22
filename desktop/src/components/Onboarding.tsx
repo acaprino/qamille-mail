@@ -4,7 +4,7 @@
 // is no way past it without signing in; an unreachable server offers «Retry». It tries the server
 // by itself. The window has no frame, so the screen carries the window controls.
 import { useEffect, useState } from 'react';
-import Button from '../ds/primitives/Button';
+import Button from '../ui/Button';
 import { call, desktop } from '../lib/api';
 import { tr } from '../lib/i18n';
 import type { Probe } from '../lib/server-connect';

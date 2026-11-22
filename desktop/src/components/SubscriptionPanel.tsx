@@ -4,8 +4,8 @@
 // price logic here: plans and state come from the server.
 import { useEffect, useRef, useState } from 'react';
 import { useFocusAfterStep } from '../lib/focus-after-step';
-import Button from '../ds/primitives/Button';
-import { notify } from '../ds/primitives/Toaster';
+import Button from '../ui/Button';
+import { notify } from '../ui/Toaster';
 import { call, errorText } from '../lib/api';
 import { isItalian, tr } from '../lib/i18n';
 import type { AccountInfo, BillingInfo, PlanInfo, Probe, Subscription } from '../lib/server-connect';

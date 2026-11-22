@@ -1,5 +1,5 @@
-@import url('../ds/tokens/theme.css');
-/* The window is its own page and does not load system.css: it takes the tokens, Sigrid's typeface and the font and
+@import url('../theme/qamille-tokens.css');
+/* The window is its own page and does not load base.css: it takes the tokens, Sigrid's typeface and the font and
    control size that Sigrid's theme would give it. */
 @import url('../theme/compatto.css');
 @import url('../../vendor/sigrid/src/styles/fonts.css');

@@ -15,7 +15,7 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@acaprino/sigrid';
-import Icon from '../ds/primitives/Icon';
+import Icon from '../ui/Icon';
 import Tooltip from './Tooltip';
 
 export type MenuItem = {

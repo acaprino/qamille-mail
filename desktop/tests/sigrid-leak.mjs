@@ -70,10 +70,10 @@ try {
   const token = (name) => page.evaluate((name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim(), name);
 
   // The two rooms. The clean one has exactly the sheets clean-room.html links, none of Qamille's base, and none of
-  // the tokens only Qamille writes (--z-toast is in ds/tokens/theme.css); Qamille's has /src/styles.css and them.
+  // the tokens only Qamille writes (--z-toast is in theme/qamille-tokens.css); Qamille's has /src/styles.css and them.
   await mountCleanRoom(page, 'none');
   assert.deepEqual(await sheets(), cleanRoomSheets(), 'the clean room has only the sheets clean-room.html links');
-  assert.ok(!cleanRoomSheets().some((sheet) => sheet === '/src/styles.css' || sheet.startsWith('/src/ds/')), 'clean-room.html links none of Qamille\'s own sheets');
+  assert.ok(!cleanRoomSheets().some((sheet) => ['/src/styles.css', '/src/theme/base.css', '/src/theme/qamille-tokens.css', '/src/ui/parts.css'].includes(sheet)), 'clean-room.html links none of Qamille\'s own sheets');
   assert.equal(await token('--z-toast'), '', 'no Qamille-only token in the clean room');
   assert.notEqual(await token('--color-paper'), '', 'Sigrid\'s tokens are in the clean room');
   await mountGallery(page, 'none');

@@ -3,8 +3,8 @@
 // downloaded models (always behind a confirmation in this window, never a browser `confirm()`)
 // and goes away for good with «Ho capito».
 import { useEffect, useRef, useState } from 'react';
-import Button from '../ds/primitives/Button';
-import Modal from '../ds/primitives/Modal';
+import Button from '../ui/Button';
+import Modal from '../ui/Modal';
 import { call, errorText } from '../lib/api';
 import { tr } from '../lib/i18n';
 import { SERVER_GUIDE_URL } from '../lib/types';

@@ -6,7 +6,7 @@
 // time the user picks a meeting, so picking the open one again reads it again.
 // The shell holds it with `ref` and hands in a meeting it read itself through `accept`.
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
-import Button from '../../ds/primitives/Button';
+import Button from '../../ui/Button';
 import { errorText } from '../../lib/api';
 import { tr } from '../../lib/i18n';
 import { meetingCall, type CaptureSnapshot, type MeetingDetail, type MeetingReadiness } from '../../lib/meetings';

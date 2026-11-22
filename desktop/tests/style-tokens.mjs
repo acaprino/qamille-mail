@@ -1,11 +1,11 @@
-// Every visual value comes from desktop/src/ds/tokens/theme.css (ADR-0008, ADR-0009, ADR-0011).
+// Every visual value comes from desktop/src/theme/qamille-tokens.css (ADR-0008, ADR-0009, ADR-0011).
 // Fails on literal colors, z-index layers, radii and pixel font sizes anywhere else in src/.
 // Run: node tests/style-tokens.mjs
 import fs from 'node:fs';
 import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '../src');
-const THEME = path.join(root, 'ds/tokens/theme.css');
+const THEME = path.join(root, 'theme/qamille-tokens.css');
 // The look Sigrid's engine computes: its parameters (the one place Compatto's colours are written, now) and the
 // stylesheet generated from them (scripts/theme-css.mjs): colours by definition.
 const GENERATED_THEME = [path.join(root, 'theme/compatto.css'), path.join(root, 'theme/compatto.ts')];
@@ -47,7 +47,6 @@ const RULES = [
 function files(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const full = path.join(dir, entry.name);
-    // ds/unlumen is checked too: the vendored components read the tokens like the rest (ADR-0011 v3 INV-008).
     if (entry.isDirectory()) return files(full);
     return /\.(css|tsx?)$/.test(entry.name) && full !== THEME && !GENERATED_THEME.includes(full) ? [full] : [];
   });

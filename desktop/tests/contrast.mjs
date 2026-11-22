@@ -1,4 +1,4 @@
-// WCAG 2.x contrast of the pairs of the theme, measured on src/ds/tokens/theme.css and src/theme/compatto.css. Every text pair has to
+// WCAG 2.x contrast of the pairs of the theme, measured on src/theme/qamille-tokens.css and src/theme/compatto.css. Every text pair has to
 // reach 4.5:1; the non-text pairs of the dark theme (field border, chosen tab, focus ring) 3:1. The themes to check are the arguments (one or more of `light`, `dark`); the dark block falls
 // back on the :root value for a token it does not redeclare. Pure file check.
 //   node tests/contrast.mjs light

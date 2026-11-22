@@ -6,7 +6,7 @@
 // need not change, and is not read.
 import { useId } from 'react';
 import { Button, DateField as SigridDateField } from '@acaprino/sigrid';
-import Icon from '../ds/primitives/Icon';
+import Icon from '../ui/Icon';
 import { tr } from '../lib/i18n';
 
 export type DateFieldProps = {

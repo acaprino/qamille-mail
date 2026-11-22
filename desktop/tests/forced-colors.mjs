@@ -1,4 +1,4 @@
-// Windows Contrast themes (forced colours, audit F10, src/ds/styles/forced-colors.css): against the
+// Windows Contrast themes (forced colours, audit F10, src/theme/forced-colors.css): against the
 // browser preview with `forced-colors: active` emulated, every state that the app shows only with a
 // tint or a shadow must still be visible as a border or an outline in a system colour.
 // Run: node tests/forced-colors.mjs   (Vite preview on 127.0.0.1:1420). Synthetic sample data only.

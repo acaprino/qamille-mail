@@ -1,5 +1,5 @@
-import Button from '../../ds/primitives/Button';
-import Icon from '../../ds/primitives/Icon';
+import Button from '../../ui/Button';
+import Icon from '../../ui/Icon';
 import { bookLabel, tr } from '../../lib/i18n';
 import type { DuplicateView } from '../../lib/types';
 

@@ -12,7 +12,7 @@
   }
   & .detail-title {
     margin: 0;
-    font-size: var(--text-2xl);
+    font-size: var(--text-xl);
     font-weight: 600;
     text-wrap: balance;
   }

@@ -21,10 +21,6 @@ const UNCHANGED = [
   ['--hover', '#f4f5f8'],
   ['--thread-open', '#f7f8fe'],
   ['--sidebar-hover', '#22262e'],
-  ['--text-lg', '15px'],
-  ['--text-xl', '18px'],
-  ['--text-2xl', '20px'],
-  ['--text-3xl', '26px'],
   ['--radius-sm', '4px'],
   ['--radius-md', '6px'],
   ['--radius-lg', '8px'],
@@ -65,12 +61,12 @@ for (const [name, was, now] of CHANGED) {
   if (actual !== now) problems.push(`${name}: expected ${now} (was ${was}), found ${actual ?? 'nothing'}`);
 }
 
-// The type scale below the titles is Sigrid's (12, 13 and 14 px): Qamille's own steps for them are gone, and --text-md
-// follows --text-sm.
-for (const name of ['--text-2xs', '--text-xs', '--text-sm']) {
+// The whole type scale is Sigrid's: 12, 13, 14 and 16 px, and the titles at 18, 20 and 24 px (`lg`, `xl`, `2xl`, since Sigrid
+// 3.1). Qamille writes none of the steps, and no longer has its own `md` or `3xl`. Its titles of 15, 18, 20 and 26 px
+// moved to base, lg, xl and 2xl (16, 18, 20 and 24 px).
+for (const name of ['--text-2xs', '--text-xs', '--text-sm', '--text-base', '--text-md', '--text-lg', '--text-xl', '--text-2xl', '--text-3xl']) {
   if (light.has(name)) problems.push(`${name} is still written by Qamille: the scale is Sigrid's`);
 }
-if (light.get('--text-md') !== 'var(--text-sm)') problems.push(`--text-md: expected var(--text-sm), found ${light.get('--text-md')}`);
 
 // Every token that moved to Sigrid is written in both schemes.
 const hex = /^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/;

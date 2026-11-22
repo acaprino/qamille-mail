@@ -45,6 +45,69 @@ Già pronto in v2.1.0: il motore dei temi (`themeTokens`, `themeVariables`, `The
 - **Ondata A.** Canale, tema e parole non dipendono da P1-P4: si può unire in `develop` da sola.
 - **Lo stop.** Se alla fine dell'ondata A manca P1, il controller si ferma e lo dice al proprietario. Le modifiche vanno fatte in `acaprino/sigrid`, mai in Qamille.
 
+## Che cosa chiedere a Sigrid
+
+Questa sezione si può passare così com'è a chi lavora su `acaprino/sigrid`. Ogni richiesta dice che cosa cambiare, perché serve a Qamille e come lo verifica `desktop/tests/sigrid-preconditions.mjs` sulla copia sincronizzata. Basta che arrivi in una release del `main`: Qamille la prende con `sigrid:sync`.
+
+**P1. Ark, Zag e Motion fuori dal bundle, come peer dependency a versione esatta.**
+- **Che cosa cambiare:**
+  - `@ark-ui/react`, `motion` e `@internationalized/date` passano da `dependencies` a `peerDependencies`, a versione esatta, senza `^`. Oggi sarebbero `5.39.3`, `14.7.1` e `3.12.4`.
+  - Motion sale da 14.6.0 alla versione di Qamille, oppure le due app si accordano su una sola.
+  - In `scripts/build.mjs` gli stessi pacchetti diventano `external`, con i loro sottopercorsi (`@ark-ui/react/*`, `motion/*`). Così `dist/index.js` e `dist/chunks/*` li importano per nome, e dentro non resta codice di Ark né di Zag: Zag arriva con Ark.
+  - Le altre dipendenze (lucide, `class-variance-authority`, `clsx`, `tailwind-merge`, `@material/material-color-utilities`) possono restare nel bundle, ma a versione esatta, come chiede la spec.
+- **Perché:**
+  - Con Ark dentro il bundle, Qamille ha due copie di Zag.
+  - Un popup di Sigrid (il calendario di un `DateField`, la lista di un `Select`) aperto dentro un dialogo di Qamille è un livello che la copia di Qamille non vede. Un clic su un giorno chiude il dialogo, e le due trappole del focus si contendono il focus.
+  - Due copie di Ark o di Zag sono un anti-obiettivo della spec, e due copie di Motion pesano senza servire.
+- **Come lo verifica Qamille:**
+  - `package.json` di Sigrid ha `@ark-ui/react` e `motion` in `peerDependencies` a versione esatta.
+  - `dist/index.js` contiene `from "@ark-ui/react/…"` e `from "motion…"`, e non il testo che Zag ha una volta per copia.
+  - `sigrid:sync` (`checkPeers`) accetta le versioni perché coincidono con quelle di `desktop/package.json`.
+  - In Qamille, `build-check.mjs --strict` conta una copia di Zag, di React e di Motion.
+
+**P2. Le primitive rimaste su Base UI passano ad Ark, e Base UI esce.**
+- **Che cosa cambiare:**
+  - `Dialog`/`DialogRoot`, `Sheet`, `Select`, `Popover`, `DropdownMenu`, `Checkbox`, `Tooltip`, `RadioGroup`, `ToggleGroup`, `Input`, `Textarea` passano su Ark, insieme ai `Collapsible`, `Field` e `PopoverPrimitive` riesportati da `headless.ts`.
+  - `Button` e `Badge` lasciano `useRender`: Ark `asChild`, oppure uno slot di Sigrid.
+  - `@base-ui/react` esce da `package.json`.
+  - Il DOM tiene le parti di Ark (`[data-scope][data-part]`) accanto ai `data-slot`.
+  - È l'obiettivo 4 della spec.
+- **Perché:**
+  - I test di Qamille scelgono le parti di Ark: con Base UI andrebbero riscritti adesso e di nuovo quando le primitive passeranno ad Ark.
+  - Una trappola del focus e una pila di livelli di Base UI accanto a quelle di Ark rifanno il problema di P1 dentro la stessa app.
+- **Come lo verifica Qamille:**
+  - niente `@base-ui` in `package.json`, in `src/` e in `dist/` della copia sincronizzata;
+  - le primitive dell'ondata C hanno le loro parti `[data-scope][data-part]` nella galleria (`primitives-*.mjs`).
+
+**P3. I raggi come parametro della definizione del tema.**
+- **Che cosa cambiare:**
+  - `ThemeDef` prende un campo facoltativo per i raggi. Nome proposto `radii`: `{ sm, md, lg, xl }`, più `button` e `chip` se restano a parte.
+  - `themeTokens(...).shape`, `themeVariables` e `applyTheme` lo scrivono in `--radius-*`.
+  - Senza il campo tutto resta com'è (4/6/10/10).
+  - Il carattere è già a posto: IBM Plex Sans è il predefinito. Le ombre di Park Qamille le accetta: non servono parametri.
+- **Perché:**
+  - I raggi 4/6/8/12 di «Compatto» sono un parametro di Qamille per decisione del proprietario.
+  - Senza il campo, Qamille deve scrivere `--radius-*` da sé sopra quelli di Sigrid: due fonti per lo stesso token, che la spec vieta alla fine della migrazione. Il Task 16 non può finire.
+- **Come lo verifica Qamille:**
+  - `themeTokens({ ...COMPATTO, radii: { sm: 4, md: 6, lg: 8, xl: 12 } }, 'light').shape['--radius-lg']` vale `8px`;
+  - e `--radius-xl` vale `12px`.
+
+  Se Sigrid sceglie un altro nome, si cambia solo quella riga del controllo.
+
+**P4. Gradini di titolo sopra `base`.**
+- **Che cosa cambiare:**
+  - La scala di `src/styles/theme.css` ha gradini sopra `base` (16 px) fino ad almeno 26 px (1.625rem), ciascuno con la sua interlinea (`--text-*--line-height`). Sono gradini di Sigrid, con valori suoi.
+  - La regola di `DESIGN.md` che oggi ammette solo `2xs`, `xs`, `sm` e `base` li ammette per i titoli.
+- **Perché:**
+  - I titoli di Qamille sono di 15, 18, 20 e 26 px. La spec li vuole come gradini in più della scala di Sigrid: «gradini senza valori di un'app».
+  - Senza quei gradini restano token di Qamille, e il Task 16 non può finire. Con i gradini, i titoli prendono i valori di Sigrid più vicini: il Task 16 li elenca.
+- **Come lo verifica Qamille:** `theme.css` della copia sincronizzata definisce un `--text-*` di almeno 1.625rem, con la sua interlinea.
+
+**Facoltative, non bloccano il piano.** Ognuna toglierebbe una riga da «da decidere».
+- `cursor-pointer` e `cursor-not-allowed` tolti da `switch`, `checkbox`, `input`, `radio-group`, `select`, `textarea`, `file-drop`. Contraddicono la regola del layer `base` di Sigrid stessa («the pointer stays an arrow»), e Qamille deve escluderli nel suo Tailwind.
+- Una durata per avviso in `Toasts`, e un annuncio immediato (`alert`) per gli errori.
+- Un parametro per il colore delle caselle, degli interruttori e dei radio accesi, oggi l'inchiostro.
+
 ## Global Constraints
 
 - **Rami.** Ramo `qamille-sigrid`, da `develop`, che torna in `develop` e poi si cancella (`AGENTS.md`).
@@ -230,8 +293,9 @@ Ognuna viene dalla forma di Sigrid, quindi per la strada A vince Sigrid. Nessuna
 - I quattro controlli di `checkPreconditions` leggono solo la copia sincronizzata.
   - **P1:** `package.json` di Sigrid ha `@ark-ui/react` e `motion` in `peerDependencies` a versione esatta, e `dist/index.js` li importa da fuori (`from "@ark-ui/react/…"`, `from "motion…"`). Non c'è codice di Zag dentro: si cerca un testo che Zag ha una volta per copia, scelto leggendo `node_modules/@zag-js/core`.
   - **P2:** niente `@base-ui` in `package.json`, in `src/` e in `dist/`.
-  - **P3:** `--radius-lg` di `themeTokens(...).shape` vale 8px quando la definizione porta i raggi di Compatto. Il nome del campo lo sceglie Sigrid: finché il campo non esiste, il controllo dice «manca».
-  - **P4:** `src/styles/theme.css` ha un gradino `--text-*` di almeno 1.625rem.
+  - **P3:** con `radii: { sm: 4, md: 6, lg: 8, xl: 12 }` nella definizione, `--radius-lg` e `--radius-xl` di `themeTokens(...).shape` valgono 8px e 12px. `radii` è il nome proposto in «Che cosa chiedere a Sigrid»: se Sigrid ne sceglie un altro, cambia solo questa riga.
+  - **P4:** `src/styles/theme.css` ha un gradino `--text-*` di almeno 1.625rem, con la sua interlinea.
+  - Le quattro descrizioni del controllo corrispondono a «Che cosa chiedere a Sigrid»: chi cambia l'una cambia l'altra.
 - Il punto di partenza visivo: `node tests/visual-snapshot.mjs D:\Projects\qamille-mail\capture\sigrid-baseline` sulla base del ramo. `capture/` è git-ignorata. Il Task 17 confronta con questa.
 
 - [ ] **Step 1:** `checkPreconditions` con i suoi test, su una copia finta per ogni caso, in una cartella temporanea. La copia vera si stampa soltanto: oggi dà P1, P2, P3 e P4 falsi, ognuno col suo motivo.
@@ -577,6 +641,12 @@ Ogni task di primitiva segue questi passi; sotto, per ciascuno, solo ciò che è
 - **Dove vanno.** `RecipientsInput`, `NavList`/`NavItem`, `Icon`, `GoogleMark`, `ime.ts` e `focus-return.ts` (se resta) vanno in `desktop/src/ui/`, con i loro `.css` e le regole di `nav.css` e di `ark/recipients.css` legate alle loro classi radice. `cn` diventa quello di Sigrid.
 - **`RecipientsInput`** si costruisce su `ChipsInput` e `Combobox` di Sigrid, se coprono incolla, suggerimenti, convalida e la riga che non cresce oltre `--recipients-max`. Altrimenti si costruisce su Ark direttamente, dentro `src/ui/`, l'unica cartella che può importare `@ark-ui/*`: con P1 è la stessa copia di Sigrid.
 - **`NavList`** tiene la barra della voce attiva (`--accent-on-sidebar`). La barra si muove con una transizione CSS, spenta con la riduzione delle animazioni: la copia di Sidebar 001 non c'è più. `ds/unlumen/` sparisce.
+- **La barra laterale non usa `Sidebar`/`SidebarGroup` né `NavList`/`NavItem` di Sigrid** (2.1.0). Lì nessuna barra segna la voce attiva, che si riconosce solo dalla tinta (R1 di Sigrid): applicarlo a Qamille è un anti-obiettivo della spec. Portano anche:
+  - la riduzione a icone, con il pulsante in fondo;
+  - la ricerca tra le voci;
+  - sotto 860 px CSS, il cassetto da sinistra, che con lo zoom dell'app al 150 % su una finestra di 1280 px si aprirebbe al posto della colonna.
+
+  Niente di questo c'è oggi in Qamille, e la spec non lo chiede. `components/Sidebar.tsx` resta di Qamille, con il suo `NavList` costruito sui token e sul `Count` di Sigrid. Se un giorno il proprietario vuole la riduzione a icone o la ricerca, è un lavoro a parte e chiede a Sigrid una barra della voce attiva come parametro.
 - **`Icon`** tiene i disegni di Qamille.
 - **Le regole rimaste.** `tests/ds-usage.mjs` vieta `@ark-ui/*` fuori da `src/ui/`.
 
@@ -635,7 +705,7 @@ Ogni task di primitiva segue questi passi; sotto, per ciascuno, solo ciò che è
   6. le dipendenze;
   7. i documenti.
 - [ ] **Step 4:** `npm run build` (con `test:ui`), `node tests/native-feel.mjs`, `node tests/build-check.mjs --strict`, `node tests/first-paint.mjs`, `npm run test:browser` (tutti).
-- [ ] **Step 5:** `visual-compare` con la base del ramo: nessuna differenza. Il task cambia nomi e percorsi, non valori.
+- [ ] **Step 5:** `visual-compare` con la base del ramo. Nessuna differenza, salvo i titoli che passano ai gradini di Sigrid (P4), ciascuno elencato con la misura di prima e di dopo e riportato al proprietario. I raggi passati come parametri (P3) restano 4/6/8/12; nomi e percorsi non cambiano niente a vista.
 - [ ] **Step 6: Commit** — `git commit -m "Use Sigrid's token names, keep only Qamille's own tokens, and retire src/ds (ADR-0011 v4)"`
 
 ### Task 17: verifica sull'exe e approvazione del proprietario

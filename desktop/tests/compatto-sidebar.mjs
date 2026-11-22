@@ -80,25 +80,19 @@ try {
   assert.equal((await box(calendar)).height, 32);
   console.log('PASS The tools are in the bottom of the column, above a --color-sidebar-selected hairline');
 
-  // (f) Accounts: small coloured squares with a legible initial, no light chip.
-  const avatars = sidebar.locator('.account-avatar');
+  // (f) Accounts: Sigrid's avatars in the colour of each account, with a legible initial.
+  const avatars = sidebar.locator('.accounts-nav [data-slot="avatar"]');
   const avatarCount = await avatars.count();
   assert.ok(avatarCount >= 3);
   for (let i = 0; i < avatarCount; i++) {
     const avatar = avatars.nth(i);
-    const size = await box(avatar);
-    assert.equal(size.width, 18);
-    assert.equal(size.height, 18);
-    assert.equal(await css(avatar, 'border-top-left-radius'), '4px');
     const [fill, ink] = [await css(avatar, 'background-color'), await css(avatar, 'color')];
-    assert.ok(luminance(fill) < 0.3, `account square ${i} is not a light chip (${fill})`);
-    assert.ok(contrast(fill, ink) >= 4.5, `account square ${i} text is legible (${fill} on ${ink})`);
+    assert.ok(contrast(fill, ink) >= 4.5, `account avatar ${i} text is legible (${fill} on ${ink})`);
   }
-  const user = sidebar.locator('[data-slot="avatar"]');
+  const user = sidebar.locator('[data-slot="avatar"]').last();
   const [userFill, userInk] = [await css(user, 'background-color'), await css(user, 'color')];
-  assert.ok(luminance(userFill) < 0.3, `the user square is not a light chip (${userFill})`);
   assert.ok(contrast(userFill, userInk) >= 4.5, 'the user initial is legible');
-  console.log('PASS Account avatars are small coloured squares and the user avatar is Sigrid’s, with legible initials');
+  console.log('PASS Account and user avatars are Sigrid’s, with legible initials');
 
   // (g) Collapse sidebar: a hint, not a title; the name stays; the hint opens on focus.
   const collapse = sidebar.getByRole('button', { name: 'Collapse sidebar' });

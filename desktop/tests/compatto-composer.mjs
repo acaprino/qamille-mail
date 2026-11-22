@@ -10,7 +10,14 @@ import { openApp, css, box } from './support/compatto.mjs';
 
 const results = [];
 const step = async (name, work) => {
-  await work();
+  try {
+    await work();
+  } catch (error) {
+    // A step that fails is told, and the next ones still run: one pass shows every difference from Sigrid, not the first.
+    process.exitCode = 1;
+    console.log(`FAIL STEP ${name}: ${String(error?.message ?? error).split('\n').slice(0, 8).join(' | ').slice(0, 700)}`);
+    return;
+  }
   results.push(name);
   console.log(`PASS ${name}`);
 };

@@ -41,6 +41,7 @@ import { tick } from '../lib/tick';
 import { useDirtyCloseGuard } from '../lib/use-dirty-close-guard';
 import { cn } from '../lib/utils';
 import './Calendar.css';
+import { Input, Textarea } from '../ui/Input';
 
 export type CalendarProps = {
   notify: (message: string, error?: boolean) => void;
@@ -1298,7 +1299,7 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
             </header>
             <div className="side-panel-body sheet-body">
               <fieldset disabled={readOnly}>
-                <input
+                <Input
                   ref={titleInput}
                   className="title-input"
                   value={s.title}
@@ -1346,7 +1347,7 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
                       translations={calendarWords}
                     />
                     {!s.allDay && (
-                      <input
+                      <Input
                         type="time"
                         aria-label={tr('Ora di inizio', 'Start time')}
                         required
@@ -1367,7 +1368,7 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
                       translations={calendarWords}
                     />
                     {!s.allDay && (
-                      <input
+                      <Input
                         type="time"
                         aria-label={tr('Ora di fine', 'End time')}
                         required
@@ -1413,7 +1414,7 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
                   <label className="k" htmlFor="event-location">
                     {tr('Luogo', 'Location')}
                   </label>
-                  <input
+                  <Input
                     id="event-location"
                     value={s.location}
                     onChange={(e) => (s.location = e.target.value)}
@@ -1423,7 +1424,7 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
                   <label className="k" htmlFor="event-guests">
                     {tr('Invitati', 'Guests')}
                   </label>
-                  <input
+                  <Input
                     id="event-guests"
                     value={s.attendees}
                     onChange={(e) => (s.attendees = e.target.value)}
@@ -1439,7 +1440,7 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
                       <label className="k" htmlFor="event-link">
                         {tr('Meeting', 'Meeting')}
                       </label>
-                      <input
+                      <Input
                         id="event-link"
                         value={s.link}
                         onChange={(e) => (s.link = e.target.value)}
@@ -1516,13 +1517,13 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
                   <label className="k top" htmlFor="event-notes">
                     {tr('Note', 'Notes')}
                   </label>
-                  <textarea
+                  <Textarea
                     id="event-notes"
                     rows={4}
                     value={s.description}
                     onChange={(e) => (s.description = e.target.value)}
                     placeholder={tr('Aggiungi una descrizione', 'Add a description')}
-                  ></textarea>
+                  ></Textarea>
                 </div>
               </fieldset>
             </div>

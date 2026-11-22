@@ -8,6 +8,7 @@ import { bookLabel, tr } from '../../lib/i18n';
 import { formatDateTime } from '../../lib/regional';
 import { useReactive } from '../../lib/store';
 import type { BookView, ContactSettings, ContactSyncReport } from '../../lib/types';
+import { Input } from '../../ui/Input';
 
 export type ContactsSettingsProps = { notify: (message: string, error?: boolean) => void };
 
@@ -191,7 +192,7 @@ export default function ContactsSettings({ notify }: ContactsSettingsProps) {
           'Parti iniziali da non considerare della stessa persona (separate da virgola)',
           'Address names never treated as one person (comma-separated)',
         )}
-        <input
+        <Input
           value={s.roles}
           placeholder={tr('info, vendite, segreteria', 'info, sales, office')}
           onChange={(event) => {

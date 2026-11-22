@@ -18,6 +18,7 @@ import { GROUP_ORDER, clockLabel, type MeetingGroup, type MeetingRow } from '../
 import { cn } from '../../lib/utils';
 import MeetingRowItem from './MeetingRowItem';
 import './MeetingList.css';
+import { Input } from '../../ui/Input';
 
 export type MeetingListProps = {
   groups: Record<MeetingGroup, MeetingRow[]>;
@@ -231,7 +232,7 @@ export default function MeetingList({
           <span className="list-search-icon">
             <Icon name="search" size={15} />
           </span>
-          <input
+          <Input
             type="search"
             value={query}
             onChange={(event) => onquery(event.currentTarget.value)}

@@ -26,6 +26,7 @@ import {
 import ContactForm from './contacts/ContactForm';
 import DuplicatesPanel from './contacts/DuplicatesPanel';
 import MergeDialog from './contacts/MergeDialog';
+import { Input } from '../ui/Input';
 
 export type ContactsProps = { notify: (message: string, error?: boolean) => void };
 
@@ -419,7 +420,7 @@ export default function Contacts({ notify }: ContactsProps) {
             />
           </div>
           <div className="contacts-filters">
-            <input
+            <Input
               type="search"
               aria-label={tr('Cerca nei contatti', 'Search contacts')}
               placeholder={tr('Cerca nome, email, telefono…', 'Search name, email, phone…')}

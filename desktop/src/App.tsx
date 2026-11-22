@@ -77,6 +77,7 @@ import type {
   Workspace,
   UndoAction,
 } from './lib/types';
+import { Input } from './ui/Input';
 
 // The composer dock is only needed once a draft is open: it is loaded on demand.
 const ComposerDock = lazy(() => import('./components/ComposerDock'));
@@ -1784,7 +1785,7 @@ export default function App() {
               {mailView && (
                 <div className="global-search">
                   <Icon name="search" size={18} />
-                  <input
+                  <Input
                     ref={searchElement}
                     value={s.searchInput}
                     onChange={(event) => {

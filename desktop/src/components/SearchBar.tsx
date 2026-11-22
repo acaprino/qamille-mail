@@ -30,6 +30,7 @@ import { tick } from '../lib/tick';
 import { cn } from '../lib/utils';
 import type { MailPage, Workspace } from '../lib/types';
 import { imeComposing } from '../ds/ime';
+import { Input } from '../ui/Input';
 
 export type SearchBarProps = {
   query: string;
@@ -406,7 +407,7 @@ export default function SearchBar({
                 {panel === 'from'
                   ? t('Chi ha inviato l’email?', 'Who sent the email?')
                   : t('A chi era indirizzata?', 'Who was it sent to?')}{' '}
-                <input
+                <Input
                   ref={firstControl}
                   value={field}
                   onChange={(event) => (s.field = event.target.value)}
@@ -485,7 +486,7 @@ export default function SearchBar({
                     {mode === 'around' && (
                       <label>
                         {t('Giorni prima e dopo', 'Days before and after')}
-                        <input
+                        <Input
                           type="number"
                           min="0"
                           max="365"
@@ -584,7 +585,7 @@ export default function SearchBar({
               ) : s.attachment === 'filename' ? (
                 <label>
                   {t('Il nome contiene', 'Name contains')}
-                  <input
+                  <Input
                     ref={firstControl}
                     value={field}
                     onChange={(event) => (s.field = event.target.value)}
@@ -626,7 +627,7 @@ export default function SearchBar({
               ) : (
                 <label>
                   {t('Valore', 'Value')}{' '}
-                  <input
+                  <Input
                     ref={firstControl}
                     value={field}
                     onChange={(event) => (s.field = event.target.value)}

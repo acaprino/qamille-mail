@@ -19,6 +19,7 @@ import RecipientInput, { splitRecipients } from './contacts/RecipientInput';
 import RichEditor, { type RichEditorHandle } from './RichEditor';
 import { imeComposing } from '../ds/ime';
 import './Composer.css';
+import { Input } from '../ui/Input';
 
 // The status value is a stable key: the dock compares it, so only its label is translated.
 export function saveStatusLabel(status: string): string {
@@ -597,7 +598,7 @@ export default function Composer(props: ComposerProps) {
         )}
         <label className="field-row">
           <span>{tr('Oggetto', 'Subject')}</span>
-          <input
+          <Input
             aria-label={tr('Oggetto', 'Subject')}
             value={draft.subject}
             onChange={(event) => {
@@ -679,7 +680,7 @@ export default function Composer(props: ComposerProps) {
             value={s.scheduleDay}
             onChange={(value) => (s.scheduleDay = value)}
           />
-          <input
+          <Input
             className="time-field"
             type="time"
             aria-label={tr('Ora di invio', 'Send time')}

@@ -1,11 +1,2 @@
-// A labelled form control: the label text and the control are its children.
-import type { LabelHTMLAttributes } from 'react';
-import { cn } from '../cn';
-
-export default function Field({ className, children, ...rest }: LabelHTMLAttributes<HTMLLabelElement>) {
-  return (
-    <label className={cn('field', className)} {...rest}>
-      {children}
-    </label>
-  );
-}
+// Field is drawn by Sigrid's form (src/ui/Field.tsx); the app keeps importing it from here until src/ds goes (the Sigrid plan, Task 20).
+export { default } from '../../ui/Field';

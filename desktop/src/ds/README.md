@@ -65,7 +65,7 @@ Sono diciassette componenti più l’icona. La loro forma è fissata: cambiare u
 | Primitiva | Basata su | Props | Lo stile sta in |
 |---|---|---|---|
 | `Button` | `Button` di Sigrid (`src/ui/Button.tsx`; `Tooltip` con `tip`) | `variant` (`primary`, `secondary`, `icon`, `text`); `className?`; `ref?`; `tip?`; `shortcut?`; gli attributi di `<button>`. Il tipo è `button` se non si dice altro: chi invia un modulo scrive `type="submit"`. `primary` con la classe `danger` è il distruttivo di Sigrid | — |
-| `Field` | `<label>` | `children` (etichetta e controllo); `className?`; gli attributi di `<label>` | `styles/system.css` |
+| `Field` | `<label>` con il testo e il controllo; il controllo è `Input` o `Textarea` di Sigrid (`src/ui/Input.tsx`) | gli attributi di `<label>`; `className?` | `.field` in `styles/system.css` (solo lo spazio sotto) |
 | `Modal` | Ark `Dialog`, modale | `size?` (`sm`, `md`, `lg`; predefinito `md`); `onClose?`; `aria-label?` o `aria-labelledby`; `className?`; `children`; gli attributi di `<div>` | `styles/ark/dialog.css` |
 | `SidePanel` | Ark `Dialog`, non modale | `onScrim` (obbligatoria); `narrow?`; `onClose?`; `onOpen?`; `ref?`; `aria-label?`; `className?`; `children`; gli attributi di `<div>` | `styles/ark/dialog.css` |
 | `Popover` | Ark `Popover` | `trigger` (un elemento); `label`; `tip?`; `open?`; `onOpenChange?`; `className?`; `children` | `styles/ark/popover.css` |

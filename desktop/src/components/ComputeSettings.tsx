@@ -19,6 +19,7 @@ import { SERVER_GUIDE_URL } from '../lib/types';
 import ServerConnect from './server-connect/ServerConnect';
 import SubscriptionPanel from './SubscriptionPanel';
 import './ComputeSettings.css';
+import { Input } from '../ui/Input';
 
 export type AppEdition = { kind: 'self-hosted' | 'professional'; server?: string; default_device_name: string };
 type Status = {
@@ -375,11 +376,11 @@ export default function ComputeSettings() {
             <h3>{tr('Cambia password', 'Change password')}</h3>
             <Field>
               {tr('Password attuale', 'Current password')}
-              <input type="password" value={current} autoComplete="current-password" onChange={(e) => setCurrent(e.currentTarget.value)} />
+              <Input type="password" value={current} autoComplete="current-password" onChange={(e) => setCurrent(e.currentTarget.value)} />
             </Field>
             <Field>
               {tr('Nuova password', 'New password')}
-              <input type="password" value={next} autoComplete="new-password" onChange={(e) => setNext(e.currentTarget.value)} />
+              <Input type="password" value={next} autoComplete="new-password" onChange={(e) => setNext(e.currentTarget.value)} />
             </Field>
             <Checkbox checked={signOutOthers} onChange={() => setSignOutOthers(!signOutOthers)}>
               {tr('Scollega gli altri dispositivi', 'Sign out the other devices')}
@@ -469,7 +470,7 @@ export default function ComputeSettings() {
           ) : (
             <Field>
               {tr('Password', 'Password')}
-              <input type="password" value={deletePassword} autoComplete="current-password" onChange={(e) => setDeletePassword(e.currentTarget.value)} />
+              <Input type="password" value={deletePassword} autoComplete="current-password" onChange={(e) => setDeletePassword(e.currentTarget.value)} />
             </Field>
           )}
           {/* The error belongs here while the dialog is open: outside, it is under the inert veil. */}

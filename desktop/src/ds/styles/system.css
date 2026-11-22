@@ -113,23 +113,29 @@ a {
     outline-offset: 3px;
   }
 }
-input,
-textarea,
-select {
-  color: inherit;
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
-  padding: 7px 9px;
+/* The bare fields (the ones that are not Sigrid's Input) and the base of the page: in the base layer, so Sigrid's own
+   classes on its fields win over them (the Sigrid plan, Task 9). */
+@layer base {
+  input,
+  textarea,
+  select {
+    color: inherit;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    padding: 7px 9px;
+  }
 }
 /* A disabled field looks like every disabled control (ds/README.md, "Stati e movimento"): without this
    rule the colours above replace the browser's own and a locked field looks ready to type in.
    Checkboxes keep the browser's disabled look; the date and recipient fields dim as a whole. */
-input:not([type='checkbox'], [type='radio']):disabled,
-textarea:disabled,
-select:disabled {
-  opacity: 0.5;
-  cursor: default;
+@layer base {
+  input:not([type='checkbox'], [type='radio']):disabled,
+  textarea:disabled,
+  select:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
 }
 input[type='checkbox'] {
   accent-color: var(--accent);
@@ -205,20 +211,14 @@ kbd {
 }
 
 /* Task 9: field (the Sigrid plan: only Task 9 touches this section, which ends at the next blank line) */
+/* The look of a field is Sigrid's (ui/Field.tsx, ui/Input.tsx); what is left is the space under it and the weight of what
+   is typed (the label is medium). */
 .field {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  font-size: var(--text-xs);
-  font-weight: 500;
   margin-bottom: 14px;
 }
 .field input,
-.field select,
 .field textarea {
-  width: 100%;
   font-weight: 400;
-  font-size: var(--text-sm);
 }
 
 /* A progress bar: a visible track filled in the accent. The bare element drew no track, so at 0% it was a

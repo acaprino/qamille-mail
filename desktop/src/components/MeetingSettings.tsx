@@ -22,6 +22,7 @@ import { regionalLocale } from '../lib/regional';
 import { useReactive } from '../lib/store';
 import type { Settings } from '../lib/types';
 import './MeetingSettings.css';
+import { Input } from '../ui/Input';
 
 export type MeetingSettingsProps = {
   settings: Settings;
@@ -227,7 +228,7 @@ export default function MeetingSettings({ settings, onSettingsChange, notify }: 
         <>
           <Field>
             {tr('Modello remoto', 'Remote model')}
-            <input
+            <Input
               value={settings.meeting_remote_model}
               onChange={(event) => set({ meeting_remote_model: event.currentTarget.value })}
               placeholder="whisper-1"

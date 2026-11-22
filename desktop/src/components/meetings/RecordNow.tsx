@@ -23,6 +23,7 @@ import {
 } from '../../lib/meetings';
 import { pickDevices } from '../../lib/meetings-view';
 import './RecordNow.css';
+import { Input } from '../../ui/Input';
 
 export type RecordNowProps = {
   settings: { meeting_microphone: string; meeting_system_audio: string };
@@ -114,7 +115,7 @@ export default function RecordNow({ settings, live, notify, onstarted }: RecordN
         >
           <Field>
             <span>{tr('Nome (facoltativo)', 'Name (optional)')}</span>
-            <input
+            <Input
               value={name}
               onChange={(event) => setName(event.currentTarget.value)}
               maxLength={300}

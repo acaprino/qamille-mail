@@ -6,6 +6,9 @@ import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '../src');
 const THEME = path.join(root, 'ds/tokens/theme.css');
+// The look Sigrid's engine computes: its parameters (the one place Compatto's colours are written, now) and the
+// stylesheet generated from them (scripts/theme-css.mjs): colours by definition.
+const GENERATED_THEME = [path.join(root, 'theme/compatto.css'), path.join(root, 'theme/compatto.ts')];
 
 // Literal values that cannot be tokens, with the reason.
 const ALLOWED = [
@@ -52,7 +55,7 @@ function files(dir) {
     const full = path.join(dir, entry.name);
     // ds/unlumen is checked too: the vendored components read the tokens like the rest (ADR-0011 v3 INV-008).
     if (entry.isDirectory()) return files(full);
-    return /\.(css|tsx?)$/.test(entry.name) && full !== THEME ? [full] : [];
+    return /\.(css|tsx?)$/.test(entry.name) && full !== THEME && !GENERATED_THEME.includes(full) ? [full] : [];
   });
 }
 

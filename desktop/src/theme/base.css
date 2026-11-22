@@ -174,15 +174,6 @@ h3 {
   font-size: var(--text-sm);
   font-weight: 600;
 }
-kbd {
-  font: inherit;
-  font-size: var(--text-2xs);
-  color: var(--color-ink-mute);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-sm);
-  padding: 1px 5px;
-  white-space: nowrap;
-}
 .muted {
   color: var(--color-ink-mute);
 }

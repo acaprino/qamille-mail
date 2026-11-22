@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
+import Kbd from './ui/Kbd';
 import Button from './ui/Button';
 import Toaster, { notify as showNotice, type NoticeAction } from './ui/Toaster';
 import { listen } from '@tauri-apps/api/event';
@@ -1798,7 +1799,7 @@ export default function App() {
                     aria-keyshortcuts="Control+K"
                     placeholder={tr('Cerca una persona, una parola o una data', 'Search a person, a word or a date')}
                   />
-                  <kbd>Ctrl K</kbd>
+                  <Kbd>Ctrl K</Kbd>
                 </div>
               )}
               <div className="topbar-end">

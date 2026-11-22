@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react';
+import Kbd from '../ui/Kbd';
 import ConnectMailbox from './ConnectMailbox';
 import Button from '../ui/Button';
 import Icon from '../ui/Icon';
@@ -511,7 +512,7 @@ export default function Reader({
           <div className="reader-footer">
             <Icon name="info" size={13} />
             <span>
-              {tr('Premi', 'Press')} <kbd>R</kbd> {tr('per rispondere,', 'to reply,')} <kbd>E</kbd>{' '}
+              {tr('Premi', 'Press')} <Kbd>R</Kbd> {tr('per rispondere,', 'to reply,')} <Kbd>E</Kbd>{' '}
               {tr('per archiviare', 'to archive')}
             </span>
           </div>
@@ -534,8 +535,8 @@ export default function Reader({
               <h2>{tr('Un po’ più di concentrazione.', 'A little more focus.')}</h2>
               <p>{tr('Seleziona un messaggio per leggerlo qui.', 'Select a message to read it here.')}</p>
               <span>
-                <kbd>↑</kbd>
-                <kbd>↓</kbd> {tr('Spostati tra i messaggi', 'Move between messages')}
+                <Kbd>↑</Kbd>
+                <Kbd>↓</Kbd> {tr('Spostati tra i messaggi', 'Move between messages')}
               </span>
             </>
           )}

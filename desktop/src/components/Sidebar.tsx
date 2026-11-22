@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import Kbd from '../ui/Kbd';
 import Button from '../ui/Button';
 import Count from '../ui/Count';
 import Icon from '../ui/Icon';
@@ -110,7 +111,7 @@ export default function Sidebar({
       >
         <Icon name="edit" size={iconSize} stroke={iconStroke} />
         <span className="sidebar-text">{tr('Nuovo messaggio', 'New message')}</span>
-        <kbd>N</kbd>
+        <Kbd>N</Kbd>
       </Button>
       <div className="sidebar-body" id="sidebar-navigation">
         <div className="sidebar-label sidebar-text">{tr('Account', 'Accounts')}</div>

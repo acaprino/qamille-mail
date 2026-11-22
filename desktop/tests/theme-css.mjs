@@ -49,13 +49,16 @@ test('compatto.css is what scripts/theme-css.mjs writes now', () => {
   assert.equal(committed, compattoCss(sigrid, parameters), 'compatto.css is out of date: run `npm run theme:css` and read the diff');
 });
 
-test('compatto.css writes the colours for both schemes, the density and every alias, and no radius', () => {
+test('compatto.css writes the colours for both schemes, the density, every alias and COMPATTO’s radii', () => {
   const css = readFileSync(OUTPUT, 'utf8');
   assert.match(css, /:root:not\(\[data-scheme\]\),\n:root\[data-scheme='light'\] \{/);
   assert.match(css, /:root\[data-scheme='dark'\] \{/);
   assert.match(css, /--density-control-md: 32px;/);
   for (const [name, value] of Object.entries(ALIASES)) assert.ok(css.includes(`  ${name}: ${value};`), name);
-  assert.doesNotMatch(css, /--radius-/, 'the radii are Qamille’s until Sigrid takes them as parameters (P3)');
+  // The corners are a parameter of the theme (`radii` of COMPATTO, Sigrid 3.2.1): 4, 6, 8 and 12 px in both schemes.
+  for (const [name, px] of [['sm', 4], ['md', 6], ['lg', 8], ['xl', 12]]) {
+    assert.equal(css.split(`  --radius-${name}: ${px}px;`).length - 1, 2, `--radius-${name} is ${px}px in both blocks`);
+  }
   assert.doesNotMatch(css, /\bcursor:/);
 });
 

@@ -10,7 +10,8 @@ import type { DensityOverride, ThemeDef, ThemeTone } from '@acaprino/sigrid';
  * The definition. The grays take their hue and chroma from Compatto's page, lines and ink; the accent is the OKLCH
  * saturation and hue of #4f46e5. `surfaces` hold Compatto's own page, sheet, lines, ink, accent text and fill in each
  * scheme; the sidebar of `surfaces` is the light lane, because `sidebar: 'scura'` makes the engine draw the dark column
- * itself (a dark colour here would push ink, lines and red to black and white).
+ * itself (a dark colour here would push ink, lines and red to black and white). `radii` are Compatto's corners (4, 6, 8 and
+ * 12 px), a parameter of the theme since Sigrid 3.2.1.
  */
 export const COMPATTO: ThemeDef = {
   id: 'compatto',
@@ -20,6 +21,7 @@ export const COMPATTO: ThemeDef = {
   accent: [0.234, 277],
   sidebar: 'scura',
   palette: 'crisp',
+  radii: { sm: 4, md: 6, lg: 8, xl: 12 },
   surfaces: {
     light: { paper: '#f6f7f9', sidebar: '#eef0f3', raised: '#ffffff', line: '#e3e6ea', ink: '#111827', accent: '#4338ca', fill: '#4f46e5' },
     dark: { paper: '#12161e', sidebar: '#161b25', raised: '#1a202c', line: '#2a3240', ink: '#e8ecf3', accent: '#aeb0fa', fill: '#9a9cf8' },

@@ -60,10 +60,9 @@ const block = (selector, variables) =>
 export function compattoCss(sigrid, { COMPATTO, COMPATTO_TONE, QAMILLE_DENSITY }) {
   const density = sigrid.densityWith('compact', QAMILLE_DENSITY);
   const pick = (scheme) => ({ theme: COMPATTO, scheme, tone: COMPATTO_TONE });
-  // The shape variables (`--radius-*`, elevations) come with themeVariables; Qamille's radii are its own until Sigrid
-  // takes them as parameters (P3), so they are left out and ds/tokens/theme.css keeps them.
-  const colours = (scheme) =>
-    Object.fromEntries(Object.entries(sigrid.themeVariables(pick(scheme))).filter(([name]) => !name.startsWith('--radius-')));
+  // Everything the engine owns comes with themeVariables: the colours, the shape (`--radius-*` from COMPATTO's `radii`) and
+  // the elevations.
+  const colours = (scheme) => sigrid.themeVariables(pick(scheme));
   return [
     GENERATED,
     block(':root', { ...sigrid.densityVariables(density), ...ALIASES }),

@@ -165,6 +165,13 @@
   --color-mark-icon-18: #9c3054;
   --color-sidebar-mark-18: #e77494;
   --color-sidebar-mark-icon-18: #f983a4;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-button: 6px;
+  --radius-check: 9999px;
+  --radius-chip: 6px;
   --icon-stroke: 1.75;
   --icon-cap: round;
   --icon-join: round;
@@ -298,6 +305,13 @@
   --color-mark-icon-18: #f983a4;
   --color-sidebar-mark-18: #e77494;
   --color-sidebar-mark-icon-18: #f983a4;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-button: 6px;
+  --radius-check: 9999px;
+  --radius-chip: 6px;
   --icon-stroke: 1.75;
   --icon-cap: round;
   --icon-join: round;

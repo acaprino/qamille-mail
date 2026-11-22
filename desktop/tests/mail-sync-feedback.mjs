@@ -63,6 +63,8 @@ await page.addInitScript(({ settings, account }) => {
       if (command === 'list_mail') return { items: [], total: 0, next_offset: null };
       if (command === 'meeting_capture_status') return { state: 'idle' };
       if (command === 'meeting_list_page') return { items: [], total: 0, next_offset: null };
+      // The mail link Windows started Qamille with, asked once at start (lib/mailto.ts): none here.
+      if (command === 'take_launch_mailto') return null;
       if (command === 'sync_mail') return new Promise((resolve, reject) => { window.finishManualSync = resolve; window.failManualSync = reject; });
       throw new Error(`Unexpected command: ${command}`);
     },

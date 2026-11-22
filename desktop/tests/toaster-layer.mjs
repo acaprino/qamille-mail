@@ -47,6 +47,104 @@ try {
   await expect(page.locator('.app-shell.has-composers')).toHaveCount(1);
   assert.equal(await lift(), '62px', 'with a composer open the notice lifts above the dock');
   console.log('PASS with a composer open the notice lifts above the dock');
+
+  // A notice may carry up to two actions (ds primitive buttons inside it): saved files offer Open and
+  // Show in folder. `notify` is called from the page the way the app calls it.
+  const toast = page.locator('[data-scope="toast"][data-part="root"]');
+  const raise = (message, labels) =>
+    page.evaluate(
+      async ({ message, labels }) => {
+        const { notify } = await import('/src/ds/primitives/Toaster.tsx');
+        window.noticeRuns ??= [];
+        notify(
+          message,
+          false,
+          labels.map((label) => ({ label, run: () => window.noticeRuns.push(label) })),
+        );
+      },
+      { message, labels },
+    );
+  const runs = () => page.evaluate(() => window.noticeRuns ?? []);
+  const focused = () =>
+    page.evaluate(() => {
+      const el = document.activeElement;
+      return el?.getAttribute('aria-label') || el?.textContent?.trim() || el?.tagName;
+    });
+
+  await raise('File saved', ['Open', 'Show in folder']);
+  await expect(toast).toHaveCount(1);
+  await expect(toast).toContainText('File saved');
+  assert.deepEqual(
+    await toast.locator('button.secondary').allTextContents(),
+    ['Open', 'Show in folder'],
+    'two actions, as ds buttons, before the close button',
+  );
+  // From the notice itself, Tab walks the actions and then the close button.
+  await toast.focus();
+  const walked = [];
+  for (let step = 0; step < 3; step += 1) {
+    await page.keyboard.press('Tab');
+    walked.push(await focused());
+  }
+  assert.deepEqual(walked, ['Open', 'Show in folder', 'Dismiss notification'], 'both actions are reachable with Tab');
+  // Nothing takes them out of the tab order: not hidden, not inert, no tabindex of -1.
+  assert.deepEqual(
+    await toast.locator('button.secondary').evaluateAll((buttons) =>
+      buttons.map((b) => ({ tab: b.tabIndex, disabled: b.disabled, hidden: !!b.closest('[inert], [aria-hidden="true"]') })),
+    ),
+    [
+      { tab: 0, disabled: false, hidden: false },
+      { tab: 0, disabled: false, hidden: false },
+    ],
+  );
+  console.log('PASS a notice with two actions shows two buttons reachable with Tab');
+
+  // Focus inside keeps the notice open, past the 10 s an actions notice stays.
+  await page.clock.install();
+  await raise('Kept while focused', ['Open', 'Show in folder']);
+  await expect(toast).toContainText('Kept while focused');
+  await toast.getByRole('button', { name: 'Open' }).focus();
+  await page.clock.runFor(11000);
+  await expect(toast).toHaveCount(1);
+  console.log('PASS a notice with actions waits while focus is on it');
+
+  // Enter on a focused action runs it and closes the notice.
+  await page.keyboard.press('Enter');
+  assert.deepEqual(await runs(), ['Open']);
+  await page.clock.runFor(1000);
+  await expect(toast).toHaveCount(0);
+  console.log('PASS Enter on an action runs it and closes the notice');
+
+  // 10 s with actions, against 4.5 s without.
+  await raise('Quick', []);
+  await expect(toast).toContainText('Quick');
+  await page.clock.runFor(5000);
+  await expect(toast).toHaveCount(0);
+  await raise('Offers', ['Open']);
+  await expect(toast).toContainText('Offers');
+  await page.clock.runFor(5000);
+  await expect(toast).toHaveCount(1);
+  await page.clock.runFor(6000);
+  await expect(toast).toHaveCount(0);
+  console.log('PASS a notice with actions stays 10 s, one without 4.5 s');
+  await page.clock.resume();
+
+  // A click runs the action and closes the notice; the next notice replaces the last one.
+  await raise('Second file', ['Open', 'Show in folder']);
+  await toast.getByRole('button', { name: 'Show in folder' }).click();
+  assert.deepEqual(await runs(), ['Open', 'Show in folder']);
+  await expect(toast).toHaveCount(0);
+  await raise('First', ['One']);
+  await expect(toast).toContainText('First');
+  await raise('Second', ['Two']);
+  await expect(toast).toHaveCount(1);
+  await expect(toast).toContainText('Second');
+  assert.deepEqual(await toast.locator('button.secondary').allTextContents(), ['Two']);
+  // More than two actions never fit: the extra one is dropped.
+  await raise('Crowded', ['A', 'B', 'C']);
+  await expect(toast).toContainText('Crowded');
+  assert.deepEqual(await toast.locator('button.secondary').allTextContents(), ['A', 'B']);
+  console.log('PASS a click runs the action and closes the notice, and a new notice replaces it');
 } finally {
   await browser.close();
 }

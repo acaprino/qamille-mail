@@ -43,13 +43,17 @@ export async function freePort() {
  * @param name     folder name under checks/
  * @param store    optional object written as the workspace's store.json (the sample workspace reads it)
  * @param browserArgs extra WebView2 arguments, e.g. '--force-device-scale-factor=1.5'
+ * @param background the workspace's background.json (src-tauri/src/background.rs): by default the X
+ *                   closes Qamille, as these tests expect, and no first-hide message waits
+ * @param args     command-line arguments of Qamille, e.g. ['--autostart']
  */
-export async function launchNative(name, { store, browserArgs = '', language = 'en' } = {}) {
+export async function launchNative(name, { store, browserArgs = '', language = 'en', background = { close_to_tray: false, tray_notice_shown: true }, args = [] } = {}) {
   const exe = executable();
   await fs.access(exe);
   await assertNoQamilleWindow();
   const data = path.join(root, 'checks', name, `native-${Date.now()}-${process.pid}`);
   await fs.mkdir(path.join(data, 'webview'), { recursive: true });
+  await fs.writeFile(path.join(data, 'background.json'), JSON.stringify(background));
   // The interface language comes from the workspace's regional setting, so no page reload is needed
   // (a reload would make the app open and mark read a second message: it opens the first row at every start).
   const seed = structuredClone(store ?? JSON.parse(await fs.readFile(path.join(root, 'desktop/src/lib/sample.json'), 'utf8')));
@@ -57,7 +61,7 @@ export async function launchNative(name, { store, browserArgs = '', language = '
   await fs.writeFile(path.join(data, 'store.json'), JSON.stringify(seed));
   const port = await freePort();
   const dead = 'http://127.0.0.1:9';
-  const child = spawn(exe, [], {
+  const child = spawn(exe, args, {
     cwd: root, windowsHide: true, stdio: 'pipe',
     env: {
       ...process.env, QAMILLE_DATA: data, QAMILLE_DEMO: '1',

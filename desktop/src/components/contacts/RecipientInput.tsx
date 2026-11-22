@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type Ref } from 'react';
 import RecipientsInput from '../../ds/primitives/RecipientsInput';
 import { call } from '../../lib/api';
 import { tr } from '../../lib/i18n';
+import { validAddress } from '../../lib/mailto';
 import type { ContactSuggestion } from '../../lib/types';
 
 // "Ann <a@x.it>, b@y.it; c@z.it" to its entries: a comma or semicolon outside quotes and angle
@@ -119,7 +120,7 @@ export default function RecipientInput({
       translations={words}
       listTranslations={listWords}
       onQuery={query}
-      invalid={(email) => !/^[^\s@]+@[^\s@]+$/.test(email)}
+      invalid={(email) => !validAddress(email)}
     />
   );
 }

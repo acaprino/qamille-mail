@@ -11,6 +11,8 @@ const root = path.resolve(import.meta.dirname, '../..');
 const data = path.join(root, 'checks/meetings/test-data', `native-${Date.now()}`);
 const folder = path.join(data, 'meetings/9001');
 await fs.mkdir(folder, { recursive: true });
+// The X closes Qamille here, as before the tray (src-tauri/src/background.rs).
+await fs.writeFile(path.join(data, 'background.json'), JSON.stringify({ close_to_tray: false, tray_notice_shown: true }));
 const sample = JSON.parse(await fs.readFile(path.join(root, 'desktop/src/lib/sample.json'), 'utf8'));
 const meeting = { ...sample.meetings[0], id: 9001, title: 'Meeting sintetico nativo', date: Math.floor(Date.now() / 1000), duration_secs: 2, event_id: null, audio_path: null, notes: 'Originale sintetico', transcript: '', summary: '', key_points: [], action_items: [] };
 const capture = { meeting_id: 9001, state: 'saved', requires_receipts: true, elapsed_ms: 2000, saved_ms: 2000, microphone_level: 0, system_level: 0, error: null, chunks: [{ source: 'microphone', sequence: 0, path: 'synthetic.wav', start_ms: 0, end_ms: 2000, sample_rate: 16000, channels: 1 }] };

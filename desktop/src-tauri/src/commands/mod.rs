@@ -13,3 +13,5 @@ pub mod contacts;
 pub mod server_account;
 pub mod sync;
 pub mod legacy_local;
+// phase 3, Task 7: the key of the credentials
+pub mod vault;

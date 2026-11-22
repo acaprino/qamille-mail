@@ -39,6 +39,8 @@ async function freePort() {
 
 async function launch(name, data, demo = false, options = {}) {
   await fs.mkdir(data, { recursive: true });
+  // `stop` closes with the X, which closes Qamille here, as before the tray (src-tauri/src/background.rs).
+  await fs.writeFile(path.join(data, 'background.json'), JSON.stringify({ close_to_tray: false, tray_notice_shown: true }));
   const port = await freePort();
   const env = { ...process.env, ...options.env,
     WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}` };
@@ -319,9 +321,11 @@ try {
     },
   });
   assert.equal((await firstPortable.invoke('workspace_snapshot')).has_ai_key, true);
-  const keyPath = path.join(portableA, 'data', 'credentials.key');
+  // Phase 3, Task 7: the key is wrapped by Windows for this user, never written in clear.
+  const keyPath = path.join(portableA, 'data', 'credentials.key.dpapi');
   const credentialsPath = path.join(portableA, 'data', 'credentials.json');
   assert.ok((await fs.stat(keyPath)).size > 0, 'Portable credential key is stored beside the executable');
+  await assert.rejects(fs.stat(path.join(portableA, 'data', 'credentials.key')), 'No plain credential key beside it');
   const encryptedCredentials = await fs.readFile(credentialsPath, 'utf8');
   assert.equal(encryptedCredentials.includes(syntheticSecret), false, 'Credential file must not contain plaintext secrets');
   const ciphertext = Buffer.from(JSON.parse(encryptedCredentials).ciphertext);

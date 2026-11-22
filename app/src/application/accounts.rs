@@ -23,8 +23,10 @@ impl AccountService {
     }
     /// `login_hint` is the address the person expects to use; empty lets Google ask.
     pub fn connect_google(&self, login_hint: &str) -> AppResult<()> {
+        // Before the browser opens: a sign-in whose token could not be saved is not started.
+        self.context.secrets.check_writable()?;
         let store = self.context.read_shared()?;
-        let secret = self.context.secrets.get(GOOGLE_SECRET)?;
+        let secret = self.context.secrets.get_for_sign_in(GOOGLE_SECRET)?;
         let (client_id, secret) = self.identity.client_credentials(&store.settings.google_client_id, &secret)?;
         let (email, token) = self.identity.sign_in(&client_id, &secret, login_hint)?;
         self.connect(None, &email, &token, &client_id)
@@ -56,6 +58,7 @@ impl AccountService {
     /// `name` is what the person typed; `None` (Google sign-in) names a new account after its address
     /// and leaves the name of an account that is already there alone.
     fn connect(&self, name: Option<&str>, email: &str, password: &str, client_id: &str) -> AppResult<()> {
+        self.context.secrets.check_writable()?;
         let rename = name.is_some();
         let name = name.unwrap_or(email).trim().to_string();
         let email = email.trim().to_lowercase();

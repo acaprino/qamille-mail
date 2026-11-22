@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { useReducedMotion } from 'motion/react';
 import Button from './ds/primitives/Button';
-import Toaster, { notify as showNotice } from './ds/primitives/Toaster';
+import Toaster, { notify as showNotice, type NoticeAction } from './ds/primitives/Toaster';
 import { listen } from '@tauri-apps/api/event';
 import Sidebar from './components/Sidebar';
 import WindowControls from './components/WindowControls';
@@ -21,6 +21,8 @@ import PrintPreview from './components/PrintPreview';
 import HistoryUnreadDialog from './components/HistoryUnreadDialog';
 import Onboarding from './components/Onboarding';
 import LegacyLocalNotice from './components/LegacyLocalNotice';
+import VaultNotice from './components/VaultNotice';
+import UpdateNotice from './components/UpdateNotice';
 import type { AppEdition } from './components/ComputeSettings';
 import Settings, { type SettingsHandle } from './components/Settings';
 import UnsavedDialog from './components/UnsavedDialog';
@@ -33,6 +35,7 @@ import { captureActive, flushMeetingDrafts, meetingCall, requestMeetingOpen, typ
 import { installWindowCloseHandler, registerCloseGuard } from './lib/window-close';
 import { paintWindowBackground } from './lib/native-window';
 import { installWindowShell, windowAppearance, zoomWindow } from './lib/window-shell';
+import { installNotificationOpen } from './lib/notification-open';
 import Icon from './ds/primitives/Icon';
 import UndoStack from './components/UndoStack';
 import { refreshActivity } from './lib/activity-center';
@@ -46,6 +49,9 @@ import { configureRegional, configureRegionalWording, regionalLocale, regionalTi
 import { backendText, folderLabel, isItalian, setLanguageLocale, tr, useLanguage } from './lib/i18n';
 import { personIndex, type PersonIndex } from './lib/people';
 import { replyAllRecipients } from './lib/reply-all';
+import { installMailtoRouting, mailtoDraft, type MailtoFields } from './lib/mailto';
+import { savedFileActions } from './lib/saved-file';
+import { rowMenuAction, rowMenuEntries, showRowMenu } from './lib/row-menu';
 import { patchExtraRead, repliesOf, threadState } from './lib/groups';
 import { useStore } from './lib/store';
 import { tick } from './lib/tick';
@@ -231,6 +237,8 @@ export default function App() {
     return {
       // Account picked while unsaved settings held the user back; applied once they leave.
       leaveAccount: null as { id: number | null } | null,
+      // What runs once that view is there (`navigate`'s `then`): dropped if the user stays.
+      afterLeave: null as (() => void) | null,
       reportedSyncError: '',
       // Accounts whose typed `sync-progress` the UI has seen: a snapshot pulled at startup never
       // overrides them (see seedSyncActivities).
@@ -346,8 +354,8 @@ export default function App() {
       void call('prefetch_mail', { ids }).catch(() => {});
     }, 120);
   }
-  function notify(message: string, error = false) {
-    showNotice(message, error);
+  function notify(message: string, error = false, actions: NoticeAction[] = []) {
+    showNotice(message, error, actions);
   }
   async function printEmails(ids: number[], thread = false) {
     if (s.outputBusy) return;
@@ -373,7 +381,8 @@ export default function App() {
     if (s.outputBusy) return;
     s.outputBusy = true;
     try {
-      const saved = await call<{ count: number; path: string } | null>('export_mail', {
+      // The browser preview downloads instead of saving a file: it has no token and no actions.
+      const saved = await call<{ count: number; path: string; token?: number } | null>('export_mail', {
         italian: isItalian(),
         ids,
         format,
@@ -386,6 +395,8 @@ export default function App() {
                 `${saved.count} messaggi esportati: ${saved.path}`,
                 `${saved.count} messages exported: ${saved.path}`,
               ),
+          false,
+          savedFileActions(saved.token, notify),
         );
     } catch (error) {
       notify(errorText(error), true);
@@ -851,19 +862,25 @@ export default function App() {
       if (request === v.readRequest) s.openingId = null;
     }
   }
-  function navigate(next: Folder, account?: { id: number | null }) {
+  /** Goes to `next` (and `account`). `then` runs once the view is there: at once, or after the
+   *  unsaved-settings question let the user leave; never if they stay. */
+  function navigate(next: Folder, account?: { id: number | null }, then?: () => void) {
     if (s.view === 'Settings' && next !== 'Settings' && s.settingsDirty) {
       s.leaveTarget = next;
       v.leaveAccount = account ?? null;
+      v.afterLeave = then ?? null;
       return;
     }
     if (account) s.accountId = account.id;
     goTo(next);
+    then?.();
   }
   async function finishLeaving(save: boolean) {
     const target = s.leaveTarget;
     const account = v.leaveAccount;
+    const after = v.afterLeave;
     v.leaveAccount = null;
+    v.afterLeave = null;
     if (save && !(await settingsPanel.current?.save())) {
       s.leaveTarget = null;
       return;
@@ -877,6 +894,7 @@ export default function App() {
     } else if (target) {
       if (account) s.accountId = account.id;
       goTo(target);
+      after?.();
     }
   }
   function goTo(next: Folder) {
@@ -1183,6 +1201,45 @@ export default function App() {
       await refresh();
     }
   }
+  // The native menu of list rows (lib/row-menu.ts, docs/aspetto-nativo.md rule 33). `rowIds` are the
+  // rows it is for: the one right-clicked, or every ticked one. It acts without opening the row,
+  // through the paths the row and the reader use and with their locks; the focus is back on the row.
+  async function openRowMenu(id: number, at: { x: number; y: number }, rowIds: number[]) {
+    // The rows as the list holds them now, and the messages they stand for: a conversation row
+    // acts on every message of it the view holds, as its pin button does.
+    const listedRows = () =>
+      rowIds
+        .map((rowId) => s.page.items.find((item) => item.id === rowId))
+        .filter((row): row is EmailSummary => !!row);
+    const messagesOf = (rows: EmailSummary[]) => rows.flatMap((row) => (s.threads ? row.message_ids : [row.id]));
+    const rows = listedRows();
+    if (!rows.length) return;
+    const locked = messagesOf(rows).some((messageId) => s.busyIds.has(messageId) || shownOnly(messageId));
+    const choice = await showRowMenu(rowMenuEntries(rows, s.view, locked, tr), at);
+    const rowButton = (rowId: number) =>
+      document.querySelector<HTMLElement>(`.mail-row[data-row-id="${rowId}"] .mail-open`);
+    rowButton(id)?.focus();
+    if (!choice) return;
+    if (choice === 'reply' || choice === 'reply-all' || choice === 'forward') {
+      await compose(id, choice === 'forward', choice === 'reply-all');
+      return;
+    }
+    const command = rowMenuAction(choice);
+    // The list may have changed while the menu was open: a row that left is not acted on.
+    const messages = messagesOf(listedRows());
+    if (!command || !messages.length) return;
+    // Rows sent away leave the focus on the next row, as triage does; `action` moves it itself when
+    // the message on show is among them.
+    if (leavesList.includes(command.action) && !(s.selected && messages.includes(s.selected.id))) {
+      const listed = s.visibleOrder.filter((entry) => s.page.items.some((item) => item.id === entry));
+      const from = listed.indexOf(id);
+      const next = [...listed.slice(from + 1), ...listed.slice(0, Math.max(from, 0)).reverse()].find(
+        (entry) => !rowIds.includes(entry),
+      );
+      (next === undefined ? document.querySelector<HTMLElement>('.mail-list h1') : rowButton(next))?.focus();
+    }
+    await action(id, command.action, command.value, messages);
+  }
   async function restoreListFocus() {
     await tick();
     const active = document.activeElement;
@@ -1240,14 +1297,38 @@ export default function App() {
     // The control that asked for the composer, before the draft is made: that wait can move the focus.
     const opener = document.activeElement;
     try {
+      // A row's menu answers everyone without opening the message: its recipients are read first.
+      const message =
+        everyone && replyTo !== null && s.selected?.id !== replyTo ? await call<Email>('read_mail', { id: replyTo }) : null;
       let draft = await call<Draft>('create_draft', { accountId: s.accountId, replyTo, forward });
-      const selected = s.selected;
+      const selected = message ?? s.selected;
       if (everyone && selected && selected.id === replyTo) {
         const own = new Set((s.workspace?.accounts ?? []).map((account) => account.email.trim().toLowerCase()));
         draft = await call<Draft>('save_draft', {
           draft: { ...draft, ...replyAllRecipients(selected, draft.to, own) },
           importLeaseIds: [],
         });
+      }
+      openComposer(draft, opener);
+      await loadWorkspace();
+    } catch (e) {
+      notify(errorText(e), true);
+    }
+  }
+  // A mailto: link, of a message or of another program (lib/mailto.ts, rule 32): a new message from the
+  // account in view, as «Nuovo messaggio» makes it, filled with the link's fields and opened. Never sent
+  // from here: the person reads it and sends it.
+  async function composeMailto(fields: MailtoFields) {
+    const opener = document.activeElement;
+    try {
+      const created = await call<Draft>('create_draft', { accountId: s.accountId, replyTo: null, forward: false });
+      let draft: Draft;
+      try {
+        draft = await call<Draft>('save_draft', { draft: { ...created, ...mailtoDraft(fields) }, importLeaseIds: [] });
+      } catch (e) {
+        // Without the link's fields the new draft is empty: it does not stay in Drafts.
+        await call('discard_draft', { id: created.id }).catch(() => {});
+        throw e;
       }
       openComposer(draft, opener);
       await loadWorkspace();
@@ -1521,6 +1602,24 @@ export default function App() {
       ),
     );
     unsubscribers.push(installWindowShell());
+    // A click on a Windows notification (lib/notification-open.ts): Rust brought the window back.
+    unsubscribers.push(
+      installNotificationOpen({
+        // The Inbox of the message's account, so the list shows it; a message gone meanwhile (deleted,
+        // moved) leaves the Inbox open without an error.
+        openMail: (id, accountId) =>
+          navigate('Inbox', { id: accountId }, () =>
+            void call<{ folder?: string }[]>('read_rows', { ids: [id] })
+              .then((rows) => {
+                if (rows.some((row) => (row.folder ?? 'Inbox') === 'Inbox')) void open(id);
+              })
+              .catch(() => {}),
+          ),
+        openDrafts: () => navigate('Drafts'),
+        openAccounts: () => (navigate('Settings'), void tick().then(() => settingsPanel.current?.showSection('Accounts'))),
+        openServer: () => (navigate('Settings'), void tick().then(() => settingsPanel.current?.showSection('Compute'))),
+      }),
+    );
     void installWindowCloseHandler(notify)
       .then((unsubscribe) => (disposed ? unsubscribe() : unsubscribers.push(unsubscribe)))
       .catch((error) => notify(errorText(error), true));
@@ -1540,6 +1639,15 @@ export default function App() {
             s.view !== 'Settings' || !s.settingsDirty || (await settingsPanel.current?.save()) !== false,
         },
       ),
+    );
+    // Mail links to the composer: a message's, and in the desktop app those Windows hands to Qamille.
+    unsubscribers.push(
+      installMailtoRouting({
+        compose: (fields) => void composeMailto(fields),
+        refused: () => notify(tr('Questo link di posta non si può aprire.', 'This mail link cannot be opened.'), true),
+        failed: (error) => notify(errorText(error), true),
+        native: desktop ? { listen, call } : undefined,
+      }),
     );
     // `workspace-changed` and its preview twin carry no content: until the backend stops sending
     // them (Task 2.2) they stay as a coalesced full refresh next to the typed `app-event`.
@@ -1808,6 +1916,7 @@ export default function App() {
                       )
                     }
                     loadMore={() => void loadMail(true)}
+                    rowMenu={(id, at, rows) => void openRowMenu(id, at, rows)}
                   />
                   <Reader
                     dark={darkNow === 'dark'}
@@ -1989,6 +2098,7 @@ export default function App() {
           discard={() => void finishLeaving(false)}
           stay={() => {
             s.leaveTarget = null;
+            v.afterLeave = null;
           }}
         />
       )}
@@ -2003,9 +2113,21 @@ export default function App() {
           }}
         />
       )}
+      <VaultNotice
+        notify={notify}
+        setAside={workspace?.credentials_set_aside}
+        changed={() =>
+          void loadWorkspace().then(async () => {
+            // Credentials opened again may hold the server session the onboarding was asking for.
+            if (s.onboarding && (await call<{ connected: boolean }>('server_status').catch(() => null))?.connected)
+              s.onboarding = null;
+          })
+        }
+      />
       {s.printPreview && (
         <PrintPreview emails={s.printPreview.emails} title={s.printPreview.title} close={() => (s.printPreview = null)} />
       )}
+      <UpdateNotice onerror={(message) => notify(message, true)} />
       <Toaster label={tr('Notifiche', 'Notifications')} closeLabel={tr('Chiudi la notifica', 'Dismiss notification')} />
     </>
   );

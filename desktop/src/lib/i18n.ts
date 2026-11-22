@@ -1,4 +1,5 @@
 import { backendTextEnglish, backendTextItalian } from './backend-text';
+import { vaultText } from './vault';
 import { readPreference, savePreference } from './preferences';
 import { reactive, useStore } from './store';
 
@@ -55,8 +56,10 @@ export function tr(it: string, en: string): string {
   return isItalian() ? it : en;
 }
 
-// Text written by the Rust backend, shown in the interface language.
+// Text written by the Rust backend, shown in the interface language. The messages of the
+// credentials vault have their own texts (vault.ts, phase 3, Task 7).
 export function backendText(message: string): string {
+  if (typeof message === 'string' && isItalian()) message = message.split('\n').map((line) => vaultText(line, true)).join('\n');
   return isItalian() ? backendTextItalian(message) : backendTextEnglish(message);
 }
 

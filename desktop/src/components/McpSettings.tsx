@@ -238,16 +238,14 @@ export default function McpSettings({ workspace, notify }: McpSettingsProps) {
                   'Allow permanent deletion of drafts',
                 )}
               </Switch>
-              <Switch
-                checked={state.config.worker_autostart}
-                onChange={(on) => (state.config.worker_autostart = on)}
-              >
-                {tr(
-                  'Esegui gli invii programmati in background all’accesso Windows',
-                  'Run scheduled sends in the background at Windows sign-in',
-                )}
-              </Switch>
             </div>
+            {/* `worker_autostart` stays in the configuration, which saves it as loaded: it starts nothing. */}
+            <p className="field-help">
+              {tr(
+                'Il worker non serve più all’accesso: con «Avvia Qamille all’accesso» (Impostazioni → Generali) Qamille parte nell’area di notifica e invia da sé.',
+                'The worker is no longer needed at sign-in: with “Start Qamille at Windows sign-in” (Settings → General) Qamille starts in the notification area and sends by itself.',
+              )}
+            </p>
             <p className="field-help" role="status">
               {state.running
                 ? tr('Processo in background attivo', 'Background worker running')

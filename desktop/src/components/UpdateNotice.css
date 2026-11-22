@@ -1,0 +1,35 @@
+/* The notice of an update ready to install (UpdateNotice.tsx): it stays at the bottom right, where
+   neither the undo stack (bottom left) nor the notices (bottom center) are, above the composer dock. */
+.update-notice {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: var(--z-floating);
+  display: grid;
+  gap: 6px;
+  width: min(360px, calc(100vw - 40px));
+  padding: 12px 14px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+:root:has(.app-shell.has-composers) .update-notice {
+  bottom: 62px;
+}
+.update-notice p {
+  margin: 0;
+  color: var(--muted);
+}
+/* The release notes: at most three lines here, the rest is in the release. */
+.update-notice .update-notice-notes {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  white-space: pre-line;
+}
+.update-notice .button-row {
+  justify-content: flex-end;
+}

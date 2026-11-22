@@ -304,6 +304,8 @@ fn fetch_policy_extended<T: Read + Write>(
                             email.date_missing = false;
                         }
                     }
+                    // When Gmail received it, whatever its Date header says: whether it is new mail.
+                    email.received_at = row.internal_date().map(|date| date.timestamp());
                     let key = format!(
                         "location:{}:{:?}:{uid}",
                         folder.remote, mailbox.uid_validity

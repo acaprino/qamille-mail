@@ -1,4 +1,5 @@
 use crate::runtime::{DesktopState, blocking};
+use crate::saved_files::SavedFile;
 use qamille::{
     application::{
         AppResult,
@@ -78,6 +79,8 @@ pub async fn prepare_print(
 pub struct ExportSaved {
     path: String,
     count: usize,
+    /// Opens or shows the exported file afterwards (`saved_files.rs`).
+    token: u64,
 }
 
 #[tauri::command]
@@ -117,9 +120,11 @@ pub async fn export_mail(
     let path = file.path().to_path_buf();
     blocking(move || {
         std::fs::write(&path, export.bytes)?;
+        let saved = SavedFile::remember(path);
         Ok(Some(ExportSaved {
-            path: path.to_string_lossy().into_owned(),
+            path: saved.path,
             count: export.count,
+            token: saved.token,
         }))
     })
     .await

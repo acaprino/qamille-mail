@@ -230,6 +230,8 @@ export interface Workspace {
   has_google_secret: boolean;
   signatures: Signature[];
   drafts: Draft[];
+  /** Phase 3, Task 7: the folder of data a sign-in set the credentials of another computer aside in. */
+  credentials_set_aside?: string | null;
 }
 export interface MailPage {
   search?: {

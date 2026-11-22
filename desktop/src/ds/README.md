@@ -60,7 +60,7 @@ L’HTML che produce, e che si scrive fuori dall’app:
 
 ## Le primitive
 
-Sono diciassette componenti più l’icona. La loro forma è fissata: cambiare un controllo vuol dire cambiare un solo file, e cambiano tutti i punti dell’app che lo usano (ADR-0011). Ogni file ha un’esportazione predefinita, salvo `NavList.tsx` (`NavList` e `NavItem` per nome); `Toaster.tsx` esporta anche `notify`, `Icon.tsx` anche `iconPaths`, `Menu.tsx` anche il tipo `MenuItem`. In tabella le props (quelle senza «?» sono obbligatorie; il resto degli attributi del nodo passa dove indicato); sotto, una sezione per primitiva con un esempio in TSX e l’HTML che produce.
+Sono diciassette componenti più l’icona. La loro forma è fissata: cambiare un controllo vuol dire cambiare un solo file, e cambiano tutti i punti dell’app che lo usano (ADR-0011). Ogni file ha un’esportazione predefinita, salvo `NavList.tsx` (`NavList` e `NavItem` per nome); `Toaster.tsx` esporta anche `notify` e il tipo `NoticeAction`, `Icon.tsx` anche `iconPaths`, `Menu.tsx` anche il tipo `MenuItem`. In tabella le props (quelle senza «?» sono obbligatorie; il resto degli attributi del nodo passa dove indicato); sotto, una sezione per primitiva con un esempio in TSX e l’HTML che produce.
 
 | Primitiva | Basata su | Props | Lo stile sta in |
 |---|---|---|---|
@@ -78,7 +78,7 @@ Sono diciassette componenti più l’icona. La loro forma è fissata: cambiare u
 | `Slider` | Ark `Slider` | `value`; `onChange?`; `min`; `max`; `step?` (1); `aria-label` | `styles/ark/slider.css` |
 | `DateField` | Ark `DatePicker` | `value` (`'YYYY-MM-DD'` o `''`); `onChange?`; `aria-label`; `min?`; `max?`; `locale?` (`en-US`); `disabled?`; `translations?` | `styles/ark/date-picker.css` |
 | `RecipientsInput` | Ark `TagsInput` e `Combobox` | `value?` (`string[]`); `onChange?`; `suggestions`; `aria-label`; `onQuery?`; `invalid?`; `placeholder?`; `disabled?`; `inputRef?`; `pending?`; `onPendingChange?`; `translations?`; `listTranslations?`; `suggestionsLabel?`; `className?` | `styles/ark/recipients.css` |
-| `Toaster` | Ark `Toast` | `label`; `closeLabel`; l’esportazione `notify(message, error?)` mostra un avviso | `styles/ark/toast.css` |
+| `Toaster` | Ark `Toast` | `label`; `closeLabel`; l’esportazione `notify(message, error?, actions?)` mostra un avviso, con al massimo due azioni (`NoticeAction = { label, run }`) | `styles/ark/toast.css` |
 | `Icon` | SVG | `name`; `size?` (20); `stroke?` (1,7) | `primitives/Icon.tsx` |
 | `Count` | Animate Digits di unlumen | `value` (`number` o `string`); `className?` | `styles/nav.css` (`.count-digits`) |
 | `NavList` / `NavItem` | Sidebar 001 di unlumen, Motion | `NavList`: `group?` (`'nav'`); `className?`; gli attributi di `<nav>`. `NavItem`: `active?`; `hint?`; `className?`; gli attributi di `<button>` | `styles/nav.css` (`.nav-hover`, `.nav-active-bar`) |
@@ -542,7 +542,7 @@ const field = useRef<HTMLInputElement>(null);
 
 ### Toaster
 
-Gli avvisi dell’app, su `Toast` di Ark: se ne vede uno alla volta, in basso al centro a `z-toast` (con una finestra di scrittura aperta si alza sopra la sua barra, con `--toast-bottom`). Si monta una volta sola, alla radice dell’app, con `label` (il nome della regione) e `closeLabel` (il nome del pulsante di chiusura): le parole le dà il chiamante, il modulo non legge le traduzioni dell’app. Si mostra un avviso con `notify(message, error)` esportato dallo stesso file: un nuovo avviso sostituisce il vecchio; un esito è uno `status` con la spunta in `success` che si chiude da solo dopo 4,5 s, un errore è un `alert` con bordo `danger-border` che resta 12 s; restano aperti finché il puntatore o il focus sono sopra. Superficie `surface`, bordo `border`, raggio `radius-lg` (8px), ombra `shadow`, come un popover; il testo si può selezionare. Scorre al suo posto in `motion-panel`. La scorciatoia propria di Ark (Alt+T) è spenta. `UndoStack` non passa da qui: il suo conto alla rovescia batte ogni 50 ms e `tests/undo.mjs` conta quel battito, mentre `Toast` ha i suoi timer (ADR-0011).
+Gli avvisi dell’app, su `Toast` di Ark: se ne vede uno alla volta, in basso al centro a `z-toast` (con una finestra di scrittura aperta si alza sopra la sua barra, con `--toast-bottom`). Si monta una volta sola, alla radice dell’app, con `label` (il nome della regione) e `closeLabel` (il nome del pulsante di chiusura): le parole le dà il chiamante, il modulo non legge le traduzioni dell’app. Si mostra un avviso con `notify(message, error, actions)` esportato dallo stesso file: un nuovo avviso sostituisce il vecchio; un esito è uno `status` con la spunta in `success` che si chiude da solo dopo 4,5 s, un errore è un `alert` con bordo `danger-border` che resta 12 s; restano aperti finché il puntatore o il focus sono sopra. Con `actions` (al massimo due, `{ label, run }`; le altre si ignorano) l’avviso porta altrettanti pulsanti `secondary` tra il messaggio e il pulsante di chiusura, raggiungibili con Tab: un clic esegue `run` e chiude l’avviso, e con azioni l’avviso resta 10 s (almeno), perché c’è qualcosa da decidere. Le azioni sono una comodità, mai l’unica strada: quello che fanno si deve poter fare anche altrove (il file salvato resta in Esplora risorse). Superficie `surface`, bordo `border`, raggio `radius-lg` (8px), ombra `shadow`, come un popover; il testo si può selezionare. Scorre al suo posto in `motion-panel`. La scorciatoia propria di Ark (Alt+T) è spenta. `UndoStack` non passa da qui: il suo conto alla rovescia batte ogni 50 ms e `tests/undo.mjs` conta quel battito, mentre `Toast` ha i suoi timer (ADR-0011).
 
 ```tsx
 import Toaster, { notify } from '../ds/primitives/Toaster';
@@ -550,6 +550,7 @@ import Toaster, { notify } from '../ds/primitives/Toaster';
 <Toaster label="Notifiche" closeLabel="Chiudi la notifica" />
 <Button variant="primary" type="button" onClick={() => notify('Salvato')}>Salva</Button>
 // un errore: notify('Impossibile salvare il contatto. Riprova tra poco.', true)
+// con azioni: notify('Allegato salvato', false, [{ label: 'Apri', run: apri }, { label: 'Mostra nella cartella', run: mostra }])
 ```
 
 ```html
@@ -557,6 +558,8 @@ import Toaster, { notify } from '../ds/primitives/Toaster';
   <div data-scope="toast" data-part="root" data-type="success" class="toast" role="status">
     <svg>…</svg>
     <div data-scope="toast" data-part="description">Salvato</div>
+    <!-- con azioni, prima del pulsante di chiusura: -->
+    <button class="secondary toast-action" type="button">Apri</button>
     <button data-scope="toast" data-part="close-trigger" class="icon-button" aria-label="Chiudi la notifica">…</button>
   </div>
 </div>

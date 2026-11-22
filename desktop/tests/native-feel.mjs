@@ -296,7 +296,14 @@ check('12. a failed start and a blank page reach a message (rule 21, audit Q2 Q1
   assert.ok(at('recovery::stop_asking()') < dialog, 'no recovery dialog opens over the message of a failed start');
   assert.ok(dialog < at('recovery::finish_meetings_before_exit(app)'), 'startup_failed stops the meetings as every exit does');
   assert.ok(at('recovery::finish_meetings_before_exit(app)') < at('std::process::exit(1)'), 'startup_failed exits with 1, last');
-  assert.match(main, /\.run\(context\);[\s\S]*?if let Err\(error\) = started \{\s*startup_failed\(None, &error\)/, 'a failed Builder::build says it too');
+  // Built, then run (the run's events go to updates.rs): an Err of Builder::build (a plugin or the
+  // runtime could not start) is said as every failed start.
+  assert.match(
+    main,
+    /\.build\(context\);[\s\S]*?match built \{\s*Ok\(app\) => app\.run\(\|app, event\| updates::run_event\(app, &event\)\),\s*Err\(error\) => startup_failed\(None, &error\),?\s*\}/,
+    'a failed Builder::build says it too',
+  );
+  assert.ok(!/\.run\(context\)/.test(main), 'the app is built with .build(context) and then run, never .run(context)');
   const setup = item(main, 'fn setup_app(');
   const lookup = setup.indexOf('tauri::webview_version()');
   const build = setup.indexOf('.build()?');
@@ -443,15 +450,18 @@ function nshMacro(text, name) {
   return found[1];
 }
 
-check("17. the installer removes the worker's startup and, when asked, the data (audit Q23)", () => {
+check("17. the installer removes the start at sign-in, the old worker's startup file and, when asked, the data (audit Q22 Q23)", () => {
   const nsis = JSON.parse(read('src-tauri/tauri.professional.conf.json')).bundle?.windows?.nsis;
   const hooksPath = nsis?.installerHooks?.replace(/^\.\//, '');
   assert.equal(hooksPath, 'windows/installer-hooks.nsh', 'the Professional installer must take its hooks from windows/installer-hooks.nsh');
   const hooks = read(`src-tauri/${hooksPath}`);
 
-  // What the app writes, read from the code that writes it: the startup file and the data folder.
+  // What the app writes, read from the code that writes it: the Run entry of the installed
+  // Professional, the old worker's startup file (versions before phase 3) and the data folder.
+  const entryName = rustItem(read('src-tauri/src/background_rules.rs'), 'pub fn autostart_entry_name(').match(/if installed \{ "([^"]+)"\.to_owned\(\) \}/);
+  assert.ok(entryName, 'autostart_entry_name no longer gives the installed Professional a fixed name: change this check and the hook together');
   const launcher = rustItem(read('../app/src/infrastructure/mcp_config.rs'), 'fn startup_launcher()');
-  assert.match(launcher, /env::var_os\("APPDATA"\)/, 'the startup file is still placed under %APPDATA%');
+  assert.match(launcher, /env::var_os\("APPDATA"\)/, 'the old startup file is still looked for under %APPDATA%');
   const written = launcher.match(/\.join\("(Microsoft\/Windows\/[^"]*\.vbs)"\)/);
   assert.ok(written, 'startup_launcher no longer joins a .vbs path: change this check and the hook together');
   const startupFile = written[1].replaceAll('/', '\\');
@@ -468,17 +478,26 @@ check("17. the installer removes the worker's startup and, when asked, the data 
   assert.match(before, /\$\$_\.CommandLine\s+-match\s+'\(\^\|\\s\)--worker\(\\s\|\$\$\)'/, 'a process must be matched on --worker as a whole argument');
   assert.match(before, /Stop-Process\s+-Id\s+\$\$_\.ProcessId/, 'the matching processes must be stopped');
   // Nothing is deleted before the uninstaller's "Qamille is running" step: cancelling there leaves
-  // Qamille installed, and it must keep its startup file and its data.
-  assert.ok(!/\b(Delete|RMDir)\b/i.test(before) && !before.includes(startupFile), 'the hook that runs first must not delete anything');
+  // Qamille installed, and it must keep its start at sign-in and its data.
+  assert.ok(!/\b(Delete|DeleteRegValue|DeleteRegKey|RMDir)\b/i.test(before) && !before.includes(startupFile), 'the hook that runs first must not delete anything');
 
   const after = nshMacro(hooks, 'NSIS_HOOK_POSTUNINSTALL');
-  // The startup file goes only once the uninstall went through, and not on an /UPDATE. The Delete must
-  // sit inside the If $UpdateMode <> 1 block: no ${EndIf} between the two.
-  assert.match(after, /ReadEnvStr\s+\$\d\s+APPDATA/, 'the startup folder is found from %APPDATA%, as mcp_config.rs does');
+  // Each removal sits inside the If $UpdateMode <> 1 block (no ${EndIf} between the two): an /UPDATE keeps them.
+  const inUpdateBlock = (what) => new RegExp(`\\$\\{If\\}\\s+\\$UpdateMode\\s*<>\\s*1(?:(?!\\$\\{EndIf\\})[\\s\\S])*?${what}`);
+  const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  for (const key of ['Software\\Microsoft\\Windows\\CurrentVersion\\Run', 'Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run']) {
+    assert.match(
+      after,
+      inUpdateBlock(`DeleteRegValue\\s+HKCU\\s+"${escape(key)}"\\s+"${escape(entryName[1])}"`),
+      `the uninstall must remove "${entryName[1]}" from HKCU\\${key}, and not on an /UPDATE`,
+    );
+  }
+  assert.ok(!/HKLM/.test(after), 'the app writes its start at sign-in only for the current user');
+  assert.match(after, /ReadEnvStr\s+\$\d\s+APPDATA/, 'the old startup folder is found from %APPDATA%, as mcp_config.rs does');
   assert.match(
     after,
-    new RegExp(`\\$\\{If\\}\\s+\\$UpdateMode\\s*<>\\s*1(?:(?!\\$\\{EndIf\\})[\\s\\S])*?Delete\\s+"\\$\\d\\\\${startupFile.replaceAll('\\', '\\\\')}"`),
-    `${startupFile} must be deleted after the uninstall, and not on an /UPDATE`,
+    inUpdateBlock(`Delete\\s+"\\$\\d\\\\${escape(startupFile)}"`),
+    `${startupFile} of an earlier version must be deleted after the uninstall, and not on an /UPDATE`,
   );
   // The template's "Delete app data" only empties %APPDATA%\<identifier> and %LOCALAPPDATA%\<identifier>,
   // where Qamille keeps nothing: its data and credentials.key sit beside the program.
@@ -488,18 +507,8 @@ check("17. the installer removes the worker's startup and, when asked, the data 
     'the data folder must go only when the box is ticked, never on an /UPDATE, and never from an empty $INSTDIR',
   );
   assert.ok(!/RMDir\s+\/r\s+"\$INSTDIR"/.test(after), 'only the data folder is removed recursively, never the install folder');
-
-  // A manual upgrade runs the old uninstaller without /UPDATE, so it removes the startup file too: the
-  // app writes it again when it starts, with automatic startup on, never while it is off.
-  const refresh = rustItem(read('../app/src/infrastructure/mcp_config.rs'), 'pub fn refresh_autostart()');
-  assert.match(refresh, /refresh_autostart_at\(/, 'refresh_autostart must do the work of refresh_autostart_at');
-  const decision = rustItem(read('../app/src/infrastructure/mcp_config.rs'), 'fn launcher_refresh(');
-  assert.match(decision, /if !autostart \{\s*return None;\s*\}/, 'a launcher must never be written while automatic startup is off');
-  assert.match(
-    rustItem(read('src-tauri/src/main.rs'), 'fn setup_app('),
-    /if !demo \{(?:(?!\n    \})[\s\S])*?mcp_config::refresh_autostart\(\)/,
-    'setup_app must refresh the worker startup file when the app starts (not in the demo)',
-  );
+  // The worker's startup file is never written again: nothing in the app puts it back.
+  assert.ok(!/refresh_autostart/.test(hooks), 'the hooks no longer point to refresh_autostart, which is gone');
 });
 
 check("18. the calendar sheet's end-of-session step never calls the provider (rule 15, audit Q6)", () => {
@@ -518,6 +527,708 @@ check("18. the calendar sheet's end-of-session step never calls the provider (ru
   const guard = calendar.slice(start, end + 1);
   assert.match(guard, /,\s*async \(\) => false,?\s*\)$/, "the calendar sheet's saveNow must be exactly `async () => false`");
   assert.ok(!/\b(save|calendarCall)\b/.test(guard), "the calendar sheet's guard must not reach save() or calendarCall");
+});
+
+// phase 3, Task 1: checks 19-20
+check('19. the close button hides, and one restore path brings the window back (rule 26)', () => {
+  const main = read('src-tauri/src/main.rs');
+  const background = read('src-tauri/src/background.rs');
+  // A second start, the tray, a notification and a mail link all come back through background::restore.
+  assert.match(main, /\.plugin\(tauri_plugin_single_instance::init\(background::second_instance\)\)/, 'the single-instance callback must be background::second_instance');
+  assert.match(rustItem(background, 'pub fn second_instance('), /\brestore\(app\)/, 'a second start restores the window');
+  // The close button hides only while hides_on_close() says so; otherwise the page's guards decide.
+  const events = main.slice(main.indexOf('.on_window_event('), main.indexOf('.invoke_handler('));
+  assert.match(
+    events,
+    /tauri::WindowEvent::CloseRequested \{ api, \.\. \} => \{\s*if background::hides_on_close\(\) \{\s*api\.prevent_close\(\);\s*background::hide\(window\.app_handle\(\)\);?\s*\} else \{\s*recovery::close_requested\(window\.app_handle\(\)\);?\s*\}/,
+    'CloseRequested must prevent the close and hide only when background::hides_on_close(), and else go to recovery::close_requested',
+  );
+  assert.equal((main.match(/prevent_close\(\)/g) ?? []).length, 1, 'main.rs prevents a close in one place only');
+  assert.match(events, /tauri::WindowEvent::Resized\(_\) => background::window_resized\(window\)/, 'a minimized window pauses its webview (background::window_resized)');
+  assert.match(rustItem(read('src-tauri/src/recovery.rs'), 'pub fn close_seen('), /!crate::background::hides_on_close\(\)/, 'close_seen tells the page not to close when Rust only hid the window');
+  assert.match(read('src/lib/window-close.ts'), /await call<boolean>\('close_seen'\)/, 'the page waits for close_seen before running its guards');
+  // All of it on the main thread: from another thread (a toast's click, an async command, the close
+  // watch) the Win32 show of a maximized first show would run at once while SetIsVisible and tao's
+  // show() are posted, and the window would show one frame of its ground. `restore` sends the work
+  // there and waits for it, bounded, so the caller's next step (a question, the page's open event)
+  // comes with the window in view.
+  const entry = rustItem(background, 'pub fn restore(');
+  assert.match(entry, /\.run_on_main_thread\(move \|\| \{\s*restore_on_main\(&\w+\);/, 'restore runs restore_on_main through run_on_main_thread');
+  assert.match(entry, /\.recv_timeout\(/, 'restore waits for the main thread, and not for ever');
+  const code = background.replace(/(^|\s)\/\/.*$/gm, '$1');
+  assert.equal((code.match(/\brestore_on_main\(/g) ?? []).length, 2, 'restore_on_main is defined once and called only by restore');
+  const confirmClose = rustItem(read('src-tauri/src/commands/meetings.rs'), 'pub async fn meeting_confirm_close(');
+  assert.match(confirmClose, /blocking\(move \|\| \{\s*crate::background::restore\(/, 'meeting_confirm_close waits for the window off the async runtime');
+  // The webview is visible before the window shows, then the window comes to the front, on screen.
+  const restore = rustItem(background, 'fn restore_on_main(');
+  const at = (part) => {
+    const index = restore.indexOf(part);
+    assert.ok(index >= 0, `restore: no ${part}`);
+    return index;
+  };
+  // The show is `window_shell::show_main`, the one function that shows the main window (rule 29: a
+  // maximized placement opens maximized from the first show, a normal start's or the tray's).
+  assert.ok(at('set_webview_visible(') < at('show_main(') && restore.slice(at('set_webview_visible('), at('show_main(')).includes('true'), 'restore makes the webview visible before show');
+  assert.ok(at('show_main(') < at('.unminimize()') && at('.unminimize()') < at('.set_focus()'), 'restore: show, then unminimize, then set_focus');
+  assert.match(restore, /recovery::offer_reload_if_not_ready\(/, 'the first restore offers the reload the hidden window did not ask for');
+  // Nothing else shows the main window: a reload or a dialog never pulls it out of the tray.
+  // `window_shell::show_main` is the only `.show()` of a window; native_feel::show_main_window and
+  // background::restore are the only callers of `show_main`.
+  const allowed = { 'window_shell.rs': 'pub fn show_main(' };
+  const callers = { 'native_feel.rs': 'pub fn show_main_window(', 'background.rs': 'fn restore_on_main(' };
+  const shows = (text) => (text.match(/\b[A-Za-z_]\w*\.show\(\)/g) ?? []).length;
+  const calls = (text) => (text.match(/\bshow_main\(/g) ?? []).length;
+  for (const file of fs.readdirSync(path.join(desktop, 'src-tauri/src'), { recursive: true }).filter((f) => f.endsWith('.rs'))) {
+    const text = read(path.join('src-tauri/src', file)).replace(/(^|\s)\/\/.*$/gm, '$1');
+    if (shows(text)) {
+      const owner = allowed[path.basename(file)];
+      assert.ok(owner, `${file} shows a window (.show()): only window_shell::show_main may`);
+      assert.equal(shows(rustItem(text, owner)), shows(text), `${file}: .show() outside ${owner}`);
+    }
+    if (path.basename(file) !== 'window_shell.rs' && calls(text)) {
+      const owner = callers[path.basename(file)];
+      assert.ok(owner, `${file} calls show_main: only native_feel::show_main_window and background::restore may`);
+      assert.equal(calls(rustItem(text, owner)), calls(text), `${file}: show_main outside ${owner}`);
+    }
+  }
+  // The tray: Show and Quit, with ids of its own (every menu event reaches every handler, the row menu's
+  // too); Quit closes the window through the page's guards, never app.exit.
+  assert.match(background, /MenuItem::with_id\(\s*app,\s*"tray:show",/, 'the tray menu has "tray:show"');
+  assert.match(background, /MenuItem::with_id\(\s*app,\s*"tray:quit",/, 'the tray menu has "tray:quit"');
+  assert.match(background, /"tray:show" => restore\(app\),\s*"tray:quit" => quit\(app\),\s*_ => \{\}/, 'the tray menu calls restore and quit, and ignores ids it does not own');
+  const quit = rustItem(background, 'pub fn quit(');
+  assert.ok(quit.includes('QUITTING.store(true') && /\.close\(\)/.test(quit) && !/\.exit\(/.test(quit), 'quit raises QUITTING and calls close(), never exit');
+  const recovery = read('src-tauri/src/recovery.rs');
+  // «Attendi» on «Qamille non si chiude», or Esc: «Esci» is over, so the next X hides again.
+  assert.match(
+    rustItem(recovery, 'pub fn close_requested('),
+    /== Some\(false\);\s*if close \{[^}]*\} else \{\s*crate::background::close_settled\(\);?\s*\}/,
+    'waiting on «Qamille non si chiude» lowers QUITTING (background::close_settled)',
+  );
+  // The recording question during «Esci» from the tray: the window comes back with it.
+  const confirm = rustItem(read('src-tauri/src/commands/meetings.rs'), 'pub async fn meeting_confirm_close(');
+  assert.ok(/background::restore\(/.test(confirm) && confirm.indexOf('background::restore(') < confirm.indexOf('MessageDialog'), 'meeting_confirm_close restores the window before asking');
+  // Session end: every step first (the recording stops without waiting for the queue), then the queue
+  // gets the rest of the time, then Windows may go on.
+  assert.match(
+    read('src/lib/window-close.ts'),
+    /if \(last\) void saving\.then\(\(\) => undoQueue\?\.settle\(\)\)\.finally\(\(\) => call\('session_end_ready'\)/,
+    'at session end the queue is waited for after the other steps, before session_end_ready',
+  );
+  const shell = read('src-tauri/src/window_shell.rs');
+  assert.match(
+    rustItem(shell, 'fn add_reload_entry('),
+    /AppendMenuW\(menu, MF_STRING, crate::background_rules::SC_APP_QUIT as usize, quit_label\(italian\)\);\s*let _ = AppendMenuW\(menu, MF_SEPARATOR/,
+    'the system menu offers «Esci da Qamille» right under «Chiudi»',
+  );
+  assert.match(
+    shell,
+    /WM_SYSCOMMAND if \(wparam\.0 as u32 & 0xFFF0\) == crate::background_rules::SC_APP_QUIT => \{[^}]*crate::background::quit\(&?app\)/,
+    'Esci in the system menu calls background::quit',
+  );
+  // A hidden window never asks "Qamille non si è aperto" by itself: the 15 s watch and a page that did
+  // not load read is_visible() first (the load's watch then asks at the first restore).
+  for (const head of ['pub fn watch_startup(', 'pub fn page_not_loaded(']) {
+    const body = rustItem(recovery, head);
+    assert.ok(body.indexOf('is_visible()') >= 0 && body.indexOf('is_visible()') < body.indexOf('ask_once('), `${head.slice(7, -1)} asks only after reading is_visible()`);
+  }
+});
+
+check('20. start at sign-in is Qamille in the tray, an HKCU Run value Qamille writes quoted, never a VBS (rule 27, audit Q22)', () => {
+  const cargo = read('src-tauri/Cargo.toml');
+  assert.match(cargo, /^tauri = \{ version = "2", features = \[[^\]]*"tray-icon"/m, 'tauri needs the tray-icon feature');
+  // auto-launch (the autostart plugin's backend) writes the path unquoted, and HKLM when it may.
+  assert.ok(!/tauri-plugin-autostart|auto-launch/.test(cargo + read('src-tauri/Cargo.lock')), 'no autostart plugin: Qamille writes its own entry');
+  const rules = read('src-tauri/src/background_rules.rs');
+  assert.match(rustItem(rules, 'pub fn run_command('), /format!\("\\"\{\w+\}\\" \{AUTOSTART_ARG\}"\)/, 'the Run value is "<exe>" --autostart, the executable in quotes');
+  const background = read('src-tauri/src/background.rs');
+  assert.match(background, /background_rules::autostart_entry_name\(installed\(\),/, 'the entry name comes from autostart_entry_name');
+  assert.match(background, /background_rules::workspace_tag\(/, 'the entry name carries the stable tag of the data folder');
+  const tagCode = ['pub fn workspace_tag(', 'pub fn workspace_id(', 'pub fn fnv1a64('].map((head) => rustItem(rules, head)).join('') + rustItem(background, 'fn autostart_entry(');
+  assert.ok(/fnv1a64\(/.test(tagCode) && !/DefaultHasher|Hasher/.test(tagCode), 'the tag is FNV-1a, not DefaultHasher, which changes between Rust releases');
+  const startup = rustItem(background, 'mod startup {');
+  assert.match(startup, /const RUN: &str = r"Software\\Microsoft\\Windows\\CurrentVersion\\Run";/, 'the entry lives in the Run key');
+  assert.match(startup, /const APPROVED: &str = r"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";/, 'Task Manager\'s switch is its twin under StartupApproved');
+  assert.ok(/HKEY_CURRENT_USER/.test(startup) && !/HKEY_LOCAL_MACHINE/.test(background), 'only for the current user, never machine-wide');
+  assert.match(rustItem(background, 'fn turn_on('), /background_rules::run_command\(/, 'turning it on writes run_command');
+  assert.match(rustItem(background, 'pub async fn autostart_set('), /\bturn_on\(\)/, 'the switch in Settings turns it on through turn_on');
+  const main = read('src-tauri/src/main.rs');
+  const setup = rustItem(main, 'fn setup_app(');
+  assert.match(
+    setup,
+    /if background_rules::stays_hidden\(&args, background::restarted_hidden\(\)\) \{\s*native_feel::prepare_main_window\(&main_window\);\s*native_feel::set_webview_visible\(&main_window, false\);?\s*\} else \{\s*native_feel::show_main_window\(&main_window\);?\s*\}/,
+    'a start with AUTOSTART_ARG prepares the window and leaves it in the tray; a restart comes back as it was',
+  );
+  // A restart keeps the arguments of the first start: it says whether the window was on screen.
+  assert.match(main, /recovery::wait_for_previous_instance\(\);\s*background::take_restart_state\(\);/, 'main reads the restart state before any thread starts');
+  assert.match(rustItem(read('src-tauri/src/recovery.rs'), 'fn restart_app('), /crate::background::before_restart\(app\);[\s\S]*request_restart\(\)/, 'a restart says first whether the window was hidden');
+  // Windows has the last word, also when Settings shows the switch: off in Task Manager stays off after an upgrade.
+  assert.match(rustItem(background, 'fn status('), /follow_windows\(\)/, 'reading the state for Settings follows Windows');
+  assert.match(rustItem(background, 'fn follow_windows('), /set_start_at_sign_in\(enabled\)/, 'what Windows has is what Qamille remembers');
+  assert.match(setup, /if !demo \{(?:(?!\n    \})[\s\S])*?background::migrate_legacy_launcher\(/, 'setup_app migrates the old worker startup file, never in the demo');
+  // A manual upgrade runs the old uninstaller without /UPDATE, which removes the entry: the installed
+  // Professional puts it back at its next start, only if the person had turned it on in Qamille.
+  assert.match(rustItem(background, 'pub fn migrate_legacy_launcher('), /put_back_after_upgrade\(/, 'the startup pass puts the entry back after a manual upgrade');
+  assert.match(rustItem(background, 'fn put_back_after_upgrade('), /if !installed\(\) \|\| !preferences\(\)\.start_at_sign_in/, 'only for the installed Professional, and only when it was turned on in Qamille');
+  // The app writes no startup file any more, and the page reaches start at sign-in only through app commands.
+  const mcp = read('../app/src/infrastructure/mcp_config.rs');
+  assert.ok(!/launcher_content|refresh_autostart|set_autostart/.test(mcp), 'mcp_config.rs must not write a startup file (launcher_content, refresh_autostart, set_autostart)');
+  for (const file of ['capabilities/main.json', 'capabilities/reminder.json']) {
+    assert.ok(!JSON.parse(read(`src-tauri/${file}`)).permissions.some((p) => /^(autostart|core:tray|core:menu):/.test(p)), `${file}: no autostart, tray or menu permission for the page`);
+  }
+  assert.ok(!/@tauri-apps\/plugin-autostart/.test(read('package.json')), 'no autostart package for the page');
+});
+
+// phase 3, Task 2: check 21
+
+check('21. the saved placement is applied before the first show and only on a connected monitor (rule 29)', () => {
+  const shell = read('src-tauri/src/window_shell.rs');
+  const placement = read('src-tauri/src/placement.rs');
+  // The decisions are pure (std only, tested with `rustc --test`), and the module is declared once.
+  assert.ok(!/^\s*use\s+(tauri|serde|crate)\b/m.test(placement), 'placement.rs must stay free of Tauri, serde and the app');
+  assert.match(read('src-tauri/src/main.rs'), /^mod placement;$/m, 'main.rs declares `mod placement;`');
+  assert.ok(!/\bplacement::/.test(read('src-tauri/src/main.rs')), 'main.rs only declares the module: window_shell.rs does the rest');
+  // The preferences file keeps it, and an older file without it still reads.
+  const preferences = rustItem(shell, 'struct WindowPreferences {');
+  assert.match(preferences, /#\[serde\([^\]]*\bdefault\b[^\]]*\)\]\s*placement:/, 'WindowPreferences.placement needs #[serde(default ...)]');
+  // Applied by the startup preferences, which never show or maximize the window themselves.
+  const startup = rustItem(shell, 'pub fn apply_startup_preferences(');
+  assert.match(startup, /\bapply_placement\(window\b/, 'apply_startup_preferences must apply the saved placement');
+  assert.ok(!/\.show\(|\.maximize\(/.test(startup), 'apply_startup_preferences must neither show nor maximize the hidden window: tao sets WS_MAXIMIZE on it without moving it to the monitor');
+  assert.match(startup, /\bpending_show\(\)/, 'apply_startup_preferences leaves what it decided for the first show');
+  const feel = read('src-tauri/src/native_feel.rs');
+  const prepare = rustItem(feel, 'pub fn prepare_main_window(');
+  assert.match(prepare, /\bapply_startup_preferences\(/, 'prepare_main_window must apply the startup preferences');
+  assert.ok(!/\.show\(|\bshow_main\(/.test(prepare), 'prepare_main_window must not show the window (a start in the tray stops here)');
+  // The first show, from a normal start and from background::restore, is one function.
+  const showMain = rustItem(feel, 'pub fn show_main_window(');
+  assert.ok(showMain.search(/\bprepare_main_window\(/) >= 0 && showMain.search(/\bprepare_main_window\(/) < showMain.search(/\bshow_main\(/), 'show_main_window prepares, then shows with window_shell::show_main');
+  assert.match(rustItem(read('src-tauri/src/background.rs'), 'fn restore_on_main('), /\bwindow_shell::show_main\(/, 'background::restore shows with window_shell::show_main, on the main thread');
+  const show = rustItem(shell, 'pub fn show_main(');
+  assert.match(show, /\bplacement::first_show\(/, 'show_main asks placement::first_show how to show');
+  assert.match(show, /ShowPath::Maximized/, 'show_main has a maximized path');
+  // Maximized: one Win32 step (SetWindowPlacement over the rectangle applied while hidden), then tao is told the window is visible.
+  assert.ok(show.search(/\bshow_maximized\b/) >= 0 && show.search(/\bshow_maximized\b/) < show.search(/\.show\(\)/), 'show_main maximizes through win::show_maximized, and tells tao with show() afterwards');
+  const placementCall = rustItem(shell, 'pub fn show_maximized(');
+  assert.match(placementCall, /GetWindowPlacement\([\s\S]*SW_SHOWMAXIMIZED[\s\S]*SetWindowPlacement\(/, 'show_maximized reads the placement, then sets it with SW_SHOWMAXIMIZED');
+  // The only maximize() of the window is the fallback inside show_main, after show().
+  const code = shell.replace(/(^|\s)\/\/.*$/gm, '$1');
+  assert.equal((code.match(/\.maximize\(\)/g) ?? []).length, (show.match(/\.maximize\(\)/g) ?? []).length, 'maximize() only in show_main');
+  if (/\.maximize\(\)/.test(show)) assert.ok(show.search(/\.show\(\)/) < show.search(/\.maximize\(\)/), 'a maximize() fallback comes after show(), never on a hidden window');
+  // Only on a monitor that is connected now, with the work area (not the taskbar) as the limit.
+  const apply = rustItem(shell, 'fn apply_placement(');
+  assert.match(apply, /\.available_monitors\(\)/, 'apply_placement must ask for the connected monitors');
+  assert.match(apply, /\.work_area\(\)/, 'apply_placement must use the work area of each monitor');
+  assert.match(apply, /\bplacement::restore\(/, 'apply_placement must decide with placement::restore');
+  assert.match(apply, /\bmin_logical_size\(/, 'apply_placement must pass the minimum size of the window config');
+  assert.match(apply, /\.set_position\([\s\S]*\.set_size\(/, 'position first (a move to another scale settles), then size');
+  assert.ok(!/\.show\(|\.maximize\(/.test(apply), 'apply_placement only places: it neither shows nor maximizes');
+  // The normal rectangle is applied and remembered while hidden; a maximized one is the first show's to open.
+  assert.match(startup, /\bapply_placement\([\s\S]*\bremember_start_rectangle\(/, 'the rectangle is applied and remembered at startup');
+  // The saving is the window's own listener, registered from attach_main (no line in main.rs).
+  assert.match(rustItem(shell, 'pub fn attach_main('), /\bwatch_placement\(/, 'attach_main must register the placement saver');
+  const watch = rustItem(shell, 'fn watch_placement(');
+  assert.match(watch, /\.on_window_event\(/, 'watch_placement registers a window event listener');
+  for (const event of ['Moved', 'Resized', 'ScaleFactorChanged', 'CloseRequested', 'Destroyed']) {
+    assert.ok(new RegExp(`WindowEvent::${event}\\b`).test(watch), `the placement saver must listen to ${event}`);
+  }
+  assert.match(watch, /Moved\([^)]*\)\s*\|[\s\S]*?ScaleFactorChanged\b[\s\S]*?=>\s*\{[\s\S]*?save_placement_soon\(\)/, 'a move, a resize and a scale change are saved after a delay');
+  assert.match(watch, /CloseRequested\b[\s\S]*?=>\s*\{[\s\S]*?track_placement\([\s\S]*?\bsave_placement\(\)/, 'a close request saves at once, after taking in where the window is');
+  assert.match(watch, /Destroyed\s*=>\s*save_placement\(\)/, 'a destroyed window saves at once');
+  assert.match(shell, /PLACEMENT_DELAY: Duration = Duration::from_millis\(500\)/, 'moves and resizes are saved 500 ms after the last one');
+  // Never from a minimized or hidden window.
+  const track = rustItem(shell, 'fn track_placement(');
+  assert.match(track, /\.is_minimized\(\)/, 'a minimized window is never saved');
+  assert.match(track, /\.is_visible\(\)/, 'a hidden window is never saved');
+  // A maximize moves the window before tao's flag changes: Windows is asked as well, or the screen-sized rectangle is saved.
+  assert.match(rustItem(shell, 'fn is_maximized('), /\bis_zoomed\b/, 'is_maximized must ask Windows (IsZoomed) as well as tao');
+  // The last half second is not lost at the end of the session (Windows kills the process after WM_ENDSESSION).
+  assert.match(rustItem(shell, 'fn session_end('), /\bsave_placement\(\)/, 'session_end must save the placement before it waits for the page');
+  // One thread saving must not undo another's change: every write of the preferences file is a locked update.
+  for (const head of ['pub fn window_appearance(', 'pub fn window_zoom(', 'fn save_placement(']) {
+    const body = rustItem(shell, head);
+    assert.ok(/\bupdate_preferences\(/.test(body) && !/\bsave_preferences\(/.test(body), `${head.slice(head.indexOf('fn ') + 3, -1)} must change the preferences with update_preferences`);
+  }
+  // The window config keeps centring it and keeping it in the work area where nothing is applied.
+  const main = JSON.parse(read('src-tauri/tauri.conf.json')).app.windows.find((w) => w.label === 'main');
+  assert.equal(main.center, true, 'main window needs center: true (no saved placement, or a monitor that is gone)');
+  assert.equal(main.preventOverflow, true, 'main window needs preventOverflow: true');
+  assert.ok(main.minWidth > 0 && main.minHeight > 0, 'minWidth and minHeight are the least a saved size may have');
+});
+
+// phase 3, Task 5: check 22
+check('22. a saved file is opened or shown only through its token (rule 31)', () => {
+  const rust = read('src-tauri/src/saved_files.rs');
+  // The code without its tests and comments: an assertion on what it does is met by neither.
+  const code = rust.slice(0, rust.indexOf('#[cfg(test)]')).replace(/(^|\s)\/\/.*$/gm, '$1');
+  assert.ok(code.length > 0 && rust.includes('#[cfg(test)]'), 'saved_files.rs keeps its tests in a test module');
+  // The page never names a path: each command takes the token, an unsigned number, and nothing else.
+  for (const command of ['saved_file_open', 'saved_file_reveal']) {
+    assert.match(code, new RegExp(String.raw`#\[tauri::command\]\s*pub async fn ${command}\(token: u64\) -> AppResult<\(\)>`), `${command} must take only token: u64`);
+  }
+  const main = read('src-tauri/src/main.rs');
+  assert.match(main, /attachment_save,\s*saved_files::saved_file_open, saved_files::saved_file_reveal,/, 'both commands are registered after attachment_save');
+  // Open goes through the shell, which asks about a file from the Internet zone; Show in folder through
+  // the shell call that selects the file. No process is started with a command line that carries the
+  // file: a name such as /select,… must never be read as an Explorer switch.
+  assert.match(code, /open::that_detached\(path\)/, 'Open must use open::that_detached');
+  assert.match(code, /SHOpenFolderAndSelectItems\(/, 'Show in folder must use SHOpenFolderAndSelectItems');
+  assert.ok(!/explorer/i.test(code), 'saved_files.rs must not start explorer');
+  assert.ok(!/Command::new|\.args?\(|std::process|\/select/.test(code), 'saved_files.rs must not build a command line');
+  // What a save hands out is the token, and a save is the only way to get one.
+  assert.match(code, /pub fn remember\(path: PathBuf\) -> u64/, 'remember(path) -> u64 is the one way in');
+  assert.match(read('src-tauri/src/commands/document_preview.rs'), /pub async fn attachment_save\([^)]*\) -> AppResult<Option<SavedFile>>/, 'attachment_save returns the SavedFile with its token');
+  assert.match(read('src-tauri/src/commands/mail.rs'), /pub struct ExportSaved \{[^}]*token: u64/, 'export_mail returns the token');
+  // The page asks for the commands with the token alone, and from one place.
+  const asking = [];
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(path.join(desktop, dir), { withFileTypes: true })) {
+      const file = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) walk(file);
+      else if (/\.(ts|tsx)$/.test(entry.name) && /saved_file_(open|reveal)/.test(read(file))) asking.push(file);
+    }
+  };
+  walk('src');
+  assert.deepEqual(asking.sort(), ['src/lib/preview.ts', 'src/lib/saved-file.ts'], 'only the helper and the browser preview name the commands');
+  assert.match(read('src/lib/saved-file.ts'), /call\(command, \{ token \}\)/, 'the helper calls the commands with { token } only');
+});
+
+// phase 3, Task 6: check 23
+check('23. the mail rows get a native menu built by an app command (rule 33)', () => {
+  // Rust builds and shows the menu; the page only says which entries (lib/row-menu.ts) and gets
+  // back the chosen one. The page has no menu permission of its own.
+  const menu = read('src-tauri/src/row_menu.rs');
+  assert.match(rustItem(menu, 'pub async fn show_row_menu('), /\.popup_menu_at\(/, 'show_row_menu opens the menu with popup_menu_at, under the pointer');
+  assert.match(read('src-tauri/src/main.rs'), /row_menu::show_row_menu/, 'show_row_menu must be an app command');
+  const capability = JSON.parse(read('src-tauri/capabilities/main.json'));
+  assert.ok(!capability.permissions.some((p) => /menu/.test(p)), 'no core:menu in main.json: the menu is built in Rust');
+  // The row stops the event: no WebView2 menu on the rows, and the system menu stays shut.
+  const list = read('src/components/MailList.tsx');
+  assert.match(list, /onContextMenu: \(event: MouseEvent<HTMLElement>\) => openRowMenu\(event, email\)/, 'the mail row must handle contextmenu');
+  assert.match(rustItem(list, 'function openRowMenu('), /event\.preventDefault\(\)/, 'the row menu handler must call preventDefault');
+  assert.match(read('src/lib/window-shell.ts'), /if \(event\.defaultPrevented/, 'installWindowShell must leave a stopped contextmenu alone');
+});
+
+// phase 3, Task 3: checks 24-25
+check('24. system notifications come from Rust only, through the registered app identity (rule 28)', () => {
+  // The page has no permission of the plugin and no package of it: it only hears notification-open.
+  for (const file of ['capabilities/main.json', 'capabilities/reminder.json']) {
+    assert.ok(!JSON.parse(read(`src-tauri/${file}`)).permissions.some((p) => /^notification:/.test(p)), `${file}: no notification: permission for the page`);
+  }
+  assert.ok(!/@tauri-apps\/plugin-notification/.test(read('package.json')), 'no notification package for the page');
+  // The toast backend of the official plugin, used directly: the plugin waits for every toast's answer
+  // on a thread of its own, which under Do not disturb stays until Qamille exits.
+  const cargo = read('src-tauri/Cargo.toml');
+  assert.match(cargo, /^tauri-winrt-notification = "0\.8"/m, 'tauri-winrt-notification 0.8 sends the toasts');
+  assert.ok(!/tauri-plugin-notification|notify-rust/.test(cargo + read('src-tauri/Cargo.lock')), 'no notification plugin, no notify-rust');
+  const main = read('src-tauri/src/main.rs');
+  assert.ok(!/tauri_plugin_notification/.test(main), 'no notification plugin in main.rs');
+  assert.match(main, /notifications::notifications_get, notifications::notifications_set,/, 'the switches are app commands');
+  // The identifier ends with the data folder's FNV-1a (`workspace_id`): it names the copy's
+  // identity key in the registry, so it must stay the same across Rust releases, which
+  // DefaultHasher does not promise.
+  assert.match(
+    main,
+    /identifier\.push_str\(&format!\("\.workspace\{\}", background_rules::workspace_id\(&\w+\.to_string_lossy\(\)\)\)\)/,
+    'the identifier ends with background_rules::workspace_id of the canonical data folder',
+  );
+  assert.ok(!/DefaultHasher|std::hash::/.test(main.replace(/(^|\s)\/\/.*$/gm, '$1')), 'main.rs hashes nothing with the standard library hasher');
+  // The identity Windows shows the notifications under: the per-data-folder identifier the toasts go
+  // out with (`app.config().identifier`), registered for the current user, never the process's own
+  // AUMID, which would detach the window from the icons pinned to the taskbar.
+  const notifications = read('src-tauri/src/notifications.rs');
+  // The code without its test module and comments: an assertion on what it does is met by neither.
+  const tests = notifications.indexOf('#[cfg(test)]\nmod tests');
+  assert.ok(tests > 0, 'notifications.rs keeps its tests in a test module');
+  const code = notifications.slice(0, tests).replace(/(^|\s)\/\/.*$/gm, '$1');
+  assert.match(code, /const CLASSES: &str = r"Software\\Classes\\AppUserModelId";/, 'the identity lives under HKCU\\Software\\Classes\\AppUserModelId');
+  assert.match(code, /format!\(r"\{\w+\}\\\{\w+\}"\)/, 'the key is AppUserModelId\\<identifier>');
+  assert.match(rustItem(code, 'fn identifier('), /app\.config\(\)\.identifier/, 'the identifier is the per-data-folder one');
+  // A toast holds its click handler, and nothing of Qamille waits for its answer.
+  const toast = rustItem(code, 'fn toast(');
+  assert.ok(/Toast::new\(aumid\)/.test(toast) && /\.on_activated\(/.test(toast), 'toast() builds the toast with its click handler');
+  const show = rustItem(code, 'fn show(');
+  assert.match(show, /if uses_identity\(\) \{ identifier\(app\) \}/, 'a toast goes out under the registered identity');
+  assert.match(show, /toast\([\s\S]*\)\s*\.show\(\);/, 'show() shows the toast and returns');
+  for (const [name, body] of [['toast', toast], ['show', show]]) {
+    assert.ok(!/thread|spawn|recv|wait_for|on_dismissed|channel/.test(body), `${name}() starts nothing that waits for the toast`);
+  }
+  assert.ok(/HKEY_CURRENT_USER/.test(code) && !/HKEY_LOCAL_MACHINE/.test(code), 'only for the current user');
+  for (const file of fs.readdirSync(path.join(desktop, 'src-tauri/src'), { recursive: true })) {
+    if (!String(file).endsWith('.rs')) continue;
+    assert.ok(!/SetCurrentProcessExplicitAppUserModelID/.test(read(`src-tauri/src/${file}`)), `${file}: never the process's own AUMID`);
+  }
+  // The three facts never reach the page: the sink hands them to notifications.rs first.
+  const sink = rustItem(read('src-tauri/src/runtime.rs'), 'impl EventSink for TauriEventSink {');
+  const observed = sink.indexOf('crate::notifications::observe(');
+  assert.ok(observed >= 0 && observed < sink.indexOf('emit_to('), 'TauriEventSink::emit asks notifications::observe before emit_to');
+  assert.match(sink, /if crate::notifications::observe\(&self\.0, &event\) \{\s*return;\s*\}/, 'what observe takes is not forwarded');
+  const observe = rustItem(code, 'pub fn observe(');
+  for (const variant of ['MailArrived', 'ScheduledSendFailed', 'SignInExpired']) {
+    assert.match(observe, new RegExp(`AppEvent::${variant} \\{`), `observe takes ${variant}`);
+  }
+  assert.match(observe, /=> \{[\s\S]*true\s*\}\s*_ => false/, 'observe answers true for the three and false for the rest');
+  // The Professional's uninstaller takes the identity away: it reads it from the data folder, before
+  // the data may go, and only a Qamille identifier.
+  const file = code.match(/const AUMID_FILE: &str = "([^"]+)";/);
+  assert.ok(file, 'notifications.rs names the file with the registered identifier');
+  const after = nshMacro(read('src-tauri/windows/installer-hooks.nsh'), 'NSIS_HOOK_POSTUNINSTALL');
+  const update = after.slice(after.search(/\$\{If\}\s+\$UpdateMode\s*<>\s*1/));
+  assert.ok(update.length < after.length, 'the hook has the If $UpdateMode <> 1 block');
+  const open = update.search(new RegExp(String.raw`FileOpen\s+\$\d\s+"\$INSTDIR\\data\\${file[1].replace('.', '\\.')}"\s+r`));
+  const prefix = update.search(/StrCpy\s+\$\d\s+\$\d\s+19\s+\$\{If\}\s+\$\d\s+==\s+"com\.qamille\.desktop"/);
+  const remove = update.search(/DeleteRegKey\s+HKCU\s+"Software\\Classes\\AppUserModelId\\\$\d"/);
+  assert.ok(open >= 0 && prefix > open && remove > prefix, 'the hook reads the identifier, checks that it begins with com.qamille.desktop, then removes its key');
+  assert.ok(remove < update.search(/\$DeleteAppDataCheckboxState/), 'the identity goes before the data folder may');
+  assert.match(read('src-tauri/tauri.conf.json'), /"identifier": "com\.qamille\.desktop"/, 'the identifiers still begin with com.qamille.desktop (19 characters)');
+});
+
+check('25. the taskbar shows unread mail and the full indexing (rule 30)', () => {
+  const code = read('src-tauri/src/taskbar.rs').replace(/(^|\s)\/\/.*$/gm, '$1');
+  for (const call of ['set_overlay_icon', 'set_progress_bar']) {
+    assert.ok(code.includes(`.${call}(`), `taskbar.rs calls ${call}`);
+    for (const file of fs.readdirSync(path.join(desktop, 'src-tauri/src'), { recursive: true })) {
+      if (String(file).endsWith('.rs') && !String(file).endsWith('taskbar.rs')) {
+        assert.ok(!read(`src-tauri/src/${file}`).includes(`.${call}(`), `${file}: only taskbar.rs calls ${call}`);
+      }
+    }
+  }
+  assert.ok(/get_webview_window\("main"\)/.test(code) && !/get_webview_window\("(?!main")/.test(code), 'only on the main window');
+  // The number is the sidebar's: Rust counts it with the snapshot's own rule, never the page.
+  assert.match(code, /\.inbox_unread\(\)/, 'the count comes from WorkspaceService::inbox_unread');
+  const workspace = read('../app/src/application/workspace.rs');
+  assert.match(rustItem(workspace, 'pub fn snapshot('), /counts_as_inbox_unread\(/, 'snapshot counts the Inbox with counts_as_inbox_unread');
+  assert.match(rustItem(workspace, 'pub fn inbox_unread('), /counts_as_inbox_unread\(/, 'inbox_unread uses the same rule');
+  assert.match(rustItem(read('src-tauri/src/runtime.rs'), 'impl EventSink for TauriEventSink {'), /crate::taskbar::observe\(&self\.0, &event\);/, 'the sink shows every event to the taskbar');
+  assert.match(rustItem(read('src-tauri/src/commands/assistant.rs'), 'pub async fn search_reindex('), /crate::taskbar::reset_index\(\);/, '«Reindex» shows the bar again');
+  assert.match(code, /badge_rgba\(/, 'the overlay is drawn by taskbar_rules::badge_rgba');
+  assert.match(code, /crate::background::set_tray_tooltip\(/, 'the tray tooltip says how many are unread');
+  // A change of language reaches the tooltip at once, with the count it shows, not at the next count.
+  assert.match(rustItem(code, 'fn show_count('), /UNREAD\.store\(count, /, 'show_count remembers the count of the tooltip');
+  assert.match(rustItem(code, 'pub fn tooltip('), /taskbar_rules::tray_tooltip\(UNREAD\.load\(/, 'tooltip() says the remembered count');
+  assert.match(
+    rustItem(read('src-tauri/src/background.rs'), 'pub fn relabel('),
+    /set_tray_tooltip\(app, &crate::taskbar::tooltip\(italian\)\)/,
+    'relabel says the tooltip again in the new language',
+  );
+});
+
+// phase 3, Task 4: check 26
+const { isMailto, parseMailto } = await import(pathToFileURL(path.join(desktop, 'src/lib/mailto.ts')).href);
+check("26. a mailto link opens Qamille's composer, and the installer registers exactly the keys the app removes (rule 32, audit Q10)", () => {
+  // A message's mail link goes to the composer, never to open_link (another mail program). The web
+  // links of a message still leave through open_link, so check 16 is unchanged.
+  const html = read('src/components/MessageHtml.tsx');
+  const openLink = rustItem(html, 'function openLink(');
+  assert.match(
+    openLink,
+    /if \(isMailto\(address\)\) \{\s*const fields = parseMailto\(address\);\s*if \(fields\) requestCompose\(fields\);[\s\S]*?return;\s*\}\s*void openExternal\(/,
+    'MessageHtml: a mailto: address goes to requestCompose(parseMailto(…)) and returns before openExternal',
+  );
+  assert.equal((html.match(/openExternal\(/g) ?? []).length, 1, 'MessageHtml calls openExternal in one place only');
+  assert.ok(isMailto(externalAddress('MAILTO:a@b.it')) && !isMailto(externalAddress('https://example.com/mailto:a@b.it')), 'isMailto reads the scheme');
+  assert.deepEqual(parseMailto(externalAddress('mailto:a@b.it?subject=x%0D%0ABcc:c@d.it')).bcc, [], 'a line break adds no recipient');
+  // The navigation hooks of the main window send a mail link to the page as compose-mailto, a web link
+  // to the browser; the reminder chip (open_outside false) opens neither. A mail address that is not a
+  // whole link (over 8 KB) is dropped there, never handed to the browser.
+  const feel = read('src-tauri/src/native_feel.rs');
+  for (const head of ['pub fn navigation_guard(', 'pub fn new_window_guard(']) {
+    assert.match(
+      rustItem(feel, head),
+      /if crate::launch_args::has_mail_scheme\((?:[^()]|\(\))*\) \{\s*crate::launch_args::from_navigation\(&app, [^;]+\);\s*\} else \{\s*open_in_browser\([^;]+\);\s*\}/,
+      `${head.slice(7, -1)}: every mailto: address goes to launch_args::from_navigation, only a web one to open_in_browser`,
+    );
+  }
+  const launch = read('src-tauri/src/launch_args.rs');
+  assert.match(
+    rustItem(launch, 'pub fn from_navigation('),
+    /if !is_mail_link\(&link\) \{\s*return;\s*\}[\s\S]*\bdeliver\(/,
+    'from_navigation drops a mail address that is not a whole link, and hands the others to deliver',
+  );
+  assert.match(rustItem(launch, 'fn deliver('), /\.emit_to\("main", "compose-mailto", \w+\)/, 'deliver emits compose-mailto to the main window');
+  // A page that loads again (a reload, a crash) has no listener until it asks: the links wait for it.
+  assert.match(
+    rustItem(read('src-tauri/src/recovery.rs'), 'pub fn page_load('),
+    /if payload\.event\(\) == PageLoadEvent::Started \{[^}]*crate::launch_args::page_started\(\);/,
+    'a page that starts loading in the main window makes the links wait for its take_launch_mailto',
+  );
+  // Another program's link: at a cold start it waits for the page (not after a restart, which keeps the
+  // first start's arguments); a second start's comes after background::restore.
+  const mainRs = read('src-tauri/src/main.rs');
+  const setup = rustItem(mainRs, 'fn setup_app(');
+  assert.match(
+    setup,
+    /if background::restarted_hidden\(\)\.is_none\(\) \{\s*launch_args::route\(app\.handle\(\), &args\);\s*\}/,
+    'setup_app routes the mailto: argument of a start that is not a restart',
+  );
+  assert.match(setup, /let args: Vec<String> = launch_args::effective\(std::env::args\(\)\.collect\(\)\);/, 'setup_app reads the arguments as launch_args::effective gives them');
+  // A link Windows passed first takes no option after it: a caller that did not quote it
+  // (`mailto:x" --worker "`) cannot start a worker or an MCP server instead of the composer.
+  const start = rustItem(mainRs, 'fn main(');
+  const effective = start.indexOf('let args = launch_args::effective(std::env::args().collect());');
+  assert.ok(effective >= 0 && effective < start.indexOf('"--skill"'), 'main reads launch_args::effective before the --skill, --mcp and --worker branches');
+  assert.ok(!/std::env::args(?:_os)?\(\)\.(?:nth|any)\(/.test(start), 'main picks its mode from launch_args::effective, never from the raw arguments');
+  const second = rustItem(read('src-tauri/src/background.rs'), 'pub fn second_instance(');
+  assert.ok(/\brestore\(app\);\s*crate::launch_args::route\(app, &args\);/.test(second), 'a second start restores the window, then routes its mailto: argument');
+  assert.match(rustItem(launch, 'pub fn take_launch_mailto('), /\.take\(\)/, 'the page takes the waiting link');
+
+  // Qamille never makes itself the default (Windows lets only the person choose): it registers what it
+  // opens, for the current user only, and never writes the mailto key itself.
+  const handler = read('src-tauri/src/mail_handler.rs');
+  assert.ok(!/HKEY_LOCAL_MACHINE|HKLM/.test(handler), 'mail_handler.rs writes only under HKEY_CURRENT_USER');
+  assert.match(handler, /HKEY_CURRENT_USER/, 'mail_handler.rs writes under HKEY_CURRENT_USER');
+  assert.match(handler, /ms-settings:defaultapps\?registeredAppUser=/, "the choice is the person's, in Settings > Default apps");
+  const constant = (name) => {
+    const found = handler.match(new RegExp(`pub const ${name}: &str = r?"([^"]+)";`));
+    assert.ok(found, `mail_handler.rs: no pub const ${name}`);
+    return found[1];
+  };
+  const [classes, registered, apps] = ['CLASSES', 'REGISTERED', 'APPS'].map(constant);
+  const [name, progId, key] = ['INSTALLED_NAME', 'INSTALLED_PROG_ID', 'INSTALLED_KEY'].map(constant);
+  assert.equal(classes, 'Software\\Classes');
+  assert.equal(registered, 'Software\\RegisteredApplications');
+  // What the app writes for a copy (`entries`), and therefore what the installer must write for the
+  // installed Professional, with the fixed names of `handler_keys(true, …)`.
+  const entries = rustItem(handler, 'pub fn entries(');
+  const shapes = [
+    /\(prog\.clone\(\), String::new\(\), keys\.display\.clone\(\)\)/,
+    /\(format!\(r"\{prog\}\\DefaultIcon"\), String::new\(\), icon\.clone\(\)\)/,
+    /\(format!\(r"\{prog\}\\shell\\open\\command"\), String::new\(\), command\)/,
+    /\(capabilities\.clone\(\), "ApplicationName"\.into\(\), keys\.display\.clone\(\)\)/,
+    /\(capabilities\.clone\(\), "ApplicationDescription"\.into\(\), keys\.display\.clone\(\)\)/,
+    /\(capabilities\.clone\(\), "ApplicationIcon"\.into\(\), icon\)/,
+    /\(format!\(r"\{capabilities\}\\URLAssociations"\), "mailto"\.into\(\), keys\.prog_id\.clone\(\)\)/,
+    /\(hive\.registered\.to_owned\(\), keys\.name\.clone\(\), capabilities\)/,
+  ];
+  for (const shape of shapes) assert.match(entries, shape, `entries no longer writes ${shape}: change this check and the hook together`);
+  assert.equal((entries.match(/^\s*\(/gm) ?? []).length, shapes.length, 'entries writes exactly these values');
+  assert.match(entries, /let command = format!\("\\"\{exe\}\\" \\"%1\\""\);/, 'the command is "<exe>" "%1", both in quotes');
+  assert.match(entries, /let icon = format!\("\\"\{exe\}\\",0"\);/, 'the icon is "<exe>",0');
+  assert.match(entries, /let prog = format!\(r"\{\}\\\{\}", hive\.classes, keys\.prog_id\);/, 'the ProgID lives under Software\\Classes');
+  assert.match(rustItem(handler, 'fn capabilities_key('), /format!\(r"\{\}\\\{\}\\Capabilities", hive\.apps, keys\.key\)/, 'the Capabilities key is <APPS>\\<key>\\Capabilities');
+  assert.match(
+    rustItem(handler, 'pub fn handler_keys('),
+    /if installed \{\s*HandlerKeys \{\s*name: INSTALLED_NAME\.into\(\),\s*display: INSTALLED_NAME\.into\(\),\s*prog_id: INSTALLED_PROG_ID\.into\(\),\s*key: INSTALLED_KEY\.into\(\),?\s*\}/,
+    'handler_keys(true, …) gives the fixed names',
+  );
+  const exe = '<exe>';
+  const prog = `${classes}\\${progId}`;
+  const capabilities = `${apps}\\${key}\\Capabilities`;
+  const expected = [
+    [prog, '', name],
+    [`${prog}\\DefaultIcon`, '', `"${exe}",0`],
+    [`${prog}\\shell\\open\\command`, '', `"${exe}" "%1"`],
+    [capabilities, 'ApplicationName', name],
+    [capabilities, 'ApplicationDescription', name],
+    [capabilities, 'ApplicationIcon', `"${exe}",0`],
+    [`${capabilities}\\URLAssociations`, 'mailto', progId],
+    [registered, name, capabilities],
+  ];
+  const hooks = read('src-tauri/windows/installer-hooks.nsh');
+  const quoted = '"((?:\\$\\\\"|[^"])*)"';
+  const unquote = (text) => text.replaceAll('$\\"', '"').replaceAll('$INSTDIR\\${MAINBINARYNAME}.exe', exe);
+  const install = nshMacro(hooks, 'NSIS_HOOK_POSTINSTALL');
+  const writes = [...install.matchAll(new RegExp(`^\\s*WriteRegStr\\s+(\\w+)\\s+${quoted}\\s+${quoted}\\s+${quoted}\\s*$`, 'gm'))];
+  assert.ok(writes.every((write) => write[1] === 'HKCU'), 'the installer writes the mailto keys under HKCU only');
+  assert.deepEqual(
+    writes.map((write) => write.slice(2).map(unquote)),
+    expected,
+    'NSIS_HOOK_POSTINSTALL writes exactly what mail_handler.rs writes for the installed Professional, in its order',
+  );
+  assert.ok(!/\bWriteReg(?!Str\b)\w*/.test(install) && !/\bDeleteReg/.test(install), 'the install hook writes only those strings');
+  const announce = /System::Call "shell32::SHChangeNotify\(i,i,i,i\) \(0x08000000, 0x1000, 0, 0\)"/;
+  assert.match(install, announce, 'the install hook tells Windows the associations changed (SHCNE_ASSOCCHANGED)');
+  // The uninstaller removes what the app's «Smetti» removes, and not on an /UPDATE.
+  const uninstall = nshMacro(hooks, 'NSIS_HOOK_POSTUNINSTALL');
+  const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const inUpdateBlock = (what) => new RegExp(`\\$\\{If\\}\\s+\\$UpdateMode\\s*<>\\s*1(?:(?!\\$\\{EndIf\\})[\\s\\S])*?${what}`);
+  for (const [what, removal] of [
+    ['the RegisteredApplications value', `DeleteRegValue\\s+HKCU\\s+"${escape(registered)}"\\s+"${escape(name)}"`],
+    ['the ProgID', `DeleteRegKey\\s+HKCU\\s+"${escape(prog)}"`],
+    ["the copy's key with its Capabilities", `DeleteRegKey\\s+HKCU\\s+"${escape(`${apps}\\${key}`)}"`],
+  ]) {
+    assert.match(uninstall, inUpdateBlock(removal), `the uninstall must remove ${what}, and not on an /UPDATE`);
+  }
+  const removal = rustItem(handler, 'pub fn unregister(');
+  assert.ok(
+    /delete_value\(hive\.registered, &keys\.name\)/.test(removal) &&
+      /delete_tree\(&format!\(r"\{\}\\\{\}", hive\.classes, keys\.prog_id\)\)/.test(removal) &&
+      /delete_tree\(&format!\(r"\{\}\\\{\}", hive\.apps, keys\.key\)\)/.test(removal),
+    "unregister removes the RegisteredApplications value, the ProgID and the copy's key, as the uninstaller does",
+  );
+  assert.ok(!/HKLM/.test(uninstall) && !/Classes\\mailto\b/i.test(hooks + handler), 'neither the app nor the installer writes or removes the mailto key itself');
+});
+
+// phase 3, Task 8: check 27
+check('27. the updater runs only in an installed Professional built with its key, and installs through the close guards', () => {
+  const rust = read('src-tauri/src/updates.rs');
+  // The code without its tests and comments: an assertion on what it does is met by neither.
+  const code = rust.slice(0, rust.indexOf('#[cfg(test)]')).replace(/(^|\s)\/\/.*$/gm, '$1');
+  assert.ok(code.length > 0 && rust.includes('#[cfg(test)]'), 'updates.rs keeps its tests in a test module');
+  // Used from Rust only: the page gets no permission and no package of the plugin.
+  for (const file of ['capabilities/main.json', 'capabilities/reminder.json']) {
+    assert.ok(!JSON.parse(read(`src-tauri/${file}`)).permissions.some((p) => /^updater:/.test(p)), `${file}: no updater permission for the page`);
+  }
+  assert.ok(!/@tauri-apps\/plugin-updater/.test(read('package.json')), 'no updater package for the page');
+  // Off unless the key and the address are compiled in, the edition is the Professional and it is installed.
+  assert.match(code, /const PUBKEY: Option<&str> = option_env!\("QAMILLE_UPDATER_PUBKEY"\);/, 'the public key comes from the build (QAMILLE_UPDATER_PUBKEY)');
+  assert.match(code, /const ENDPOINT: Option<&str> = option_env!\("QAMILLE_UPDATER_ENDPOINT"\);/, 'the address comes from the build (QAMILLE_UPDATER_ENDPOINT)');
+  const plugin = rustItem(code, 'pub fn plugin(');
+  assert.match(
+    plugin,
+    /if !rules::updater_on\(PUBKEY, ENDPOINT, qamille::edition::edition\(\)\.preset\(\)\.is_some\(\), background::installed\(\)\) \{\s*return None;\s*\}/,
+    'plugin() is None unless updater_on(key, address, Professional, installed)',
+  );
+  assert.ok(!JSON.parse(read('src-tauri/tauri.conf.json')).plugins?.updater, "tauri.conf.json has no plugins.updater: the key and the address are the build's");
+  const main = read('src-tauri/src/main.rs');
+  assert.match(main, /if let Some\(updater\) = updates::plugin\(context\.config_mut\(\)\) \{\s*builder = builder\.plugin\(updater\);\s*\}/, 'main.rs registers the plugin only when updates::plugin gives it');
+  assert.ok(!/tauri_plugin_updater/.test(main), 'main.rs never builds the updater plugin itself');
+  // «Riavvia e aggiorna» quits as «Esci» does: the page's close guards and the undo queue decide.
+  const command = rustItem(code, 'pub fn update_install(');
+  assert.match(command, /background::quit\(&app\)/, 'update_install quits through background::quit');
+  assert.ok(!/\.install\(/.test(command), 'update_install installs nothing itself');
+  assert.match(rustItem(code, 'fn watch_quit('), /quit_settled\(background::is_quitting\(\), /, 'a guard that keeps the window ends the request');
+  // One place installs: at the end of the run, once the main window was closed while quitting.
+  assert.equal((code.match(/\.install\(/g) ?? []).length, 1, 'only install_if_armed installs');
+  const run = rustItem(code, 'pub fn run_event(');
+  assert.match(run, /WindowEvent::Destroyed[\s\S]*?window_destroyed\(background::is_quitting\(\)\)/, 'only the main window closed while quitting arms the install');
+  assert.match(run, /RunEvent::Exit => install_if_armed\(app\)/, 'the install runs at the end of the run');
+  const install = rustItem(code, 'fn install_if_armed(');
+  const at = (part) => {
+    const index = install.indexOf(part);
+    assert.ok(index >= 0, `install_if_armed: no ${part}`);
+    return index;
+  };
+  assert.ok(at('installs_on_exit()') < at('.install('), 'it installs only once armed');
+  assert.ok(at('background::before_restart(app)') < at('.install('), 'it says how the window was before the installer starts Qamille again');
+  const checking = rustItem(code, 'fn check(');
+  assert.match(
+    checking,
+    /\.restart_after_install\(false\)[\s\S]*?\.installer_args\(rules::RESTART_ARGS\)/,
+    'the installer starts Qamille again without the arguments of its first start',
+  );
+  // A connection that stalls ends: the thread of the checks is never stuck for good.
+  assert.match(checking, /\.timeout\(UPDATE_TIMEOUT\)/, 'the checks and the download have a time limit');
+  // The package as well as latest.json over https://, and signed for the version it claims to be.
+  assert.ok(
+    checking.indexOf('rules::download_allowed(update.download_url.scheme())') >= 0 &&
+      checking.indexOf('rules::download_allowed(update.download_url.scheme())') < checking.indexOf('.download('),
+    'a package not served over https:// is refused before it is downloaded',
+  );
+  assert.match(plugin, /config\.plugins\.0\.insert\("updater"\.into\(\), rules::plugin_settings\(key\)\)/, 'the settings come from plugin_settings');
+  assert.match(rustItem(code, 'pub fn plugin_settings('), /"requireSignedVersion": true/, 'the signature must name the version');
+  // The updater artifacts: never from the Professional's configuration, only with the signing key.
+  const professional = read('src-tauri/tauri.professional.conf.json');
+  assert.ok(!/createUpdaterArtifacts/.test(professional), 'tauri.professional.conf.json does not ask for the updater artifacts');
+  const updaterConf = JSON.parse(read('src-tauri/tauri.updater.conf.json'));
+  delete updaterConf.$schema;
+  assert.deepEqual(updaterConf, { bundle: { createUpdaterArtifacts: true } }, 'tauri.updater.conf.json only asks for the updater artifacts');
+  // Authenticode in Tauri's own build: it signs the program it puts in the installer, the uninstaller and
+  // the installer, before the updater signs the installer. The certificate comes from the environment only.
+  assert.ok(!/signCommand|certificateThumbprint/.test(professional), 'tauri.professional.conf.json does not sign');
+  const signingConf = JSON.parse(read('src-tauri/tauri.signing.conf.json'));
+  delete signingConf.$schema;
+  assert.deepEqual(
+    signingConf,
+    { bundle: { windows: { signCommand: { cmd: 'powershell', args: ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', 'windows/sign.ps1', '%1'] } } } },
+    'tauri.signing.conf.json only names the signing script, with the file to sign',
+  );
+  const script = read('src-tauri/windows/sign.ps1');
+  const scriptCode = script.replace(/(^|\s)#.*$/gm, '$1');
+  assert.match(scriptCode, /\$env:QAMILLE_SIGNING_PFX\b/, 'the script reads the PFX path from QAMILLE_SIGNING_PFX');
+  assert.match(scriptCode, /\$env:QAMILLE_SIGNING_PFX_PASSWORD\b/, 'the script reads the password from QAMILLE_SIGNING_PFX_PASSWORD');
+  assert.match(scriptCode, /sign \/s \$store \/sha1 \$signer\.Thumbprint \/fd SHA256 \/tr \$timestamp \/td SHA256 \/d Qamille \$File/, 'signtool signs by thumbprint, SHA-256 and an RFC 3161 timestamp');
+  assert.ok(!/\s\/p\s|\s\/f\s/.test(scriptCode), 'the password never reaches signtool\'s command line (no /f, no /p)');
+  const password = scriptCode.match(/\$env:QAMILLE_SIGNING_PFX_PASSWORD/g) ?? [];
+  assert.equal(password.length, 1, 'the password is read once');
+  assert.ok(!/Write-(Host|Output|Verbose|Information)[^\n]*(password|secure)|echo[^\n]*password/i.test(scriptCode), 'the password is never written out');
+  assert.match(scriptCode, /\$store = "QamilleSigning\$PID"/, 'a store of this one signature, never one holding other certificates');
+  assert.match(
+    scriptCode,
+    /finally \{[\s\S]*?-DeleteKey[\s\S]*?Remove-Item -LiteralPath \$registry -Recurse/,
+    'the certificate, its key and the store of this one signature are removed after it',
+  );
+  assert.match(scriptCode, /\$registry = "HKCU:\\Software\\Microsoft\\SystemCertificates\\\$store"/, 'the store removed is the one of this signature');
+  // A signature killed halfway leaves its store: the next one removes it, never the store of a signature still running.
+  const sweepStart = scriptCode.indexOf("$certificates = 'HKCU:\\Software\\Microsoft\\SystemCertificates'");
+  assert.ok(sweepStart >= 0 && sweepStart < scriptCode.indexOf('$opened = New-Object'), 'stale stores are swept before this signature makes its own');
+  const sweep = scriptCode.slice(sweepStart, scriptCode.indexOf('$opened = New-Object'));
+  assert.match(sweep, /QamilleSigning\(\\d\+\)/, 'only QamilleSigning<pid> stores are swept');
+  assert.match(sweep, /Get-Process -Id \$owner -ErrorAction SilentlyContinue/, 'a store whose signature is still running stays');
+  assert.match(sweep, /-DeleteKey[\s\S]*?Remove-Item -LiteralPath \$stale\.PSPath -Recurse/, 'a stale store goes with its certificates and their keys');
+  // build-release.bat: without TAURI_SIGNING_PRIVATE_KEY and QAMILLE_SIGNING_PFX the installer's command is
+  // the one of before, byte for byte.
+  const bat = read('../build-release.bat');
+  const build = bat.slice(bat.indexOf('\n:build\n'), bat.indexOf('\n:assemble\n'));
+  const commands = build.split('\n').filter((line) => line.includes('npm run tauri build'));
+  assert.equal(commands.length, 1, 'build-release.bat builds the installer with one command');
+  const [line] = commands;
+  const before = build.slice(0, build.indexOf(line));
+  const assignments = (name) => [...before.matchAll(new RegExp(`^(?:if defined (\\w+) )?set "${name}=([^"]*)"$`, 'gm'))];
+  assert.deepEqual(
+    assignments('UPDATER_CONFIG').map(([, when, value]) => [when ?? null, value]),
+    [[null, ''], ['TAURI_SIGNING_PRIVATE_KEY', ' --config src-tauri/tauri.updater.conf.json']],
+    'UPDATER_CONFIG is cleared, then set only with TAURI_SIGNING_PRIVATE_KEY',
+  );
+  assert.deepEqual(
+    assignments('SIGNING_CONFIG').map(([, when, value]) => [when ?? null, value]),
+    [[null, ''], ['QAMILLE_SIGNING_PFX', ' --config src-tauri/tauri.signing.conf.json']],
+    'SIGNING_CONFIG is cleared, then set only with QAMILLE_SIGNING_PFX',
+  );
+  assert.ok(!/%(?!(?:SIGNING|UPDATER)_CONFIG%)\w+%/.test(line), 'the command expands no other variable');
+  const expanded = (environment) =>
+    line.replace(/%(SIGNING_CONFIG|UPDATER_CONFIG)%/g, (_, name) => {
+      let value = '';
+      for (const [, when, set] of assignments(name)) if (!when || environment[when]) value = set;
+      return value;
+    });
+  const today = 'call npm run tauri build -- --bundles nsis --config src-tauri/tauri.professional.conf.json --features custom-protocol';
+  assert.equal(expanded({}), today, 'without the keys the command is the one of before the updater and the signing');
+  assert.equal(
+    expanded({ TAURI_SIGNING_PRIVATE_KEY: 'key' }),
+    'call npm run tauri build -- --bundles nsis --config src-tauri/tauri.professional.conf.json --config src-tauri/tauri.updater.conf.json --features custom-protocol',
+    'with the updater key its configuration comes after the Professional one',
+  );
+  assert.equal(
+    expanded({ QAMILLE_SIGNING_PFX: 'C:\\signing.pfx', TAURI_SIGNING_PRIVATE_KEY: 'key' }),
+    'call npm run tauri build -- --bundles nsis --config src-tauri/tauri.professional.conf.json --config src-tauri/tauri.signing.conf.json --config src-tauri/tauri.updater.conf.json --features custom-protocol',
+    'with the certificate the signing configuration comes too',
+  );
+  // Tauri restores the program it built unsigned: the portable copy is signed where it is assembled, with
+  // the same script and only with the certificate.
+  const assemble = bat.slice(bat.indexOf('\n:assemble\n'), bat.indexOf('\n:clean_project\n'));
+  const copied = assemble.indexOf('"%RELEASE%\\Qamille.exe" >nul || goto :sub_fail');
+  const signed = assemble.indexOf(
+    'if defined QAMILLE_SIGNING_PFX powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "desktop\\src-tauri\\windows\\sign.ps1" "%RELEASE%\\Qamille.exe" || goto :sub_fail',
+  );
+  assert.ok(copied >= 0 && signed > copied, 'the portable Qamille.exe is signed after it is copied, only with QAMILLE_SIGNING_PFX');
+  assert.equal((assemble.match(/sign\.ps1/g) ?? []).length, 1, 'nothing else is signed there');
+  // The notice stays until the person acts: a notice of its own, not a toast that goes away by itself.
+  const notice = read('src/components/UpdateNotice.tsx');
+  assert.ok(!/\bnotify\(|Toaster/.test(notice), 'UpdateNotice is a notice of its own, not a toast');
+  assert.match(notice, /call\('update_install'\)/, 'its button calls update_install');
+  assert.match(read('src/App.tsx'), /<UpdateNotice [^\n]*\/>\n\s*<Toaster /, 'App.tsx shows it beside the Toaster');
+});
+
+// Task 9: the first maximized show blinked (tao's show() rewrites the style without WS_VISIBLE).
+check('28. the first maximized show is cloaked by DWM only through a guard that always uncloaks (rule 29)', () => {
+  const shell = read('src-tauri/src/window_shell.rs');
+  const code = shell.replace(/(^|\s)\/\/.*$/gm, '$1');
+  // DWMWA_CLOAK is set in one place: the guard's own setter.
+  assert.equal((code.match(/DwmSetWindowAttribute\(\s*hwnd,\s*DWMWA_CLOAK\b/g) ?? []).length, 1, 'DWMWA_CLOAK is set only by set_cloak');
+  const setter = rustItem(shell, 'fn set_cloak(');
+  assert.ok(!/\bpub\b/.test(setter.slice(0, setter.indexOf('fn set_cloak('))), 'set_cloak stays private to the win module: only the guard calls it');
+  assert.equal((code.match(/\bset_cloak\(/g) ?? []).length, 3, 'set_cloak is defined once and called twice: on by Cloak::on, off by its Drop');
+  // On only when DWM took it: a failed cloak gives no guard, and the show is the one of before.
+  const on = rustItem(shell, 'pub fn on(hwnd: HWND)');
+  assert.match(on, /set_cloak\(hwnd,\s*true\)\.then\(/, 'Cloak::on returns a guard only when DWM cloaked the window');
+  assert.match(rustItem(shell, 'impl Drop for Cloak {'), /set_cloak\(self\.0,\s*false\)/, 'dropping the guard uncloaks the window');
+  // show_main holds the guard for the whole first maximized show, the fallback show() + maximize() included.
+  const show = rustItem(shell, 'pub fn show_main(');
+  assert.match(show, /let _cloak\b[^;]*Cloak::on\b/, 'show_main binds the guard to a name (`let _ =` would uncloak at once)');
+  assert.ok(!/let _ = [^;]*Cloak::on\b/.test(show), 'never `let _ = Cloak::on(…)`');
+  assert.ok(show.search(/Cloak::on\b/) >= 0 && show.search(/Cloak::on\b/) < show.search(/\bshow_maximized\b/), 'the window is cloaked before the Win32 maximize');
+  assert.ok(!/\bset_cloak\(|DWMWA_CLOAK/.test(show), 'show_main never cloaks or uncloaks by hand');
 });
 
 if (failures.length) {

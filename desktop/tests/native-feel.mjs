@@ -90,7 +90,8 @@ check('2. fields, editors and reading content stay selectable', () => {
   // Rule 3: no hand cursor on the app's controls, in any stylesheet or Tailwind class.
   const dir = path.join(desktop, 'src');
   for (const file of fs.readdirSync(dir, { recursive: true }).filter((f) => /\.(css|tsx)$/.test(f))) {
-    const text = stripComments(fs.readFileSync(path.join(dir, file), 'utf8'));
+    // The one place that names Sigrid's cursor classes is the rule that keeps the arrow on them (check 29).
+    const text = stripComments(fs.readFileSync(path.join(dir, file), 'utf8')).replaceAll(/\[class\*='cursor-(?:not-allowed|progress)'\]/g, '');
     assert.ok(!/cursor:\s*(pointer|not-allowed)|\bcursor-(pointer|not-allowed)\b/.test(text), `${file}: a hand or "not allowed" cursor on a control (docs/aspetto-nativo.md rule 3)`);
   }
 });
@@ -1231,6 +1232,32 @@ check('28. the first maximized show is cloaked by DWM only through a guard that 
   assert.ok(!/let _ = [^;]*Cloak::on\b/.test(show), 'never `let _ = Cloak::on(…)`');
   assert.ok(show.search(/Cloak::on\b/) >= 0 && show.search(/Cloak::on\b/) < show.search(/\bshow_maximized\b/), 'the window is cloaked before the Win32 maximize');
   assert.ok(!/\bset_cloak\(|DWMWA_CLOAK/.test(show), 'show_main never cloaks or uncloaks by hand');
+});
+
+// The Sigrid plan, Task 2: check 29.
+check('29. Sigrid draws no web cursor of its own: the pointer stays the arrow (rule 3)', () => {
+  // Sigrid's sources may name `cursor-not-allowed` and `cursor-progress` only where they do today (asked of Sigrid as R16),
+  // and Qamille's base keeps the arrow on them. `cursor-pointer` and every other cursor never appear.
+  const KNOWN = new Set([
+    'components/ui/checkbox.tsx',
+    'components/ui/input.tsx',
+    'components/ui/radio-group.tsx',
+    'components/ui/select.tsx',
+    'components/ui/switch.tsx',
+    'components/ui/textarea.tsx',
+    'internal/file-drop.tsx',
+  ]);
+  const home = path.join(desktop, 'vendor', 'sigrid', 'src');
+  const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => (entry.isDirectory() ? walk(path.join(dir, entry.name)) : [path.join(dir, entry.name)]));
+  for (const file of walk(home).filter((name) => /\.tsx?$/.test(name))) {
+    const cursors = [...fs.readFileSync(file, 'utf8').matchAll(/cursor-([a-z-]+)/g)].map((match) => match[1]);
+    if (!cursors.length) continue;
+    const name = path.relative(home, file).replaceAll('\\', '/');
+    for (const cursor of cursors) assert.ok(['not-allowed', 'progress', 'default'].includes(cursor), `${name} uses cursor-${cursor}: ask Sigrid to drop it`);
+    if (cursors.some((cursor) => cursor !== 'default')) assert.ok(KNOWN.has(name), `${name} is a new file with a web cursor: ask Sigrid to drop it`);
+  }
+  const system = stripComments(read('src/ds/styles/system.css'));
+  assert.match(system, /\[class\*='cursor-not-allowed'\],\s*\[class\*='cursor-progress'\]\s*\{\s*cursor:\s*default;/, "system.css must keep the arrow on Sigrid's disabled and busy controls");
 });
 
 if (failures.length) {

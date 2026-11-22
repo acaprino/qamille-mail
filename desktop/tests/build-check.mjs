@@ -97,11 +97,16 @@ try {
   const kB = (bytes) => `${Math.round(bytes / 1024)} kB`;
   console.log(`Sigrid: ${kB(sigridLength)} of code before minification, in ${sigridChunks.map((name) => `${name} (${kB(fs.statSync(path.join(outDir, name)).size)})`).join(', ') || 'no chunk'}`);
 
-  // The cursors of a web page, which a Windows app does not show on its controls.
+  // The cursors of a web page, which a Windows app does not show on its controls. Sigrid's disabled and busy controls
+  // still have `not-allowed` and `progress` (R16 of the plan's asks); Qamille's system.css keeps the arrow on them
+  // (`[class*='cursor-not-allowed']`), so those two are tolerated only while that rule is in the build, and `pointer` never.
   const cssFiles = fs.readdirSync(path.join(outDir, 'assets')).filter((name) => name.endsWith('.css'));
+  const allCss = cssFiles.map((name) => fs.readFileSync(path.join(outDir, 'assets', name), 'utf8')).join('\n');
+  const overridden = /\[class\*=["']?cursor-not-allowed["']?\][^{]*\{[^}]*cursor\s*:\s*default/.test(allCss);
   for (const name of cssFiles) {
     const css = fs.readFileSync(path.join(outDir, 'assets', name), 'utf8');
     for (const match of css.matchAll(/cursor\s*:\s*(pointer|not-allowed|progress)\b/g)) {
+      if (match[1] !== 'pointer' && overridden) continue;
       problems.push(`assets/${name}: cursor: ${match[1]} near «${css.slice(Math.max(0, match.index - 60), match.index + 30)}»`);
     }
   }

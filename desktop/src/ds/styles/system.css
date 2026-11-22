@@ -31,6 +31,12 @@ body {
   user-select: none;
   cursor: default;
 }
+/* Sigrid's disabled and busy controls still carry the web page's cursors (`cursor-not-allowed`, `cursor-progress`; asked
+   of Sigrid as R16): a Windows app keeps the arrow. Unlayered, so it beats Sigrid's utilities until they are gone. */
+[class*='cursor-not-allowed'],
+[class*='cursor-progress'] {
+  cursor: default;
+}
 /* Fields and reading content opt back in: text the user types, reads or copies.
    A new reading area adds `.selectable` (or joins this list). */
 input,

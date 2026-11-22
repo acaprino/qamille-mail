@@ -14,7 +14,7 @@ Il sistema visivo è un modulo interno, `desktop/src/ds/`, non un pacchetto. L�
 |---|---|
 | `tokens/theme.css` | Tutti i token, nei due temi, con i valori di «Compatto»; in più `--accent-pro` e `--ring`, i nomi che leggono i componenti di unlumen, con lo stesso indaco di `--accent`. È la sola fonte dei valori. |
 | `styles/system.css` | Base (corpo, titoli, campi, focus) e regole di sistema: pulsanti e campo. Importa `theme.css`, `ark.css` e `tailwind.css` e dichiara il carattere IBM Plex Sans. |
-| `styles/tailwind.css` | Tailwind v4 (tema e utility, niente preflight) e `tw-animate-css`; i nomi di colore di unlumen e shadcn mappati sui token, la tavolozza propria di Tailwind spenta. Vedi «Tailwind». |
+| `styles/tailwind.css` | Tailwind v4 (tema e utility, niente preflight) e `tw-animate-css`, con il tema, i caratteri e le misure di Sigrid e i valori di Qamille per loro (`src/theme/compatto.css`, generato). Vedi «Tailwind». |
 | `styles/ark.css` | In testa gli `@import` di `styles/nav.css` e di `styles/ark/*.css`, poi le regole del suggerimento. Importato da `system.css`. Vedi «Le regole di `ark.css`». |
 | `styles/nav.css` | Le regole proprie di `NavList` e `Count`: `.nav-hover`, `.nav-active-bar`, `.count-digits`. |
 | `styles/ark/*.css` | L’aspetto delle parti delle primitive, un file per primitiva: `dialog`, `popover`, `menu`, `select`, `checkbox`, `switch`, `tabs`, `slider`, `date-picker`, `recipients`, `toast`. |
@@ -659,33 +659,9 @@ Per aggiungere un componente:
 
 Tailwind CSS v4 entra con `@tailwindcss/vite`; `styles/tailwind.css` importa il tema e le utility, non il preflight: la base resta `system.css`, e il contenuto delle email ricevute conserva i valori del browser. `tw-animate-css` aggiunge le classi d’animazione che i componenti di unlumen usano. La variante `dark:` vale dentro `[data-scheme='dark']`.
 
-Ogni nome di colore è quello di unlumen e shadcn, e punta a un token di `theme.css`, quindi una classe e una regola di pagina dicono sempre la stessa cosa, nei due temi (ADR-0011 v3, decisione 4; RA-005). La tavolozza propria di Tailwind è spenta (`--color-*: initial`): esistono solo questi nomi.
+I nomi di colore (`bg-paper`, `text-ink`, `bg-raised`, `bg-primary`…) sono quelli del tema di Sigrid (`vendor/sigrid/src/styles/theme.css`, importato da `tailwind.css`), con i valori di «Compatto» di `src/theme/compatto.css`; la tavolozza propria di Tailwind è spenta (`--color-*: initial`) prima che Sigrid nomini la sua. La vecchia mappa dei nomi di unlumen e shadcn sui token di Qamille non c’è più: le regole di pagina leggono i token di Qamille (alias dei token di Sigrid), le classi di Tailwind leggono quelli di Sigrid, e i due dicono lo stesso colore. Tailwind genera anche le classi che Sigrid scrive nei suoi sorgenti (`@source` su `vendor/sigrid/src`).
 
-| Nome di Tailwind | Token |
-|---|---|
-| `background`, `card`, `popover` | `--surface` |
-| `foreground`, `card-foreground`, `popover-foreground`, `secondary-foreground`, `accent-foreground` | `--text` |
-| `primary` | `--accent` |
-| `primary-foreground` | `--on-accent` |
-| `secondary`, `muted` | `--hover` |
-| `muted-foreground` | `--muted` |
-| `accent` | `--selection` |
-| `accent-pro` | `--accent-pro` |
-| `destructive` | `--danger` |
-| `border` | `--border` |
-| `input` | `--border-strong` |
-| `ring` | `--ring` |
-| `ground` | `--ground` |
-| `sidebar` | `--sidebar` |
-| `sidebar-foreground` | `--sidebar-text` |
-| `sidebar-accent` | `--sidebar-active` |
-
-Anche `font-sans` (`--font-text`) e `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-xl` (`--radius-*`) leggono i token. Attenzione ai nomi che si incrociano: l’`accent` dell’app è l’indaco per agire e in Tailwind si chiama `primary`; `bg-accent` di Tailwind è `--selection`; `accent-pro` e `ring` sono lo stesso indaco di `--accent`; `muted` di Tailwind è un fondo (`--hover`), il testo attenuato dell’app è `text-muted-foreground`.
-
-- I nomi di classe che esistono restano: le regole di pagina, i test e questa guida li usano. Non riscrivere in utility una regola di `styles.css`.
-- Le utility servono per markup nuovo e per i componenti di unlumen. `system.css`, `styles.css` e il CSS dei componenti non stanno in un layer, quindi vincono sulle utility (che stanno nel layer `utilities`): una utility su un elemento che una regola di pagina già stila può non vedersi.
-- Usa solo i nomi della tabella. Non usare la tavolozza propria di Tailwind (`bg-red-500`) né valori arbitrari (`bg-[#…]`, `rounded-[3px]`, `text-[13px]`): `style-tokens.mjs` legge i valori nel CSS e nel TSX, non riconosce i nomi di classe, quindi qui il controllo è tuo.
-- Unisci le classi con `cn` di `cn.ts`, che lascia vincere l’ultima utility in conflitto.
+Il cursore resta la freccia: Sigrid ha ancora `cursor-not-allowed` e `cursor-progress` sui controlli disattivati (richiesta R16), e `system.css` tiene la freccia su di essi (regola 3, controllo 29 di `native-feel.mjs`).
 
 ## Le regole di `ark.css`
 
@@ -706,7 +682,7 @@ Anche `font-sans` (`--font-text`) e `rounded-sm`, `rounded-md`, `rounded-lg`, `r
 
 ## Colore
 
-I valori sono in `tokens/theme.css`; qui i ruoli. La tavolozza è quella di «Compatto»; i componenti di unlumen non portano colori propri e leggono questi token (INV-008).
+I colori di Sigrid sono calcolati dal suo motore dei temi a partire dai parametri di «Compatto» (`src/theme/compatto.ts`) e scritti in `src/theme/compatto.css` (`npm run theme:css`, file generato: non si modifica a mano). I nomi di Qamille per i token che Sigrid possiede (`ground`, `surface`, `text`, `muted`, `border`, `accent`, `selection`, `sidebar*`, `danger`, `success`…) sono alias di quelli di Sigrid in quel file; in `tokens/theme.css` restano solo i token che esistono solo in Qamille (priorità, etichette, avatar, scala dei titoli, raggi, livelli, movimento). La tabella prima/dopo dei valori che sono cambiati è in `tests/tokens-compatto.mjs`. Qui i ruoli. I componenti di unlumen non portano colori propri e leggono questi token (INV-008). I valori citati sotto sono quelli di «Compatto» prima del passaggio a Sigrid dove non diversamente detto.
 
 - **Un solo accento**: l’indaco `accent` (`#4f46e5` nel chiaro, schiarito in `#9a9cf8` nello scuro), con `accent-hover` in hover e `on-accent` per il testo sopra (bianco nel chiaro, quasi nero nello scuro); `accent-text` per testo in accento su `surface` (`#4338ca`; `#aeb0fa` nello scuro), `selection` e `badge`. Serve solo a non letti, selezione, azione principale e conteggi: è il riempimento del pulsante primario, della casella spuntata, del giorno scelto, del tratto del cursore, della barra della scheda scelta, dell’interruttore acceso e del marchio, e il colore del focus. Non introdurre un secondo colore d’azione.
 - **I nomi di unlumen**: `accent-pro` e `ring` sono i colori che leggono i componenti di unlumen (l’alone di Apple Switch, `bg-accent-pro` e `ring-ring` di Tailwind) e valgono lo stesso indaco di `accent` nei due temi. Non sono un secondo accento: non dargli un valore diverso.
@@ -724,7 +700,7 @@ Ogni token entra in entrambi i temi quando il valore scuro differisce. Il tema s
 
 ## Tipografia
 
-Un solo carattere, **IBM Plex Sans** (licenza OFL), variabile (pesi 100–700) e incluso come due file woff2 (latino e latino esteso) in `desktop/public/fonts/ibm-plex-sans/` con `OFL.txt`: l’app è offline e la CSP ha `font-src 'self'`; nessuna dipendenza npm per il carattere. Si dichiara in `system.css` come `IBM Plex Sans`, con `Segoe UI` e `system-ui` di riserva. `font-text` e `font-title` restano due token ma puntano allo stesso carattere: usa `font-text` salvo per titoli (`h1`, `h2`) e marchio, dove si scrive `font-title`.
+Un solo carattere, **IBM Plex Sans** (licenza OFL), quello di Sigrid: i pesi 400, 500 e 600 (latino e latino esteso) più Inter per i glifi fuori dal latino, in `fonts.css` di Sigrid, che Vite impacchetta come file dell’app (l’app è offline e la CSP ha `font-src 'self'`). Qamille non porta file di caratteri propri; i pesi 550, 650 e 700 sono diventati 500 e 600. `--font-text` e `--font-title` sono alias di `--font-sans` di Sigrid. Quanto segue sul carattere variabile e sui due file woff2 in `public/fonts` è superato. Si dichiara in `system.css` come `IBM Plex Sans`, con `Segoe UI` e `system-ui` di riserva. `font-text` e `font-title` restano due token ma puntano allo stesso carattere: usa `font-text` salvo per titoli (`h1`, `h2`) e marchio, dove si scrive `font-title`.
 
 La scala, in `text-2xs`…`text-3xl`: 11,5, 12,5, 13,5, 14, 15, 18, 20 e 26 px. La base è `text-sm` (13,5px, interlinea 1,5), impostata su `body` con il testo levigato (`-webkit-font-smoothing: antialiased`). Il corpo del messaggio è `text-md` con interlinea 1,6 e al massimo 760px di larghezza; il riassunto AI `text-md`; il titolo del messaggio (`h2`) `text-2xl`, peso 600, spaziatura -0,4px (`h1`: `text-3xl`, peso 650, -1px). Pesi: 400 per il testo, 500 per le etichette dei campi e la voce attiva della barra laterale, 600 per titoli, pulsanti e scheda scelta, 700 per il mittente di un messaggio non letto. Non scendere sotto `text-2xs`.
 

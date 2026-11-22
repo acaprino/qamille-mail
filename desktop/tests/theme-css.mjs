@@ -70,3 +70,14 @@ test('every alias leads to a token the generated blocks write, or to one Sigridâ
     assert.ok(written.has(target) || OWN.has(target), `${name} leads to ${target}, which nothing writes`);
   }
 });
+
+test('the two windows carry the theme and density ids and the shape attributes the engine states', () => {
+  const tokens = sigrid.themeTokens(COMPATTO, 'light', null, COMPATTO_TONE);
+  const expected = { 'data-theme': COMPATTO.id, 'data-density': sigrid.densityWith('compact', QAMILLE_DENSITY).id, ...tokens.attributes };
+  for (const file of ['../index.html', '../reminder.html']) {
+    const html = readFileSync(new URL(file, import.meta.url), 'utf8');
+    const root = html.match(/<html[^>]*>/)?.[0] ?? '';
+    for (const [name, value] of Object.entries(expected)) assert.ok(root.includes(` ${name}="${value}"`), `${file}: <html> lacks ${name}="${value}"`);
+    assert.ok(!root.includes('data-scheme'), `${file}: data-scheme is written by theme-boot.js, not in the file`);
+  }
+});

@@ -547,8 +547,20 @@ check('19. the close button hides, and one restore path brings the window back (
   assert.match(events, /tauri::WindowEvent::Resized\(_\) => background::window_resized\(window\)/, 'a minimized window pauses its webview (background::window_resized)');
   assert.match(rustItem(read('src-tauri/src/recovery.rs'), 'pub fn close_seen('), /!crate::background::hides_on_close\(\)/, 'close_seen tells the page not to close when Rust only hid the window');
   assert.match(read('src/lib/window-close.ts'), /await call<boolean>\('close_seen'\)/, 'the page waits for close_seen before running its guards');
+  // All of it on the main thread: from another thread (a toast's click, an async command, the close
+  // watch) the Win32 show of a maximized first show would run at once while SetIsVisible and tao's
+  // show() are posted, and the window would show one frame of its ground. `restore` sends the work
+  // there and waits for it, bounded, so the caller's next step (a question, the page's open event)
+  // comes with the window in view.
+  const entry = rustItem(background, 'pub fn restore(');
+  assert.match(entry, /\.run_on_main_thread\(move \|\| \{\s*restore_on_main\(&\w+\);/, 'restore runs restore_on_main through run_on_main_thread');
+  assert.match(entry, /\.recv_timeout\(/, 'restore waits for the main thread, and not for ever');
+  const code = background.replace(/(^|\s)\/\/.*$/gm, '$1');
+  assert.equal((code.match(/\brestore_on_main\(/g) ?? []).length, 2, 'restore_on_main is defined once and called only by restore');
+  const confirmClose = rustItem(read('src-tauri/src/commands/meetings.rs'), 'pub async fn meeting_confirm_close(');
+  assert.match(confirmClose, /blocking\(move \|\| \{\s*crate::background::restore\(/, 'meeting_confirm_close waits for the window off the async runtime');
   // The webview is visible before the window shows, then the window comes to the front, on screen.
-  const restore = rustItem(background, 'pub fn restore(');
+  const restore = rustItem(background, 'fn restore_on_main(');
   const at = (part) => {
     const index = restore.indexOf(part);
     assert.ok(index >= 0, `restore: no ${part}`);
@@ -563,7 +575,7 @@ check('19. the close button hides, and one restore path brings the window back (
   // `window_shell::show_main` is the only `.show()` of a window; native_feel::show_main_window and
   // background::restore are the only callers of `show_main`.
   const allowed = { 'window_shell.rs': 'pub fn show_main(' };
-  const callers = { 'native_feel.rs': 'pub fn show_main_window(', 'background.rs': 'pub fn restore(' };
+  const callers = { 'native_feel.rs': 'pub fn show_main_window(', 'background.rs': 'fn restore_on_main(' };
   const shows = (text) => (text.match(/\b[A-Za-z_]\w*\.show\(\)/g) ?? []).length;
   const calls = (text) => (text.match(/\bshow_main\(/g) ?? []).length;
   for (const file of fs.readdirSync(path.join(desktop, 'src-tauri/src'), { recursive: true }).filter((f) => f.endsWith('.rs'))) {
@@ -632,7 +644,7 @@ check('20. start at sign-in is Qamille in the tray, an HKCU Run value Qamille wr
   const background = read('src-tauri/src/background.rs');
   assert.match(background, /background_rules::autostart_entry_name\(installed\(\),/, 'the entry name comes from autostart_entry_name');
   assert.match(background, /background_rules::workspace_tag\(/, 'the entry name carries the stable tag of the data folder');
-  const tagCode = ['pub fn workspace_tag(', 'pub fn fnv1a64('].map((head) => rustItem(rules, head)).join('') + rustItem(background, 'fn autostart_entry(');
+  const tagCode = ['pub fn workspace_tag(', 'pub fn workspace_id(', 'pub fn fnv1a64('].map((head) => rustItem(rules, head)).join('') + rustItem(background, 'fn autostart_entry(');
   assert.ok(/fnv1a64\(/.test(tagCode) && !/DefaultHasher|Hasher/.test(tagCode), 'the tag is FNV-1a, not DefaultHasher, which changes between Rust releases');
   const startup = rustItem(background, 'mod startup {');
   assert.match(startup, /const RUN: &str = r"Software\\Microsoft\\Windows\\CurrentVersion\\Run";/, 'the entry lives in the Run key');
@@ -691,7 +703,7 @@ check('21. the saved placement is applied before the first show and only on a co
   // The first show, from a normal start and from background::restore, is one function.
   const showMain = rustItem(feel, 'pub fn show_main_window(');
   assert.ok(showMain.search(/\bprepare_main_window\(/) >= 0 && showMain.search(/\bprepare_main_window\(/) < showMain.search(/\bshow_main\(/), 'show_main_window prepares, then shows with window_shell::show_main');
-  assert.match(rustItem(read('src-tauri/src/background.rs'), 'pub fn restore('), /\bwindow_shell::show_main\(/, 'background::restore shows with window_shell::show_main');
+  assert.match(rustItem(read('src-tauri/src/background.rs'), 'fn restore_on_main('), /\bwindow_shell::show_main\(/, 'background::restore shows with window_shell::show_main, on the main thread');
   const show = rustItem(shell, 'pub fn show_main(');
   assert.match(show, /\bplacement::first_show\(/, 'show_main asks placement::first_show how to show');
   assert.match(show, /ShowPath::Maximized/, 'show_main has a maximized path');
@@ -812,6 +824,15 @@ check('24. system notifications come from Rust only, through the registered app 
   const main = read('src-tauri/src/main.rs');
   assert.ok(!/tauri_plugin_notification/.test(main), 'no notification plugin in main.rs');
   assert.match(main, /notifications::notifications_get, notifications::notifications_set,/, 'the switches are app commands');
+  // The identifier ends with the data folder's FNV-1a (`workspace_id`): it names the copy's
+  // identity key in the registry, so it must stay the same across Rust releases, which
+  // DefaultHasher does not promise.
+  assert.match(
+    main,
+    /identifier\.push_str\(&format!\("\.workspace\{\}", background_rules::workspace_id\(&\w+\.to_string_lossy\(\)\)\)\)/,
+    'the identifier ends with background_rules::workspace_id of the canonical data folder',
+  );
+  assert.ok(!/DefaultHasher|std::hash::/.test(main.replace(/(^|\s)\/\/.*$/gm, '$1')), 'main.rs hashes nothing with the standard library hasher');
   // The identity Windows shows the notifications under: the per-data-folder identifier the toasts go
   // out with (`app.config().identifier`), registered for the current user, never the process's own
   // AUMID, which would detach the window from the icons pinned to the taskbar.
@@ -882,6 +903,14 @@ check('25. the taskbar shows unread mail and the full indexing (rule 30)', () =>
   assert.match(rustItem(read('src-tauri/src/commands/assistant.rs'), 'pub async fn search_reindex('), /crate::taskbar::reset_index\(\);/, '«Reindex» shows the bar again');
   assert.match(code, /badge_rgba\(/, 'the overlay is drawn by taskbar_rules::badge_rgba');
   assert.match(code, /crate::background::set_tray_tooltip\(/, 'the tray tooltip says how many are unread');
+  // A change of language reaches the tooltip at once, with the count it shows, not at the next count.
+  assert.match(rustItem(code, 'fn show_count('), /UNREAD\.store\(count, /, 'show_count remembers the count of the tooltip');
+  assert.match(rustItem(code, 'pub fn tooltip('), /taskbar_rules::tray_tooltip\(UNREAD\.load\(/, 'tooltip() says the remembered count');
+  assert.match(
+    rustItem(read('src-tauri/src/background.rs'), 'pub fn relabel('),
+    /set_tray_tooltip\(app, &crate::taskbar::tooltip\(italian\)\)/,
+    'relabel says the tooltip again in the new language',
+  );
 });
 
 // phase 3, Task 4: check 26

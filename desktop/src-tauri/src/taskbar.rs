@@ -14,9 +14,19 @@
 
 use crate::taskbar_rules::{self, Bar, IndexBars};
 use qamille::application::{events::AppEvent, workspace::WorkspaceService};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{OnceLock, mpsc};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager};
+
+/// The count the tray tooltip says (`show_count`), so that a change of language says it again at
+/// once (`background::relabel`) instead of at the next count, up to a minute later.
+static UNREAD: AtomicU32 = AtomicU32::new(0);
+
+/// The tray tooltip for the count last shown, in `italian` or English.
+pub fn tooltip(italian: bool) -> String {
+    taskbar_rules::tray_tooltip(UNREAD.load(Ordering::SeqCst), italian)
+}
 
 /// What the thread hears (`observe`, `reset_index`, the window's focus).
 enum Signal {
@@ -151,7 +161,8 @@ fn run(app: &AppHandle, workspace: &WorkspaceService, received: &mpsc::Receiver<
 /// The overlay and the tooltip for `count`. The tooltip is set every time: the tray icon may have
 /// come after the window.
 fn show_count(app: &AppHandle, window: &tauri::WebviewWindow, shown: &mut Shown, count: u32) {
-    crate::background::set_tray_tooltip(app, &taskbar_rules::tray_tooltip(count, crate::window_shell::italian()));
+    UNREAD.store(count, Ordering::SeqCst);
+    crate::background::set_tray_tooltip(app, &tooltip(crate::window_shell::italian()));
     if shown.count == Some(count) {
         return;
     }

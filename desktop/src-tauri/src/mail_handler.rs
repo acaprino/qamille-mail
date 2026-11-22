@@ -422,41 +422,30 @@ mod tests {
         assert_eq!(installed[7], entry(r"Software\RegisteredApplications", "Qamille", r"Software\Qamille\MailLinks\Installed\Capabilities"));
     }
 
-    /// A key of its own under `HKCU\Software`, removed with everything in it when the test ends: the
-    /// tests never write Windows' own keys, nor those of the owner's copies.
+    /// The test's own key (`test_registry`), with the four keys of a hive under it: the tests never
+    /// write Windows' own keys, nor those of the owner's copies.
     #[cfg(windows)]
     struct Scratch {
-        root: String,
         classes: String,
         registered: String,
         apps: String,
         choice: String,
+        _key: crate::test_registry::ScratchKey,
     }
     #[cfg(windows)]
     impl Scratch {
         fn new(test: &str) -> Self {
-            let root = format!(r"Software\Qamille tests\mail-{test}-{}", std::process::id());
+            let key = crate::test_registry::ScratchKey::new("mail_handler", test);
             Self {
-                classes: format!(r"{root}\Classes"),
-                registered: format!(r"{root}\RegisteredApplications"),
-                apps: format!(r"{root}\Qamille\MailLinks"),
-                choice: format!(r"{root}\UrlAssociations\mailto"),
-                root,
+                classes: key.under("Classes"),
+                registered: key.under("RegisteredApplications"),
+                apps: key.under(r"Qamille\MailLinks"),
+                choice: key.under(r"UrlAssociations\mailto"),
+                _key: key,
             }
         }
         fn hive(&self) -> Hive<'_> {
             Hive { classes: &self.classes, registered: &self.registered, apps: &self.apps, choice: &self.choice }
-        }
-    }
-    #[cfg(windows)]
-    impl Drop for Scratch {
-        fn drop(&mut self) {
-            use windows::Win32::System::Registry::{HKEY_CURRENT_USER, RegDeleteKeyW, RegDeleteTreeW};
-            unsafe {
-                let _ = RegDeleteTreeW(HKEY_CURRENT_USER, &windows::core::HSTRING::from(self.root.as_str()));
-                // The parent goes with the last test: it cannot be deleted while another test's key is in it.
-                let _ = RegDeleteKeyW(HKEY_CURRENT_USER, windows::core::w!(r"Software\Qamille tests"));
-            }
         }
     }
 

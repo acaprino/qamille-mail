@@ -49,10 +49,16 @@ pub fn fnv1a64(bytes: &[u8]) -> u64 {
     bytes.iter().fold(0xcbf2_9ce4_8422_2325, |hash, &byte| (hash ^ u64::from(byte)).wrapping_mul(0x0000_0100_0000_01b3))
 }
 
-/// 8 hex digits for a data folder (its canonical path; Windows paths ignore case): the same in every
-/// start and every version of one copy, different for another copy.
+/// 16 hex digits for a data folder (its canonical path; Windows paths ignore case): the same in every
+/// start and every version of one copy, different for another copy. It ends the app identifier
+/// (`main.rs`), which names the copy's notification identity in the registry (rule 28).
+pub fn workspace_id(data_dir: &str) -> String {
+    format!("{:016x}", fnv1a64(data_dir.to_lowercase().as_bytes()))
+}
+
+/// The first 8 digits of `workspace_id`, for the name of the start-at-sign-in entry.
 pub fn workspace_tag(data_dir: &str) -> String {
-    format!("{:016x}", fnv1a64(data_dir.to_lowercase().as_bytes()))[..8].to_owned()
+    workspace_id(data_dir)[..8].to_owned()
 }
 
 /// The command of the Run value: the executable in quotes, then `AUTOSTART_ARG`. Unquoted, Windows
@@ -185,6 +191,17 @@ mod tests {
         assert_eq!(workspace_tag(r"\\?\d:\software\QAMILLE\DATA"), "6a5c8aa2");
         assert_ne!(workspace_tag(r"\\?\D:\Software\Qamille-Professional\data"), "6a5c8aa2");
         assert_eq!(workspace_tag(r"\\?\D:\Software\Qamille-Professional\data").len(), 8);
+    }
+
+    #[test]
+    fn the_identifier_suffix_is_the_whole_stable_hash_of_the_data_folder() {
+        // One copy's suffix, pinned: it names the copy's notification identity in the registry
+        // (`AppUserModelId\com.qamille.desktop.workspace<id>`), which a future build must find again.
+        assert_eq!(workspace_id(r"\\?\D:\Software\Qamille\data"), "6a5c8aa20e00690a");
+        assert_eq!(workspace_id(r"\\?\d:\software\QAMILLE\DATA"), "6a5c8aa20e00690a");
+        assert_eq!(workspace_id(r"\\?\D:\Software\Qamille-Professional\data"), "b4fdf48fe39f6e12");
+        // The start-at-sign-in tag is its first 8 digits.
+        assert_eq!(workspace_tag(r"\\?\D:\Software\Qamille\data"), workspace_id(r"\\?\D:\Software\Qamille\data")[..8]);
     }
 
     #[test]

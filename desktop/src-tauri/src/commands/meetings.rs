@@ -107,16 +107,19 @@ pub async fn meeting_confirm_close(window: tauri::WebviewWindow, italian: Option
     let italian = italian.unwrap_or(true);
     // Buttons named by what they do; Esc and the X keep recording.
     let (stop, keep) = if italian { ("Termina e chiudi", "Continua a registrare") } else { ("Stop and close", "Keep recording") };
-    // «Esci» from the tray: the window comes back with the question it owns.
-    crate::background::restore(tauri::Manager::app_handle(&window));
-    blocking(move || Ok(rfd::MessageDialog::new().set_parent(&window).set_title(if italian { "Registrazione in corso" } else { "Recording in progress" })
-        .set_description(if italian {
-            "Chiudendo Qamille la registrazione si ferma e viene salvata."
-        } else {
-            "Closing Qamille stops the recording and saves it."
-        })
-        .set_buttons(rfd::MessageButtons::OkCancelCustom(stop.into(), keep.into()))
-        .show() == rfd::MessageDialogResult::Custom(stop.into()))).await
+    blocking(move || {
+        crate::background::restore(tauri::Manager::app_handle(&window));
+        // «Esci» from the tray: the window is back (`restore` waits for the main thread, here off the
+        // async runtime) before the question it owns.
+        Ok(rfd::MessageDialog::new().set_parent(&window).set_title(if italian { "Registrazione in corso" } else { "Recording in progress" })
+            .set_description(if italian {
+                "Chiudendo Qamille la registrazione si ferma e viene salvata."
+            } else {
+                "Closing Qamille stops the recording and saves it."
+            })
+            .set_buttons(rfd::MessageButtons::OkCancelCustom(stop.into(), keep.into()))
+            .show() == rfd::MessageDialogResult::Custom(stop.into()))
+    }).await
 }
 #[tauri::command]
 pub async fn meeting_cancel_all_jobs(state: State<'_, DesktopState>) -> AppResult<()> { state.meetings.cancel_all_jobs(); Ok(()) }

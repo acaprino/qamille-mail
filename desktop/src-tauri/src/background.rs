@@ -142,8 +142,8 @@ fn tray_notice(app: &AppHandle) {
         .set_title("Qamille")
         .set_level(rfd::MessageLevel::Info)
         .set_description(words(
-            "Qamille resta aperto nell'area di notifica: invia i messaggi programmati, mostra i promemoria e riceve la posta. Per uscire usa Esci dal menu dell'icona.",
-            "Qamille keeps running in the notification area: it sends scheduled messages, shows reminders and receives mail. To quit, use Quit in the icon's menu.",
+            "Qamille resta aperto nell'area di notifica: invia i messaggi programmati, mostra i promemoria e riceve la posta. Per riaprire la finestra fai clic sull'icona di Qamille (in Windows 11 può essere fra le icone nascoste, sotto la freccia ^) oppure avvia di nuovo Qamille. Per uscire usa Esci dal menu dell'icona.",
+            "Qamille keeps running in the notification area: it sends scheduled messages, shows reminders and receives mail. To bring the window back, click Qamille's icon (in Windows 11 it may be among the hidden icons, under the ^ arrow) or start Qamille again. To quit, use Quit in the icon's menu.",
         ))
         .set_buttons(rfd::MessageButtons::OkCancelCustom("OK".into(), leave.into()))
         .show();
@@ -155,9 +155,31 @@ fn tray_notice(app: &AppHandle) {
 }
 
 /// The one way back to the window: the tray, a second start, a notification, a mail link, a guard
-/// that kept the window during «Esci». The webview is told it is visible before the window shows, so
-/// the first frame is the page, then the window leaves the taskbar and comes to the front.
+/// that kept the window during «Esci». The work runs on the main thread (`restore_on_main`): called
+/// from another thread (a toast's click, an async command, the close watch), the Win32 show of a
+/// maximized first show (`window_shell::show_main`) would run at once while `SetIsVisible` and tao's
+/// `show()` wait in the event loop, and the window would show one frame of its ground. The caller
+/// waits for it, so its next step (a question, the page's open event) comes with the window in view;
+/// on the main thread Tauri runs it at once.
 pub fn restore(app: &AppHandle) {
+    let (done, finished) = std::sync::mpsc::channel();
+    let handle = app.clone();
+    let sent = app.run_on_main_thread(move || {
+        restore_on_main(&handle);
+        let _ = done.send(());
+    });
+    if sent.is_ok() {
+        // Bounded: an event loop held by a modal loop of its own never keeps the caller for long.
+        let _ = finished.recv_timeout(RESTORE_WAIT);
+    }
+}
+
+/// How long `restore` waits for the main thread.
+const RESTORE_WAIT: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// `restore`, on the main thread. The webview is told it is visible before the window shows, so the
+/// first frame is the page, then the window leaves the taskbar and comes to the front.
+fn restore_on_main(app: &AppHandle) {
     let Some(window) = app.get_webview_window("main") else { return };
     crate::native_feel::set_webview_visible(&window, true);
     // `show_main` opens a maximized saved placement maximized, the first time (rule 29).
@@ -274,16 +296,17 @@ pub fn install(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
-/// The interface language changed (`window_shell::window_appearance`): the tray menu follows it.
+/// The interface language changed (`window_shell::window_appearance`): the tray menu and the tooltip
+/// (the unread count, `taskbar::tooltip`) follow it at once.
 pub fn relabel(app: &AppHandle, italian: bool) {
     let Some(menu) = app.try_state::<TrayMenu>() else { return };
     let (show_text, quit_text) = tray_labels(italian);
     let _ = menu.show.set_text(show_text);
     let _ = menu.quit.set_text(quit_text);
+    set_tray_tooltip(app, &crate::taskbar::tooltip(italian));
 }
 
-/// The tray icon's tooltip (it says «Qamille» until a caller says more).
-#[allow(dead_code, reason = "phase 3, Task 3 shows the unread count here")]
+/// The tray icon's tooltip (it says «Qamille» until the unread count says more, `taskbar.rs`).
 pub fn set_tray_tooltip(app: &AppHandle, text: &str) {
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
         let _ = tray.set_tooltip(Some(text));
@@ -581,31 +604,22 @@ pub fn restore_main_window(app: AppHandle) {
 mod tests {
     use super::startup::{self, StartupKeys};
     use crate::background_rules::{APPROVED_ON, run_command};
+    use crate::test_registry::ScratchKey;
 
-    /// A key of its own under `HKCU\Software`, removed with everything in it when the test ends:
-    /// the tests never touch Windows' own `Run` key, nor the entries of the owner's copies.
+    /// The test's own key (`test_registry`), with a `Run` and a `StartupApproved\Run` under it: the
+    /// tests never touch Windows' own `Run` key, nor the entries of the owner's copies.
     struct Scratch {
         run: String,
         approved: String,
-        root: String,
+        _key: ScratchKey,
     }
     impl Scratch {
         fn new(test: &str) -> Self {
-            let root = format!(r"Software\Qamille tests\startup-{test}-{}", std::process::id());
-            Self { run: format!(r"{root}\Run"), approved: format!(r"{root}\StartupApproved\Run"), root }
+            let key = ScratchKey::new("background", test);
+            Self { run: key.under("Run"), approved: key.under(r"StartupApproved\Run"), _key: key }
         }
         fn keys(&self) -> StartupKeys<'_> {
             StartupKeys { run: &self.run, approved: &self.approved }
-        }
-    }
-    impl Drop for Scratch {
-        fn drop(&mut self) {
-            use windows::Win32::System::Registry::{HKEY_CURRENT_USER, RegDeleteKeyW, RegDeleteTreeW};
-            unsafe {
-                let _ = RegDeleteTreeW(HKEY_CURRENT_USER, &windows::core::HSTRING::from(self.root.as_str()));
-                // The parent goes with the last test: it cannot be deleted while another test's key is in it.
-                let _ = RegDeleteKeyW(HKEY_CURRENT_USER, windows::core::w!(r"Software\Qamille tests"));
-            }
         }
     }
 

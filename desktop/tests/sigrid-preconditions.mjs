@@ -4,7 +4,8 @@
 //   P2  Base UI and Ark live together inside Sigrid: tests/sigrid-coexistence.mjs, in the browser.
 //   P3  The radii as a parameter of the theme definition: with `radii: { sm: 4, md: 6, lg: 8, xl: 12 }`,
 //       themeTokens(...).shape has --radius-lg 8px and --radius-xl 12px.
-//   P4  Title steps above `base`: src/styles/theme.css defines a --text-* of at least 1.625rem, with its line height.
+//   P4  Title steps above `base`: src/styles/theme.css defines --text-lg, --text-xl and --text-2xl (Sigrid 3.1: 18, 20 and 24px),
+//       each with its line height. Qamille's 26px title becomes 24px (the owner's ruling: everything as Sigrid has it).
 //   P5  The icon meanings of Qamille: every target name of ICON_MAP in src/ui/icon-names.ts (Task 19) is in
 //       ICON_NAMES. Until that file exists, the check lists the icons Qamille draws today whose name Sigrid lacks.
 // P1 is withdrawn (the owner's rule of 2026-11-22: Sigrid's bundle may carry Ark and Motion).
@@ -60,17 +61,12 @@ function titleSteps(dir) {
   const css = fs.readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   const sizes = new Map([...css.matchAll(/--text-([a-z0-9]+(?:-[a-z0-9]+)*)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
   const leading = new Set([...css.matchAll(/--text-([a-z0-9-]+?)--line-height\s*:/g)].map((m) => m[1]));
-  const steps = [...sizes].map(([name, value]) => ({ name, value, px: pixels(value) })).filter((step) => step.px !== null);
-  const title = steps.find((step) => step.px >= 26 && leading.has(step.name));
-  if (title) return { ok: true, why: `--text-${title.name} is ${title.value}, with its line height` };
-  const largest = steps.sort((a, b) => b.px - a.px)[0];
-  const large = steps.find((step) => step.px >= 26);
-  return {
-    ok: false,
-    why: large
-      ? `--text-${large.name} (${large.value}) has no --text-${large.name}--line-height`
-      : `no --text-* reaches 1.625rem: the largest is ${largest ? `--text-${largest.name} (${largest.value})` : 'none'}`,
-  };
+  const steps = ['lg', 'xl', '2xl'];
+  const missing = steps.filter((name) => !sizes.has(name));
+  if (missing.length) return { ok: false, why: `theme.css lacks ${missing.map((name) => `--text-${name}`).join(', ')}` };
+  const bare = steps.find((name) => !leading.has(name));
+  if (bare) return { ok: false, why: `--text-${bare} (${sizes.get(bare)}) has no --text-${bare}--line-height` };
+  return { ok: true, why: `--text-lg, --text-xl and --text-2xl are ${steps.map((name) => sizes.get(name)).join(', ')}, each with its line height` };
 }
 
 /** The string values of the object literal given to `const <name>` in a TypeScript file, with their keys. */
@@ -230,20 +226,19 @@ else if (entry) {
     assert.equal(result.P5.ok, false);
   });
 
-  test('P4 holds with a step of at least 1.625rem and its line height', () => {
-    const steps = '  --text-title: 1.625rem;\n  --text-title--line-height: 1.25;\n';
-    assert.deepEqual(checkPreconditions(fakeSigrid({ steps }), { src: fakeSrc() }).P4, { ok: true, why: '--text-title is 1.625rem, with its line height' });
+  test('P4 holds with the steps lg, xl and 2xl and their line heights', () => {
+    const steps = '  --text-lg: 1.125rem;\n  --text-lg--line-height: 1.5;\n  --text-xl: 1.25rem;\n  --text-xl--line-height: 1.4;\n  --text-2xl: 1.5rem;\n  --text-2xl--line-height: 1.3;\n';
+    assert.deepEqual(checkPreconditions(fakeSigrid({ steps }), { src: fakeSrc() }).P4, { ok: true, why: '--text-lg, --text-xl and --text-2xl are 1.125rem, 1.25rem, 1.5rem, each with its line height' });
   });
 
-  test('P4 fails when the scale stops at base, or a large step has no line height', () => {
+  test('P4 fails when the scale stops at base, or a title step has no line height', () => {
     const base = checkPreconditions(fakeSigrid(), { src: fakeSrc() }).P4;
     assert.equal(base.ok, false);
-    assert.match(base.why, /the largest is --text-base \(1rem\)/);
-    const bare = checkPreconditions(fakeSigrid({ steps: '  --text-2xl: 28px;\n' }), { src: fakeSrc() }).P4;
+    assert.match(base.why, /lacks --text-lg, --text-xl, --text-2xl/);
+    const steps = '  --text-lg: 1.125rem;\n  --text-lg--line-height: 1.5;\n  --text-xl: 1.25rem;\n  --text-2xl: 1.5rem;\n  --text-2xl--line-height: 1.3;\n';
+    const bare = checkPreconditions(fakeSigrid({ steps }), { src: fakeSrc() }).P4;
     assert.equal(bare.ok, false);
-    assert.match(bare.why, /--text-2xl \(28px\) has no --text-2xl--line-height/);
-    const small = checkPreconditions(fakeSigrid({ steps: '  --text-lg: 1.25rem;\n  --text-lg--line-height: 1.4;\n' }), { src: fakeSrc() }).P4;
-    assert.equal(small.ok, false);
+    assert.match(bare.why, /--text-xl \(1\.25rem\) has no --text-xl--line-height/);
   });
 
   test('P5, before Task 19: lists the icons drawn today whose name is not in ICON_NAMES', () => {

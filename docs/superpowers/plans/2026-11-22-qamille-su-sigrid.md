@@ -138,6 +138,10 @@ Qamille, per decisione del proprietario, non ha librerie proprie di comportament
   - Si chiede anche che `styles.css`, il CSS già compilato, esca senza preflight: Qamille potrebbe allora usarlo, e togliere anche `tailwindcss` e `@tailwindcss/vite`.
 - **R13. IBM Plex Sans variabile** (pesi da 100 a 700), o almeno il 700, in `fonts.css`. Qamille usa 550, 650 e 700: con i soli 400, 500 e 600 di Sigrid passano a 500 e 600 (vedi «Carattere»).
 
+- **R14. `ChipsInput`: scegliere un suggerimento col puntatore non deve aggiungere anche il testo digitato.** Provato in `tests/sigrid-coexistence.mjs` (Task 0): scrivendo «b» e cliccando `bob@example.com` il campo contiene `b, bob@example.com`. Riguarda il campo dei destinatari (Task 15).
+- **R15. Un `dist` che si riduca in fase di build (tree-shaking).** `dist/index.js` è un file di 2,3 MB e circa 1,7 MB restano nel pacchetto anche importando solo `WordsProvider` e `MotionProvider`: il pezzo condiviso caricato all'avvio, dalla finestra principale e dal promemoria, passa da 338 kB a 1186 kB (JavaScript totale da 1836 a 2685 kB). Il Task 21 misura l'avvio sull'exe.
+- **R16. Niente `cursor-not-allowed` e `cursor-progress` nelle parti** (`checkbox`, `input`, `radio-group`, `select`, `switch`, `textarea`, `file-drop`). Un'app Windows tiene la freccia (`docs/aspetto-nativo.md`, regola 3). Finché ci sono, `system.css` tiene la freccia su di esse (`[class*='cursor-not-allowed']`) e il controllo 29 di `native-feel.mjs` ammette solo i file di oggi.
+
 ## Global Constraints
 
 > **Regola del proprietario (2026-11-22, prevale su tutto ciò che segue): «lavora direttamente in develop», «no worktrees».**

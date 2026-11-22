@@ -69,6 +69,17 @@ try {
             return Promise.resolve(bytes);
           }
           if (command === 'read_attachment') return Promise.resolve('Extracted text fallback');
+          // The desktop answers a save with where the file went and a token that stands for it.
+          if (command === 'attachment_save') {
+            const save = new URLSearchParams(window.location.search).get('save');
+            return save === 'cancel' ? Promise.resolve(null) : Promise.resolve({ path: 'C:\\Saved\\report.pdf', token: 41 });
+          }
+          if (command === 'saved_file_open' || command === 'saved_file_reveal') {
+            if (new URLSearchParams(window.location.search).get('launch') === 'fail') {
+              return Promise.reject({ message: 'The file is gone: it was moved or deleted.', code: 'not_found' });
+            }
+            return Promise.resolve(null);
+          }
           throw new Error(`Unexpected desktop command: ${command}`);
         },
       };
@@ -79,10 +90,10 @@ try {
     },
   );
 
-  async function openFixture(mode, attachment) {
+  async function openFixture(mode, attachment, extra = {}) {
     const page = await context.newPage();
     page.setDefaultTimeout(30000);
-    const query = new URLSearchParams({ mode, attachment: JSON.stringify(attachment) });
+    const query = new URLSearchParams({ mode, attachment: JSON.stringify(attachment), ...extra });
     await page.goto(`${url}/tests/attachment-preview.html?${query}`, {
       timeout: 30000,
       waitUntil: 'domcontentloaded',
@@ -161,6 +172,53 @@ try {
   assert.deepEqual(await plain.evaluate(() => window.workers), { created: 0, terminated: 0 });
   await plain.close();
   console.log('PASS unsupported attachments ask the backend once and keep the text preview');
+
+  // After a save the notice offers Open and Show in folder; they name the file by the token the save
+  // returned, never by a path.
+  const saved = await openFixture('visual', pdf);
+  await expect(saved.locator('.preview-canvas img')).toBeVisible();
+  await saved.getByRole('button', { name: 'Download attachment' }).click();
+  await expect.poll(() => saved.evaluate(() => window.previewNotices.length)).toBe(1);
+  const [notice] = await saved.evaluate(() => window.previewNotices);
+  assert.deepEqual(notice, {
+    message: 'Attachment saved: C:\\Saved\\report.pdf',
+    error: false,
+    actions: ['Open', 'Show in folder'],
+  });
+  await saved.evaluate(() => window.runNoticeAction('Show in folder'));
+  await expect.poll(() => commands(saved)).toContain('saved_file_reveal');
+  await saved.evaluate(() => window.runNoticeAction('Open'));
+  await expect.poll(() => commands(saved)).toContain('saved_file_open');
+  const calls = await saved.evaluate(() => window.previewCalls);
+  assert.deepEqual(calls.find((call) => call.command === 'attachment_save').args.attachmentId, 7);
+  assert.deepEqual(calls.find((call) => call.command === 'saved_file_reveal').args, { token: 41 });
+  assert.deepEqual(calls.find((call) => call.command === 'saved_file_open').args, { token: 41 });
+  assert.equal(await saved.evaluate(() => window.previewNotices.length), 1, 'an action that works says nothing more');
+  await saved.close();
+  console.log('PASS a saved attachment offers Open and Show in folder, which name the file by its token');
+
+  const cancelled = await openFixture('visual', pdf, { save: 'cancel' });
+  await expect(cancelled.locator('.preview-canvas img')).toBeVisible();
+  await cancelled.getByRole('button', { name: 'Download attachment' }).click();
+  await expect.poll(() => commands(cancelled)).toContain('attachment_save');
+  await cancelled.waitForTimeout(300);
+  assert.equal(await cancelled.evaluate(() => window.previewNotices.length), 0, 'a cancelled dialog offers nothing');
+  await cancelled.close();
+  console.log('PASS a cancelled save offers nothing');
+
+  const gone = await openFixture('visual', pdf, { launch: 'fail' });
+  await expect(gone.locator('.preview-canvas img')).toBeVisible();
+  await gone.getByRole('button', { name: 'Download attachment' }).click();
+  await expect.poll(() => gone.evaluate(() => window.previewNotices.length)).toBe(1);
+  await gone.evaluate(() => window.runNoticeAction('Open'));
+  await expect.poll(() => gone.evaluate(() => window.previewNotices.length)).toBe(2);
+  assert.deepEqual((await gone.evaluate(() => window.previewNotices))[1], {
+    message: 'The file is gone: it was moved or deleted.',
+    error: true,
+    actions: [],
+  });
+  await gone.close();
+  console.log('PASS an action that fails says why in an error notice');
 } finally {
   await browser?.close();
   server.kill();

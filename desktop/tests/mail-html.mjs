@@ -44,6 +44,7 @@ try {
     await route.fulfill({ response, body: source.replace('export async function previewCommand(', 'async function originalPreviewCommand(') + `
       export async function previewCommand(command, args = {}) {
         if (command === 'open_link') { window.openedLinks.push(args.url); return; }
+        if (command === 'save_draft' && window.failNextSave) { window.failNextSave = false; throw new Error('The disk is full.'); }
         return originalPreviewCommand(command, args);
       }
     ` });
@@ -60,7 +61,7 @@ try {
     <p><a id="spaced" href=" https://example.com/spaced ">Spaced</a> <a id="nbsp" href="&nbsp;https://example.com/x">No-break space</a>
     <a id="bom" href="&#xFEFF;https://example.com/x">BOM</a> <a id="ideographic" href="&#x3000;https://example.com/x">Ideographic space</a>
     <a id="nohost" href="http:foo">No slashes</a> <a id="oneslash" href="HTTP:/foo">One slash</a> <a id="relative" href="/relative">Relative</a>
-    <a id="data" href="data:text/html,x">Data</a></p>
+    <a id="data" href="data:text/html,x">Data</a> <a id="mail" href="mailto:a@b.it?subject=x">Write to us</a></p>
     <map name="zones"><area shape="rect" coords="0,0,100,100" href="https://example.com/a" alt="Zone"></map>
     <img usemap="#zones" src="${gif}" width="100" height="100" alt="">
     <svg width="120" height="40" xmlns:xlink="http://www.w3.org/1999/xlink"><a xlink:href="https://example.com/b"><rect width="120" height="40" fill="#c00"/></a></svg>
@@ -128,6 +129,28 @@ try {
 
   await page.getByRole('button', { name: 'Inbox', exact: false }).first().click();
   await page.getByText('This week: 5 tools for focused work').first().click();
+
+  // A mail link of a message opens Qamille's composer with the link's fields, never another mail
+  // program: nothing reaches open_link, and the frame keeps its document (rule 32, audit Q10).
+  // A draft whose fields could not be saved is not left empty in Drafts: the failure is said, and no
+  // composer opens.
+  const draftCount = () => page.evaluate(async () => (await (await import('/src/lib/api.ts')).call('list_drafts')).length);
+  const draftsBefore = await draftCount();
+  await page.evaluate(() => { window.failNextSave = true; });
+  await frame.locator('#mail').click();
+  await expect(page.getByText('The disk is full.')).toBeVisible();
+  await expect.poll(draftCount).toBe(draftsBefore);
+  const composer = page.getByRole('tabpanel');
+  await expect(composer).toHaveCount(0);
+  await frame.locator('#mail').click();
+  await expect(composer.getByRole('textbox', { name: 'Subject', exact: true })).toHaveValue('x');
+  await expect(composer.getByRole('button', { name: 'Remove a@b.it', exact: true })).toBeVisible();
+  await expect(composer.locator('[data-scope="tags-input"][data-part="item"]')).toHaveCount(1);
+  await expect(frame.locator('h1')).toHaveText('5 tools for focused work');
+  assert.deepEqual(await page.evaluate(() => window.openedLinks), [], 'A mail link never reaches open_link');
+  await composer.getByRole('button', { name: 'Save and close draft' }).click();
+  await expect(composer).toHaveCount(0);
+
   await frame.getByRole('link', { name: 'Read the issue' }).click();
   await expect.poll(() => page.evaluate(() => window.openedLinks)).toEqual(['https://focus.example.com/issue']);
   await expect(frame.locator('h1')).toBeVisible();

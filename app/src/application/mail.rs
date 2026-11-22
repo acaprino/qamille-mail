@@ -338,6 +338,21 @@ pub struct MailService {
     reader_locks: Arc<Mutex<std::collections::HashMap<u64, std::sync::Weak<Mutex<()>>>>>,
     reader_active: Arc<AtomicUsize>,
     prefetch_queue: Arc<Mutex<PrefetchQueue>>,
+    /// The accounts whose sync merged in this process: from their next sync on, new mail is an arrival
+    /// (`AppEvent::MailArrived`). The first one only sets the baseline, so neither a mailbox just added
+    /// nor the mail that came while Qamille was closed is announced.
+    synced: Arc<Mutex<std::collections::HashSet<u32>>>,
+    /// The accounts whose expired sign-in `AppEvent::SignInExpired` announced, until a sync works again.
+    sign_in_expired: Arc<Mutex<std::collections::HashSet<u32>>>,
+}
+/// How much earlier than the account's last sync a new message may have been received (IMAP
+/// INTERNALDATE, `Email::received_at`) and still be an arrival: what Gmail received while the previous
+/// sync was downloading, or with the clocks apart. Mail received earlier is the sync still bringing in
+/// the mailbox (an offline copy being prepared), never announced.
+const ARRIVAL_SLACK_SECS: i64 = 15 * 60;
+/// One of the account sets of `MailService`; a poisoned lock still holds a usable set.
+fn lock_set(set: &Mutex<std::collections::HashSet<u32>>) -> std::sync::MutexGuard<'_, std::collections::HashSet<u32>> {
+    set.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 #[derive(Default)]
 struct PrefetchQueue { ids: std::collections::VecDeque<u64>, running: bool }
@@ -429,6 +444,8 @@ impl MailService {
             reader_locks: Arc::new(Mutex::new(std::collections::HashMap::new())),
             reader_active: Arc::new(AtomicUsize::new(0)),
             prefetch_queue: Arc::new(Mutex::new(PrefetchQueue::default())),
+            synced: Arc::default(),
+            sign_in_expired: Arc::default(),
         }
     }
     pub fn list(&self, q: MailQuery) -> AppResult<MailPage> {
@@ -1851,8 +1868,21 @@ impl MailService {
                         report
                             .errors
                             .push(format!("{}: {}", account.email, e.message));
+                        // The credential is gone from the vault, or Google refuses it: once per
+                        // account, until a sync works again. A network error is no such thing.
+                        if matches!(e.code, "sign_in_required" | "sign_in_expired")
+                            && lock_set(&self.sign_in_expired).insert(account.id)
+                        {
+                            self.context.events.emit(AppEvent::SignInExpired {
+                                account_id: Some(account.id),
+                            });
+                        }
                     }
                     Ok(outcome) => {
+                        lock_set(&self.sign_in_expired).remove(&account.id);
+                        // Only a sync after this process's first merge of the account announces
+                        // arrivals (`synced`).
+                        let baseline_set = lock_set(&self.synced).contains(&account.id);
                         let notice = outcome.notice.clone();
                         let batch = outcome.batch;
                         let downloaded_paths: Vec<_> = batch
@@ -1889,6 +1919,15 @@ impl MailService {
                             // same values names none of them, so the UI keeps
                             // patching by ids instead of reloading (decision 6).
                             let mut touched: Vec<u64> = Vec::new();
+                            // The new unread messages of the Inbox that are an arrival: received by
+                            // the provider since the account last synced (`ARRIVAL_SLACK_SECS`), with
+                            // this process's baseline set. Never the first sync of an account.
+                            let arrival_since = current
+                                .account(account.id)
+                                .and_then(|a| a.last_sync)
+                                .filter(|_| baseline_set)
+                                .map(|last| last - ARRIVAL_SLACK_SECS);
+                            let mut arrived: Vec<u64> = Vec::new();
                             for mut email in batch.emails {
                                 let position = current
                                     .emails
@@ -1992,6 +2031,15 @@ impl MailService {
                                 }
                                 email.classified = true;
                                 touched.push(email.id);
+                                // The moment of receipt decides, not the Date header; a provider
+                                // without one has only the date. The store never keeps it.
+                                let received = email.received_at.take().unwrap_or(email.date);
+                                if email.folder == "Inbox"
+                                    && !email.read
+                                    && arrival_since.is_some_and(|since| received >= since)
+                                {
+                                    arrived.push(email.id);
+                                }
                                 current.emails.push(email);
                                 added += 1;
                             }
@@ -2016,10 +2064,19 @@ impl MailService {
                                     account_id: account.id,
                                 });
                             }
+                            // Never forwarded to the page: a Windows notification may say it
+                            // (desktop `notifications.rs`). Dropped when empty.
+                            events.push(AppEvent::MailArrived {
+                                account_id: account.id,
+                                ids: arrived,
+                            });
                             Ok((added, events))
                         });
                         match result {
-                            Ok(added) => report.added += added,
+                            Ok(added) => {
+                                report.added += added;
+                                lock_set(&self.synced).insert(account.id);
+                            }
                             Err(error) => {
                                 // The provider may already have written managed files.
                                 // Queue them for cleanup against the latest committed

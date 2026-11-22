@@ -1,5 +1,6 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { backendText } from './i18n';
+import { SIGN_IN_COMMANDS, VAULT_LOCKED_EVENT } from './vault';
 export const desktop = isTauri();
 export class CommandError extends Error {
   constructor(message: string, readonly code?: string) {
@@ -13,8 +14,11 @@ export async function call<T>(command: string, args: Record<string, unknown> = {
     const { previewCommand } = await import('./preview');
     return (await previewCommand(command, args)) as T;
   } catch (e) {
-    if (e && typeof e === 'object' && 'message' in e)
-      throw new CommandError(String(e.message), 'code' in e ? String(e.code) : undefined);
+    if (e && typeof e === 'object' && 'message' in e) {
+      const error = new CommandError(String(e.message), 'code' in e ? String(e.code) : undefined);
+      if (error.code === 'vault_locked' && SIGN_IN_COMMANDS.has(command)) window.dispatchEvent(new Event(VAULT_LOCKED_EVENT));
+      throw error;
+    }
     throw new Error(String(e));
   }
 }

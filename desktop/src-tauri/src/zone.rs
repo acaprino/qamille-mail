@@ -85,13 +85,13 @@ fn save_with_attachment_execute(path: &Path, source: &str) -> windows::core::Res
 
 /// COM on the calling thread (a pooled blocking thread) for as long as the guard lives.
 #[cfg(windows)]
-struct Apartment {
+pub(crate) struct Apartment {
     owned: bool,
 }
 
 #[cfg(windows)]
 impl Apartment {
-    fn enter() -> Self {
+    pub(crate) fn enter() -> Self {
         use windows::Win32::System::Com::{COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE, CoInitializeEx};
         // S_OK and S_FALSE each take one reference to give back. RPC_E_CHANGED_MODE: the thread already
         // has COM in the other apartment, usable as it is and not ours to close.

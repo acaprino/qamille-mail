@@ -19,6 +19,8 @@ store.settings.locale = 'en-US';
 store.settings.time_zone = 'UTC';
 await fs.mkdir(data, { recursive: true });
 await fs.writeFile(path.join(data, 'store.json'), JSON.stringify(store));
+// The X closes Qamille here, as before the tray (src-tauri/src/background.rs).
+await fs.writeFile(path.join(data, 'background.json'), JSON.stringify({ close_to_tray: false, tray_notice_shown: true }));
 const server = net.createServer();
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const port = server.address().port;

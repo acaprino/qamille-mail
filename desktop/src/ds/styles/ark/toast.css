@@ -45,6 +45,10 @@
 [data-scope='toast'][data-part='root'][data-type='error'] > svg {
   color: var(--danger);
 }
+/* An action keeps its size when the message is long: the message wraps, the buttons do not. */
+[data-scope='toast'][data-part='root'] .toast-action {
+  flex-shrink: 0;
+}
 [data-scope='toast'][data-part='description'] {
   flex: 1;
   min-width: 0;

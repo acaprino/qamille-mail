@@ -24,10 +24,17 @@
 //!   wait, or close Qamille without the page.
 //!
 //! Every way out that leaves without the page (`exit_app`, `restart_app`, the forced
-//! close) first stops and saves a running recording (`finish_meetings_before_exit`),
-//! as the page's close guard would: otherwise it is found "interrupted" at the next start.
+//! close, a failed start) first stops and saves a running recording and sends the undo
+//! queue (`finish_meetings_before_exit`), as the page's close guards would: otherwise the
+//! recording is found "interrupted" at the next start, and a send still undoable waits
+//! for it in silence (audit Q8).
 //! A failed start (`startup_failed` in `main.rs`) says why itself: from then on no dialog
 //! here opens (`stop_asking`).
+//!
+//! A window in the tray (`background.rs`, also a start at sign-in) never opens "Qamille non
+//! si è aperto" by itself: a page that did not draw, or failed, while it was hidden is
+//! offered a reload at the first `background::restore` (`offer_reload_if_not_ready`). A
+//! reload never shows a hidden window.
 //!
 //! WebView2 reports these from its own callbacks, which must not run a dialog's
 //! modal loop: every dialog and reload here runs on a thread of its own, and
@@ -68,6 +75,9 @@ const EXIT_SAVE_WAIT: Duration = Duration::from_secs(20);
 
 /// The main page now loading has drawn (`frontend_ready`); reset at every load it watches.
 static FRONTEND_READY: AtomicBool = AtomicBool::new(false);
+/// The question the hidden window did not ask (`watch_startup`, `frontend_failed`): `Some(opened)`
+/// for `offer_reload`, asked at the first restore. Cleared by every load the watch arms.
+static UNASKED: Mutex<Option<bool>> = Mutex::new(None);
 /// Watches armed so far (`watch_startup`): the newest retires the older ones.
 static PAGE_LOADS: AtomicU64 = AtomicU64::new(0);
 static CLOSE_ASKED: AtomicU64 = AtomicU64::new(0);
@@ -255,6 +265,11 @@ pub fn page_not_loaded(window: &WebviewWindow, status: i32) {
         chip_failed(window);
         return;
     }
+    // In the tray nothing asks by itself: the failed load never draws, so its 15 s watch leaves the
+    // question to the first restore (`offer_reload_if_not_ready`).
+    if !window.is_visible().unwrap_or(true) {
+        return;
+    }
     ask_once(window, move |window| {
         let text = if tauri::is_dev() {
             format!(
@@ -349,9 +364,11 @@ pub fn reload_ready(window: WebviewWindow, token: u64, saved: bool) {
 /// window with no message. Armed by `page_load` whenever a page starts loading, whoever
 /// started it, and also when the window shows and by `reload`, so a load Qamille starts
 /// is watched even if it never starts loading. The newest arm retires the older ones:
-/// each load gets one watch, its whole `STARTUP_WAIT` and at most one dialog.
+/// each load gets one watch, its whole `STARTUP_WAIT` and at most one dialog. A window in the
+/// tray asks nothing: the question waits for the first restore (`offer_reload_if_not_ready`).
 pub fn watch_startup(window: &WebviewWindow) {
     FRONTEND_READY.store(false, Ordering::SeqCst);
+    *UNASKED.lock().unwrap_or_else(|e| e.into_inner()) = None;
     let load = PAGE_LOADS.fetch_add(1, Ordering::SeqCst) + 1;
     let window = window.clone();
     std::thread::spawn(move || {
@@ -362,8 +379,23 @@ pub fn watch_startup(window: &WebviewWindow) {
         {
             return;
         }
+        if !window.is_visible().unwrap_or(true) {
+            *UNASKED.lock().unwrap_or_else(|e| e.into_inner()) = Some(false);
+            return;
+        }
         ask_once(&window, |window| offer_reload(window, false));
     });
+}
+
+/// The first `background::restore` after the hidden window's page did not draw, or failed: the
+/// question it did not ask then, now that the window is in view. Nothing when the page has drawn
+/// since, or a later load is being watched.
+pub fn offer_reload_if_not_ready(window: &WebviewWindow) {
+    let Some(opened) = UNASKED.lock().unwrap_or_else(|e| e.into_inner()).take() else { return };
+    if !opened && FRONTEND_READY.load(Ordering::SeqCst) {
+        return;
+    }
+    ask_once(window, move |window| offer_reload(window, opened));
 }
 
 /// The main window's `on_page_load` (`main.rs`): every page that starts loading in it
@@ -372,6 +404,8 @@ pub fn watch_startup(window: &WebviewWindow) {
 pub fn page_load(window: WebviewWindow, payload: PageLoadPayload<'_>) {
     if payload.event() == PageLoadEvent::Started {
         watch_startup(&window);
+        // The new page has no compose-mailto listener yet: a mail link waits for its take (rule 32).
+        crate::launch_args::page_started();
     }
 }
 
@@ -424,11 +458,16 @@ pub fn frontend_failed(window: WebviewWindow, message: String) {
         return;
     }
     let opened = FRONTEND_READY.load(Ordering::SeqCst);
+    if !window.is_visible().unwrap_or(true) {
+        *UNASKED.lock().unwrap_or_else(|e| e.into_inner()) = Some(opened);
+        return;
+    }
     ask_once(&window, move |window| offer_reload(window, opened));
 }
 
-/// Main's `CloseRequested` (X, Alt+F4, the taskbar, the system menu). The
-/// page's close listener has the decision: Tauri cancels the close for it.
+/// Main's `CloseRequested` (X, Alt+F4, the taskbar, the system menu) when it closes for real
+/// (`background::hides_on_close` false: «Esci», or the close button set to quit). The page's
+/// close listener has the decision: Tauri cancels the close for it.
 pub fn close_requested(app: &AppHandle) {
     let Some(window) = app.get_webview_window("main") else { return };
     let request = CLOSE_ASKED.fetch_add(1, Ordering::SeqCst) + 1;
@@ -441,6 +480,10 @@ pub fn close_requested(app: &AppHandle) {
             if CLOSE_SEEN.load(Ordering::SeqCst) >= request || window.app_handle().get_webview_window("main").is_none() {
                 return;
             }
+        }
+        // «Esci» from the tray: the window comes back with the question.
+        if !window.is_visible().unwrap_or(true) {
+            crate::background::restore(window.app_handle());
         }
         ask_once(&window, |window| {
             let close = ask(
@@ -456,21 +499,29 @@ pub fn close_requested(app: &AppHandle) {
             if close {
                 finish_meetings_before_exit(window.app_handle());
                 let _ = window.destroy();
+            } else {
+                // «Attendi», or Esc: «Esci» is over until the person asks again, so the next X
+                // hides as usual instead of quitting.
+                crate::background::close_settled();
             }
         });
     });
 }
 
-/// The page got the close request: it is alive and its guards are running.
+/// The page got the close request: it is alive. `true`: its guards run and it closes the window;
+/// `false`: Rust only put the window in the tray (`background::hides_on_close`), nothing closes.
 #[tauri::command]
-pub fn close_seen() {
+pub fn close_seen() -> bool {
     CLOSE_SEEN.store(CLOSE_ASKED.load(Ordering::SeqCst), Ordering::SeqCst);
+    !crate::background::hides_on_close()
 }
 
-/// The page's close ended without closing (a guard kept the window, or failed).
+/// The page's close ended without closing (a guard kept the window, or failed): also the end of
+/// an «Esci» (`background::close_settled`).
 #[tauri::command]
 pub fn close_settled() {
     *CLOSING_SINCE.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    crate::background::close_settled();
 }
 
 /// A failed start says why and exits (`startup_failed`, `main.rs`): from now on no recovery
@@ -488,6 +539,8 @@ fn exit_app(app: &AppHandle) {
 
 fn restart_app(app: &AppHandle) {
     finish_meetings_before_exit(app);
+    // The new process gets this one's arguments, `--autostart` too: it comes back as the window was.
+    crate::background::before_restart(app);
     // SAFETY: the variable is only read by the next process, at its start.
     unsafe { std::env::set_var(RESTART_AFTER, std::process::id().to_string()) };
     app.request_restart();
@@ -495,15 +548,20 @@ fn restart_app(app: &AppHandle) {
 
 /// Before the app leaves without its page: stops and saves a running recording, then
 /// stops the meeting jobs for the app closing, as the page's meetings close guard does
-/// (`App.tsx`). Blocks until that is done, at most `EXIT_SAVE_WAIT`: call it from a thread
-/// of its own, or from `startup_failed` (`main.rs`) just before its exit, never from a
+/// (`App.tsx`), and sends the undo queue, as its undo-queue guard does (`lib/undo-close.ts`,
+/// audit Q8). Blocks until that is done, at most `EXIT_SAVE_WAIT` for both: call it from a
+/// thread of its own, or from `startup_failed` (`main.rs`) just before its exit, never from a
 /// WebView2 callback. Without the app's state it does nothing. Failures go to `native.log`
-/// and never stop the exit.
+/// and never stop the exit; what did not leave in time goes at the next start.
 pub fn finish_meetings_before_exit(app: &AppHandle) {
     let (done, finished) = std::sync::mpsc::channel();
     let handle = app.clone();
+    // A little before the wait below gives up, so a queue still sending is not reported as a
+    // recording not saved.
+    let deadline = Instant::now() + EXIT_SAVE_WAIT.saturating_sub(Duration::from_millis(500));
     let spawned = std::thread::Builder::new().name("qamille-exit-meetings".into()).spawn(move || {
         stop_recording_and_jobs(&handle);
+        send_undo_queue(&handle, deadline);
         let _ = done.send(());
     });
     match spawned {
@@ -534,6 +592,43 @@ fn stop_recording_and_jobs(app: &AppHandle) {
         }
     }
     state.meetings.cancel_all_jobs();
+}
+
+/// Every action still undoable leaves now (`UndoService::send_now`); then waits, until
+/// `deadline`, for the queue to settle, or less when it stops moving for `UNDO_STALL` (no
+/// connection, or a failed start whose queue thread never ran). Queued ones stay for the next
+/// start; one still on its way is cut off, and the next start marks it failed without retrying it.
+fn send_undo_queue(app: &AppHandle, deadline: Instant) {
+    const UNDO_STALL: Duration = Duration::from_secs(5);
+    let Some(state) = app.try_state::<DesktopState>() else { return };
+    if let Err(error) = state.undo.send_now() {
+        crate::native_feel::report(&format!("the undo queue was not sent before exit: {}", error.message));
+        return;
+    }
+    let mut last = (usize::MAX, Instant::now());
+    loop {
+        match state.undo.unsettled() {
+            Ok(left) if left.total() == 0 => return,
+            Ok(left) if Instant::now() >= deadline || (left.total() == last.0 && last.1.elapsed() >= UNDO_STALL) => {
+                crate::native_feel::report(&format!(
+                    "undo queue at exit: {} send(s) and {} action(s) queued for the next start, {} send(s) and {} action(s) cut off on their way (the next start marks them failed)",
+                    left.sends, left.actions, left.sending, left.confirming
+                ));
+                return;
+            }
+            Ok(left) => {
+                let remaining = left.total();
+                if remaining != last.0 {
+                    last = (remaining, Instant::now());
+                }
+                std::thread::sleep(Duration::from_millis(200));
+            }
+            Err(error) => {
+                crate::native_feel::report(&format!("could not read the undo queue before exit: {}", error.message));
+                return;
+            }
+        }
+    }
 }
 
 /// No wildcard: a new recorder state must be sorted here.

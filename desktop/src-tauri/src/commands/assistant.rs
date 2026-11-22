@@ -68,6 +68,7 @@ pub async fn compute_status() -> AppResult<qamille::infrastructure::compute_fact
 /// D4 «Reindex»: every vector is made again with the model the server serves now.
 #[tauri::command]
 pub async fn search_reindex(state: State<'_, DesktopState>) -> AppResult<()> {
+    crate::taskbar::reset_index();
     let service = state.indexer.clone();
     blocking(move || service.reindex_vectors()).await
 }

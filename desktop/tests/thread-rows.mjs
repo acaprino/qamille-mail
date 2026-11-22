@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { IDS, SUBJECT, withConversation } from './support/conversation-fixture.mjs';
+import { IDS, MARIA, ME, SUBJECT, withConversation } from './support/conversation-fixture.mjs';
 
 const port = 28174;
 const url = `http://127.0.0.1:${port}`;
@@ -352,6 +352,103 @@ try {
   await expect(messageBody()).toContainText('Budget is with Maria');
   for (const button of lockedActions) await expect(button).toBeDisabled();
   console.log('PASS A Sent reply stays locked after its conversation leaves the list');
+  await page.close();
+
+  // ---- phase 3, Task 6: the native menu of a row (docs/aspetto-nativo.md, rule 33) ----
+  // The preview has no native menu: its `show_row_menu` keeps what it was asked to show and answers
+  // with the entry the test prepared.
+  page = await open(fixture);
+  const rowMenu = (choice) =>
+    page.evaluate((value) => {
+      window.__previewRowMenu = { calls: [], choice: value };
+    }, choice);
+  const menuCalls = () => page.evaluate(() => window.__previewRowMenu.calls);
+  await rowMenu('archive');
+  // The app opens the first message at start: the conversation right-clicked is another one.
+  await expect(page.locator('.message-title')).toHaveCount(1);
+  await expect(row(page)).not.toHaveClass(/selected/);
+  const onShow = await page.locator('.message-title').innerText();
+  await page.evaluate(() => (window.__previewCalls = []));
+  const opener = row(page).locator('.mail-open');
+  const pointer = await opener.boundingBox();
+  await opener.click({ button: 'right' });
+  await expect(row(page)).toHaveCount(0);
+  assert.ok(
+    await page.evaluate(() => !!document.activeElement?.matches('.mail-row .mail-open')),
+    'the focus moves on to the next row, not to the page',
+  );
+  let shown = await menuCalls();
+  assert.equal(shown.length, 1, 'one right-click, one menu');
+  const offered = shown[0].items.map((item) => item.value);
+  for (const value of ['reply', 'reply-all', 'forward', 'archive', 'moveToTrash', 'markAsDone', 'snooze', 'pin'])
+    assert.ok(offered.includes(value), `the row offers ${value}: ${offered}`);
+  assert.ok(!offered.includes('moveToInbox'), 'an Inbox row has nothing to move back');
+  assert.ok(Math.abs(shown[0].x - (pointer.x + pointer.width / 2)) <= 1, `under the pointer (x ${shown[0].x})`);
+  assert.ok(Math.abs(shown[0].y - (pointer.y + pointer.height / 2)) <= 1, `under the pointer (y ${shown[0].y})`);
+  assert.equal(
+    (await page.evaluate(() => window.__previewCalls)).filter((name) => name === 'queue_mail_action').length,
+    4,
+    'Archive takes the messages of the conversation the Inbox holds, not the Sent reply',
+  );
+  assert.equal(await page.locator('.message-title').innerText(), onShow, 'the reader keeps the message it showed');
+  assert.ok(!(await page.evaluate(() => window.__previewCalls)).includes('read_mail'), 'the row was not opened');
+  console.log('PASS A right-click on a row opens the native menu; Archive archives that conversation without opening it');
+
+  // Two ticked rows: the menu is for both of them, with the group actions only.
+  const ticks = page.locator('.mail-row .mail-checkbox');
+  await ticks.nth(0).check();
+  await ticks.nth(1).check();
+  await rowMenu(null);
+  await page.locator('.mail-row').nth(1).locator('.mail-open').click({ button: 'right' });
+  await expect.poll(async () => (await menuCalls()).length).toBe(1);
+  const group = (await menuCalls())[0].items.map((item) => item.value);
+  assert.ok(!group.includes('reply') && !group.includes('forward') && group.includes('archive'), `group actions only: ${group}`);
+  await expect(ticks.nth(0)).toBeChecked();
+  console.log('PASS On ticked rows the menu offers only what applies to all of them');
+  await page.close();
+
+  // Shift+F10 on the row with the focus: the menu opens below the row, and the focus comes back to it.
+  page = await open(fixture);
+  await page.getByRole('tab', { name: 'All', exact: true }).click();
+  const focused = page.locator('.mail-row').first();
+  const wasUnread = /\bunread\b/.test(await focused.getAttribute('class'));
+  await rowMenu(wasUnread ? 'markAsSeen' : 'markAsUnseen');
+  // The native menu holds the keyboard while it is open: the focus is not on the row meanwhile.
+  await page.evaluate(() => (window.__previewCommandDelay = { show_row_menu: 600 }));
+  await focused.locator('.mail-open').focus();
+  const below = await focused.boundingBox();
+  await page.keyboard.press('Shift+F10');
+  await page.locator('.mail-list h1').focus();
+  await expect.poll(async () => (await menuCalls()).length).toBe(1);
+  shown = await menuCalls();
+  assert.ok(Math.abs(shown[0].x - (below.x + 16)) <= 1, `16 px from the left edge of the row (x ${shown[0].x}, row ${below.x})`);
+  assert.ok(Math.abs(shown[0].y - (below.y + below.height)) <= 1, `below the row (y ${shown[0].y}, row ${below.y}+${below.height})`);
+  if (wasUnread) await expect(focused).not.toHaveClass(/\bunread\b/);
+  else await expect(focused).toHaveClass(/\bunread\b/);
+  await expect(focused.locator('.mail-open')).toBeFocused();
+  console.log('PASS Shift+F10 opens the menu below the focused row, and the focus comes back to the row');
+  await page.close();
+
+  // Reply all from the menu of a message that is not open: its recipients are read for the composer.
+  page = await open(fixture);
+  await page.getByRole('button', { name: 'Emails', exact: true }).click();
+  const many = page.locator('.mail-row.unread', { hasText: SUBJECT });
+  await expect(many).toHaveCount(1);
+  await expect(many).not.toHaveClass(/selected/);
+  await rowMenu('reply-all');
+  await many.locator('.mail-open').click({ button: 'right' });
+  const toField = page.getByRole('combobox', { name: 'To', exact: true });
+  await expect(toField).toBeVisible();
+  const toChips = await page
+    .locator('.field-row')
+    .filter({ has: toField })
+    .locator('[data-scope="tags-input"][data-part="item-preview"]')
+    .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('title')));
+  assert.ok(toChips.some((entry) => entry.includes(MARIA[1])), `the sender is in To: ${toChips}`);
+  assert.ok(toChips.some((entry) => entry.includes('guest9@example.test')), `the other recipients are in To: ${toChips}`);
+  assert.ok(!toChips.some((entry) => entry.includes(ME)), 'the reader is not in To');
+  await expect(many).not.toHaveClass(/selected/);
+  console.log('PASS Reply all from the menu of a row that is not open writes to everyone');
   await page.close();
 
   assert.deepEqual(errors, []);

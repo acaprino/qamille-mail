@@ -461,6 +461,7 @@ export async function previewCommand(
         labels: labels(),
         has_ai_key: false,
         has_google_secret: false,
+        credentials_set_aside: window.__previewVault?.notice ?? null,
         counts: {
           Inbox: view.emails.filter((e) => inbox(e) && !e.read).length,
           Tasks: view.emails.filter((e) => (e.pinned || e.due || e.set_aside) && !e.done).length,
@@ -658,6 +659,18 @@ export async function previewCommand(
         action: String(args.action),
         value: args.value ? String(args.value) : null,
       });
+    case 'show_row_menu': {
+      // No native menu here: keep what was asked and answer the entry the test prepared
+      // (`__previewRowMenu`, declared in lib/row-menu.ts). Without one, the menu closes unchosen.
+      const menu = (window.__previewRowMenu ??= { calls: [], choice: null });
+      type Shown = (typeof menu.calls)[number];
+      menu.calls.push({
+        items: structuredClone(args.items) as Shown['items'],
+        x: Number(args.x),
+        y: Number(args.y),
+      });
+      return menu.choice;
+    }
     case 'queue_draft_action': {
       const draft_id = Number(args.id);
       if (args.action === 'send') return queue({ kind: 'send_draft', draft_id });
@@ -762,6 +775,20 @@ export async function previewCommand(
       store.settings.meeting_engine = meetingEngine(store.settings.meeting_engine);
       return;
     }
+    // Background presence (src-tauri/src/background.rs): a browser has no tray and no sign-in entry.
+    case 'close_to_tray_get':
+      return true;
+    case 'close_to_tray_set':
+    case 'restore_main_window':
+      return;
+    case 'autostart_status':
+    case 'autostart_set':
+      return { enabled: false, supported: false };
+    // The undo queue at quit (lib/undo-close.ts): the preview sends nothing, so nothing is left.
+    case 'undo_send_now':
+      return { remaining: 0, sends: 0, sending: 0, actions: 0, confirming: 0 };
+    case 'undo_quit_anyway':
+      return true;
     case 'list_events':
       return structuredClone(store.events);
     case 'save_event': {
@@ -817,6 +844,13 @@ export async function previewCommand(
         message: 'The browser preview cannot save attachments. Open the desktop app.',
         code: 'preview_unsupported',
       };
+    case 'saved_file_open':
+    case 'saved_file_reveal':
+      // A save here is a download and gives no token: only a test that fakes one reaches these.
+      throw {
+        message: 'The browser preview cannot open saved files. Open the desktop app.',
+        code: 'preview_unsupported',
+      };
     case 'attachment_preview_source':
       throw {
         message: 'The browser preview cannot read attachment files. Open the desktop app.',
@@ -853,6 +887,14 @@ export async function previewCommand(
     case 'legacy_local_dismiss':
       if (window.__previewLegacy) window.__previewLegacy.dismissed = true;
       return;
+    // phase 3, Task 7: the key of the credentials
+    case 'vault_status':
+    case 'vault_set_transfer_passphrase':
+    case 'vault_remove_transfer_passphrase':
+    case 'vault_unlock':
+    case 'vault_start_over':
+    case 'vault_dismiss_set_aside':
+      return (await import('./preview-vault')).previewVault(command, args);
     case 'search_model_status':
       return { installed: false, running: false, done_bytes: 0, total_bytes: 0, error: null };
     case 'indexing_status': {
@@ -881,6 +923,11 @@ export async function previewCommand(
           : null,
       }));
     }
+    // Windows notifications (components/NotificationSettings.tsx): the preview shows none.
+    case 'notifications_get':
+      return { enabled: false, new_mail: true, scheduled_send: true, sign_in: true, portable: true, supported: false };
+    case 'notifications_set':
+      return;
     case 'set_include_spam_trash': {
       const account = store.accounts.find((a) => a.id === Number(args.accountId));
       if (!account) throw new Error('Account not found');
@@ -948,6 +995,15 @@ export async function previewCommand(
       return previewServer(command, args);
     case 'configure_indexing':
       throw new Error('Open the desktop app to configure local mail indexing.');
+    // mailto: links from outside the page (src-tauri/src/launch_args.rs, mail_handler.rs): a browser
+    // has no other program to hand one over, and no Windows to offer Qamille to.
+    case 'take_launch_mailto':
+      return null;
+    case 'mail_handler_status':
+      return { registered: false, name: 'Qamille', installed: false, supported: false, chosen: false };
+    case 'mail_handler_register':
+    case 'mail_handler_unregister':
+      throw new Error('Open the desktop app to choose Qamille for mailto links.');
     case 'open_link':
       window.open(String(args.url), '_blank', 'noopener,noreferrer');
       return;
@@ -1199,6 +1255,13 @@ function previewServer(command: string, args: Record<string, unknown>) {
       return { kind: agreed ? 'ready' : 'consent_needed', label, external };
     }
     case 'server_connect':
+      // Phase 3, Task 7: a vault that the transfer passphrase opens refuses the sign-in first.
+      if (window.__previewVault?.state === 'locked' && window.__previewVault.transfer)
+        throw {
+          code: 'vault_locked',
+          message:
+            'The credentials key belongs to another Windows user or another computer: enter the transfer passphrase in Settings, or sign in to the accounts again.',
+        };
       return connect(args.url);
     case 'server_change_temporary_password':
       return connect(args.url, true);

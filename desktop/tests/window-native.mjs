@@ -1,18 +1,39 @@
-// Exercise the real window controls against an isolated sample workspace.
+// Exercise the real window controls against an isolated sample workspace, on the built exe
+// (release/Qamille.exe, or QAMILLE_NATIVE_EXE), with Qamille closed. Run: node tests/window-native.mjs
 import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
+import { promisify } from 'node:util';
+import { assertNoQamilleWindow, executable as builtExecutable } from './support/native-app.mjs';
+
+const WS_SIZEBOX = 0x00040000;
+/** The main window as Windows sees it (support/win-windows.ps1), also while it is minimized. */
+async function mainWindowOf(pid) {
+  const { stdout } = await promisify(execFile)('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+    '-File', path.join(import.meta.dirname, 'support/win-windows.ps1'), 'windows', String(pid)], { windowsHide: true });
+  return [JSON.parse(stdout.trim() || '[]')].flat().find((w) => w.cls !== '#32770' && w.title.startsWith('Qamille'));
+}
 
 const root = path.resolve(import.meta.dirname, '../..');
 const data = path.join(root, 'checks/window-controls', `native-${Date.now()}`);
 await fs.mkdir(data, { recursive: true });
-const executable = path.join(root, 'app/target/debug/qamille-desktop.exe');
+// The X closes Qamille here, as before the tray (src-tauri/src/background.rs).
+await fs.writeFile(path.join(data, 'background.json'), JSON.stringify({ close_to_tray: false, tray_notice_shown: true }));
+// The interface language comes from the workspace's regional setting (as in support/native-app.mjs).
+const seed = JSON.parse(await fs.readFile(path.join(root, 'desktop/src/lib/sample.json'), 'utf8'));
+seed.settings = { ...seed.settings, locale: 'en-US' };
+await fs.writeFile(path.join(data, 'store.json'), JSON.stringify(seed));
+const executable = builtExecutable();
+await assertNoQamilleWindow();
 const port = 40000 + Math.floor(Math.random() * 10000);
+// As support/native-app.mjs: every outgoing HTTP(S) request of the Rust side goes to a dead proxy.
+const dead = 'http://127.0.0.1:9';
 const options = {
   cwd: root, windowsHide: true, stdio: 'pipe',
   env: { ...process.env, QAMILLE_DATA: data, QAMILLE_DEMO: '1',
+    HTTP_PROXY: dead, HTTPS_PROXY: dead, ALL_PROXY: dead, NO_PROXY: '',
     WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}`,
     WEBVIEW2_USER_DATA_FOLDER: path.join(data, 'webview') },
 };
@@ -44,8 +65,10 @@ try {
   await page.locator('.compose-main').waitFor();
   const controls = page.getByRole('group', { name: 'Window controls' });
   await expect(controls.getByRole('button')).toHaveCount(3);
-  assert.equal(await windowCall('is_decorated'), false);
-  assert.equal(await windowCall('is_resizable'), true);
+  // The page may ask the window plugin only for is_maximized (capabilities/main.json, rule 20). The page's
+  // own bar replaces Windows' title bar (the three buttons above); that the window still resizes is its
+  // WS_SIZEBOX style, read from Windows.
+  assert.ok(((await mainWindowOf(child.pid)).style & WS_SIZEBOX) !== 0, 'the window can be resized');
   await page.screenshot({ path: path.join(data, 'borderless-light.png') });
   console.log('PASS native window has no decorations and remains resizable');
 
@@ -62,17 +85,17 @@ try {
   console.log('PASS maximize, restore and header double-click');
 
   await controls.getByRole('button', { name: 'Minimize window', exact: true }).click();
-  await expect.poll(() => windowCall('is_minimized')).toBe(true);
+  await expect.poll(async () => (await mainWindowOf(child.pid))?.minimized).toBe(true);
   // The existing single-instance handler restores the test window.
   const second = spawn(executable, [], options);
   await new Promise((resolve, reject) => { second.on('exit', resolve); second.on('error', reject); });
-  await expect.poll(() => windowCall('is_minimized')).toBe(false);
+  await expect.poll(async () => (await mainWindowOf(child.pid))?.minimized).toBe(false);
   await page.getByRole('button', { name: 'Toggle dark appearance' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await page.screenshot({ path: path.join(data, 'borderless-dark.png') });
   console.log('PASS minimize, restore on relaunch and dark appearance');
 
-  await page.getByTitle('Settings', { exact: true }).click();
+  await page.locator('aside button.profile').click(); // the profile button opens Settings
   await page.getByRole('textbox', { name: 'Your name', exact: true }).fill('Unsaved window test');
   await controls.getByRole('button', { name: 'Close window', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Save your changes?' })).toBeVisible();

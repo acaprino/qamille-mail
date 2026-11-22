@@ -130,12 +130,22 @@ mod outgoing_snapshot_tests {
 }
 
 pub struct KeyringSecrets;
+/// A vault message with its code (`vault_codes`), for the interface to word it.
+pub fn vault_error(message: String) -> AppError {
+    AppError::new(secret::error_code(&message), message)
+}
 impl SecretStore for KeyringSecrets {
     fn get(&self, key: &str) -> AppResult<String> {
-        secret::get_result(key).map_err(AppError::external)
+        secret::get_result(key).map_err(vault_error)
     }
     fn set(&self, key: &str, value: &str) -> AppResult<()> {
-        secret::set(key, value).map_err(AppError::external)
+        secret::set(key, value).map_err(vault_error)
+    }
+    fn check_writable(&self) -> AppResult<()> {
+        secret::check_writable().map_err(vault_error)
+    }
+    fn set_aside_notice(&self) -> Option<String> {
+        secret::set_aside_notice()
     }
 }
 
@@ -166,8 +176,9 @@ impl MailGateway for GmailGateway {
     fn save_remote_draft(&self, account: &Account, draft: &crate::domain::outbox::RemoteDraft) -> AppResult<crate::domain::outbox::RemoteDraft> { super::gmail_drafts::save(account, draft) }
     fn delete_remote_draft(&self, account: &Account, id: &str) -> AppResult<()> { super::gmail_drafts::delete(account, id) }
     fn sync_with_policy(&self, account: &Account, request: &SyncRequest<'_>) -> AppResult<PolicySyncBatch> {
+        // Google's refusal of the sign-in keeps its code (`sign_in_expired`) through the IMAP error.
         super::mail_cache_download::sync_account_policy(account, &self.attachments, request)
-            .map_err(AppError::external)
+            .map_err(oauth::provider_error)
     }
     fn load_body(&self, account: &Account, email: &Email) -> AppResult<Email> {
         super::mail_cache_download::download_body(account, email).map_err(AppError::external)
@@ -216,8 +227,8 @@ impl MailGateway for GmailGateway {
                 trash_folder: None,
             });
         }
-        let emails = mail::sync_account(a, &self.attachments, 0).map_err(AppError::external)?;
-        let (archive_folder, trash_folder) = mail::gmail_folders(a).map_err(AppError::external)?;
+        let emails = mail::sync_account(a, &self.attachments, 0).map_err(oauth::provider_error)?;
+        let (archive_folder, trash_folder) = mail::gmail_folders(a).map_err(oauth::provider_error)?;
         Ok(SyncBatch { emails, archive_folder, trash_folder })
     }
     fn apply(&self, a: &Account, uid: u32, action: RemoteAction) -> AppResult<()> {

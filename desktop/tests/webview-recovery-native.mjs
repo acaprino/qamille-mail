@@ -39,9 +39,15 @@ async function win(action, target, message = 0, wparam = 0) {
 async function processes(name) {
   const { stdout } = await run('powershell.exe', [
     '-NoProfile', '-NonInteractive', '-Command',
-    `@(Get-CimInstance Win32_Process -Filter "Name='${name}'" | Select-Object ProcessId, CommandLine) | ConvertTo-Json -Compress`,
+    `@(Get-CimInstance Win32_Process -Filter "Name='${name}'" | Select-Object ProcessId, CommandLine, ExecutablePath) | ConvertTo-Json -Compress`,
   ], { windowsHide: true, maxBuffer: 1 << 24 });
   return [JSON.parse(stdout.trim() || '[]')].flat();
+}
+
+/** Processes of the exe under test only, by its full path: never another copy with the same name. */
+async function copiesOfTheExe() {
+  const exe = executable().toLowerCase();
+  return (await processes(path.basename(executable()))).filter((p) => (p.ExecutablePath ?? '').toLowerCase() === exe);
 }
 
 /** The WebView2 processes of this workspace's profile (its folder is on their command line). */
@@ -162,9 +168,8 @@ try {
     assert.match(dialog.title, /restart/, `dialog title ${dialog.title}`);
     await win('post', dialog.hwnd, TDM_CLICK_BUTTON, FIRST_BUTTON);
     await until('the old process to exit', async () => child.exitCode !== null, 20000);
-    const name = path.basename(executable());
     const restarted = await until('the restarted process', async () =>
-      (await processes(name)).find((p) => p.ProcessId !== child.pid && !/--(mcp|worker)/.test(p.CommandLine ?? '')));
+      (await copiesOfTheExe()).find((p) => p.ProcessId !== child.pid && !/--(mcp|worker)/.test(p.CommandLine ?? '')));
     restartedPid = restarted.ProcessId;
     current = await drawnPage(port);
     assert.ok(await mainWindowOf(restartedPid), 'the restarted Qamille has no window');
@@ -173,12 +178,11 @@ try {
   await step('7. closing Qamille normally ends WebView2 without any recovery dialog', async () => {
     await current.page.evaluate(() => window.__TAURI_INTERNALS__.invoke('plugin:window|close', { label: 'main' })).catch(() => {});
     await current.browser.close().catch(() => {});
-    const name = path.basename(executable());
     const end = Date.now() + 15000;
     for (;;) {
       const dialog = (await win('windows', restartedPid).catch(() => [])).find((w) => w.cls === '#32770');
       assert.equal(dialog, undefined, `a dialog opened while closing: ${dialog?.title}`);
-      if (!(await processes(name)).some((p) => p.ProcessId === restartedPid)) break;
+      if (!(await copiesOfTheExe()).some((p) => p.ProcessId === restartedPid)) break;
       assert.ok(Date.now() < end, 'Qamille did not exit after its window closed');
       await delay(200);
     }

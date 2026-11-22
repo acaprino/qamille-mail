@@ -239,7 +239,9 @@ salva file: non dà un token, e la notifica non ha azioni.
       dopo Invia; e un invio ancora in corso fa comparire la domanda («is being sent… check Sent»). Con la rete
       staccata la prima prova è **fallita** (nessuna domanda, l'invio fallito durante l'attesa e Qamille uscito); dopo la
       correzione *osservato*: «1 message was not sent: it is still in Drafts.», «Stay open» tiene Qamille aperto con la
-      finestra in vista e la mail nelle Bozze.
+      finestra in vista e la mail nelle Bozze; un errore di prima non si conta di nuovo. A fine sessione con la finestra
+      nella tray: nessuna domanda, una riga «session end: 1 send(s) failed while waiting and are in Drafts, …» in
+      `native.log`.
     - **C.** Ripristino dalla tray, da una seconda istanza a finestra nascosta e da ridotta a icona: finestra disegnata,
       davanti, con il focus; CPU di `msedgewebview2` in 10 s più bassa a finestra nascosta. *Osservato*: la finestra
       torna e la pagina passa a `visible` (a nascosta era `hidden`) in tutti e tre i modi. *Da fare*: davanti e con il
@@ -252,8 +254,8 @@ salva file: non dà un token, e la notifica non ha azioni.
     - **E.** Posizione: stesso posto dopo la riapertura; `x` a 99999 → al centro del monitor principale; ingrandita →
       riapre ingrandita senza un fotogramma alla misura normale, anche con `--autostart` e il primo ripristino.
       *Osservato*. La prima prova ha mostrato che al primo show ingrandito la finestra spariva per 16-44 ms e ricompariva;
-      dopo la correzione (`DWMWA_CLOAK`) lo stesso controllo, ogni millisecondo, vede la finestra comparire una volta
-      sola, già ingrandita. *Da fare*: secondo monitor (ce n'è uno solo).
+      dopo la correzione (`DWMWA_CLOAK` in un guard, controllo 28) lo stesso controllo, ogni millisecondo, vede la
+      finestra comparire una volta sola, già ingrandita, sia all'avvio sia con `--autostart` e il primo ripristino. *Da fare*: secondo monitor (ce n'è uno solo).
     - **F.** Notifiche con account finti: un invio programmato che fallisce (SMTP su `127.0.0.1:1`) e un account senza
       password (`sign_in_required`) → due notifiche col nome e l'icona di Qamille; il clic riporta la finestra sulla
       bozza o sulle Impostazioni. *Osservato*: chiave AUMID con `DisplayName` Qamille e `IconUri`, i due toast nel centro

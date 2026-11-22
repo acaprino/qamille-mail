@@ -140,6 +140,13 @@ Qamille, per decisione del proprietario, non ha librerie proprie di comportament
 
 ## Global Constraints
 
+> **Regola del proprietario (2026-11-22, prevale su tutto ciò che segue): «lavora direttamente in develop», «no worktrees».**
+> - Niente ramo `qamille-sigrid`, niente rami `sigrid/*`, niente worktree: ogni task fa i suoi commit su `develop`, nella cartella del repository, aggiungendo solo i propri file.
+> - Dove sotto si legge `qamille-sigrid` o `sigrid/wave-c`, vale `develop`. L'ondata C si fa su `develop` un task dopo l'altro, nell'ordine 10, 11, 12, 13, 14, 15; il Task 16 non unisce rami ma fa le prove dell'app intera alla fine dell'ondata.
+> - In mezzo `develop` ha due copie di Zag e di Motion (quelle di Qamille e quelle dentro Sigrid), e tra un task e l'altro dell'ondata C l'app può avere superfici delle due librerie: per questo **nessuna release `develop` → `main` finché il Task 20 non toglie Ark e Motion di Qamille**, salvo decisione del proprietario.
+> - In parallelo solo task con file separati; un solo agente alla volta lancia i test del browser e `visual-snapshot` (porte fisse).
+
+
 - **Solo Sigrid** (regola del proprietario, 2026-11-22).
   - **Che cosa è vietato.** Nessun file di Qamille importa `@ark-ui/*`, `@base-ui/*`, `motion`/`motion/*`, `lucide-react`, `@fluentui/*`, `clsx`, `class-variance-authority`, `tailwind-merge`, `@internationalized/date` o `tw-animate-css`.
   - **Durante la migrazione.** Li importano ancora solo i file elencati in `PENDING` di `tests/only-sigrid.mjs`: `src/ds/**` e i file che usano Motion direttamente. L'elenco si accorcia e non si allunga mai: un import nuovo fuori elenco fa fallire il test, dal Task 1.
@@ -194,6 +201,13 @@ Qamille, per decisione del proprietario, non ha librerie proprie di comportament
 - **Build di release** (Task 21): `build-release.bat --no-install`, oppure `npm run build` in `desktop/` e poi `cargo build --manifest-path desktop/src-tauri/Cargo.toml --release --features custom-protocol --locked --jobs 1`. Prima di usare l'exe, controllare che contenga `theme-boot.js`.
 
 ## Lavoro in parallelo
+
+> **Regola del proprietario (2026-11-22, prevale su tutto ciò che segue): «lavora direttamente in develop», «no worktrees».**
+> - Niente ramo `qamille-sigrid`, niente rami `sigrid/*`, niente worktree: ogni task fa i suoi commit su `develop`, nella cartella del repository, aggiungendo solo i propri file.
+> - Dove sotto si legge `qamille-sigrid` o `sigrid/wave-c`, vale `develop`. L'ondata C si fa su `develop` un task dopo l'altro, nell'ordine 10, 11, 12, 13, 14, 15; il Task 16 non unisce rami ma fa le prove dell'app intera alla fine dell'ondata.
+> - In mezzo `develop` ha due copie di Zag e di Motion (quelle di Qamille e quelle dentro Sigrid), e tra un task e l'altro dell'ondata C l'app può avere superfici delle due librerie: per questo **nessuna release `develop` → `main` finché il Task 20 non toglie Ark e Motion di Qamille**, salvo decisione del proprietario.
+> - In parallelo solo task con file separati; un solo agente alla volta lancia i test del browser e `visual-snapshot` (porte fisse).
+
 
 ### Ondate
 

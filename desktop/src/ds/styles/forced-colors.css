@@ -83,28 +83,23 @@
     border-color: GrayText;
   }
 
-  /* Task 4: switch. The track and the thumb are backgrounds only. */
-  button[role='switch'] {
-    border: 1px solid ButtonText;
-  }
-  button[role='switch'] [data-part='fill'],
-  button[role='switch'] [data-part='thumb'] {
+  /* Task 4: switch (Sigrid's). The track and the thumb are backgrounds only. */
+  [data-slot='switch-control'] {
     forced-color-adjust: none;
+    border: 1px solid ButtonText;
+    background-color: ButtonFace;
   }
-  button[role='switch'][aria-checked='true'] [data-part='fill'] {
-    background-color: Highlight !important;
-    opacity: 1 !important;
+  [data-slot='switch-control'][data-state='checked'] {
+    background-color: Highlight;
   }
-  button[role='switch'][aria-checked='false'] [data-part='fill'] {
-    opacity: 0 !important;
+  [data-slot='switch-thumb'] {
+    forced-color-adjust: none;
+    background-color: ButtonText;
   }
-  button[role='switch'] [data-part='thumb'] {
-    background-color: ButtonText !important;
+  [data-slot='switch-control'][data-state='checked'] [data-slot='switch-thumb'] {
+    background-color: HighlightText;
   }
-  button[role='switch'][aria-checked='true'] [data-part='thumb'] {
-    background-color: HighlightText !important;
-  }
-  button[role='switch']:disabled {
+  [data-slot='switch-control'][data-disabled] {
     border-color: GrayText;
   }
 

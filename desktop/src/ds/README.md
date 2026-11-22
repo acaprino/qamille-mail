@@ -73,7 +73,7 @@ Sono diciassette componenti più l’icona. La loro forma è fissata: cambiare u
 | `Tooltip` | Ark `Tooltip` | `text`; `shortcut?`; `children` (l’unico elemento che fa da attivatore) | `styles/ark.css` |
 | `Select` | Ark `Select` | `value` (`''` = niente); `onChange?`; `items` (`{ value, label, disabled? }[]`); `label?` o `aria-label`; `placeholder?`; `aria-required?`; `aria-invalid?`; `disabled?`; `className?` | `styles/ark/select.css` |
 | `Checkbox` | Ark `Checkbox` | `checked`; `onChange?`; `indeterminate?`; `disabled?`; `aria-label?`; `children` (etichetta) | `styles/ark/checkbox.css` |
-| `Switch` | Apple Switch di unlumen | `checked`; `onChange?`; `disabled?`; `aria-label?`; `children` (etichetta) | `styles/ark/switch.css` e `unlumen/apple-switch.tsx` |
+| `Switch` | `Switch` di Sigrid (`src/ui/Switch.tsx`) | `checked`; `onChange?`; `disabled?`; `aria-label?`; `children` (etichetta) | — |
 | `Tabs` | Ark `Tabs` e Motion | `value`; `onChange?`; `items` (`{ value, label, count?, className?, props? }[]`); `aria-label`; `variant?` (`underline`, `segment`, `plain`); `activation?` (`automatic`, `manual`); `ids?`; `onPick?`; `tab?`; `after?` | `styles/ark/tabs.css` |
 | `Slider` | Ark `Slider` | `value`; `onChange?`; `min`; `max`; `step?` (1); `aria-label` | `styles/ark/slider.css` |
 | `DateField` | Ark `DatePicker` | `value` (`'YYYY-MM-DD'` o `''`); `onChange?`; `aria-label`; `min?`; `max?`; `locale?` (`en-US`); `disabled?`; `translations?` | `styles/ark/date-picker.css` |

@@ -244,7 +244,9 @@ for (const file of words(DS, /\.(tsx?|js|css)$/)) {
       const bridge =
         rel === 'ds/styles/tailwind.css' &&
         [path.join(root, 'theme'), path.join(root, '..', 'vendor', 'sigrid')].some((home) => resolved.startsWith(`${home}${path.sep}`));
-      if (!bridge && resolved !== DS && !resolved.startsWith(`${DS}${path.sep}`)) problems.push(`${rel}:${index + 1}  imports ${target}: the module does not reach into the app`);
+      // The primitives drawn by Sigrid are re-exported from src/ui until src/ds goes (Task 20).
+      const reexport = rel.startsWith('ds/primitives/') && resolved.startsWith(`${path.join(root, 'ui')}${path.sep}`);
+      if (!bridge && !reexport && resolved !== DS && !resolved.startsWith(`${DS}${path.sep}`)) problems.push(`${rel}:${index + 1}  imports ${target}: the module does not reach into the app`);
     }
   });
 }

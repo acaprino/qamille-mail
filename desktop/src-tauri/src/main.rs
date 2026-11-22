@@ -34,6 +34,10 @@ mod row_menu;
 // phase 3, Task 8: modules
 mod updates;
 
+// The registry key of each test that writes the registry.
+#[cfg(all(test, windows))]
+mod test_registry;
+
 use commands::{accounts::*, activity::*, assistant::*, document_preview::*, drafts::*, mail::*, undo::*, workspace::*};
 use tauri::{Emitter, Manager};
 use commands::meetings::*;

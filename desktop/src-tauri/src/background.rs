@@ -581,31 +581,22 @@ pub fn restore_main_window(app: AppHandle) {
 mod tests {
     use super::startup::{self, StartupKeys};
     use crate::background_rules::{APPROVED_ON, run_command};
+    use crate::test_registry::ScratchKey;
 
-    /// A key of its own under `HKCU\Software`, removed with everything in it when the test ends:
-    /// the tests never touch Windows' own `Run` key, nor the entries of the owner's copies.
+    /// The test's own key (`test_registry`), with a `Run` and a `StartupApproved\Run` under it: the
+    /// tests never touch Windows' own `Run` key, nor the entries of the owner's copies.
     struct Scratch {
         run: String,
         approved: String,
-        root: String,
+        _key: ScratchKey,
     }
     impl Scratch {
         fn new(test: &str) -> Self {
-            let root = format!(r"Software\Qamille tests\startup-{test}-{}", std::process::id());
-            Self { run: format!(r"{root}\Run"), approved: format!(r"{root}\StartupApproved\Run"), root }
+            let key = ScratchKey::new("background", test);
+            Self { run: key.under("Run"), approved: key.under(r"StartupApproved\Run"), _key: key }
         }
         fn keys(&self) -> StartupKeys<'_> {
             StartupKeys { run: &self.run, approved: &self.approved }
-        }
-    }
-    impl Drop for Scratch {
-        fn drop(&mut self) {
-            use windows::Win32::System::Registry::{HKEY_CURRENT_USER, RegDeleteKeyW, RegDeleteTreeW};
-            unsafe {
-                let _ = RegDeleteTreeW(HKEY_CURRENT_USER, &windows::core::HSTRING::from(self.root.as_str()));
-                // The parent goes with the last test: it cannot be deleted while another test's key is in it.
-                let _ = RegDeleteKeyW(HKEY_CURRENT_USER, windows::core::w!(r"Software\Qamille tests"));
-            }
         }
     }
 

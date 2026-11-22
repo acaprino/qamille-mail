@@ -504,28 +504,13 @@ mod tests {
         }
     }
 
-    /// A key of its own under `HKCU\Software`, removed with everything in it when the test ends: the
-    /// tests never touch `Software\Classes`, nor the identities of the owner's copies.
-    #[cfg(windows)]
-    struct Scratch(String);
-    #[cfg(windows)]
-    impl Drop for Scratch {
-        fn drop(&mut self) {
-            use windows::Win32::System::Registry::{HKEY_CURRENT_USER, RegDeleteKeyW, RegDeleteTreeW};
-            unsafe {
-                let _ = RegDeleteTreeW(HKEY_CURRENT_USER, &windows::core::HSTRING::from(self.0.as_str()));
-                let _ = RegDeleteKeyW(HKEY_CURRENT_USER, &windows::core::HSTRING::from(self.0.as_str()));
-                // The parent goes with the last test: it cannot be deleted while another test's key is in it.
-                let _ = RegDeleteKeyW(HKEY_CURRENT_USER, windows::core::w!(r"Software\Qamille tests"));
-            }
-        }
-    }
-
     #[cfg(windows)]
     #[test]
     fn the_identity_is_written_with_its_name_and_icon_and_taken_away() {
-        let scratch = Scratch(format!(r"Software\Qamille tests\aumid-{}", std::process::id()));
-        let root = scratch.0.as_str();
+        // The test's own key (`test_registry`): the tests never touch `Software\Classes`, nor the
+        // identities of the owner's copies.
+        let scratch = crate::test_registry::ScratchKey::new("notifications", "identity");
+        let root = scratch.path();
         let aumid = "com.qamille.desktop.workspace00000000000000aa";
         assert_eq!(identity::value(root, aumid, "DisplayName"), None);
         // Twice is fine, before and after.

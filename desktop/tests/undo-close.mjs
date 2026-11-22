@@ -53,7 +53,7 @@ test('a send that did not leave asks, and keeping Qamille open vetoes', async ()
     assert.equal(await createUndoQueueGuard(fake.call)(), closes);
     // The window comes back first (Esci from the tray: it is hidden), so the question is seen with it.
     assert.deepEqual(fake.commands(), ['undo_send_now', 'restore_main_window', 'undo_quit_anyway']);
-    assert.deepEqual(fake.log[2].args, { left: { sends: 1, sending: 1, actions: 1, confirming: 0 }, failed: 0 });
+    assert.deepEqual(fake.log[2].args, { left: { sends: 1, sending: 1, actions: 1, confirming: 0, failed: 0 } });
   }
 });
 
@@ -67,7 +67,7 @@ test('a send that failed while Qamille waited to quit asks too, and says so', as
   });
   assert.equal(await createUndoQueueGuard(fake.call)(), false);
   assert.deepEqual(fake.commands(), ['undo_send_now', 'restore_main_window', 'undo_quit_anyway']);
-  assert.deepEqual(fake.log[2].args, { left: { sends: 0, sending: 0, actions: 0, confirming: 0 }, failed: 1 });
+  assert.deepEqual(fake.log[2].args, { left: { sends: 0, sending: 0, actions: 0, confirming: 0, failed: 1 } });
 });
 
 test('session end sends only when the session really ends', async () => {
@@ -78,10 +78,14 @@ test('session end sends only when the session really ends', async () => {
   assert.deepEqual(fake.commands(), []);
   // It ends: the queue leaves now, without waiting here (the other steps still have to run).
   await step(true);
-  assert.deepEqual(fake.log, [{ command: 'undo_send_now', args: { waitMs: 0 } }]);
-  // Then, once every step ran, the queue gets what is left of the ~8 s Windows waits.
+  // `sessionEnd` on both calls: Rust keeps what this one made due, so a send failing before the
+  // second call still reaches the log line.
+  assert.deepEqual(fake.log, [{ command: 'undo_send_now', args: { waitMs: 0, sessionEnd: true } }]);
+  // Then, once every step ran, the queue gets what is left of the ~8 s Windows waits. Nobody can
+  // answer now: what did not leave is only a line in native.log (`sessionEnd`), never a question.
   await settleUndoQueue(fake.call);
-  assert.deepEqual(fake.log[1], { command: 'undo_send_now', args: { waitMs: SESSION_END_WAIT_MS } });
+  assert.deepEqual(fake.log[1], { command: 'undo_send_now', args: { waitMs: SESSION_END_WAIT_MS, sessionEnd: true } });
+  assert.equal(fake.log.length, 2, 'no question at session end');
   assert.ok(SESSION_END_WAIT_MS > 0 && SESSION_END_WAIT_MS <= 5000);
 });
 

@@ -101,7 +101,7 @@ pub struct QueueLeft {
     /// Other actions being confirmed by the provider.
     pub confirming: u32,
     /// Sends that were queued when «Esci» asked and failed while it waited (no connection): they did
-    /// not leave, and their drafts are still in Drafts (`not_sent`).
+    /// not leave, and their drafts are still in Drafts (`UndoService::unsettled_since` in the `app` crate).
     pub failed: u32,
 }
 impl QueueLeft {
@@ -114,15 +114,6 @@ impl QueueLeft {
     }
 }
 
-/// The sends that «Esci» made due and that did not leave: of the drafts whose send was queued when it
-/// asked (`started`), the ones no longer queued (`queued`) whose draft is still there (`drafts`). A sent
-/// draft leaves Drafts; one still queued is counted with the queue. Each draft once.
-pub fn not_sent(started: &[u64], queued: &[u64], drafts: &[u64]) -> u32 {
-    let mut left: Vec<u64> = started.iter().copied().filter(|id| !queued.contains(id) && drafts.contains(id)).collect();
-    left.sort_unstable();
-    left.dedup();
-    u32::try_from(left.len()).unwrap_or(u32::MAX)
-}
 
 /// The question when «Esci» finds actions of the undo queue that did not leave
 /// (`commands::undo::undo_quit_anyway`): one line per kind, each saying what quitting anyway does to
@@ -165,6 +156,15 @@ pub fn unsent_text(italian: bool, left: QueueLeft) -> String {
         (false, n) => Some(format!("{n} mail actions have not been completed yet. If you quit, they will be completed the next time Qamille starts.")),
     };
     [failed, sending, sends, confirming, actions].into_iter().flatten().collect::<Vec<_>>().join("\n")
+}
+
+/// The `native.log` line at session end when the undo queue did not all leave (`undo_send_now` with
+/// `session_end`): nobody can answer then, so it is written down, never asked. English, like the
+/// rest of the log.
+pub fn session_end_line(failed: u32, sends: u32, sending: u32, actions: u32) -> String {
+    format!(
+        "session end: {failed} send(s) failed while waiting and are in Drafts, {sends} send(s) still queued for the next start, {sending} send(s) cut off on their way (check Sent), {actions} other action(s) left"
+    )
 }
 
 /// What to do with `Qamille-worker.vbs`, the startup file of the old background worker, now that
@@ -369,6 +369,14 @@ mod tests {
     }
 
     #[test]
+    fn session_end_writes_down_what_did_not_leave() {
+        assert_eq!(
+            session_end_line(1, 2, 0, 3),
+            "session end: 1 send(s) failed while waiting and are in Drafts, 2 send(s) still queued for the next start, 0 send(s) cut off on their way (check Sent), 3 other action(s) left"
+        );
+    }
+
+    #[test]
     fn a_send_that_failed_while_quitting_is_said_first_and_is_in_drafts() {
         // Network off: «Esci» made the send due, it failed during the wait, and the draft stayed. Never a
         // silent quit: the question says it did not leave and where it is.
@@ -386,15 +394,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn a_send_queued_when_quitting_began_whose_draft_is_still_there_did_not_leave() {
-        // Drafts of the sends queued when «Esci» asked: 7 failed (no longer queued, its draft still
-        // there), 8 left (a sent draft is gone), 9 is still queued (counted as queued, not here).
-        assert_eq!(not_sent(&[7, 8, 9], &[9], &[7, 9, 42]), 1);
-        assert_eq!(not_sent(&[7, 7], &[], &[7]), 1);
-        assert_eq!(not_sent(&[], &[], &[1, 2]), 0);
-        assert_eq!(not_sent(&[3], &[3], &[3]), 0);
-    }
 
     #[test]
     fn the_quit_entry_is_an_app_command_of_the_system_menu() {

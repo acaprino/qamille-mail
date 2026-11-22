@@ -38,8 +38,9 @@ export function createUndoQueueGuard(call: Call): CloseGuard {
   return async () => {
     const { remaining, sends, sending, actions, confirming, failed = 0 } = await call<SendResult>('undo_send_now', { waitMs: QUIT_WAIT_MS });
     if (remaining <= 0) return true;
+    // In view before the question, and still in view after «Resta aperto»: the person can open Drafts.
     await call('restore_main_window');
-    return await call<boolean>('undo_quit_anyway', { left: { sends, sending, actions, confirming }, failed });
+    return await call<boolean>('undo_quit_anyway', { left: { sends, sending, actions, confirming, failed } });
   };
 }
 
@@ -50,7 +51,7 @@ export function createUndoQueueGuard(call: Call): CloseGuard {
 export function createUndoQueueSessionEnd(call: Call): SessionEndStep {
   return async (last) => {
     if (!last) return true;
-    await call<SendResult>('undo_send_now', { waitMs: 0 });
+    await call<SendResult>('undo_send_now', { waitMs: 0, sessionEnd: true });
     return true;
   };
 }
@@ -59,5 +60,6 @@ export function createUndoQueueSessionEnd(call: Call): SessionEndStep {
  *  answer then: what is still queued goes at the next start, and what is still on its way when
  *  Windows ends the process is not sent again (the next start marks it failed: check Sent). */
 export async function settleUndoQueue(call: Call): Promise<void> {
-  await call<SendResult>('undo_send_now', { waitMs: SESSION_END_WAIT_MS });
+  // `sessionEnd`: what did not leave becomes a line in native.log; nothing asks.
+  await call<SendResult>('undo_send_now', { waitMs: SESSION_END_WAIT_MS, sessionEnd: true });
 }

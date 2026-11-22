@@ -177,10 +177,20 @@ pub struct Unsettled {
     pub actions: usize,
     /// Other actions being confirmed: quitting may interrupt them, and the next start reports them failed.
     pub confirming: usize,
+    /// Sends that were in the queue when the quit's wait began and failed during it (no connection):
+    /// out of the queue, but they did not leave, and their drafts are in Drafts
+    /// ([`UndoService::unsettled_since`]). Never a failure from before the wait.
+    #[serde(default)]
+    pub failed: usize,
 }
 impl Unsettled {
-    pub fn total(&self) -> usize {
+    /// What is still in the queue, waiting or on its way.
+    pub fn queued(&self) -> usize {
         self.sends + self.sending + self.actions + self.confirming
+    }
+    /// Everything that did not leave: the queue and the sends that failed during the wait.
+    pub fn total(&self) -> usize {
+        self.queued() + self.failed
     }
 }
 
@@ -670,6 +680,38 @@ impl UndoService {
     /// The actions that have not reached the provider yet, by what quitting does to them
     /// ([`Unsettled`]): `Pending` rows (undoable, due, or backing off) stay queued, `Committing`
     /// ones are on their way. `Failed` rows are notices, not work.
+    /// The drafts whose send is in the queue now, waiting or on its way: what «Esci» is about to send.
+    /// Taken before [`send_now`](Self::send_now), it is what [`unsettled_since`](Self::unsettled_since)
+    /// counts the failures of; a send that had already failed is not in it.
+    pub fn sends_in_queue(&self) -> AppResult<Vec<u64>> {
+        let store = self.context.read_shared()?;
+        let mut drafts: Vec<u64> = store
+            .undo_actions
+            .iter()
+            .filter(|action| matches!(action.status, UndoStatus::Pending | UndoStatus::Committing))
+            .filter_map(|action| match action.operation {
+                UndoOperation::SendDraft { draft_id } => Some(draft_id),
+                _ => None,
+            })
+            .collect();
+        drafts.sort_unstable();
+        drafts.dedup();
+        Ok(drafts)
+    }
+    /// [`unsettled`](Self::unsettled), with the sends of `started` ([`sends_in_queue`](Self::sends_in_queue)
+    /// when the wait began) that failed since as `failed`: no longer in the queue, their draft still
+    /// in Drafts (a sent draft leaves Drafts). The retry rules of a send are not touched: a failed send
+    /// stays failed, it is only counted.
+    pub fn unsettled_since(&self, started: &[u64]) -> AppResult<Unsettled> {
+        let mut left = self.unsettled()?;
+        let queued = self.sends_in_queue()?;
+        let store = self.context.read_shared()?;
+        left.failed = started
+            .iter()
+            .filter(|draft| !queued.contains(draft) && store.drafts.iter().any(|d| d.id == **draft))
+            .count();
+        Ok(left)
+    }
     pub fn unsettled(&self) -> AppResult<Unsettled> {
         // Polled while Qamille waits to quit: the shared snapshot, never a copy of the store.
         let store = self.context.read_shared()?;
@@ -1373,10 +1415,53 @@ mod tests {
             let left = undo.unsettled().unwrap();
             // Queued rows stay for the next start; rows on their way are cut off by a quit and
             // startup recovery fails them, never retries them (INV-008).
-            assert_eq!(left, Unsettled { sends: 2, sending: 1, actions: 2, confirming: 2 });
+            assert_eq!(left, Unsettled { sends: 2, sending: 1, actions: 2, confirming: 2, failed: 0 });
             assert_eq!(left.total(), 7);
             assert_eq!(service(vec![]).0.unsettled().unwrap(), Unsettled::default());
             assert_eq!(Unsettled::default().total(), 0);
+        }
+
+        #[test]
+        fn a_send_that_fails_while_quitting_waits_counts_as_failed_and_an_older_failure_does_not() {
+            // «Esci» with the network off: the wait makes the sends due, one fails (its draft stays in
+            // Drafts), one leaves (a sent draft leaves Drafts), one is still queued. A send that had
+            // failed before «Esci» was asked is not this quit's: the person was told then.
+            let send = |id, draft_id, status| UndoAction { operation: UndoOperation::SendDraft { draft_id }, ..row(id, 0, status, NOW + 20_000) };
+            let (undo, context, _) = service(vec![
+                send(1, 20, UndoStatus::Pending),
+                send(2, 21, UndoStatus::Pending),
+                send(3, 22, UndoStatus::Failed),
+                send(4, 23, UndoStatus::Committing),
+                row(5, 10, UndoStatus::Pending, NOW + 20_000),
+            ]);
+            context
+                .update(|store| {
+                    for id in [20, 21, 22, 23] {
+                        store.drafts.push(Draft { id, account_id: 1, ..Default::default() });
+                    }
+                    Ok(())
+                })
+                .unwrap();
+            let started = undo.sends_in_queue().unwrap();
+            assert_eq!(started, [20, 21, 23], "the sends in the queue when the wait begins, never an old failure");
+            // What the wait does: 20 fails, 21 is sent (row and draft gone), 23 stays on its way.
+            context
+                .update(|store| {
+                    store.undo_actions.iter_mut().find(|a| a.id == 1).unwrap().status = UndoStatus::Failed;
+                    store.undo_actions.retain(|a| a.id != 2);
+                    store.drafts.retain(|d| d.id != 21);
+                    Ok(())
+                })
+                .unwrap();
+            let left = undo.unsettled_since(&started).unwrap();
+            assert_eq!(left, Unsettled { sends: 0, sending: 1, actions: 1, confirming: 0, failed: 1 });
+            assert_eq!((left.queued(), left.total()), (2, 3));
+            // A failed row gone from the queue (dismissed) but with its draft still there did not leave either.
+            context.update(|store| { store.undo_actions.retain(|a| a.id != 1); Ok(()) }).unwrap();
+            assert_eq!(undo.unsettled_since(&started).unwrap().failed, 1);
+            // Without a wait there is nothing of this quit to count.
+            assert_eq!(undo.unsettled().unwrap().failed, 0);
+            assert_eq!(undo.unsettled_since(&[]).unwrap().failed, 0);
         }
     }
 

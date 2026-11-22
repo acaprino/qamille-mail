@@ -27,6 +27,11 @@ export const FORBIDDEN = [
   'tailwind-merge',
   '@internationalized/date',
   'tw-animate-css',
+  // What those carry inside: importing it directly would bring the same library back by another name.
+  '@zag-js/',
+  'framer-motion',
+  'motion-dom',
+  'motion-utils',
 ];
 
 /**
@@ -53,7 +58,23 @@ export const PENDING = [
 
 // PENDING as the Sigrid plan's Task 0 wrote it. PENDING may lose entries of this list and never gain one: a file
 // that starts importing a forbidden package is not added here, it goes through Sigrid (src/ui) instead.
-const FIRST_PENDING = [...PENDING];
+const FIRST_PENDING = [
+  'src/ds/**',
+  'src/App.tsx',
+  'src/main.tsx',
+  'src/components/ActivityCenter.tsx',
+  'src/components/Composer.tsx',
+  'src/components/ComposerDock.tsx',
+  'src/components/Contacts.tsx',
+  'src/components/MailList.tsx',
+  'src/components/UndoStack.tsx',
+  'src/components/meetings/MeetingList.tsx',
+  'src/components/meetings/MeetingNotice.tsx',
+  'src/components/meetings/MeetingProgress.tsx',
+  'src/components/meetings/MeetingRecordingIndicator.tsx',
+  'src/components/meetings/MeetingRowItem.tsx',
+  'src/reminder/Reminder.tsx',
+];
 
 /** The FORBIDDEN entry a module specifier falls under, or null. */
 export function forbiddenPackage(specifier) {

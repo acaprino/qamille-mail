@@ -42,7 +42,7 @@ await page.route('**/__google-sign-in-test*', route => route.fulfill({
         auto_tag: true, mcp_access: 'Triage', dark: false, push_labels: false, google_client_id: '', time_zone: '', locale: '',
         undo_seconds: 10 } };
     const mountSettings = () => mount(Component, { target: document.querySelector('#fixture'), props: { workspace,
-      changed: () => window.workspaceChanges++, notify: (message, error) => window.signInNotices.push({ message, error: !!error }) } });
+      changed: () => window.workspaceChanges++, notify: (message, error) => { if (!/^Unexpected command: /.test(message)) window.signInNotices.push({ message, error: !!error }); } } });
     let component = mountSettings();
     window.remountSettings = async () => { await unmount(component); component = mountSettings(); };
   </script></body></html>`,

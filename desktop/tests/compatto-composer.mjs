@@ -364,7 +364,7 @@ try {
 
   await step('Esc priority: an open side panel takes the Esc before the composer minimizes', async () => {
     const side = await openApp();
-    const sidePanel = side.page.locator('[data-scope="dialog"][data-variant="side"][data-part="content"]');
+    const sidePanel = side.page.locator('[data-slot="sheet-content"]');
     await side.page.getByRole('button', { name: /Preview/ }).first().click();
     await expect(sidePanel).toHaveCount(1);
     await side.page.locator('.compose-main').click();

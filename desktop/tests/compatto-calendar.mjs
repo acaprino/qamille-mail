@@ -124,7 +124,7 @@ try {
     assert.equal(await sheet.locator('select:not([data-scope])').count(), 0);
     assert.equal(await sheet.locator('input[type="date"]').count(), 0);
     const boxes = await sheet.locator('input[type="checkbox"]').count();
-    assert.equal(boxes, await sheet.locator('[data-scope="checkbox"] input[type="checkbox"]').count(), 'every checkbox is an Ark Checkbox');
+    assert.equal(boxes, await sheet.locator('[data-slot="checkbox"]').count(), 'every checkbox is Sigrid\u2019s');
     await expect(sheet.getByRole('checkbox', { name: 'All day' })).toBeVisible();
   });
 
@@ -132,7 +132,7 @@ try {
     for (const name of ['Calendar']) {
       const trigger = sheet.getByRole('combobox', { name, exact: true });
       assert.equal(await heightOf(trigger), 32, name);
-      assert.equal(await trigger.evaluate((n) => n.getAttribute('data-scope')), 'select');
+      assert.equal(await trigger.evaluate((n) => n.getAttribute('data-slot')), 'select-trigger');
     }
     assert.equal(await sheet.locator('[data-scope="date-picker"][data-part="control"]').count(), 2);
     for (const name of ['Start date', 'End date']) {

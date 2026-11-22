@@ -218,7 +218,7 @@ try {
     await ready(confirm);
     await page.keyboard.press('Escape');
     await expect(confirm).toHaveCount(0);
-    await expect(page.locator('[data-scope="popover"][data-part="content"]')).toBeVisible();
+    await expect(page.locator('[data-slot="popover-content"]')).toBeVisible();
     await expect(opener).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(menu).toHaveCount(0);
@@ -234,7 +234,7 @@ try {
     await expect(confirm).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(confirm).toHaveCount(0);
-    await expect(page.locator('[data-scope="popover"][data-part="content"]')).toBeVisible();
+    await expect(page.locator('[data-slot="popover-content"]')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(menu).toHaveCount(0);
     console.log('PASS Nested: a click on the veil leaves the Modal, Esc closes the Modal and leaves the Popover');

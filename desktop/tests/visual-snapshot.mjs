@@ -168,7 +168,7 @@ try {
   });
   await state('attachment-panel', {}, async (page) => {
     await page.getByRole('button', { name: /Q4-proposal.txt.*Preview/ }).click();
-    await page.locator('[data-scope="dialog"][data-part="content"]').waitFor();
+    await page.locator('[data-slot="dialog-content"]').waitFor();
   });
   await state('threads', { threads: true }, openThread);
   await state('threads-narrow', { ...narrow, threads: true }, openThread);

@@ -142,8 +142,8 @@ fn tray_notice(app: &AppHandle) {
         .set_title("Qamille")
         .set_level(rfd::MessageLevel::Info)
         .set_description(words(
-            "Qamille resta aperto nell'area di notifica: invia i messaggi programmati, mostra i promemoria e riceve la posta. Per uscire usa Esci dal menu dell'icona.",
-            "Qamille keeps running in the notification area: it sends scheduled messages, shows reminders and receives mail. To quit, use Quit in the icon's menu.",
+            "Qamille resta aperto nell'area di notifica: invia i messaggi programmati, mostra i promemoria e riceve la posta. Per riaprire la finestra fai clic sull'icona di Qamille (in Windows 11 può essere fra le icone nascoste, sotto la freccia ^) oppure avvia di nuovo Qamille. Per uscire usa Esci dal menu dell'icona.",
+            "Qamille keeps running in the notification area: it sends scheduled messages, shows reminders and receives mail. To bring the window back, click Qamille's icon (in Windows 11 it may be among the hidden icons, under the ^ arrow) or start Qamille again. To quit, use Quit in the icon's menu.",
         ))
         .set_buttons(rfd::MessageButtons::OkCancelCustom("OK".into(), leave.into()))
         .show();
@@ -296,16 +296,17 @@ pub fn install(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
-/// The interface language changed (`window_shell::window_appearance`): the tray menu follows it.
+/// The interface language changed (`window_shell::window_appearance`): the tray menu and the tooltip
+/// (the unread count, `taskbar::tooltip`) follow it at once.
 pub fn relabel(app: &AppHandle, italian: bool) {
     let Some(menu) = app.try_state::<TrayMenu>() else { return };
     let (show_text, quit_text) = tray_labels(italian);
     let _ = menu.show.set_text(show_text);
     let _ = menu.quit.set_text(quit_text);
+    set_tray_tooltip(app, &crate::taskbar::tooltip(italian));
 }
 
-/// The tray icon's tooltip (it says «Qamille» until a caller says more).
-#[allow(dead_code, reason = "phase 3, Task 3 shows the unread count here")]
+/// The tray icon's tooltip (it says «Qamille» until the unread count says more, `taskbar.rs`).
 pub fn set_tray_tooltip(app: &AppHandle, text: &str) {
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
         let _ = tray.set_tooltip(Some(text));

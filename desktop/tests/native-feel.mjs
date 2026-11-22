@@ -903,6 +903,14 @@ check('25. the taskbar shows unread mail and the full indexing (rule 30)', () =>
   assert.match(rustItem(read('src-tauri/src/commands/assistant.rs'), 'pub async fn search_reindex('), /crate::taskbar::reset_index\(\);/, '«Reindex» shows the bar again');
   assert.match(code, /badge_rgba\(/, 'the overlay is drawn by taskbar_rules::badge_rgba');
   assert.match(code, /crate::background::set_tray_tooltip\(/, 'the tray tooltip says how many are unread');
+  // A change of language reaches the tooltip at once, with the count it shows, not at the next count.
+  assert.match(rustItem(code, 'fn show_count('), /UNREAD\.store\(count, /, 'show_count remembers the count of the tooltip');
+  assert.match(rustItem(code, 'pub fn tooltip('), /taskbar_rules::tray_tooltip\(UNREAD\.load\(/, 'tooltip() says the remembered count');
+  assert.match(
+    rustItem(read('src-tauri/src/background.rs'), 'pub fn relabel('),
+    /set_tray_tooltip\(app, &crate::taskbar::tooltip\(italian\)\)/,
+    'relabel says the tooltip again in the new language',
+  );
 });
 
 // phase 3, Task 4: check 26

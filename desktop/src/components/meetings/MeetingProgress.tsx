@@ -3,7 +3,6 @@
 // Sintesi tab, while the transcript next to it stays readable. It draws what the meeting says
 // now; the page re-reads the meeting, this does not ask for anything. The block fades in and the
 // bar grows with a spring (no movement under prefers-reduced-motion).
-import { motion, useReducedMotion } from '../../ui/motion';
 import Button from '../../ui/Button';
 import { tr } from '../../lib/i18n';
 import type { MeetingJob } from '../../lib/meetings';
@@ -17,10 +16,7 @@ export type MeetingProgressProps = {
   oncancel: () => void;
 };
 
-const spring = { type: 'spring', stiffness: 400, damping: 32 } as const;
-
 export default function MeetingProgress({ job, compact = false, busy = false, oncancel }: MeetingProgressProps) {
-  const still = useReducedMotion();
   const transcribing = job.kind === 'transcribe';
   const heading = transcribing
     ? tr('Sto trascrivendo la riunione', 'Transcribing the meeting')
@@ -40,11 +36,7 @@ export default function MeetingProgress({ job, compact = false, busy = false, on
       aria-valuemax={100}
       aria-valuenow={job.progress}
     >
-      <motion.span
-        initial={false}
-        animate={{ width: `${job.progress}%` }}
-        transition={still ? { duration: 0 } : spring}
-      />
+      <span style={{ width: `${job.progress}%` }} />
     </div>
   );
   const cancel = (
@@ -54,17 +46,12 @@ export default function MeetingProgress({ job, compact = false, busy = false, on
   );
 
   return compact ? (
-    <motion.div
-      className="inline meeting-progress"
-      initial={still ? false : { opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={spring}
-    >
+    <div className="inline meeting-progress">
       <h3>{heading}</h3>
       <p className="phase">{phase}</p>
       {bar}
       <div>{cancel}</div>
-    </motion.div>
+    </div>
   ) : (
     <MeetingNotice title={heading} actions={cancel} className="meeting-progress">
       <p className="phase">{phase}</p>

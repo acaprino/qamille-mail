@@ -7,7 +7,7 @@
 //    the history button of the footer.
 // The ring advances with the percent and nothing in the card moves on its own: the sidebar is not
 // the place to draw the eye. Errors are history rows, never card content (INV-009).
-import { AnimatePresence, motion, useReducedMotion } from '../ui/motion';
+import { Item, Presence } from '../ui/motion';
 import { useEffect, useRef, useState } from 'react';
 import Count from '../ui/Count';
 import Icon from '../ui/Icon';
@@ -64,7 +64,6 @@ const icons: Record<Activity['kind'], string> = {
 const ringLength = 2 * Math.PI * 15;
 const ring = (percent: number) =>
   `${(Math.min(Math.max(percent, 0), 100) / 100) * ringLength} ${ringLength}`;
-const spring = { type: 'spring', stiffness: 400, damping: 32 } as const;
 
 export default function ActivityCenter({
   activities,
@@ -74,7 +73,6 @@ export default function ActivityCenter({
   showAll,
 }: ActivityCenterProps) {
   const center = useStore(activityCenter);
-  const still = useReducedMotion();
   const [now, setNow] = useState(() => Date.now());
 
   // The event-fed activities are the App's; the confirming entry is the component's own state,
@@ -203,9 +201,9 @@ export default function ActivityCenter({
 
   return (
     <>
-      <AnimatePresence>
+      <Presence>
         {open && (
-          <motion.div
+          <Item
             key="activity-panel"
             className="activity-panel"
             id="activity-panel"
@@ -214,14 +212,6 @@ export default function ActivityCenter({
             tabIndex={-1}
             ref={panelEl}
             style={{ transformOrigin: 'bottom left' }}
-            initial={still ? false : { opacity: 0, y: 10, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={
-              still
-                ? { opacity: 0, transition: { duration: 0 } }
-                : { opacity: 0, y: 6, scale: 0.98 }
-            }
-            transition={spring}
           >
             <div className="activity-heading">{tr('Attività', 'Activity')}</div>
             {visibleList && visibleList.length > 0 && (
@@ -301,11 +291,11 @@ export default function ActivityCenter({
               <div className="activity-empty">{tr('Niente da segnalare', 'Nothing to report')}</div>
             ) : (
               // A row that arrives while the panel is open slides in; the rows it pushes out leave.
-              <AnimatePresence initial={false}>
+              <Presence>
                 {center.recent.map((entry) => {
                   const subtitle = entrySubtitle(entry, words, accountName);
                   return (
-                    <motion.div
+                    <Item
                       key={entry.seq}
                       className={cn(
                         'activity-recent',
@@ -313,15 +303,6 @@ export default function ActivityCenter({
                         entry.outcome === 'undone' && 'undone',
                       )}
                       data-activity-seq={entry.seq}
-                      layout={still ? false : 'position'}
-                      initial={still ? false : { opacity: 0, y: -8, scale: 0.97 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={
-                        still
-                          ? { opacity: 0, transition: { duration: 0 } }
-                          : { opacity: 0, scale: 0.96 }
-                      }
-                      transition={spring}
                     >
                       <span className="activity-chip">
                         <Icon name={entryIcon(entry)} size={13} />
@@ -333,18 +314,18 @@ export default function ActivityCenter({
                       <span className="activity-time">
                         {formatEntryTime(entry.at_ms, Date.now(), zone)}
                       </span>
-                    </motion.div>
+                    </Item>
                   );
                 })}
-              </AnimatePresence>
+              </Presence>
             )}
             <button className="activity-all" onClick={showEverything}>
               {tr('Vedi tutta l’attività', 'See all activity')}
               <Icon name="arrow" size={13} />
             </button>
-          </motion.div>
+          </Item>
         )}
-      </AnimatePresence>
+      </Presence>
       {visibleList && visibleList.length > 0 && primary && (
         <div className="activity-indicator">
           <button

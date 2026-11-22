@@ -14,6 +14,9 @@ import { useStore } from '../lib/store';
 import type { Folder, UndoAction, Workspace } from '../lib/types';
 import ActivityCenter from './ActivityCenter';
 
+/** An account's colour, [r, g, b, …] in 0..255, as #rrggbb. */
+const hexOf = (rgb: number[]) => `#${rgb.slice(0, 3).map((n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0')).join('')}`;
+
 export type SidebarProps = {
   workspace: Workspace;
   view: Folder;
@@ -124,9 +127,9 @@ export default function Sidebar({
             aria-label={tr('Tutti gli account', 'All accounts')}
             aria-pressed={accountId === null}
             icon={
-              <span className="account-avatar all-accounts">
+              <Avatar name={tr('Tutti gli account', 'All accounts')} size="xs" decorative className="bg-sidebar-selected text-sidebar-accent">
                 <Icon name="inbox" size={12} stroke={iconStroke} />
-              </span>
+              </Avatar>
             }
           >
             <span className="sidebar-text">{tr('Tutti gli account', 'All accounts')}</span>
@@ -140,14 +143,7 @@ export default function Sidebar({
               aria-label={collapsed ? tr(`Passa a ${account.name}`, `Switch to ${account.name}`) : undefined}
               title={collapsed ? undefined : `${account.name} · ${account.email}`}
               aria-pressed={accountId === account.id}
-              icon={
-                <span
-                  className="account-avatar"
-                  style={{ '--account-color': `rgb(${account.color.slice(0, 3).join(' ')})` } as React.CSSProperties}
-                >
-                  {initials(account.name)}
-                </span>
-              }
+              icon={<Avatar name={account.name} color={hexOf(account.color)} size="xs" decorative />}
             >
               <span className="account-details sidebar-text">
                 <strong>{account.name}</strong>

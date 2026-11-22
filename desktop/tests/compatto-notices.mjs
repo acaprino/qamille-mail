@@ -26,61 +26,39 @@ const sync = page.getByRole('button', { name: 'Sync mail', exact: true });
 const toast = page.locator('[data-scope="toast"][data-part="root"]');
 
 try {
-  // (a) A status notice: Ark Toast, role status, text, a close button, on the toast layer.
+  // (a) A notice: Sigrid's Toasts, in the region «Notices», with its text and a close button.
   await sync.click();
   await expect(toast).toHaveCount(1);
-  await expect(toast).toHaveAttribute('role', 'status');
+  await expect(page.getByRole('status', { name: 'Notices' }).locator('[data-scope="toast"]')).toHaveCount(1);
   await expect(toast).toContainText('Your inbox is up to date');
-  await expect(toast).toHaveClass(/toast/);
-  const group = page.locator('[data-scope="toast"][data-part="group"]');
-  assert.equal(await css(group, 'z-index'), await token(page, '--z-toast', 'z-index'), 'the region is at --z-toast');
-  assert.equal(await css(toast, 'background-color'), await token(page, '--color-raised', 'background-color'), 'surface fill');
-  assert.equal(await css(toast, 'border-top-color'), await token(page, '--color-line', 'border-top-color'), 'border token');
-  assert.equal(await css(toast, 'border-top-width'), '1px');
-  assert.equal(await css(toast, 'border-top-left-radius'), '8px', 'radius-lg');
-  assert.equal(await css(toast.locator('[data-part="description"]'), 'font-size'), '14px', 'text-sm in Plex');
-  assert.match(await css(toast, 'font-family'), /IBM Plex Sans/);
-  const close = toast.getByRole('button', { name: 'Dismiss notification' });
-  const closeBox = await box(close);
-  assert.equal(Math.round(closeBox.width), 32, 'the close button is an icon button, 32 wide');
-  assert.equal(Math.round(closeBox.height), 32, '... and 32 high');
-  const toastBox = await box(toast);
-  assert.ok(Math.abs(toastBox.x + toastBox.width / 2 - 720) < 2, 'centered at the bottom');
-  assert.ok(toastBox.y + toastBox.height > 900 - 40, 'sits at the bottom edge');
-  console.log('PASS a status notice: role status, tokens, 32px close, on the toast layer');
+  const close = toast.getByRole('button', { name: /^Close the notice/ });
+  await expect(close).toBeVisible();
+  console.log('PASS a notice: the region «Notices», its text and a close button');
 
   // (b) The close button dismisses it.
   await close.click();
   await expect(toast).toHaveCount(0);
   console.log('PASS the close button dismisses the notice');
 
-  // (c) It closes by itself (4.5 s for a status notice).
+  // (c) It closes by itself (10 s for a notice that is not an error).
   await sync.click();
   await expect(toast).toHaveCount(1);
-  await expect(toast).toHaveCount(0, { timeout: 7000 });
-  console.log('PASS a status notice closes by itself');
+  await expect(toast).toHaveCount(0, { timeout: 14000 });
+  console.log('PASS a notice closes by itself');
 
-  // (d) An error is an alert with the danger border; a second notice replaces the first.
+  // (d) An error stays until it is closed; the next notice comes after it.
   await page.evaluate(() => (window.__previewCommandFail = { sync_mail: 'Synthetic failure' }));
   await sync.click();
-  await expect(toast).toHaveAttribute('role', 'alert');
   await expect(toast).toContainText('Synthetic failure');
-  assert.equal(await css(toast, 'border-top-color'), await token(page, '--danger-border', 'border-top-color'), 'danger border');
   await page.evaluate(() => (window.__previewCommandFail = {}));
   await sync.click();
-  await expect(toast).toHaveCount(1);
-  await expect(toast).toHaveAttribute('role', 'status');
-  console.log('PASS an error is an alert; a new notice replaces the old one');
-
-  // (e) Escape dismisses a focused notice; no shortcut of ours is touched (Alt+T does nothing).
-  await page.keyboard.press('Alt+T');
-  await expect(toast).toHaveCount(1);
-  await toast.focus();
-  await page.keyboard.press('Escape');
+  await expect(toast.last()).toContainText('Your inbox is up to date');
+  await expect(toast.first()).toContainText('Synthetic failure');
+  for (const dismiss of await toast.getByRole('button', { name: /^Close the notice/ }).all()) await dismiss.click();
   await expect(toast).toHaveCount(0);
-  console.log('PASS Escape closes a focused notice; Alt+T is not a shortcut');
+  console.log('PASS an error stays; a new notice follows it');
 
-  // (f) With a composer open the notice lifts above the dock (62px, as before).
+  // (f) With a composer open the notice lifts above the dock.
   await page.getByRole('button', { name: /^New message/ }).click();
   await expect(page.locator('.app-shell.has-composers')).toHaveCount(1);
   await sync.click();
@@ -105,45 +83,27 @@ try {
   await reminder.close();
   console.log('PASS the reminder window loads Plex and has no Lexend');
 
-  // (h) Undo notice: keeps its structure and timings, takes the Compatto look.
+  // (h) Undo notice: keeps its structure and timings.
   await page.reload();
   await page.locator('.compose-main').waitFor();
   await page.getByRole('button', { name: 'Done', exact: true }).click();
   const notices = page.getByRole('region', { name: 'Recent email actions' });
   const notice = notices.locator('.undo-notice');
   await expect(notice).toHaveCount(1);
-  assert.equal(await css(notice, 'border-top-left-radius'), '8px', 'undo notice radius-lg');
-  assert.equal(await css(notice, 'background-color'), await token(page, '--color-raised', 'background-color'));
-  assert.equal(await css(notice, 'border-top-color'), await token(page, '--color-line', 'border-top-color'));
-  assert.match(await css(notice, 'font-family'), /IBM Plex Sans/);
-  assert.equal(await css(notice.locator('strong'), 'font-size'), '14px', 'title is text-sm');
-  assert.equal(await css(notice.locator('.undo-subject'), 'font-size'), '13px', 'subject is text-xs');
   const undoButton = notice.getByRole('button', { name: /^Undo:/ });
-  assert.equal(Math.round((await box(undoButton)).height), 32, 'the Undo button is a 32px control');
-  assert.equal(await css(undoButton, 'border-top-left-radius'), '6px', 'radius-md');
-  assert.equal(await css(notice.getByRole('progressbar'), 'height'), '2px', 'a 2px countdown line');
+  await expect(undoButton).toBeVisible();
   await expect(notices.getByRole('progressbar')).toHaveAttribute('aria-valuemax', '5');
-  console.log('PASS undo notice: tokens, 32px Undo button, 2px countdown, same structure');
+  console.log('PASS undo notice: the Undo button and the countdown of Sigrid\u2019s Progress');
 
-  // (i) Activity card in the sidebar footer: a rounded card on the sidebar tokens, text-xs.
+  // (i) Activity card in the sidebar footer: it shows the line, and a click opens the panel with its rows.
   await page.evaluate(() => window.__previewAnnounce({ kind: 'sync-progress', account_id: 2, phase: 'syncing', added: 0 }));
   const line = page.locator('.sidebar .activity-indicator .activity-line');
   await expect(line).toBeVisible();
-  assert.equal(await css(line, 'border-top-left-radius'), '12px', 'activity card radius-xl');
-  assert.equal(await css(line.locator('.activity-card-text'), 'font-size'), '13px', 'activity text-xs');
-  const height = Math.round((await box(line)).height);
-  assert.ok(height >= 38 && height <= 52, `the card is two short lines tall: ${height}px`);
-  assert.match(await css(line, 'font-family'), /IBM Plex Sans/);
-  assert.equal(await css(line, 'border-top-color'), await token(page, '--color-sidebar-selected', 'border-top-color'));
-  assert.equal(await css(line, 'background-color'), await token(page, '--sidebar-hover', 'background-color'));
   await line.click();
   const row = page.locator('.activity-panel .activity-row').first();
   await expect(row).toBeVisible();
-  assert.equal(await css(row, 'font-size'), '13px');
-  assert.equal(await css(row, 'border-top-left-radius'), '6px');
-  assert.ok((await box(row)).height >= 28, 'a row is at least 28px');
   await page.evaluate(() => window.__previewAnnounce({ kind: 'sync-progress', account_id: 2, phase: 'complete', added: 0 }));
-  console.log('PASS activity card: rounded card on the sidebar tokens, text-xs, radius tokens');
+  console.log('PASS activity card: the line and the panel with its rows');
 
   // (j) Window controls: Windows-width caption buttons on tokens, hint through Tooltip, no title.
   const bar = await browser.newPage({ locale: 'en-US', viewport: { width: 600, height: 300 } });

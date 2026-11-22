@@ -291,7 +291,7 @@ try {
   // keeps it, Esc closes the calendar first, and a click on a day neither closes the dialog nor is lost.
   for (const [kind, props] of [['Modal', { modal: true }], ['SidePanel', { panel: true }]]) {
     const page = await open('date', props);
-    const dialog = page.locator('[data-scope="dialog"][data-part="content"]');
+    const dialog = page.locator('[data-slot="dialog-content"]');
     await expect(dialog).toBeVisible();
     const field = dialog.getByRole('textbox', { name: 'Due date', exact: true });
     const calendar = page.locator('[data-scope="date-picker"][data-part="content"]');
@@ -308,7 +308,7 @@ try {
     assert.ok(onTop, `${kind}: the calendar is on top`);
     const clipped = await calendar.evaluate((el) => {
       const r = el.getBoundingClientRect();
-      const box = el.closest('[data-scope="dialog"][data-part="content"]').getBoundingClientRect();
+      const box = el.closest('[data-slot="dialog-content"]').getBoundingClientRect();
       return { bottom: r.bottom - box.bottom, viewport: r.bottom - innerHeight };
     });
     assert.ok(clipped.viewport <= 0, `${kind}: the calendar fits the window (${JSON.stringify(clipped)})`);

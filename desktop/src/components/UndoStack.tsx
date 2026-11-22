@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import Button from '../ui/Button';
 import Count from '../ui/Count';
 import Icon from '../ui/Icon';
+import Progress from '../ui/Progress';
 import { cn } from '../lib/utils';
 import { undoLabel } from '../lib/undo';
 import {
@@ -184,18 +185,14 @@ function Notice({
           >
             {available ? tr('Annulla', 'Undo') : tr('In corso…', 'Applying…')}
           </Button>
-          <div
-            className="undo-track"
-            role="progressbar"
-            aria-label={tr('Tempo rimasto per annullare', 'Time left to undo')}
-            aria-valuemin={0}
-            aria-valuemax={(action.expires_at_ms - action.created_at_ms) / 1000}
-            aria-valuenow={Math.ceil(remaining / 1000)}
-          >
-            <span
-              style={{
-                transform: `scaleX(${Math.min(1, remaining / (action.expires_at_ms - action.created_at_ms))})`,
-              }}
+          <div className="undo-track">
+            <Progress
+              countdown
+              size="sm"
+              aria-label={tr('Tempo rimasto per annullare', 'Time left to undo')}
+              value={remaining / 1000}
+              max={(action.expires_at_ms - action.created_at_ms) / 1000}
+              valueText={tr(`${Math.ceil(remaining / 1000)} s rimasti`, `${Math.ceil(remaining / 1000)} seconds left`)}
             />
           </div>
         </>

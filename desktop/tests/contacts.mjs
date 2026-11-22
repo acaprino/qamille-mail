@@ -121,7 +121,7 @@ try {
     const confirm = dialog.getByRole('button', { name: /^Merge/ }).last();
     await dialog.getByRole('button', { name: 'Only in one' }).click();
     await expect(dialog.getByRole('checkbox', { checked: true })).toHaveCount(1);
-    await dialog.locator('[data-scope="checkbox"][data-part="root"][data-state="checked"]').click();
+    await dialog.locator('[data-slot="checkbox"][data-state="checked"]').click();
     await expect(confirm).toBeDisabled();
     await tick(dialog, 'Local').click();
     await expect(dialog.getByRole('checkbox', { name: 'Local' })).toBeChecked();

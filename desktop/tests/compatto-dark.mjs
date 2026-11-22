@@ -242,12 +242,12 @@ async function section(name, run) {
 
   await section('select', async () => {
     const accent = await open('select');
-    const trigger = page.locator('[data-scope="select"][data-part="trigger"]').first();
+    const trigger = page.locator('[data-slot="select-trigger"]').first();
     await assertFieldBorder(page, trigger, 'select trigger');
     await focusAndCheck(page, trigger, trigger, 'select trigger', accent);
     await trigger.click();
     await page.getByRole('option', { name: 'English' }).waitFor();
-    await audit(page, 'select (open)', ['[data-scope="select"][data-part="content"]', '[data-scope="select"][data-part="trigger"]']);
+    await audit(page, 'select (open)', ['[data-slot="select-content"]', '[data-slot="select-trigger"]']);
     await page.keyboard.press('Escape');
   });
 
@@ -256,11 +256,11 @@ async function section(name, run) {
     const input = page.getByRole('checkbox', { name: 'Notify me' });
     await input.focus();
     await page.keyboard.press('Shift');
-    const control = page.locator('[data-scope="checkbox"][data-part="control"]').first();
+    const control = page.locator('[data-slot="checkbox"]').first();
     await assertRing(page, control, 'checkbox', accent);
     console.log('ok   focus ring of checkbox');
     await input.press('Space');
-    await audit(page, 'checkbox and switch', ['[data-scope="checkbox"][data-part="control"][data-state="checked"]', '[data-scope="switch"][data-part="control"]']);
+    await audit(page, 'checkbox and switch', ['[data-slot="checkbox"][data-state="checked"]', '[data-scope="switch"][data-part="control"]']);
   });
 
   await section('switch', async () => {
@@ -318,7 +318,7 @@ async function section(name, run) {
     await dialog.waitFor();
     const confirm = dialog.getByRole('button', { name: 'Confirm' });
     await focusAndCheck(page, confirm, confirm, 'modal button', accent);
-    await audit(page, 'modal', ['[data-scope="dialog"][data-part="content"]']);
+    await audit(page, 'modal', ['[data-slot="dialog-content"]']);
     await page.keyboard.press('Escape');
   });
 
@@ -329,7 +329,7 @@ async function section(name, run) {
     await panel.waitFor();
     const action = panel.getByRole('button', { name: 'Inside action' });
     await focusAndCheck(page, action, action, 'side panel button', accent);
-    await audit(page, 'side panel', ['[data-scope="dialog"][data-part="content"][data-variant="side"]']);
+    await audit(page, 'side panel', ['[data-slot="sheet-content"]']);
   });
 
   await section('popover', async () => {
@@ -338,7 +338,7 @@ async function section(name, run) {
     await focusAndCheck(page, trigger, trigger, 'popover trigger', accent);
     await trigger.click();
     await page.getByRole('button', { name: 'First action' }).waitFor();
-    await audit(page, 'popover', ['[data-scope="popover"][data-part="content"]']);
+    await audit(page, 'popover', ['[data-slot="popover-content"]']);
   });
 
   assert.deepEqual(errors, [], `page errors: ${errors.join('; ')}`);

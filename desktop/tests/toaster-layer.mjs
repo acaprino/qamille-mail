@@ -23,10 +23,11 @@ try {
       live: group?.getAttribute('aria-live'),
       groupHidden: !!group?.closest('[aria-hidden="true"], [inert]'),
       appHidden: !!document.getElementById('app')?.closest('[aria-hidden="true"], [inert]'),
+      bodyChildren: [...document.body.children].map((node) => `${node.tagName.toLowerCase()}#${node.id}.${node.className} aria-hidden=${node.getAttribute('aria-hidden')} inert=${node.hasAttribute('inert')} ${[...node.attributes].map((a) => a.name).filter((n) => /base-ui|data-/.test(n)).join(',')}`),
     };
   });
   assert.ok(layers.group, 'the toast group is mounted');
-  assert.ok(layers.appHidden, 'the page behind the Modal is hidden (the case this test is about)');
+  assert.ok(layers.appHidden, `the page behind the Modal is hidden (the case this test is about): ${JSON.stringify(layers.bodyChildren)}`);
   assert.ok(layers.onBody, 'the toast group is a layer of its own on <body>');
   assert.equal(layers.live, 'polite', 'the toast group is a live region');
   assert.equal(layers.groupHidden, false, 'the toast group is not hidden under an open Modal');

@@ -183,14 +183,14 @@ try {
   await page.locator('button.profile').click();
   const appearance = page.getByRole('combobox', { name: /Appearance|Aspetto/, exact: true });
   await appearance.click();
-  await shown(page.locator('[data-scope="select"][data-part="content"]'), 'The Select list');
+  await shown(page.locator('[data-slot="select-content"]'), 'The Select list');
   await page.keyboard.press('Escape');
   console.log('PASS Select opens its list');
 
   // Modal: the new-contact dialog.
   await page.locator('aside.sidebar button').filter({ hasText: either('Contacts', 'Rubrica') }).first().click();
   await page.locator('.contacts-page button').filter({ hasText: either('New contact', 'Nuovo contatto') }).first().click();
-  await shown(page.locator('[data-scope="dialog"][data-part="content"], dialog[open]'), 'The Modal');
+  await shown(page.locator('[data-slot="dialog-content"], dialog[open]'), 'The Modal');
   await page.keyboard.press('Escape');
   console.log('PASS Modal opens');
 

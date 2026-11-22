@@ -53,11 +53,11 @@ try {
     await expect(page.locator('.contacts-page select')).toHaveCount(0);
     const filters = page.locator('.contacts-filters');
     const book = trigger(filters, 'Filter by address book');
-    assert.equal(await book.getAttribute('data-part'), 'trigger');
+    assert.equal(await book.getAttribute('data-slot'), 'select-trigger');
     assert.equal((await height(book)), controlHeight);
     assert.equal((await height(page.getByRole('searchbox', { name: 'Search contacts' }))), controlHeight);
     assert.equal((await height(page.getByRole('button', { name: 'New contact' }))), controlHeight);
-    const control = filters.locator('[data-scope="checkbox"][data-part="control"]');
+    const control = filters.locator('[data-slot="checkbox"]');
     assert.equal(await control.evaluate((node) => node.offsetWidth), 16);
     await filters.getByText('Show hidden').click();
     await expect(page.getByRole('checkbox', { name: 'Show hidden' })).toBeChecked();
@@ -113,7 +113,7 @@ try {
     const dialog = dialogContent('Merge contacts');
     await expect(dialog).toHaveAttribute('data-size', 'md');
     const books = dialog.locator('.merge-books');
-    assert.ok((await books.locator('[data-scope="checkbox"][data-part="control"]').count()) >= 2);
+    assert.ok((await books.locator('[data-slot="checkbox"]').count()) >= 2);
     await dialog.getByRole('button', { name: 'Only in one' }).click();
     await expect(dialog.getByRole('checkbox', { checked: true })).toHaveCount(1);
     const locale = dialog.getByRole('checkbox', { name: 'Local' });
@@ -131,7 +131,7 @@ try {
     const dialog = dialogContent('Delete contact');
     await expect(dialog).toHaveAttribute('data-size', 'sm');
     assert.equal(await dialog.evaluate((node) => node.offsetWidth), 420);
-    await expect(dialog.locator('[data-scope="checkbox"][data-part="control"]')).toHaveCount(1);
+    await expect(dialog.locator('[data-slot="checkbox"]')).toHaveCount(1);
     await dialog.getByText('Local').click();
     await expect(dialog.getByRole('button', { name: 'Delete', exact: true })).toBeEnabled();
     await dialog.getByRole('button', { name: 'Cancel' }).click();
@@ -143,7 +143,7 @@ try {
     await page.getByRole('button', { name: 'Alex Personal workspace' }).click();
     await page.getByRole('navigation', { name: 'Settings sections' }).getByRole('button', { name: 'Contacts' }).click();
     const books = page.getByRole('list', { name: 'Connected address books' });
-    await expect(books.locator('[data-scope="checkbox"][data-part="control"]').first()).toBeVisible();
+    await expect(books.locator('[data-slot="checkbox"]').first()).toBeVisible();
     const order = page.getByRole('list', { name: 'Order of address books' });
     assert.ok((await height(order.getByRole('listitem').first())) >= controlHeight);
     assert.equal(await css(order.getByRole('listitem').nth(1), 'border-top-color'), soft);

@@ -17,7 +17,7 @@ const tests = path.join(desktop, 'tests');
 const NODE_TEST = new Set([
   'activity', 'assistant-server', 'backend-text', 'calendar-gate', 'close-guards', 'calendar-series', 'conversation-rows', 'events', 'github-release',
   'meetings-follow', 'meetings-highlight', 'meetings-preview', 'meetings-view', 'people', 'preview-search', 'regional', 'reply-all', 'shortcut-guard', 'thread-tree',
-  'sigrid-sync', 'sigrid-wiring', 'undo-notices', 'undo-close', 'mailto', 'row-menu', 'notification-open',
+  'sigrid-sync', 'sigrid-wiring', 'sigrid-words', 'theme-css', 'undo-notices', 'undo-close', 'mailto', 'row-menu', 'notification-open',
 ]);
 // Tools and checks that are not browser tests of the preview, or take arguments.
 // glance-scale also drives the built executable; ds-export runs two full exports (minutes each);

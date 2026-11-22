@@ -6,6 +6,7 @@
   "scripts": {
     "artcraft:sync": "node scripts/sync-artcraft.mjs",
     "sigrid:sync": "node scripts/sync-sigrid.mjs",
+    "theme:css": "node scripts/theme-css.mjs",
     "ds:export": "node scripts/ds-export.mjs",
     "predev": "npm run artcraft:sync && npm run sigrid:sync",
     "dev": "vite --host 127.0.0.1",

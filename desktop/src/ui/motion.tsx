@@ -43,7 +43,9 @@ const cache = new Map<string, ComponentType<Record<string, unknown>>>();
 
 /** `motion.div`, `motion.li`…: the plain element without the animation props. */
 export const motion = new Proxy({} as MotionTags, {
-  get: (_target, tag: string) => {
+  get: (_target, tag) => {
+    // A Symbol (`Symbol.toPrimitive`, `Symbol.toStringTag`…) is asked for by the runtime, not by a component: it is no tag.
+    if (typeof tag !== 'string') return undefined;
     let element = cache.get(tag);
     if (!element) {
       element = still(tag);

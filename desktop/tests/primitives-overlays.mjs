@@ -597,6 +597,24 @@ try {
     await page.close();
   }
 
+  // The Sigrid plan's insertion points (docs/superpowers/plans/2026-11-22-qamille-su-sigrid.md): a task writes its
+  // new cases under its own comment, and changes the existing cases of its primitive where they are. The blank
+  // lines stay, so two tasks never touch neighbouring lines.
+
+  // Task 3: words
+
+  // Task 10: toaster
+
+  // Task 11: date field
+
+  // Task 12: select
+
+  // Task 13: popover, menu and tooltip
+
+  // Task 14: modal and side panel
+
+  // Task 15: recipients
+
   assert.deepEqual(errors, []);
 } finally {
   await browser.close();

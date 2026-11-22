@@ -1,6 +1,6 @@
 // One section per primitive, chosen by `which` (see mount.mjs). Test code, so it lives under
 // tests/ and not in the ds module. A task that adds a primitive appends its section here.
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import Button from '../../src/ds/primitives/Button';
 import Icon from '../../src/ds/primitives/Icon';
 import SelectSection from './gallery/Select';
@@ -14,6 +14,43 @@ import PopoverSection from './gallery/Popover';
 import MenuSection from './gallery/Menu';
 import SidePanelSection from './gallery/SidePanel';
 import NoticesGallery from './gallery/NoticesGallery';
+
+// The Sigrid plan (docs/superpowers/plans/2026-11-22-qamille-su-sigrid.md): one insertion point per task. A task
+// writes its imports under its own comment and nothing elsewhere; to remove a line it removes only that line, and
+// the blank lines stay, so two tasks never touch neighbouring lines.
+
+// Task 3: words
+
+// Task 4: switch
+
+// Task 5: tabs
+
+// Task 6: count and slider
+
+// Task 7: button
+
+// Task 8: checkbox
+
+// Task 9: field
+
+// Task 10: toaster
+
+// Task 11: date field
+
+// Task 12: select
+
+// Task 13: popover, menu and tooltip
+
+// Task 14: modal and side panel
+
+// Task 15: recipients
+
+// Task 17: nav list
+
+// Task 19: icons
+
+// P2 of the Sigrid plan, loaded only by its own section: the other sections do not load the synced Sigrid.
+const SigridCoexistence = lazy(() => import('./gallery/SigridCoexistence'));
 
 export type GalleryProps = { which: string; props?: Record<string, any> };
 
@@ -85,6 +122,46 @@ export default function Gallery({ which, props = {} }: GalleryProps) {
       return <MenuSection />;
     case 'recipients':
       return <RecipientsGallery props={props} />;
+    // P2 of the Sigrid plan: Sigrid's own fields inside Sigrid's own surfaces (tests/sigrid-coexistence.mjs).
+    case 'sigrid-coexistence':
+      return (
+        <Suspense fallback={null}>
+          <SigridCoexistence props={props} />
+        </Suspense>
+      );
+
+    // The Sigrid plan's insertion points for the cases (see above, under the imports).
+
+    // Task 3: words
+
+    // Task 4: switch
+
+    // Task 5: tabs
+
+    // Task 6: count and slider
+
+    // Task 7: button
+
+    // Task 8: checkbox
+
+    // Task 9: field
+
+    // Task 10: toaster
+
+    // Task 11: date field
+
+    // Task 12: select
+
+    // Task 13: popover, menu and tooltip
+
+    // Task 14: modal and side panel
+
+    // Task 15: recipients
+
+    // Task 17: nav list
+
+    // Task 19: icons
+
     default:
       return null;
   }

@@ -181,6 +181,8 @@ kbd {
 .accent {
   color: var(--accent-text) !important;
 }
+
+/* Task 7: buttons (the Sigrid plan: only Task 7 touches this section, which ends at the next blank line) */
 .primary,
 .secondary {
   display: inline-flex;
@@ -235,6 +237,7 @@ kbd {
   color: var(--muted);
   font-size: var(--text-xs);
 }
+
 .avatar {
   display: flex;
   align-items: center;
@@ -244,6 +247,8 @@ kbd {
   font-weight: 600;
   font-size: var(--text-xs);
 }
+
+/* Task 9: field (the Sigrid plan: only Task 9 touches this section, which ends at the next blank line) */
 .field {
   display: flex;
   flex-direction: column;
@@ -259,6 +264,7 @@ kbd {
   font-weight: 400;
   font-size: var(--text-sm);
 }
+
 /* A progress bar: a visible track filled in the accent. The bare element drew no track, so at 0% it was a
    blank gap. A page that must signal a limit sets --progress-fill. */
 progress {

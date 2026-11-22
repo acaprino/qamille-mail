@@ -3,7 +3,10 @@
    the active page, a checked switch) or a shadow ring would vanish. Here each of those states also
    gets a border or an outline in a system colour, which the theme keeps. Only system colour keywords
    (Highlight, HighlightText, CanvasText, ButtonText, ButtonFace, GrayText, Canvas): never a token, never
-   a literal. `forced-color-adjust: none` only on the small parts drawn by background alone. */
+   a literal. `forced-color-adjust: none` only on the small parts drawn by background alone.
+   The Sigrid plan (docs/superpowers/plans/2026-11-22-qamille-su-sigrid.md): the rules of the app come first, then
+   one block per primitive, under its task's comment and apart from the others by a blank line. A task rewrites only
+   its own block on Sigrid's parts (the comment and its lines, never the blank lines around it). */
 @media (forced-colors: active) {
   /* Focus: a ring in the theme's highlight, also where the app draws it as a shadow. */
   :focus-visible,
@@ -32,26 +35,9 @@
   .profile.active,
   .mail-display button.active,
   .format-toolbar button.active,
-  .search-filter-button.active,
-  [data-scope='tabs'] [data-part='trigger'][data-selected],
-  [data-scope='select'][data-part='item'][data-state='checked'],
-  [data-scope='date-picker'][data-part='table-cell-trigger'][data-selected] {
+  .search-filter-button.active {
     outline: 2px solid Highlight;
     outline-offset: -2px;
-  }
-  /* The item the arrow keys are on in a list box, and the current item of a menu (the keys' or the
-     pointer's: its tint and its ring both go in a Contrast theme). */
-  [data-scope='select'][data-part='item'][data-highlighted],
-  [data-scope='combobox'][data-part='item'][data-highlighted],
-  [data-scope='tags-input'][data-part='item-preview'][data-highlighted],
-  [data-scope='menu'][data-part='item'][data-highlighted] {
-    outline: 1px dashed Highlight;
-    outline-offset: -1px;
-  }
-  /* The line between the groups of a menu is a background alone. */
-  [data-scope='menu'][data-part='separator'] {
-    forced-color-adjust: none;
-    background: CanvasText;
   }
 
   /* The calendar list: shown or hidden is only the dot's fill, a background in the calendar's own
@@ -82,8 +68,7 @@
   /* Chips, tags and counts are tinted pills: a border keeps their shape. */
   .tag,
   .origin-chip,
-  .nav-count,
-  [data-scope='tags-input'][data-part='item-preview'] {
+  .nav-count {
     border: 1px solid CanvasText;
   }
 
@@ -92,7 +77,13 @@
     border-left: 3px solid Highlight;
   }
 
-  /* Switch: the track and the thumb are backgrounds only. */
+  /* Disabled stays visibly disabled when opacity is all that marks it. */
+  button:disabled {
+    color: GrayText;
+    border-color: GrayText;
+  }
+
+  /* Task 4: switch. The track and the thumb are backgrounds only. */
   button[role='switch'] {
     border: 1px solid ButtonText;
   }
@@ -117,7 +108,15 @@
     border-color: GrayText;
   }
 
-  /* Checkbox: checked is a filled box. */
+  /* Task 5: tabs. The current tab: a highlighted edge. */
+  [data-scope='tabs'] [data-part='trigger'][data-selected] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  /* Task 6: slider. No rule of its own. */
+
+  /* Task 8: checkbox. Checked is a filled box. */
   [data-scope='checkbox'][data-part='control'] {
     border-color: ButtonText;
   }
@@ -129,21 +128,63 @@
     color: HighlightText;
   }
 
-  /* A dialog and a panel float over the page with a shadow: an edge separates them. */
-  [data-scope='dialog'][data-part='content'],
-  [data-scope='popover'][data-part='content'],
-  [data-scope='menu'][data-part='content'],
-  [data-scope='tooltip'][data-part='content'],
+  /* Task 10: toast. A notice floats over the page with a shadow: an edge separates it. */
   [data-scope='toast'][data-part='root'] {
     border: 1px solid CanvasText;
   }
 
-  /* Disabled stays visibly disabled when opacity is all that marks it. */
-  button:disabled {
-    color: GrayText;
-    border-color: GrayText;
+  /* Task 11: date-picker. The chosen day: a highlighted edge. */
+  [data-scope='date-picker'][data-part='table-cell-trigger'][data-selected] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  /* Task 12: select. The chosen item, then the item the arrow keys are on (the later rule wins on an item that is both). */
+  [data-scope='select'][data-part='item'][data-state='checked'] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+  [data-scope='select'][data-part='item'][data-highlighted] {
+    outline: 1px dashed Highlight;
+    outline-offset: -1px;
+  }
+
+  /* Task 13: popover, menu and tooltip. The current item of a menu (the keys' or the pointer's: its tint and its
+     ring both go in a Contrast theme); the line between the groups is a background alone; the surfaces float with a
+     shadow, so an edge separates them; a disabled item is grey. */
+  [data-scope='menu'][data-part='item'][data-highlighted] {
+    outline: 1px dashed Highlight;
+    outline-offset: -1px;
+  }
+  [data-scope='menu'][data-part='separator'] {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+  [data-scope='popover'][data-part='content'],
+  [data-scope='menu'][data-part='content'],
+  [data-scope='tooltip'][data-part='content'] {
+    border: 1px solid CanvasText;
   }
   [data-scope='menu'][data-part='item'][data-disabled] {
     color: GrayText;
   }
+
+  /* Task 14: dialog. A dialog and a panel float over the page with a shadow: an edge separates them. */
+  [data-scope='dialog'][data-part='content'] {
+    border: 1px solid CanvasText;
+  }
+
+  /* Task 15: recipients. The suggestion the arrow keys are on, the chip reached from the box, and the chips'
+     shape (tinted pills: a border keeps it). */
+  [data-scope='combobox'][data-part='item'][data-highlighted],
+  [data-scope='tags-input'][data-part='item-preview'][data-highlighted] {
+    outline: 1px dashed Highlight;
+    outline-offset: -1px;
+  }
+  [data-scope='tags-input'][data-part='item-preview'] {
+    border: 1px solid CanvasText;
+  }
+
+  /* Task 17: nav. No rule of its own yet: the sidebar's rows (.sidebar nav button.active, .nav-count) are in the
+     app's rules above. */
 }

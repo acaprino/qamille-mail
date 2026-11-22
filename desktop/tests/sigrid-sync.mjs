@@ -37,6 +37,7 @@ function sigridPackage({ peerDependencies, version = '1.2.3', commit = COMMIT, f
     'dist/index.d.ts': 'export declare const sigrid: 1;\n',
     'src/styles/theme.css': ':root { color-scheme: light dark; }\n',
     LICENSE: 'MIT\n',
+    'THIRD_PARTY.md': '# Third-party notices\n',
     ...files,
   };
   for (const [path, text] of Object.entries(all)) write(join(dir, path), text);
@@ -204,6 +205,57 @@ test('no release and no copy fails with a useful message', async () => {
     return true;
   });
   assert.equal(existsSync(vendorOf(desktop)), false);
+});
+
+test('a sync with no release and no copy fails, and leaves nothing half-written', async () => {
+  const desktop = desktopOf();
+  // What a sync that died while copying the package leaves: a .part that was never renamed into place. It is not a
+  // copy of Sigrid, and the failed sync does not leave it behind.
+  write(join(`${vendorOf(desktop)}.part`, 'dist', 'index.js'), 'export const sigrid = "half";\n');
+  await assert.rejects(syncSigrid({ desktop, release: null, log: () => {} }), /no release of acaprino\/sigrid's main reachable and no copy in vendor\/sigrid/);
+  assert.deepEqual(Object.keys(tree(desktop)), ['package.json'], 'no vendor/sigrid, no .part or .old, no licences');
+});
+
+const licencesOf = (desktop) => join(desktop, 'public', 'sigrid-licenses');
+
+test('licences and provenance land in public/sigrid-licenses', async () => {
+  const dir = sigridPackage({ files: { LICENSE: 'MIT, Sigrid\n', 'THIRD_PARTY.md': '# Bundled: Base UI, Ark UI, Motion\n' } });
+  const desktop = desktopOf({ old: true });
+  // A notice of an earlier release that the new one no longer has does not stay.
+  write(join(licencesOf(desktop), 'OLD_NOTICE.md'), 'old\n');
+  await syncSigrid({ desktop, release: releaseOf(dir), log: () => {} });
+  const expected = Object.fromEntries(['LICENSE', 'THIRD_PARTY.md', 'provenance.json'].map((name) => [name, readFileSync(join(dir, name), 'utf8')]));
+  assert.deepEqual(tree(licencesOf(desktop)), expected);
+  // A copy kept without the network writes them too (public/ is generated, and may have been cleaned).
+  rmSync(licencesOf(desktop), { recursive: true, force: true });
+  await syncSigrid({ desktop, release: null, log: () => {} });
+  assert.deepEqual(tree(licencesOf(desktop)), expected);
+  // And so does a package built in SIGRID_DIR.
+  const { checkout, packageDir } = fakeCheckout();
+  await syncSigrid({ desktop, source: checkout, log: () => {} });
+  assert.equal(tree(licencesOf(desktop))['provenance.json'], readFileSync(join(packageDir, 'provenance.json'), 'utf8'));
+});
+
+test('a package without its licence or its third-party notices is refused, and the old copy and its licences stay', async () => {
+  for (const missing of ['LICENSE', 'THIRD_PARTY.md']) {
+    const dir = sigridPackage();
+    // Missing from the package and from its provenance.json alike: the package is whole, but the exe could not
+    // carry the notice.
+    rmSync(join(dir, missing));
+    const provenance = JSON.parse(readFileSync(join(dir, 'provenance.json'), 'utf8'));
+    delete provenance.files[missing];
+    write(join(dir, 'provenance.json'), `${JSON.stringify(provenance, null, 2)}\n`);
+    const desktop = desktopOf({ old: true });
+    await syncSigrid({ desktop, release: null, log: () => {} });
+    const before = tree(vendorOf(desktop));
+    const licences = tree(licencesOf(desktop));
+    await assert.rejects(syncSigrid({ desktop, release: releaseOf(dir), log: () => {} }), (error) => {
+      assert.ok(error.message.includes(`the package has no ${missing}`), error.message);
+      return true;
+    }, missing);
+    assertKept(desktop, before);
+    assert.deepEqual(tree(licencesOf(desktop)), licences, missing);
+  }
 });
 
 test('no release but a copy keeps the copy', async () => {

@@ -26,6 +26,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@acaprino/sigrid": [
+        "./vendor/sigrid/dist/index.d.ts"
       ]
     }
   },

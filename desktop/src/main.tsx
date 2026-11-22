@@ -7,6 +7,7 @@ import './ds/styles/forced-colors.css';
 import { appearancePreference, resolvedAppearance, systemPrefersDark } from './lib/appearance';
 import { call, desktop } from './lib/api';
 import { installBrowserGuards } from './lib/browser-guards';
+import { SigridRoot } from './ui/SigridRoot';
 
 document.documentElement.dataset.theme = resolvedAppearance(appearancePreference(), systemPrefersDark());
 installBrowserGuards();
@@ -21,9 +22,12 @@ function pageFailed(error: unknown) {
 }
 
 // No StrictMode: the root talks to the backend on mount, and its effects must run once.
-// MotionConfig: every Motion animation (Tabs, NavList, Apple Switch, rows) honours reduced motion.
+// SigridRoot: Sigrid's words and motion. MotionConfig: every Motion animation of Qamille's own (Tabs, NavList, Apple
+// Switch, rows) honours reduced motion, until the app's motion comes from Sigrid too.
 createRoot(document.getElementById('app')!, { onUncaughtError: pageFailed }).render(
-  <MotionConfig reducedMotion="user">
-    <App />
-  </MotionConfig>,
+  <SigridRoot>
+    <MotionConfig reducedMotion="user">
+      <App />
+    </MotionConfig>
+  </SigridRoot>,
 );

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react';
+import { useLand } from '../ui/motion';
 import Button from '../ui/Button';
 import Tooltip from '../ui/Tooltip';
 import DateField from '../ui/DateField';
@@ -407,8 +408,9 @@ export default function Composer(props: ComposerProps) {
     await queue('discard', null, false);
   }
 
-  // Minimized, the panel is hidden at once; opened again it shows at once.
+  // Minimized, the panel is hidden at once; opened again it settles into place.
   const hidden = !active;
+  useLand(panel, active, active);
   const fileName = (path: string) => path.split(/[\\/]/).pop();
 
   return (

@@ -4,6 +4,7 @@
 // now; the page re-reads the meeting, this does not ask for anything. The block fades in and the
 // bar grows with a spring (no movement under prefers-reduced-motion).
 import Button from '../../ui/Button';
+import { useAppear } from '../../ui/motion';
 import { tr } from '../../lib/i18n';
 import type { MeetingJob } from '../../lib/meetings';
 import MeetingNotice from './MeetingNotice';
@@ -17,6 +18,7 @@ export type MeetingProgressProps = {
 };
 
 export default function MeetingProgress({ job, compact = false, busy = false, oncancel }: MeetingProgressProps) {
+  const appear = useAppear();
   const transcribing = job.kind === 'transcribe';
   const heading = transcribing
     ? tr('Sto trascrivendo la riunione', 'Transcribing the meeting')
@@ -46,7 +48,7 @@ export default function MeetingProgress({ job, compact = false, busy = false, on
   );
 
   return compact ? (
-    <div className="inline meeting-progress">
+    <div ref={appear} className="inline meeting-progress">
       <h3>{heading}</h3>
       <p className="phase">{phase}</p>
       {bar}

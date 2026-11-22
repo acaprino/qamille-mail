@@ -11,11 +11,15 @@ import {
   Fragment,
   createContext,
   isValidElement,
+  useCallback,
   useContext,
+  useLayoutEffect,
+  useRef,
   type ComponentPropsWithoutRef,
   type ElementType,
   type ReactNode,
   type Ref,
+  type RefObject,
 } from 'react';
 import { preloadMotion, useMotion } from '@acaprino/sigrid';
 
@@ -25,6 +29,45 @@ import { preloadMotion, useMotion } from '@acaprino/sigrid';
  */
 export async function startMotion(ms = 600): Promise<void> {
   await Promise.race([preloadMotion(), new Promise<void>((done) => setTimeout(done, ms))]);
+}
+
+// Nothing moves while the app is loading: what mounts in the first moments is simply there (Sigrid starts no motion on load).
+const STARTED = typeof performance === 'undefined' ? 0 : performance.now();
+const LOADING_MS = 1500;
+const loaded = () => typeof performance !== 'undefined' && performance.now() - STARTED > LOADING_MS;
+
+/**
+ * The `ref` of an element that comes into the page because the user did something (a state of a meeting, a card): it
+ * settles into place once, coming down a few pixels as it fades in (Sigrid's `landCard`). Not while the app is loading.
+ */
+export function useAppear(): (element: HTMLElement | null) => void {
+  const motion = useMotion();
+  const seen = useRef<HTMLElement | null>(null);
+  return useCallback(
+    (element: HTMLElement | null) => {
+      if (!element || element === seen.current) return;
+      seen.current = element;
+      if (motion && loaded()) motion.landCard(element);
+    },
+    [motion],
+  );
+}
+
+/**
+ * The same entrance on an element that stays: each time `key` changes (never on the first render, never while loading) and
+ * `when` holds, it settles into place again: the view that has just changed, a panel that has just opened.
+ */
+export function useLand(ref: RefObject<HTMLElement | null>, key: unknown, when = true): void {
+  const motion = useMotion();
+  const first = useRef(true);
+  useLayoutEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    if (motion && when && loaded() && ref.current) motion.landCard(ref.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
 }
 
 /** True while Sigrid's motion is on: the app animates, the system allows motion and the chunk with Motion is loaded. */
@@ -66,7 +109,7 @@ export type ItemProps<T extends Tag> = Omit<ComponentPropsWithoutRef<T>, 'childr
   as?: T;
   /** It comes in animated: a new entry. False for what was already there when the list appeared (no animation on load). */
   enter?: boolean;
-  /** It leaves by closing up (a row that is done), not only fading (a card). A row appears still. */
+  /** It leaves by closing up (a row that is done), not only fading (a card). A row comes down into its place, but does not make room (no layout). */
   closes?: boolean;
   ref?: Ref<HTMLElement>;
   children?: ReactNode | ((leaving: boolean) => ReactNode);
@@ -83,7 +126,12 @@ export function Item<T extends Tag = 'div'>({ as, enter = true, closes = false, 
   if (!motion) return <Plain ref={ref} {...rest}>{typeof children === 'function' ? children(false) : children}</Plain>;
   const Moving = motion.m[tag] as ElementType;
   const way = closes
-    ? { ...motion.ROW_EXIT, exit: { ...motion.ROW_EXIT.exit, overflow: 'hidden' } }
+    ? {
+        initial: enter ? motion.LIST_ITEM.initial : false,
+        animate: motion.LIST_ITEM.animate,
+        exit: { ...motion.ROW_EXIT.exit, overflow: 'hidden', transition: motion.ROW_EXIT.transition },
+        transition: motion.MOTION.enter,
+      }
     : { layout: true, ...motion.LIST_ITEM, initial: enter ? motion.LIST_ITEM.initial : false };
   return (
     <motion.Leaving>

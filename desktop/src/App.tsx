@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import Kbd from './ui/Kbd';
+import { useLand } from './ui/motion';
 import Button from './ui/Button';
 import Toaster, { notify as showNotice, type NoticeAction } from './ui/Toaster';
 import { listen } from '@tauri-apps/api/event';
@@ -1536,6 +1537,9 @@ export default function App() {
   useEffect(() => {
     if (s.openedShownOnly.size) s.openedShownOnly = new Set();
   }, [s.view, s.accountId]);
+
+  // The main view settles into place when it changes (enter only: two views never share the screen).
+  useLand(content, s.view);
 
   useEffect(() => {
     void init();

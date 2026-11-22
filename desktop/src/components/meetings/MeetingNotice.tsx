@@ -4,6 +4,7 @@
 // else the state draws (`children`), then the buttons (`actions`) and a quiet `note` under them. The
 // progress of a job is the same card with a bar in it (MeetingProgress).
 import type { ReactNode } from 'react';
+import { useAppear } from '../../ui/motion';
 import Icon from '../../ui/Icon';
 import { cn } from '../../lib/utils';
 import './MeetingNotice.css';
@@ -30,8 +31,9 @@ export default function MeetingNotice({
   actions,
   className,
 }: MeetingNoticeProps) {
+  const appear = useAppear();
   return (
-    <div className={cn('state meeting-notice', className)}>
+    <div ref={appear} className={cn('state meeting-notice', className)}>
       <h3>{title}</h3>
       {text && <p className="state-text">{text}</p>}
       {message && (

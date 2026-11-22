@@ -95,7 +95,7 @@ può aprire link nel browser). Nel suo `main.tsx` chiama `installBrowserGuards()
 test 5 conta builder e chiamate in ogni file `.rs`.
 
 **Nuovo campo che reagisce a Invio o a Esc**: prima di agire controlla `imeComposing(event.nativeEvent)`
-(`src/ds/ime.ts`); il test 11 cerca ogni `key === 'Enter'` o `'Escape'` nei `.ts` e `.tsx`.
+(`src/lib/ime.ts`); il test 11 cerca ogni `key === 'Enter'` o `'Escape'` nei `.ts` e `.tsx`.
 
 **Nuova voce da tenere nel tasto destro**: aggiungi il suo nome (`Name` di
 `ICoreWebView2ContextMenuItem`) a `MENU_ITEMS_KEPT` e un caso ai test in fondo a

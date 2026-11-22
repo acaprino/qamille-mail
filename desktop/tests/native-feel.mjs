@@ -211,7 +211,7 @@ check('8. the custom title bar keeps what a Windows title bar does (audit F2 F4 
 
 // Node strips the type annotations of these dependency-free modules.
 const { externalAddress, fragmentOf, isHistoryButton, isStrayDrop, opensLinkElsewhere } = await import(pathToFileURL(path.join(desktop, 'src/lib/browser-guards.ts')).href);
-const { imeComposing } = await import(pathToFileURL(path.join(desktop, 'src/ds/ime.ts')).href);
+const { imeComposing } = await import(pathToFileURL(path.join(desktop, 'src/lib/ime.ts')).href);
 check("9. a failed page is the app's to answer, never WebView2's error page (rule 21)", () => {
   const rust = read('src-tauri/src/native_feel.rs');
   assert.match(rust, /SetIsBuiltInErrorPageEnabled\(false\)/, 'the WebView2 error page must stay off');

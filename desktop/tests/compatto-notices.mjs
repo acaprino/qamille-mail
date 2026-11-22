@@ -38,7 +38,7 @@ try {
   assert.equal(await css(toast, 'border-top-color'), await token(page, '--border', 'border-top-color'), 'border token');
   assert.equal(await css(toast, 'border-top-width'), '1px');
   assert.equal(await css(toast, 'border-top-left-radius'), '8px', 'radius-lg');
-  assert.equal(await css(toast.locator('[data-part="description"]'), 'font-size'), '13.5px', 'text-sm in Plex');
+  assert.equal(await css(toast.locator('[data-part="description"]'), 'font-size'), '14px', 'text-sm in Plex');
   assert.match(await css(toast, 'font-family'), /IBM Plex Sans/);
   const close = toast.getByRole('button', { name: 'Dismiss notification' });
   const closeBox = await box(close);
@@ -93,7 +93,7 @@ try {
   // (g) The reminder window uses Plex, not Lexend (ruling R8).
   const css8 = await fs.readFile(path.join(root, 'src/reminder/reminder.css'), 'utf8');
   assert.ok(!/lexend/i.test(css8), 'reminder.css has no Lexend');
-  assert.match(css8, /ibm-plex-sans/i, 'reminder.css declares the Plex files');
+  assert.match(css8, /fonts.css/, "reminder.css imports the Plex files of Sigrid");
   assert.match(css8, /font-family:\s*var\(--font-text\)/, 'the body uses the font token');
   const reminder = await browser.newPage();
   await reminder.goto(`${previewUrl}/reminder.html`);
@@ -116,8 +116,8 @@ try {
   assert.equal(await css(notice, 'background-color'), await token(page, '--surface', 'background-color'));
   assert.equal(await css(notice, 'border-top-color'), await token(page, '--border', 'border-top-color'));
   assert.match(await css(notice, 'font-family'), /IBM Plex Sans/);
-  assert.equal(await css(notice.locator('strong'), 'font-size'), '13.5px', 'title is text-sm');
-  assert.equal(await css(notice.locator('.undo-subject'), 'font-size'), '12.5px', 'subject is text-xs');
+  assert.equal(await css(notice.locator('strong'), 'font-size'), '14px', 'title is text-sm');
+  assert.equal(await css(notice.locator('.undo-subject'), 'font-size'), '13px', 'subject is text-xs');
   const undoButton = notice.getByRole('button', { name: /^Undo:/ });
   assert.equal(Math.round((await box(undoButton)).height), 32, 'the Undo button is a 32px control');
   assert.equal(await css(undoButton, 'border-top-left-radius'), '6px', 'radius-md');
@@ -130,7 +130,7 @@ try {
   const line = page.locator('.sidebar .activity-indicator .activity-line');
   await expect(line).toBeVisible();
   assert.equal(await css(line, 'border-top-left-radius'), '12px', 'activity card radius-xl');
-  assert.equal(await css(line.locator('.activity-card-text'), 'font-size'), '12.5px', 'activity text-xs');
+  assert.equal(await css(line.locator('.activity-card-text'), 'font-size'), '13px', 'activity text-xs');
   const height = Math.round((await box(line)).height);
   assert.ok(height >= 38 && height <= 52, `the card is two short lines tall: ${height}px`);
   assert.match(await css(line, 'font-family'), /IBM Plex Sans/);
@@ -139,7 +139,7 @@ try {
   await line.click();
   const row = page.locator('.activity-panel .activity-row').first();
   await expect(row).toBeVisible();
-  assert.equal(await css(row, 'font-size'), '12.5px');
+  assert.equal(await css(row, 'font-size'), '13px');
   assert.equal(await css(row, 'border-top-left-radius'), '6px');
   assert.ok((await box(row)).height >= 28, 'a row is at least 28px');
   await page.evaluate(() => window.__previewAnnounce({ kind: 'sync-progress', account_id: 2, phase: 'complete', added: 0 }));

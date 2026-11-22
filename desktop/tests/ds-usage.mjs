@@ -239,7 +239,12 @@ for (const file of words(DS, /\.(tsx?|js|css)$/)) {
     if (target.startsWith('@tauri-apps')) problems.push(`${rel}:${index + 1}  imports ${target}: the module stays free of the shell`);
     if (target.startsWith('.')) {
       const resolved = path.resolve(path.dirname(file), target);
-      if (resolved !== DS && !resolved.startsWith(`${DS}${path.sep}`)) problems.push(`${rel}:${index + 1}  imports ${target}: the module does not reach into the app`);
+      // The one bridge of the move to Sigrid (the Sigrid plan, Tasks 2 to 20): the Tailwind entry takes Sigrid's theme and
+      // fonts and Qamille's parameters for them. It goes with src/ds at the end.
+      const bridge =
+        rel === 'ds/styles/tailwind.css' &&
+        [path.join(root, 'theme'), path.join(root, '..', 'vendor', 'sigrid')].some((home) => resolved.startsWith(`${home}${path.sep}`));
+      if (!bridge && resolved !== DS && !resolved.startsWith(`${DS}${path.sep}`)) problems.push(`${rel}:${index + 1}  imports ${target}: the module does not reach into the app`);
     }
   });
 }

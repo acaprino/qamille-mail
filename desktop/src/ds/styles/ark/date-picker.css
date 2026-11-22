@@ -140,7 +140,7 @@
   opacity: 0.6;
 }
 [data-scope='date-picker'][data-part='table-cell-trigger'][data-today] {
-  font-weight: 700;
+  font-weight: 600;
   color: var(--accent-text);
 }
 [data-scope='date-picker'][data-part='table-cell-trigger'][data-selected] {

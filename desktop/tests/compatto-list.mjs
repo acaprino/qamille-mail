@@ -75,11 +75,11 @@ try {
 
   // ---- the group labels ----
   const group = page.locator('.group-heading').first();
-  assert.equal(await style(group, 'font-size'), '11.5px');
+  assert.equal(await style(group, 'font-size'), '12px');
   assert.equal(await style(group, 'text-transform'), 'uppercase');
   assert.equal(await style(group, 'font-weight'), '600');
   assert.equal(await style(group, 'background-color'), 'rgb(246, 247, 249)');
-  console.log('PASS Group labels are 11.5px, uppercase, on the ground');
+  console.log('PASS Group labels are 12px, uppercase, on the ground');
 
   // ---- a row: two lines, no avatar, the unread marks, the selection ----
   assert.equal(await page.locator('.sender-avatar, .reply-avatar').count(), 0, 'no avatar');
@@ -88,7 +88,7 @@ try {
   const dotBox = await dot.boundingBox();
   assert.equal(Math.round(dotBox.width) + 'x' + Math.round(dotBox.height), '6x6', 'the dot is 6px');
   assert.equal(await style(dot, 'background-color'), ACCENT);
-  assert.equal(await style(unread.locator('.mail-meta strong'), 'font-weight'), '700', 'an unread sender is bold');
+  assert.equal(await style(unread.locator('.mail-meta strong'), 'font-weight'), '600', 'an unread sender is bold');
   assert.equal(await style(unread.locator('.mail-meta time'), 'color'), ACCENT, 'and its time is the accent');
   const lines = async (row) => {
     const sender = await row.locator('.mail-meta strong').boundingBox();
@@ -104,7 +104,7 @@ try {
   assert.ok(two.row.height >= 44 && two.row.height < 64, `two lines high (${two.row.height})`);
   assert.ok((await unread.locator('.mail-preview').innerText()).length > 0);
   const selected = page.locator('.mail-row.selected').first();
-  assert.equal(await style(selected, 'background-color'), 'rgb(237, 237, 252)', 'the selected row is accent at 10%');
+  assert.equal(await style(selected, 'background-color'), 'rgb(219, 225, 255)', 'the selected row is the selection tint of Sigrid');
   console.log('PASS A row has two lines, no avatar, a 6px accent dot and an accent time when unread');
 
   // ---- the checkbox stays native and per row; the selection bar uses the Checkbox ----

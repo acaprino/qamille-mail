@@ -124,11 +124,13 @@ check('3. the startup script picks the same theme as the app', () => {
   }
 });
 
-check('4. native window backgrounds match --ground in theme.css (what html, body and .app-shell paint)', () => {
-  const theme = stripComments(read('src/ds/tokens/theme.css'));
-  const light = theme.match(/:root\s*\{[^}]*?--ground:\s*([^;]+);/);
-  const dark = theme.match(/:root\[data-scheme='dark'\]\s*\{[^}]*?--ground:\s*([^;]+);/);
-  assert.ok(light && dark, 'theme.css must define --ground for :root and dark');
+check('4. native window backgrounds match --ground, which is the paper of Sigrid in src/theme/compatto.css (what html, body and .app-shell paint)', () => {
+  // --ground is an alias of --color-paper (compatto.css, generated from Sigrid's engine): the page colour of each scheme.
+  const theme = stripComments(read('src/theme/compatto.css'));
+  assert.match(theme, /--ground:\s*var\(--color-paper\);/, '--ground must be the paper of Sigrid');
+  const light = theme.match(/:root\[data-scheme='light'\]\s*\{[^}]*?--color-paper:\s*([^;]+);/);
+  const dark = theme.match(/:root\[data-scheme='dark'\]\s*\{[^}]*?--color-paper:\s*([^;]+);/);
+  assert.ok(light && dark, 'compatto.css must define --color-paper for light and dark');
   const conf = JSON.parse(read('src-tauri/tauri.conf.json'));
   assert.equal(hex(conf.app.windows[0].backgroundColor), hex(light[1]), 'tauri.conf.json backgroundColor ≠ light --ground');
   const rust = read('src-tauri/src/native_feel.rs').match(/DARK_GROUND: Color = Color\(0x(\w\w), 0x(\w\w), 0x(\w\w), 0xff\)/);

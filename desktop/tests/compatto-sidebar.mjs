@@ -7,7 +7,7 @@ import { openApp, css, box } from './support/compatto.mjs';
 
 const WHITE = 'rgb(255, 255, 255)';
 const ACCENT = 'rgb(79, 70, 229)';
-const SIDEBAR_ACTIVE = 'rgb(42, 46, 56)';
+const SIDEBAR_ACTIVE = 'rgb(40, 43, 49)';
 
 const channels = (color) => color.match(/[\d.]+/g).slice(0, 3).map(Number);
 const luminance = (color) => {
@@ -30,8 +30,8 @@ try {
   const tools = sidebar.getByRole('navigation', { name: 'Workspace' });
 
   // (a) The column is the Compatto dark ground.
-  assert.equal(await css(sidebar, 'background-color'), 'rgb(22, 24, 29)');
-  console.log('PASS The sidebar has the dark ground rgb(22, 24, 29)');
+  assert.equal(await css(sidebar, 'background-color'), 'rgb(21, 23, 27)');
+  console.log('PASS The sidebar has the dark ground rgb(21, 23, 27)');
 
   // (b) New message: accent fill, 36 px high, 6 px radius, the N shown.
   const compose = sidebar.getByRole('button', { name: 'New message' });
@@ -63,8 +63,8 @@ try {
   const otherCount = await folders.locator('button:not([aria-current])').count();
   assert.ok(otherCount >= 5);
   for (let i = 0; i < otherCount; i++)
-    assert.equal(await css(folders.locator('button:not([aria-current])').nth(i), 'color'), 'rgb(211, 215, 222)');
-  console.log('PASS The active folder is lifted with an accent count; the others are rgb(211, 215, 222)');
+    assert.equal(await css(folders.locator('button:not([aria-current])').nth(i), 'color'), 'rgb(209, 212, 218)');
+  console.log('PASS The active folder is lifted with an accent count; the others are rgb(209, 212, 218)');
 
   // (e) The tools sit at the bottom, above a hairline in --sidebar-active, below the folders.
   const calendar = tools.getByRole('button', { name: 'Calendar' });
@@ -119,7 +119,7 @@ try {
   const collapsed = page.getByRole('complementary', { name: 'Sidebar' });
   await expect(collapsed.locator('.sidebar-text').first()).toBeHidden();
   const dot = collapsed.locator('.nav-count').first();
-  assert.equal(await css(dot, 'background-color'), 'rgb(167, 163, 242)');
+  assert.equal(await css(dot, 'background-color'), 'rgb(173, 184, 255)');
   const buttons = collapsed.getByRole('button');
   const total = await buttons.count();
   assert.ok(total >= 14);

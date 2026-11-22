@@ -8,38 +8,6 @@
   --density-pad-xs: 6px;
   --density-row-height: 32px;
   --density-row-pad: 4px;
-  --ground: var(--color-paper);
-  --surface: var(--color-raised);
-  --sidebar: var(--color-sidebar-paper);
-  --sidebar-active: var(--color-sidebar-selected);
-  --sidebar-text: var(--color-sidebar-ink);
-  --sidebar-text-active: var(--color-sidebar-selected-ink);
-  --sidebar-muted: var(--color-sidebar-mute);
-  --accent-on-sidebar: var(--color-sidebar-accent);
-  --text: var(--color-ink);
-  --text-secondary: var(--color-ink-soft);
-  --body-text: var(--color-ink);
-  --muted: var(--color-ink-mute);
-  --nav-text: var(--color-ink-soft);
-  --border: var(--color-line);
-  --border-soft: var(--color-paper-2);
-  --border-strong: var(--color-input);
-  --accent: var(--color-primary);
-  --accent-hover: var(--color-accent);
-  --accent-text: var(--color-accent);
-  --on-accent: var(--color-primary-foreground);
-  --accent-pro: var(--color-primary);
-  --ring: var(--color-ring);
-  --selection: var(--color-selected);
-  --danger: var(--color-destructive);
-  --danger-bg: var(--color-destructive-soft);
-  --success: var(--color-success);
-  --success-bg: var(--color-success-soft);
-  --highlight: var(--color-highlight);
-  --shadow: var(--elevation-lg);
-  --control-height: var(--control-md);
-  --font-text: var(--font-sans);
-  --font-title: var(--font-sans);
 }
 
 :root:not([data-scheme]),

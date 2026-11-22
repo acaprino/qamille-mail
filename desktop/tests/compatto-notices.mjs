@@ -34,8 +34,8 @@ try {
   await expect(toast).toHaveClass(/toast/);
   const group = page.locator('[data-scope="toast"][data-part="group"]');
   assert.equal(await css(group, 'z-index'), await token(page, '--z-toast', 'z-index'), 'the region is at --z-toast');
-  assert.equal(await css(toast, 'background-color'), await token(page, '--surface', 'background-color'), 'surface fill');
-  assert.equal(await css(toast, 'border-top-color'), await token(page, '--border', 'border-top-color'), 'border token');
+  assert.equal(await css(toast, 'background-color'), await token(page, '--color-raised', 'background-color'), 'surface fill');
+  assert.equal(await css(toast, 'border-top-color'), await token(page, '--color-line', 'border-top-color'), 'border token');
   assert.equal(await css(toast, 'border-top-width'), '1px');
   assert.equal(await css(toast, 'border-top-left-radius'), '8px', 'radius-lg');
   assert.equal(await css(toast.locator('[data-part="description"]'), 'font-size'), '14px', 'text-sm in Plex');
@@ -94,7 +94,7 @@ try {
   const css8 = await fs.readFile(path.join(root, 'src/reminder/reminder.css'), 'utf8');
   assert.ok(!/lexend/i.test(css8), 'reminder.css has no Lexend');
   assert.match(css8, /fonts.css/, "reminder.css imports the Plex files of Sigrid");
-  assert.match(css8, /font-family:\s*var\(--font-text\)/, 'the body uses the font token');
+  assert.match(css8, /font-family:\s*var\(--font-sans\)/, 'the body uses the font token');
   const reminder = await browser.newPage();
   await reminder.goto(`${previewUrl}/reminder.html`);
   await reminder.evaluate(() => document.fonts.ready);
@@ -113,8 +113,8 @@ try {
   const notice = notices.locator('.undo-notice');
   await expect(notice).toHaveCount(1);
   assert.equal(await css(notice, 'border-top-left-radius'), '8px', 'undo notice radius-lg');
-  assert.equal(await css(notice, 'background-color'), await token(page, '--surface', 'background-color'));
-  assert.equal(await css(notice, 'border-top-color'), await token(page, '--border', 'border-top-color'));
+  assert.equal(await css(notice, 'background-color'), await token(page, '--color-raised', 'background-color'));
+  assert.equal(await css(notice, 'border-top-color'), await token(page, '--color-line', 'border-top-color'));
   assert.match(await css(notice, 'font-family'), /IBM Plex Sans/);
   assert.equal(await css(notice.locator('strong'), 'font-size'), '14px', 'title is text-sm');
   assert.equal(await css(notice.locator('.undo-subject'), 'font-size'), '13px', 'subject is text-xs');
@@ -134,7 +134,7 @@ try {
   const height = Math.round((await box(line)).height);
   assert.ok(height >= 38 && height <= 52, `the card is two short lines tall: ${height}px`);
   assert.match(await css(line, 'font-family'), /IBM Plex Sans/);
-  assert.equal(await css(line, 'border-top-color'), await token(page, '--sidebar-active', 'border-top-color'));
+  assert.equal(await css(line, 'border-top-color'), await token(page, '--color-sidebar-selected', 'border-top-color'));
   assert.equal(await css(line, 'background-color'), await token(page, '--sidebar-hover', 'background-color'));
   await line.click();
   const row = page.locator('.activity-panel .activity-row').first();
@@ -200,7 +200,7 @@ try {
     assert.equal(Math.round((await box(button)).height), 32, `${name} is a 32px control`);
     assert.equal(await css(button, 'border-top-left-radius'), '6px', `${name} radius-md`);
   }
-  assert.equal(await css(chip.getByRole('button', { name: 'Join', exact: true }), 'background-color'), await token(chipPage, '--accent', 'background-color'));
+  assert.equal(await css(chip.getByRole('button', { name: 'Join', exact: true }), 'background-color'), await token(chipPage, '--color-primary', 'background-color'));
   await chipPage.close();
   console.log('PASS the reminder chip: 52px, 32px controls, radius tokens, Plex');
 

@@ -10,11 +10,11 @@ const port = 28171;
 const url = `http://127.0.0.1:${port}`;
 const root = path.resolve(import.meta.dirname, '..');
 
-// The window colour shows before the page paints: it is the theme's --ground, the colour the page paints
+// The window colour shows before the page paints: it is the theme's --color-paper, the colour the page paints
 // first (docs/aspetto-nativo.md rule 6, kept in step by tests/native-feel.mjs).
 const tauri = JSON.parse(fs.readFileSync(path.join(root, 'src-tauri/tauri.conf.json'), 'utf8'));
-assert.equal(tauri.app.windows[0].backgroundColor.toLowerCase(), '#f6f7f9', 'window backgroundColor follows --ground');
-console.log('PASS The window background follows --ground');
+assert.equal(tauri.app.windows[0].backgroundColor.toLowerCase(), '#f6f7f9', 'window backgroundColor follows --color-paper');
+console.log('PASS The window background follows --color-paper');
 
 const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', String(port), '--strictPort'], {
   cwd: root, windowsHide: true, stdio: 'pipe',
@@ -57,7 +57,7 @@ try {
         sheetRight: window.innerWidth - document.querySelector('.workspace-content').getBoundingClientRect().right,
         sheetBottom: window.innerHeight - document.querySelector('.workspace-content').getBoundingClientRect().bottom,
         radiusToken: token('--radius-sheet'),
-        ground: token('--ground'),
+        ground: token('--color-paper'),
         groundPaint: style('.app-shell').backgroundColor,
         sidebarEdge: style('.sidebar').borderRightWidth,
         shadows: [...document.querySelectorAll('.primary, .compose-main, .brand-mark')].map(el => getComputedStyle(el).boxShadow),
@@ -151,7 +151,7 @@ try {
   await expect(dark.locator('.mail-row').first()).toBeVisible();
   const tokens = await dark.evaluate(() => {
     const token = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    return { ground: token('--ground'), sidebar: token('--sidebar'), surface: token('--surface'), wash: token('--priority-wash'), paint: getComputedStyle(document.querySelector('.app-shell')).backgroundColor };
+    return { ground: token('--color-paper'), sidebar: token('--color-sidebar-paper'), surface: token('--color-raised'), wash: token('--priority-wash'), paint: getComputedStyle(document.querySelector('.app-shell')).backgroundColor };
   });
   assert.deepEqual(tokens, { ground: '#12161e', sidebar: '#12161e', surface: '#1a202c', wash: '#221d18', paint: 'rgb(18, 22, 30)' });
   console.log('PASS Dark ground, sheet and priority wash');

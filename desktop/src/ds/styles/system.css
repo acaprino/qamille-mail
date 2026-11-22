@@ -6,7 +6,7 @@
   box-sizing: border-box;
 }
 html {
-  background: var(--ground);
+  background: var(--color-paper);
 }
 /* Native feel (docs/aspetto-nativo.md rule 4): the root of the WebView never scrolls and never slides past
    its edge, so a precision touchpad or a touchscreen cannot move the whole view and uncover the window
@@ -20,9 +20,9 @@ body {
 }
 body {
   margin: 0;
-  font-family: var(--font-text);
-  color: var(--text);
-  background: var(--ground);
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: var(--color-paper);
   font-size: var(--text-sm);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -81,7 +81,7 @@ code,
 }
 /* A link of the interface (a setup guide) in the app's accent, not the browser's blue and purple. */
 a:any-link {
-  color: var(--accent-text);
+  color: var(--color-accent);
   text-underline-offset: 3px;
 }
 /* Icons, avatars and links of the interface do not drag a browser ghost out of the window
@@ -109,7 +109,7 @@ a {
   textarea:focus-visible,
   select:focus-visible,
   summary:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--color-primary);
     outline-offset: 3px;
   }
 }
@@ -120,8 +120,8 @@ a {
   textarea,
   select {
     color: inherit;
-    background: var(--surface);
-    border: 1px solid var(--border-strong);
+    background: var(--color-raised);
+    border: 1px solid var(--color-input);
     border-radius: var(--radius-md);
     padding: 7px 9px;
   }
@@ -138,7 +138,7 @@ a {
   }
 }
 input[type='checkbox'] {
-  accent-color: var(--accent);
+  accent-color: var(--color-primary);
   width: 17px;
   height: 17px;
 }
@@ -158,13 +158,13 @@ p {
   margin: 0;
 }
 h1 {
-  font-family: var(--font-title);
+  font-family: var(--font-sans);
   font-size: var(--text-2xl);
   font-weight: 600;
   letter-spacing: -1px;
 }
 h2 {
-  font-family: var(--font-title);
+  font-family: var(--font-sans);
   font-size: var(--text-xl);
   font-weight: 600;
   letter-spacing: -0.4px;
@@ -176,24 +176,24 @@ h3 {
 kbd {
   font: inherit;
   font-size: var(--text-2xs);
-  color: var(--muted);
-  border: 1px solid var(--border);
+  color: var(--color-ink-mute);
+  border: 1px solid var(--color-line);
   border-radius: var(--radius-sm);
   padding: 1px 5px;
   white-space: nowrap;
 }
 .muted {
-  color: var(--muted);
+  color: var(--color-ink-mute);
 }
 .accent {
-  color: var(--accent-text) !important;
+  color: var(--color-accent) !important;
 }
 /* A checkbox with its label: the box and the text on one line, and a click anywhere on it toggles (ui/Checkbox.tsx). */
 .checkbox-row {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: var(--text);
+  color: var(--color-ink);
   font-size: var(--text-sm);
 }
 .checkbox-row[data-disabled] {
@@ -228,15 +228,15 @@ progress {
   height: 6px;
   border: 0;
   border-radius: var(--radius-full);
-  background: var(--border);
+  background: var(--color-line);
   overflow: hidden;
 }
 progress::-webkit-progress-bar {
-  background: var(--border);
+  background: var(--color-line);
   border-radius: var(--radius-full);
 }
 progress::-webkit-progress-value {
-  background: var(--progress-fill, var(--accent));
+  background: var(--progress-fill, var(--color-primary));
   border-radius: var(--radius-full);
 }
 /* A disclosure row (details): the app's chevron in place of the browser's triangle, turned down when open
@@ -272,7 +272,7 @@ details[open] > summary::before {
 }
 .field-help {
   font-size: var(--text-2xs);
-  color: var(--muted);
+  color: var(--color-ink-mute);
   line-height: 1.65;
   margin-top: -7px;
   margin-bottom: 14px;
@@ -296,7 +296,7 @@ details[open] > summary::before {
   display: block;
   height: 1px;
   margin: 4px 2px;
-  background: var(--border);
+  background: var(--color-line);
 }
 
 /* Overlays (ADR-0008): the three containers (SidePanel, Modal, Popover) are styled in ds/styles/ark/. */

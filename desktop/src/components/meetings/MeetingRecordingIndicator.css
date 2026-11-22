@@ -8,13 +8,13 @@
   align-items: center;
   gap: 10px;
   box-sizing: border-box;
-  height: var(--control-height);
-  border: 1px solid var(--border-strong);
+  height: var(--control-md);
+  border: 1px solid var(--color-input);
   border-radius: var(--radius-md);
-  background: var(--surface);
+  background: var(--color-raised);
   padding: 0 12px;
   box-shadow: var(--shadow-sm);
-  color: var(--text);
+  color: var(--color-ink);
   font-size: var(--text-sm);
   white-space: nowrap;
   max-width: calc(100vw - 30px);
@@ -23,7 +23,7 @@
     font-size: var(--text-xs);
   }
   &.interrupted {
-    border-color: var(--danger);
+    border-color: var(--color-destructive);
   }
   & > span {
     font-variant-numeric: tabular-nums;
@@ -34,7 +34,7 @@
     display: flex;
   }
   & .open {
-    color: var(--accent-text);
+    color: var(--color-accent);
     white-space: nowrap;
   }
 }

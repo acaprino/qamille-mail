@@ -59,8 +59,8 @@
   color-scheme: dark;
   /* The Compatto look in the dark: the same structure as the light block, the indigo accent lightened.
      Two steps of depth: the sidebar and the ground (the darker one, shared with the top bar), and the sheet
-     (--surface, a step lighter) that carries the work.
-     --accent sits at 6.6:1 on the sheet; the text on it is dark. */
+     (--color-raised, a step lighter) that carries the work.
+     --color-primary sits at 6.6:1 on the sheet; the text on it is dark. */
   --on-accent-soft: #26285a;
   --on-accent-border: #0f102055;
   --priority-text: #f0b878;

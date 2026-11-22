@@ -109,7 +109,7 @@ try {
     await expect(page.locator('.group-heading', { hasText: name })).toHaveAttribute('aria-expanded', 'false');
   }
   const notifications = page.locator('.group-heading', { hasText: 'Notifications' });
-  assert.equal(await notifications.locator('.group-count').evaluate((el) => getComputedStyle(el).color), await colorOf(page, '--accent-text'),
+  assert.equal(await notifications.locator('.group-count').evaluate((el) => getComputedStyle(el).color), await colorOf(page, '--color-accent'),
     'a closed group with unread mail counts in blue');
   console.log('PASS Notifications, Newsletters and Seen start closed; the unread one is marked blue');
 
@@ -174,7 +174,7 @@ try {
   await expect(replies).toHaveCount(2);
   await expect(fold).toHaveAttribute('aria-expanded', 'false');
   assert.equal((await text(fold)).replace(/\D/g, ''), '2', 'it says how many it hides');
-  assert.equal(await fold.evaluate((el) => getComputedStyle(el).color), await colorOf(page, '--accent-text'), 'blue: one of them is unread');
+  assert.equal(await fold.evaluate((el) => getComputedStyle(el).color), await colorOf(page, '--color-accent'), 'blue: one of them is unread');
   await fold.click();
   await expect(replies).toHaveCount(4);
   console.log('PASS Folding a reply hides what is under it, with a count that is blue for an unread one');

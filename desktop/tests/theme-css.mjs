@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { ALIASES, OUTPUT, compattoCss, loadParameters, loadSigrid } from '../scripts/theme-css.mjs';
+import { OUTPUT, RETIRED_NAMES, compattoCss, loadParameters, loadSigrid } from '../scripts/theme-css.mjs';
 
 const sigrid = await loadSigrid();
 const parameters = await loadParameters();
@@ -49,12 +49,11 @@ test('compatto.css is what scripts/theme-css.mjs writes now', () => {
   assert.equal(committed, compattoCss(sigrid, parameters), 'compatto.css is out of date: run `npm run theme:css` and read the diff');
 });
 
-test('compatto.css writes the colours for both schemes, the density, every alias and COMPATTO’s radii', () => {
+test('compatto.css writes the colours for both schemes, the density and COMPATTO’s radii', () => {
   const css = readFileSync(OUTPUT, 'utf8');
   assert.match(css, /:root:not\(\[data-scheme\]\),\n:root\[data-scheme='light'\] \{/);
   assert.match(css, /:root\[data-scheme='dark'\] \{/);
   assert.match(css, /--density-control-md: 32px;/);
-  for (const [name, value] of Object.entries(ALIASES)) assert.ok(css.includes(`  ${name}: ${value};`), name);
   // The corners are a parameter of the theme (`radii` of COMPATTO, Sigrid 3.2.1): 4, 6, 8 and 12 px in both schemes.
   for (const [name, px] of [['sm', 4], ['md', 6], ['lg', 8], ['xl', 12]]) {
     assert.equal(css.split(`  --radius-${name}: ${px}px;`).length - 1, 2, `--radius-${name} is ${px}px in both blocks`);
@@ -62,15 +61,13 @@ test('compatto.css writes the colours for both schemes, the density, every alias
   assert.doesNotMatch(css, /\bcursor:/);
 });
 
-test('every alias leads to a token the generated blocks write, or to one Sigrid’s stylesheet owns', () => {
+test('none of the token names Qamille used before Sigrid is written any more', () => {
   const css = readFileSync(OUTPUT, 'utf8');
   const written = new Set([...css.matchAll(/^ {2}(--[\w-]+):/gm)].map((match) => match[1]));
-  // Sigrid's theme.css owns these: the shape and the density-driven sizes and the font.
-  const OWN = new Set(['--elevation-lg', '--control-md', '--font-sans']);
-  for (const [name, value] of Object.entries(ALIASES)) {
-    const target = value.match(/^var\((--[\w-]+)\)$/)?.[1];
-    assert.ok(target, `${name}: ${value} is not a var()`);
-    assert.ok(written.has(target) || OWN.has(target), `${name} leads to ${target}, which nothing writes`);
+  for (const name of RETIRED_NAMES) assert.ok(!written.has(name), `${name} is written by compatto.css: CSS reads Sigrid's names`);
+  // And the ones it reads are there: the paper, the ink and the accent of both schemes.
+  for (const name of ['--color-paper', '--color-raised', '--color-ink', '--color-line', '--color-primary', '--color-destructive']) {
+    assert.ok(written.has(name), `${name} is not written`);
   }
 });
 

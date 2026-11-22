@@ -120,7 +120,7 @@ try {
   assert.deepEqual(await replies(page).evaluateAll((nodes) => nodes.map((n) => Number(n.dataset.replyId))), [IDS.root, IDS.a]);
   await expect(fold).toHaveAttribute('aria-expanded', 'false');
   assert.equal((await text(fold)).replace(/\D/g, ''), '2', 'the folded reply says how many it hides');
-  assert.equal(await fold.evaluate((el) => getComputedStyle(el).color), await colorOf(page, '--accent-text'), 'blue: one of them is unread');
+  assert.equal(await fold.evaluate((el) => getComputedStyle(el).color), await colorOf(page, '--color-accent'), 'blue: one of them is unread');
   await fold.click();
   await expect(replies(page)).toHaveCount(4);
   console.log('PASS Folding a reply hides everything under it and keeps a count');
@@ -277,7 +277,7 @@ try {
   page = await open(withConversation(sample, { extraReplies: 31, read: { [IDS.many]: true, [lastBeyond]: false } }));
   await expect(toggle(page)).toHaveAttribute('aria-expanded', 'false');
   await expect(toggle(page)).toHaveClass(/has-unread/);
-  assert.equal(await toggle(page).evaluate((el) => getComputedStyle(el).color), await colorOf(page, '--accent-text'), 'the closed arrow is blue');
+  assert.equal(await toggle(page).evaluate((el) => getComputedStyle(el).color), await colorOf(page, '--color-accent'), 'the closed arrow is blue');
   await toggle(page).click();
   await expect(replies(page)).toHaveCount(30);
   await page.locator('.reply-more').click();

@@ -45,7 +45,7 @@ export const tokenAs = (page, name, property = 'color') =>
   );
 
 // A control at rest carries at most the soft --shadow-sm of the unlumen look (a primary button adds its
-// inset top highlight after it), never the floating --shadow. Under Compatto --shadow-sm was `none`.
+// inset top highlight after it), never the floating --elevation-lg. Under Compatto --shadow-sm was `none`.
 export async function restingShadow(page, locator) {
   const shadow = await css(locator, 'box-shadow');
   const soft = await tokenAs(page, '--shadow-sm', 'box-shadow');

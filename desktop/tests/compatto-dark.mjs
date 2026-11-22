@@ -4,7 +4,7 @@
 //   3. The new primitives through the gallery (button, select, checkbox, switch, tabs, slider, date field with
 //      its calendar, modal, popover, side panel) in the dark: the focus ring is 2px in the accent, every
 //      visible text reads at 4.5:1 over what is really painted behind it, no surface is transparent or white
-//      on white, and a field rests on --border-strong (ruling R16).
+//      on white, and a field rests on --color-input (ruling R16).
 // Synthetic data only. Run with the preview address in QAMILLE_PREVIEW_URL (npm run test:browser sets it).
 //   node scripts/test-browser.mjs compatto-dark
 import assert from 'node:assert/strict';
@@ -19,7 +19,7 @@ const EXEMPT = /^--(paper(-text|-muted|-rule)?|sender-\d|highlight|window-close|
 {
   const { light, dark } = readThemes();
   const missing = [...light]
-    .filter(([name, value]) => (value.startsWith('#') || name === '--shadow') && !EXEMPT.test(name) && !dark.has(name))
+    .filter(([name, value]) => (value.startsWith('#') || name === '--elevation-lg') && !EXEMPT.test(name) && !dark.has(name))
     .map(([name]) => name);
   assert.deepEqual(missing, [], `tokens without a dark value: ${missing.join(', ')}`);
   console.log(`ok   every colour token of the light block has a dark value (${dark.size} declared)`);
@@ -124,16 +124,16 @@ const tokenRgb = (page, name) =>
   }, name);
 const accentRgb = (page) => tokenRgb(page, 'accent');
 
-/** The resting border of a field is --border-strong (all four sides the same, 1px). */
+/** The resting border of a field is --color-input (all four sides the same, 1px). */
 async function assertFieldBorder(page, field, what) {
   const strong = await tokenRgb(page, 'border-strong');
   const border = await field.evaluate((el) => {
     const s = getComputedStyle(el);
     return { color: s.borderTopColor, width: s.borderTopWidth };
   });
-  assert.equal(border.color, strong, `${what}: resting border is --border-strong`);
+  assert.equal(border.color, strong, `${what}: resting border is --color-input`);
   assert.equal(border.width, '1px', `${what}: resting border width`);
-  console.log(`ok   resting border of ${what} is --border-strong`);
+  console.log(`ok   resting border of ${what} is --color-input`);
 }
 
 /** The focus ring of an element: 2px, solid, in the accent. `ring` is the element that carries it. */
@@ -144,7 +144,7 @@ async function assertRing(page, ring, what, accent) {
   });
   assert.equal(style.width, '2px', `${what}: focus ring width`);
   assert.equal(style.style, 'solid', `${what}: focus ring style`);
-  assert.equal(style.color, accent, `${what}: focus ring is in --accent`);
+  assert.equal(style.color, accent, `${what}: focus ring is in --color-primary`);
 }
 
 /** Focuses with the keyboard modality so :focus-visible applies, and checks the ring. */
@@ -186,14 +186,14 @@ async function section(name, run) {
     const sidebar = await page.locator('.sidebar').first().evaluate((el) => getComputedStyle(el).backgroundColor);
     const surface = await page.evaluate(() => {
       const probe = document.createElement('i');
-      probe.style.backgroundColor = 'var(--surface)';
+      probe.style.backgroundColor = 'var(--color-raised)';
       document.body.append(probe);
       const value = getComputedStyle(probe).backgroundColor;
       probe.remove();
       return value;
     });
-    assert.ok(luma(sidebar) < luma(surface), `sidebar ${sidebar} is not darker than --surface ${surface}`);
-    console.log(`ok   sidebar ${sidebar} is darker than --surface ${surface}`);
+    assert.ok(luma(sidebar) < luma(surface), `sidebar ${sidebar} is not darker than --color-raised ${surface}`);
+    console.log(`ok   sidebar ${sidebar} is darker than --color-raised ${surface}`);
 
     await page.locator('.mail-row').first().locator('.mail-row-content').click();
     await page.locator('.message-body').first().waitFor();

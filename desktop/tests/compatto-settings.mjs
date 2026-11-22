@@ -32,7 +32,7 @@ try {
     await expect(trigger).toBeVisible();
     assert.equal(Math.round((await box(trigger)).height), 32, `${name}: 32px high`);
     assert.equal(await css(trigger, 'border-top-left-radius'), '6px', `${name}: 6px radius`);
-    assert.equal(await css(trigger, 'border-top-color'), await token('--border-strong'), `${name}: rests on --border-strong`);
+    assert.equal(await css(trigger, 'border-top-color'), await token('--color-input'), `${name}: rests on --color-input`);
   }
   // The text fields beside the Selects are 32px too.
   assert.equal(Math.round((await box(content.getByRole('textbox', { name: 'Your name' }))).height), 32, 'Your name: 32px high');
@@ -77,7 +77,7 @@ try {
   assert.deepEqual([Math.round(reminderSize.width), Math.round(reminderSize.height)], [32, 18], 'Meeting reminders: 32x18 track');
   assert.equal(Math.round((await box(lead)).height), 32, 'Reminder time: 32px high');
   assert.equal(await css(lead, 'border-top-left-radius'), '6px', 'Reminder time: 6px radius');
-  assert.equal(await css(lead, 'border-top-color'), await token('--border-strong'), 'Reminder time rests on --border-strong');
+  assert.equal(await css(lead, 'border-top-color'), await token('--color-input'), 'Reminder time rests on --color-input');
   await expect(reminders).toBeChecked();
   await expect(lead).toBeEnabled();
   await content.getByText('Meeting reminders', { exact: true }).click();

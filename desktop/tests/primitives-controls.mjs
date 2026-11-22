@@ -1,5 +1,5 @@
 // Checkbox, Switch, Tabs, Slider and DateField (spec 2026-11-08 ark-compatto §8, Task 6): the value
-// contract, the keyboard, the focus ring (2px --accent) and the Compatto look. Each primitive is mounted
+// contract, the keyboard, the focus ring (2px --color-primary) and the Compatto look. Each primitive is mounted
 // alone through tests/support/mount.mjs. Synthetic data only.
 import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
@@ -194,7 +194,7 @@ try {
     const after = page.getByRole('button', { name: 'After', exact: true });
     const control = page.locator('[data-scope="date-picker"][data-part="control"]');
 
-    // The trigger field is 32px high (--control-height).
+    // The trigger field is 32px high (--control-md).
     assert.equal(await control.evaluate((el) => Math.round(el.getBoundingClientRect().height)), 32);
 
     await expect(dialog).toBeHidden();

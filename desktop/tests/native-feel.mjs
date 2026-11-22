@@ -125,19 +125,18 @@ check('3. the startup script picks the same theme as the app', () => {
   }
 });
 
-check('4. native window backgrounds match --ground, which is the paper of Sigrid in src/theme/compatto.css (what html, body and .app-shell paint)', () => {
-  // --ground is an alias of --color-paper (compatto.css, generated from Sigrid's engine): the page colour of each scheme.
+check('4. native window backgrounds match --color-paper, which is the paper of Sigrid in src/theme/compatto.css (what html, body and .app-shell paint)', () => {
+  // --color-paper is the page colour of each scheme (compatto.css, generated from Sigrid's engine).
   const theme = stripComments(read('src/theme/compatto.css'));
-  assert.match(theme, /--ground:\s*var\(--color-paper\);/, '--ground must be the paper of Sigrid');
   const light = theme.match(/:root\[data-scheme='light'\]\s*\{[^}]*?--color-paper:\s*([^;]+);/);
   const dark = theme.match(/:root\[data-scheme='dark'\]\s*\{[^}]*?--color-paper:\s*([^;]+);/);
   assert.ok(light && dark, 'compatto.css must define --color-paper for light and dark');
   const conf = JSON.parse(read('src-tauri/tauri.conf.json'));
-  assert.equal(hex(conf.app.windows[0].backgroundColor), hex(light[1]), 'tauri.conf.json backgroundColor ≠ light --ground');
+  assert.equal(hex(conf.app.windows[0].backgroundColor), hex(light[1]), 'tauri.conf.json backgroundColor ≠ light --color-paper');
   const rust = read('src-tauri/src/native_feel.rs').match(/DARK_GROUND: Color = Color\(0x(\w\w), 0x(\w\w), 0x(\w\w), 0xff\)/);
   assert.ok(rust, 'native_feel.rs must define DARK_GROUND');
-  assert.equal(rust.slice(1, 4).join('').toLowerCase(), hex(dark[1]), 'DARK_GROUND ≠ dark --ground');
-  assert.match(read('src/lib/native-window.ts'), /getPropertyValue\('--ground'\)/, 'paintWindowBackground must follow --ground');
+  assert.equal(rust.slice(1, 4).join('').toLowerCase(), hex(dark[1]), 'DARK_GROUND ≠ dark --color-paper');
+  assert.match(read('src/lib/native-window.ts'), /getPropertyValue\('--color-paper'\)/, 'paintWindowBackground must follow --color-paper');
 });
 
 check('5. every window gets the WebView2 hardening', () => {
@@ -178,7 +177,7 @@ check('6. the page keeps the native window background in step', () => {
 
 // Node strips the type annotations of this dependency-free module.
 const { windowColor } = await import(pathToFileURL(path.join(desktop, 'src/lib/native-window.ts')).href);
-check('7. --ground values become window colors', () => {
+check('7. --color-paper values become window colors', () => {
   assert.deepEqual(windowColor(' #1d2431'), [0x1d, 0x24, 0x31]);
   assert.deepEqual(windowColor('#fff'), [255, 255, 255]);
   assert.equal(windowColor('var(--x)'), null);

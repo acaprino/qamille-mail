@@ -1,5 +1,5 @@
 // Select primitive (spec 2026-11-08 ark-compatto section 8, Task 5): an Ark Select with a button
-// (role combobox, --control-height) and a listbox in a portal. Mounted alone through
+// (role combobox, --control-md) and a listbox in a portal. Mounted alone through
 // tests/support/mount.mjs; the gallery listens to window keydown like App.tsx does, through the
 // same guard, so a key typed in the list is seen not to reach the page shortcuts. Synthetic data only.
 import { chromium, expect } from '@playwright/test';
@@ -24,7 +24,7 @@ try {
   await expect(select).toContainText('Italiano');
   await expect(listbox).toHaveCount(0);
   const box = await select.boundingBox();
-  assert.equal(Math.round(box.height), 32, 'the button is --control-height high');
+  assert.equal(Math.round(box.height), 32, 'the button is --control-md high');
   console.log('PASS The select shows the label of the chosen item');
 
   // aria-required and aria-invalid reach the button (a required form field says so to a screen reader).

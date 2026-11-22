@@ -66,7 +66,7 @@ try {
     assert.equal(await css(folders.locator('button:not([aria-current])').nth(i), 'color'), 'rgb(209, 212, 218)');
   console.log('PASS The active folder is lifted with an accent count; the others are rgb(209, 212, 218)');
 
-  // (e) The tools sit at the bottom, above a hairline in --sidebar-active, below the folders.
+  // (e) The tools sit at the bottom, above a hairline in --color-sidebar-selected, below the folders.
   const calendar = tools.getByRole('button', { name: 'Calendar' });
   for (const name of ['Calendar', 'Contacts', 'Meetings', 'Assistant'])
     await expect(tools.getByRole('button', { name: new RegExp(`^${name}`) })).toBeVisible();
@@ -78,7 +78,7 @@ try {
   assert.ok(toolsBox.y >= folderBox.y + folderBox.height, 'the tools are below the folders');
   assert.ok(sidebarBox.y + sidebarBox.height - (toolsBox.y + toolsBox.height) < 100, 'the tools are in the bottom of the column');
   assert.equal((await box(calendar)).height, 32);
-  console.log('PASS The tools are in the bottom of the column, above a --sidebar-active hairline');
+  console.log('PASS The tools are in the bottom of the column, above a --color-sidebar-selected hairline');
 
   // (f) Accounts: small coloured squares with a legible initial, no light chip.
   const avatars = sidebar.locator('.account-avatar');
@@ -184,7 +184,7 @@ try {
   assert.equal(wide.top, 48);
   assert.equal(await css(page.locator('.global-search'), 'border-top-color'), await page.evaluate(() => {
     const probe = document.createElement('i');
-    probe.style.color = 'var(--border-strong)';
+    probe.style.color = 'var(--color-input)';
     document.body.append(probe);
     const value = getComputedStyle(probe).color;
     probe.remove();

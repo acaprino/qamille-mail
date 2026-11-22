@@ -87,7 +87,7 @@ try {
   await expect(heading(page, 'Priority')).toHaveAttribute('aria-expanded', 'true');
   await expect(heading(page, 'Notifications')).toHaveClass(/has-unread/);
   await expect(heading(page, 'Seen')).not.toHaveClass(/has-unread/);
-  const blue = await token(page, '--accent-text');
+  const blue = await token(page, '--color-accent');
   assert.equal(await heading(page, 'Notifications').locator('.group-count').evaluate((el) => getComputedStyle(el).color), blue, 'the number of a closed group with unread mail is blue');
   assert.notEqual(await heading(page, 'Seen').locator('.group-count').evaluate((el) => getComputedStyle(el).color), blue);
   console.log('PASS Minor groups start closed and keep a trace');
@@ -121,7 +121,7 @@ try {
   const readRow = page.locator('.mail-row:not(.unread):not([data-section="priority"])').first();
   assert.ok((await weight(unreadRow.locator('.mail-meta strong'))) >= 700, 'an unread sender is bold');
   assert.equal(await weight(readRow.locator('.mail-meta strong')), 500, 'a read sender is regular');
-  const ink = await token(page, '--text');
+  const ink = await token(page, '--color-ink');
   assert.equal(await unreadRow.locator('.mail-meta strong').evaluate((el) => getComputedStyle(el).color), ink);
   // Compatto (mockup): the sender is ink in both states; the weight, the dot and the accent time tell them apart.
   assert.equal(await readRow.locator('.mail-meta strong').evaluate((el) => getComputedStyle(el).color), ink, 'a read sender is ink too');

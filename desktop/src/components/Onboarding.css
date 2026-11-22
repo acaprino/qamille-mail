@@ -9,7 +9,7 @@
   height: 100vh;
   overflow: auto;
   overscroll-behavior: contain;
-  background: var(--ground, var(--bg));
+  background: var(--color-paper, var(--bg));
 }
 .onboarding-main {
   flex: 1;
@@ -24,10 +24,10 @@
   width: min(440px, 100%);
   padding: 32px;
   text-align: center;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--color-raised);
+  border: 1px solid var(--color-line);
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow);
+  box-shadow: var(--elevation-lg);
 }
 .onboarding-card .onboarding-mark {
   width: 44px;
@@ -65,7 +65,7 @@
 }
 .onboarding-card .server-connect p:not([class]) {
   margin: 0 0 10px;
-  color: var(--text-secondary);
+  color: var(--color-ink-soft);
   font-size: var(--text-sm);
   line-height: 1.6;
 }
@@ -87,7 +87,7 @@
 .onboarding-card .step-actions > .text-button {
   justify-self: center;
   min-height: 32px;
-  color: var(--text-secondary);
+  color: var(--color-ink-soft);
 }
 .onboarding-card .server-connect .field input {
   height: 40px;
@@ -95,6 +95,6 @@
 .onboarding-card .sign-in-switch {
   margin-top: 10px;
   padding-top: 16px;
-  border-top: 1px solid var(--border-soft);
+  border-top: 1px solid var(--color-paper-2);
   text-align: center;
 }

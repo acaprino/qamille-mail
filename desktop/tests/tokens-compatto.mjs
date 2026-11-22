@@ -9,15 +9,15 @@ const { light, dark } = readThemes();
 
 /** Light tokens that did not move: Qamille's own, and the ones the engine keeps exactly. [token, value]. */
 const UNCHANGED = [
-  ['--text', '#111827'],
-  ['--border', '#e3e6ea'],
-  ['--border-soft', '#eef0f3'],
-  ['--surface', '#ffffff'],
-  ['--ground', '#f6f7f9'],
-  ['--accent', '#4f46e5'],
-  ['--accent-text', '#4338ca'],
-  ['--accent-hover', '#4338ca'],
-  ['--on-accent', '#ffffff'],
+  ['--color-ink', '#111827'],
+  ['--color-line', '#e3e6ea'],
+  ['--color-paper-2', '#eef0f3'],
+  ['--color-raised', '#ffffff'],
+  ['--color-paper', '#f6f7f9'],
+  ['--color-primary', '#4f46e5'],
+  ['--color-accent', '#4338ca'],
+  ['--color-accent', '#4338ca'],
+  ['--color-primary-foreground', '#ffffff'],
   ['--hover', '#f4f5f8'],
   ['--thread-open', '#f7f8fe'],
   ['--sidebar-hover', '#22262e'],
@@ -34,21 +34,21 @@ const UNCHANGED = [
 
 /** Light tokens the engine now computes differently: [token, what it was, what it is]. */
 const CHANGED = [
-  ['--text-secondary', '#4b5563', '#3a4254'],
-  ['--body-text', '#1f2937', '#111827'],
-  ['--muted', '#4b5563', '#5a6376'],
-  ['--nav-text', '#3d4656', '#3a4254'],
-  ['--border-strong', '#dde1e7', '#87898d'],
-  ['--selection', '#ededfc', '#dbe1ff'],
-  ['--sidebar', '#16181d', '#15171b'],
-  ['--sidebar-active', '#2a2e38', '#282b31'],
-  ['--sidebar-text', '#d3d7de', '#d1d4da'],
-  ['--sidebar-muted', '#a3aab7', '#9ea2a9'],
-  ['--accent-on-sidebar', '#a7a3f2', '#adb8ff'],
-  ['--ring', '#4f46e5', '#4338ca'],
-  ['--danger', '#b03f49', '#ad2a1e'],
-  ['--success', '#3f7560', '#1c6b3f'],
-  ['--highlight', '#f1d56d65', '#ffe38a'],
+  ['--color-ink-soft', '#4b5563', '#3a4254'],
+  ['--color-ink', '#1f2937', '#111827'],
+  ['--color-ink-mute', '#4b5563', '#5a6376'],
+  ['--color-ink-soft', '#3d4656', '#3a4254'],
+  ['--color-input', '#dde1e7', '#87898d'],
+  ['--color-selected', '#ededfc', '#dbe1ff'],
+  ['--color-sidebar-paper', '#16181d', '#15171b'],
+  ['--color-sidebar-selected', '#2a2e38', '#282b31'],
+  ['--color-sidebar-ink', '#d3d7de', '#d1d4da'],
+  ['--color-sidebar-mute', '#a3aab7', '#9ea2a9'],
+  ['--color-sidebar-accent', '#a7a3f2', '#adb8ff'],
+  ['--color-ring', '#4f46e5', '#4338ca'],
+  ['--color-destructive', '#b03f49', '#ad2a1e'],
+  ['--color-success', '#3f7560', '#1c6b3f'],
+  ['--color-highlight', '#f1d56d65', '#ffe38a'],
 ];
 
 const problems = [];
@@ -70,7 +70,7 @@ for (const name of ['--text-2xs', '--text-xs', '--text-sm', '--text-base', '--te
 
 // Every token that moved to Sigrid is written in both schemes.
 const hex = /^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/;
-for (const name of ['--surface', '--ground', '--text', '--muted', '--accent', '--accent-text', '--on-accent', '--border', '--sidebar', '--selection', '--danger', '--success']) {
+for (const name of ['--color-raised', '--color-paper', '--color-ink', '--color-ink-mute', '--color-primary', '--color-accent', '--color-primary-foreground', '--color-line', '--color-sidebar-paper', '--color-selected', '--color-destructive', '--color-success']) {
   for (const [scheme, tokens] of [['light', light], ['dark', dark]]) {
     if (!hex.test(tokens.get(name) ?? '')) problems.push(`${scheme} ${name}: expected a #rrggbb colour, found ${tokens.get(name) ?? 'nothing'}`);
   }

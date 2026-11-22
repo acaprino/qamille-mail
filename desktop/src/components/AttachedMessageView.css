@@ -10,7 +10,7 @@
     margin-bottom: 18px;
   }
   & .attached-status {
-    color: var(--muted);
+    color: var(--color-ink-mute);
     padding: 24px 0;
   }
   & .attached-alert {
@@ -18,7 +18,7 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
-    color: var(--danger);
+    color: var(--color-destructive);
     padding: 16px 0;
   }
   & .attached-alert-actions {

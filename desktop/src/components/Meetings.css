@@ -14,7 +14,7 @@
     flex-direction: column;
     min-width: 0;
     min-height: 0;
-    background: var(--surface);
+    background: var(--color-raised);
   }
   /* A container: it takes the focus by script only (an action took its button away), and shows no ring. */
   & .detail-pane:focus {

@@ -12,7 +12,7 @@ use std::collections::BTreeSet;
 use tauri::webview::{NewWindowFeatures, NewWindowResponse};
 use tauri::{AppHandle, Manager, Url, WebviewWindow, Wry, window::Color};
 
-/// `--ground` of the dark theme in `desktop/src/ds/tokens/theme.css`: the colour
+/// `--color-paper` of the dark theme in `desktop/src/ds/tokens/theme.css`: the colour
 /// `html`, `body` and `.app-shell` paint, so a resize never shows a strip of
 /// another colour. The light value is `app.windows[0].backgroundColor` in
 /// `tauri.conf.json`. The test keeps both in sync with the stylesheet.

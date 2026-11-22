@@ -2,6 +2,7 @@ import { AnimatePresence } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import Button from '../ds/primitives/Button';
 import Icon from '../ds/primitives/Icon';
+import { reportBottomRoom } from '../lib/bottom-room';
 import DraftTabs from '../ui/DraftTabs';
 import type { TabItem } from '../ui/Tabs';
 import { desktop, errorText } from '../lib/api';
@@ -60,6 +61,20 @@ export default function ComposerDock(props: ComposerDockProps) {
   };
 
   const handles = useRef(new Map<number, ComposerHandle>()).current;
+  // Sigrid's notices lift themselves above the strip of drafts by the room it reports (lib/bottom-room.ts).
+  const dock = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const element = dock.current;
+    if (!element) return;
+    const report = () => reportBottomRoom('dock', element.getBoundingClientRect().height);
+    report();
+    const watch = new ResizeObserver(report);
+    watch.observe(element);
+    return () => {
+      watch.disconnect();
+      reportBottomRoom('dock', 0);
+    };
+  }, []);
   const states = useReactive(() => ({}) as Record<number, ComposerState>);
   // A closed composer fades out for a moment. A draft that comes back meanwhile (Undo) must get a new
   // composer, not that one: each time a draft id appears it gets a new generation, part of the key.
@@ -207,7 +222,7 @@ export default function ComposerDock(props: ComposerDockProps) {
         })}
       </AnimatePresence>
 
-      <footer className="composer-dock" aria-label={tr('Bozze aperte', 'Open drafts')}>
+      <footer ref={dock} className="composer-dock" aria-label={tr('Bozze aperte', 'Open drafts')}>
         {/* The drafts open here, not all the saved ones the sidebar counts: the two numbers say different things. */}
         <span className="dock-label">
           <Icon name="edit" size={15} />

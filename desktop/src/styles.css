@@ -412,18 +412,6 @@
 .profile > [data-icon] {
   color: var(--color-sidebar-mute);
 }
-.user-avatar {
-  width: 24px;
-  height: 24px;
-}
-/* On the dark column the user is a small square like the accounts, not a light chip. */
-.sidebar .user-avatar {
-  border-radius: var(--radius-sm);
-  background: var(--color-sidebar-selected);
-  color: var(--color-sidebar-selected-ink);
-  font-size: var(--text-2xs);
-  font-weight: 600;
-}
 .main-shell {
   position: relative;
   display: flex;
@@ -2806,7 +2794,6 @@
 /* One --control-md row (Compatto): the name, what the name does not already say, the address books at
    the end. The name keeps its room first; the address gives way, then the last book's name. */
 .contact-row { display: flex; align-items: center; gap: 10px; width: 100%; height: var(--control-md); padding: 0 12px; text-align: left; background: var(--color-raised); }
-.contact-row .account-avatar { flex: none; width: 22px; height: 22px; font-size: var(--text-2xs); }
 .contact-row:hover { background: var(--hover); }
 .contact-row.active { background: var(--color-selected); }
 .contact-main { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; font-size: var(--text-sm); }
@@ -2826,7 +2813,6 @@
 .contact-detail header { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
 .contact-detail h2 { font-size: var(--text-xl); margin: 0; }
 .contact-detail h3 { font-size: var(--text-sm); margin: 18px 0 6px; color: var(--color-ink-soft); }
-.account-avatar.large { width: 48px; height: 48px; font-size: var(--text-base); }
 .contact-detail-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
 .contact-facts { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 0; margin: 0; font-size: var(--text-sm); }
 .contact-facts dt, .contact-facts dd { display: flex; align-items: center; min-height: var(--control-md); border-top: 1px solid var(--color-paper-2); }

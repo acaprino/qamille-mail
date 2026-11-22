@@ -192,16 +192,6 @@ h3 {
   opacity: 0.5;
 }
 
-.avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  flex-shrink: 0;
-  font-weight: 600;
-  font-size: var(--text-xs);
-}
-
 /* Task 9: field (the Sigrid plan: only Task 9 touches this section, which ends at the next blank line) */
 /* The look of a field is Sigrid's (ui/Field.tsx, ui/Input.tsx); what is left is the space under it and the weight of what
    is typed (the label is medium). */

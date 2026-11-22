@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import Avatar from '../ui/Avatar';
 import Kbd from '../ui/Kbd';
 import Button from '../ui/Button';
 import Count from '../ui/Count';
@@ -221,7 +222,7 @@ export default function Sidebar({
               'aria-current': view === 'Settings' ? 'page' : undefined,
             },
             <>
-              <span className="avatar user-avatar">{initials(workspace.settings.user_name)}</span>
+              <Avatar name={workspace.settings.user_name} size="xs" decorative className="bg-sidebar-selected text-sidebar-selected-ink" />
               <span className="sidebar-text">
                 <strong>{workspace.settings.user_name}</strong>
                 <small>{tr('Spazio personale', 'Personal workspace')}</small>

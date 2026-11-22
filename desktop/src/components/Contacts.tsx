@@ -1,6 +1,7 @@
 import { Item, Presence, useIsPresent } from '../ui/motion';
 import { useEffect, useRef, type ChangeEvent, type ReactNode } from 'react';
 import Button from '../ui/Button';
+import Avatar from '../ui/Avatar';
 import Checkbox from '../ui/Checkbox';
 import Count from '../ui/Count';
 import Icon from '../ui/Icon';
@@ -483,7 +484,7 @@ export default function Contacts({ notify }: ContactsProps) {
                     aria-current={c.id === s.selectedId ? 'true' : undefined}
                     onClick={() => (s.selectedId = c.id)}
                   >
-                    <span className="account-avatar">{initials(displayName(c))}</span>
+                    <Avatar name={displayName(c)} size="xs" decorative />
                     <span className="contact-main">
                       <span className="contact-head">
                         <strong>{displayName(c)}</strong>
@@ -518,7 +519,7 @@ export default function Contacts({ notify }: ContactsProps) {
           {selected ? (
             <>
               <header>
-                <span className="account-avatar large">{initials(displayName(selected))}</span>
+                <Avatar name={displayName(selected)} size="md" decorative />
                 <h2>{displayName(selected)}</h2>
               </header>
               <div className="contact-detail-actions">

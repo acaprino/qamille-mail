@@ -16,7 +16,7 @@ Il sistema visivo è un modulo interno, `desktop/src/ds/`, non un pacchetto. L�
 | `styles/system.css` | Base (corpo, titoli, campi, focus) e regole di sistema: pulsanti e campo. Importa `theme.css`, `ark.css` e `tailwind.css` e dichiara il carattere IBM Plex Sans. |
 | `styles/tailwind.css` | Tailwind v4 (tema e utility, niente preflight) e `tw-animate-css`, con il tema, i caratteri e le misure di Sigrid e i valori di Qamille per loro (`src/theme/compatto.css`, generato). Vedi «Tailwind». |
 | `styles/ark.css` | In testa gli `@import` di `styles/nav.css` e di `styles/ark/*.css`, poi le regole del suggerimento. Importato da `system.css`. Vedi «Le regole di `ark.css`». |
-| `styles/nav.css` | Le regole proprie di `NavList` e `Count`: `.nav-hover`, `.nav-active-bar`, `.count-digits`. |
+| `styles/nav.css` | Le regole proprie di `NavList` e `Count`: `.nav-hover`, `.nav-active-bar`. |
 | `styles/ark/*.css` | L’aspetto delle parti delle primitive, un file per primitiva: `dialog`, `popover`, `menu`, `select`, `checkbox`, `switch`, `tabs`, `slider`, `date-picker`, `recipients`, `toast`. |
 | `primitives/` | I componenti React (`.tsx`): `Button`, `Field`, `Modal`, `SidePanel`, `Popover`, `Menu`, `Tooltip`, `Select`, `Checkbox`, `Switch`, `Tabs`, `Slider`, `DateField`, `RecipientsInput`, `Toaster`, `Icon`, `Count`, `NavList`. |
 | `unlumen/` | I componenti di unlumen UI copiati nel progetto, con il loro `README.md` che annota le modifiche. Vedi «I componenti di unlumen». |
@@ -75,12 +75,11 @@ Sono diciassette componenti più l’icona. La loro forma è fissata: cambiare u
 | `Checkbox` | Ark `Checkbox` | `checked`; `onChange?`; `indeterminate?`; `disabled?`; `aria-label?`; `children` (etichetta) | `styles/ark/checkbox.css` |
 | `Switch` | `Switch` di Sigrid (`src/ui/Switch.tsx`) | `checked`; `onChange?`; `disabled?`; `aria-label?`; `children` (etichetta) | — |
 | `Tabs` | Ark `Tabs` e Motion | `value`; `onChange?`; `items` (`{ value, label, count?, className?, props? }[]`); `aria-label`; `variant?` (`underline`, `segment`, `plain`); `activation?` (`automatic`, `manual`); `ids?`; `onPick?`; `tab?`; `after?` | `styles/ark/tabs.css` |
-| `Slider` | Ark `Slider` | `value`; `onChange?`; `min`; `max`; `step?` (1); `aria-label` | `styles/ark/slider.css` |
 | `DateField` | Ark `DatePicker` | `value` (`'YYYY-MM-DD'` o `''`); `onChange?`; `aria-label`; `min?`; `max?`; `locale?` (`en-US`); `disabled?`; `translations?` | `styles/ark/date-picker.css` |
 | `RecipientsInput` | Ark `TagsInput` e `Combobox` | `value?` (`string[]`); `onChange?`; `suggestions`; `aria-label`; `onQuery?`; `invalid?`; `placeholder?`; `disabled?`; `inputRef?`; `pending?`; `onPendingChange?`; `translations?`; `listTranslations?`; `suggestionsLabel?`; `className?` | `styles/ark/recipients.css` |
 | `Toaster` | Ark `Toast` | `label`; `closeLabel`; l’esportazione `notify(message, error?, actions?)` mostra un avviso, con al massimo due azioni (`NoticeAction = { label, run }`) | `styles/ark/toast.css` |
 | `Icon` | SVG | `name`; `size?` (20); `stroke?` (1,7) | `primitives/Icon.tsx` |
-| `Count` | Animate Digits di unlumen | `value` (`number` o `string`); `className?` | `styles/nav.css` (`.count-digits`) |
+| `Count` | `Count` di Sigrid (`src/ui/Count.tsx`) | `value` (`number` o `string`); `className?` | — |
 | `NavList` / `NavItem` | Sidebar 001 di unlumen, Motion | `NavList`: `group?` (`'nav'`); `className?`; gli attributi di `<nav>`. `NavItem`: `active?`; `hint?`; `className?`; gli attributi di `<button>` | `styles/nav.css` (`.nav-hover`, `.nav-active-bar`) |
 
 ### Button
@@ -448,27 +447,6 @@ Con `tab`, `after` e `onPick`, come nelle schede delle bozze:
 </div>
 ```
 
-### Slider
-
-Un cursore a un solo valore, per esempio la posizione del player delle riunioni. `value` è il valore e `onChange` riceve ognuno; `min` e `max` sono obbligatori, `step` vale 1, `aria-label` è obbligatorio. Sinistra e Giù abbassano, Destra e Su alzano di `step`; PagSu e PagGiù di dieci passi; Home e Fine vanno a `min` e `max`; il valore non esce mai da lì. Traccia di 4px in `border-strong`, tratto in `accent`, pomello di 16px (fondo `surface`, bordo di 2px in `accent`) che porta il contorno del focus, staccato di 2px.
-
-```tsx
-import Slider from '../ds/primitives/Slider';
-
-const [position, setPosition] = useState(0);
-
-<Slider aria-label="Posizione nella registrazione" min={0} max={3600} step={5} value={position} onChange={setPosition} />
-```
-
-```html
-<div data-scope="slider" data-part="root">
-  <div data-scope="slider" data-part="control">
-    <div data-scope="slider" data-part="track"><div data-scope="slider" data-part="range"></div></div>
-    <div data-scope="slider" data-part="thumb" role="slider" aria-label="Posizione nella registrazione" aria-valuemin="0" aria-valuemax="3600" aria-valuenow="0" tabindex="0"><input hidden /></div>
-  </div>
-</div>
-```
-
 ### DateField
 
 Un campo data: una casella di testo che accetta una data scritta e un pulsante che apre un calendario. `value` è la stringa `'YYYY-MM-DD'`, o `''` per nessuna data, ed è l’unica cosa che attraversa il confine; `onChange` riceve la nuova. Il testo mostra la data come la scrive `locale` (giorno per primo per `it-IT`, mese per primo per `en-US`); scrivendo si accetta quella forma e quella ISO. Il testo scritto si legge con Invio e quando il focus esce: una data vera chiama `onChange` (riportata dentro `min`..`max` se fuori), il testo vuoto la svuota, il resto (`2026-13-40`) è rifiutato e la casella torna all’ultima data buona, con `aria-invalid` finché è sbagliata (bordo `danger`). `min` e `max` limitano i giorni; `disabled` blocca casella e pulsante. Il calendario non va in un portale: resta dentro il campo, quindi fa parte del `Modal` o del `SidePanel` che lo contiene (trappola del focus, Esc), e `fixed` evita che il corpo scorrevole di un dialog lo tagli. Ha le viste giorno, mese e anno, in un riquadro di 252px con raggio `radius-lg` e ombra `shadow`; oggi è in `accent-text`, il giorno scelto è pieno di `accent` (e col focus il suo contorno è in `on-accent`, perché uno in `accent` sparirebbe). `translations` (la forma di Ark: i nomi dei pulsanti del calendario e le lettere del segnaposto) li scrive nella lingua dell’app; senza, sono in inglese: l’app lo passa dalla sua lingua. Alto `control-height`. I campi dell’ora restano `<input type="time">` nativi di classe `time-field`.
@@ -581,7 +559,7 @@ import Icon from '../ds/primitives/Icon';
 
 ### Count
 
-Un numero che cambia sul posto: i conteggi della barra laterale, i totali. È Animate Digits di unlumen (`unlumen/animate-digits.tsx`): ogni cifra che cambia scorre su una molla, sfocata e un poco rimpicciolita mentre entra, e le cifre che non cambiano restano ferme. `value` è il numero (o un testo), `className` le classi di pagina (`nav-count` nella barra laterale). Il testo dell'elemento sono le sole cifre correnti (quelle che escono sono `aria-hidden`), quindi testo e nome accessibile sono il numero semplice. Con `prefers-reduced-motion` la primitiva rende il solo numero, senza Motion. Il colore, la dimensione e le cifre tabellari vengono dalla classe di pagina; `.count-digits` (in `styles/nav.css`) mette le celle in fila. Non usarlo per un numero che non cambia sotto gli occhi: per quello basta il testo.
+Un numero che cambia sul posto: i conteggi della barra laterale, i totali. È `Count` di Sigrid (`src/ui/Count.tsx`): il testo e il nome accessibile sono il numero, e le cifre non scorrono. `value` è il numero (o un testo), `className` le classi di passo (`nav-count`).
 
 ```tsx
 import Count from '../ds/primitives/Count';
@@ -589,13 +567,6 @@ import Count from '../ds/primitives/Count';
 {!!workspace.counts.Inbox && <Count value={workspace.counts.Inbox} className="nav-count" />}
 ```
 
-```html
-<span class="count-digits nav-count">
-  <span class="inline-flex items-center tabular-nums">…una cella per cifra, animata (1, 2)…</span>
-</span>
-<!-- con prefers-reduced-motion -->
-<span class="nav-count">12</span>
-```
 
 ### NavList e NavItem
 
@@ -642,7 +613,6 @@ unlumen UI è un registro di componenti nello stile di shadcn/ui (React, Tailwin
 | File | Da unlumen | A cosa serve |
 |---|---|---|
 | `apple-switch.tsx` | Apple Switch | Il controllo di `Switch`. Modificato: la misura `xs` (la geometria dello switch di «Compatto»: binario di 32×18px, pallino di 14px) e il tono `app` (spento `muted`, acceso `accent`, pallino `on-accent`, alone `accent-pro`). |
-| `animate-digits.tsx` | Animate Digits | Le cifre di `Count`. |
 
 I componenti Pro di unlumen (Motion Tabs Menu, Sidebar 002, Animated Input) richiedono una licenza e non sono inclusi. Al loro posto `Tabs` riprende l’evidenza scorrevole delle primitive libere di unlumen (`tabs`, `highlight`) con un `layoutId` di Motion; `Switch` non ha l’Animated Input. Non copiare codice Pro nel repository.
 

@@ -6,7 +6,6 @@ import Icon from '../../src/ds/primitives/Icon';
 import SelectSection from './gallery/Select';
 import CheckboxGallery from './gallery/CheckboxGallery';
 import DateFieldGallery from './gallery/DateFieldGallery';
-import SliderGallery from './gallery/SliderGallery';
 import TabsGallery from './gallery/TabsGallery';
 import RecipientsGallery from './gallery/RecipientsGallery';
 import ModalSection from './gallery/Modal';
@@ -109,8 +108,6 @@ export default function Gallery({ which, props = {} }: GalleryProps) {
       return <CheckboxGallery props={props} />;
     case 'tabs':
       return <TabsGallery props={props} />;
-    case 'slider':
-      return <SliderGallery props={props} />;
     case 'date':
       return <DateFieldGallery props={props} />;
     case 'modal':

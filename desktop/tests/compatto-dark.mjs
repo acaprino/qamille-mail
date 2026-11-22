@@ -274,13 +274,6 @@ async function section(name, run) {
     await audit(page, 'switch (on)', ['[data-scope="switch"][data-part="control"][data-state="checked"]', '[data-scope="switch"][data-part="thumb"]']);
   });
 
-  await section('slider', async () => {
-    const accent = await open('slider');
-    const thumb = page.getByRole('slider', { name: 'Volume' });
-    await focusAndCheck(page, thumb, thumb, 'slider thumb', accent);
-    await audit(page, 'slider', ['[data-scope="slider"][data-part="thumb"]', '[data-scope="slider"][data-part="track"]', '[data-scope="slider"][data-part="range"]']);
-  });
-
   await section('date', async () => {
     const accent = await open('date');
     const control = page.locator('[data-scope="date-picker"][data-part="control"]').first();

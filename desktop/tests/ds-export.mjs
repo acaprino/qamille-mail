@@ -18,7 +18,7 @@ const argv = process.argv.slice(2);
 const at = (flag) => { const i = argv.indexOf(flag); return i >= 0 ? argv[i + 1] : undefined; };
 // This test keeps its own list, and checks it against the folder: a primitive added without a card fails here.
 const PRIMITIVES = [
-  'Button', 'Field', 'Icon', 'Modal', 'SidePanel', 'Popover', 'Tooltip', 'Select', 'Checkbox', 'Switch', 'Tabs', 'Slider', 'DateField', 'RecipientsInput', 'Toaster',
+  'Button', 'Field', 'Icon', 'Modal', 'SidePanel', 'Popover', 'Tooltip', 'Select', 'Checkbox', 'Switch', 'Tabs', 'DateField', 'RecipientsInput', 'Toaster',
 ];
 
 const problems = [];
@@ -139,7 +139,6 @@ function checkPrimitives(tree, label) {
     Checkbox: ['data-scope="checkbox"', 'type="checkbox"', 'data-state="checked"', 'data-state="indeterminate"', 'data-disabled'],
     Switch: ['data-scope="switch"', 'role="switch"', 'data-state="checked"', 'data-state="unchecked"', 'data-disabled'],
     Tabs: ['data-scope="tabs"', 'role="tablist"', 'role="tab"', 'data-variant="underline"', 'data-variant="segment"', 'class="count"'],
-    Slider: ['data-scope="slider"', 'data-part="thumb"', 'role="slider"'],
     DateField: ['data-scope="date-picker"', 'data-part="input"', 'data-part="table-cell-trigger"', 'data-today'],
     RecipientsInput: ['data-scope="tags-input"', 'data-scope="combobox"', 'data-part="item"', 'data-invalid', 'data-part="content"'],
     Toaster: ['data-scope="toast"', 'role="status"', 'role="alert"', 'data-type="error"', 'data-part="close-trigger"'],

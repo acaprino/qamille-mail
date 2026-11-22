@@ -91,11 +91,11 @@ fn main() {
     context.config_mut().app.app_directories_override = Some(
         tauri::utils::config::AppDirectoriesOverride::Root(data_dir.clone()),
     );
-    // Each portable copy owns its own window and workspace lock.
-    use std::hash::{Hash, Hasher};
-    let mut identity = std::collections::hash_map::DefaultHasher::new();
-    data_dir.canonicalize().unwrap_or_else(|_| data_dir.clone()).hash(&mut identity);
-    context.config_mut().identifier.push_str(&format!(".workspace{:016x}", identity.finish()));
+    // Each portable copy owns its own window, workspace lock and notification identity (rule 28): the
+    // identifier ends with the FNV-1a of its data folder, the same in every build, so the identity key
+    // a copy registered is the one a later version finds and removes.
+    let canonical = data_dir.canonicalize().unwrap_or_else(|_| data_dir.clone());
+    context.config_mut().identifier.push_str(&format!(".workspace{}", background_rules::workspace_id(&canonical.to_string_lossy())));
     if demo {
         context.config_mut().identifier.push_str(".preview");
     }

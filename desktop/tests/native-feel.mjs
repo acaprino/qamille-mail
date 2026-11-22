@@ -644,7 +644,7 @@ check('20. start at sign-in is Qamille in the tray, an HKCU Run value Qamille wr
   const background = read('src-tauri/src/background.rs');
   assert.match(background, /background_rules::autostart_entry_name\(installed\(\),/, 'the entry name comes from autostart_entry_name');
   assert.match(background, /background_rules::workspace_tag\(/, 'the entry name carries the stable tag of the data folder');
-  const tagCode = ['pub fn workspace_tag(', 'pub fn fnv1a64('].map((head) => rustItem(rules, head)).join('') + rustItem(background, 'fn autostart_entry(');
+  const tagCode = ['pub fn workspace_tag(', 'pub fn workspace_id(', 'pub fn fnv1a64('].map((head) => rustItem(rules, head)).join('') + rustItem(background, 'fn autostart_entry(');
   assert.ok(/fnv1a64\(/.test(tagCode) && !/DefaultHasher|Hasher/.test(tagCode), 'the tag is FNV-1a, not DefaultHasher, which changes between Rust releases');
   const startup = rustItem(background, 'mod startup {');
   assert.match(startup, /const RUN: &str = r"Software\\Microsoft\\Windows\\CurrentVersion\\Run";/, 'the entry lives in the Run key');
@@ -824,6 +824,15 @@ check('24. system notifications come from Rust only, through the registered app 
   const main = read('src-tauri/src/main.rs');
   assert.ok(!/tauri_plugin_notification/.test(main), 'no notification plugin in main.rs');
   assert.match(main, /notifications::notifications_get, notifications::notifications_set,/, 'the switches are app commands');
+  // The identifier ends with the data folder's FNV-1a (`workspace_id`): it names the copy's
+  // identity key in the registry, so it must stay the same across Rust releases, which
+  // DefaultHasher does not promise.
+  assert.match(
+    main,
+    /identifier\.push_str\(&format!\("\.workspace\{\}", background_rules::workspace_id\(&\w+\.to_string_lossy\(\)\)\)\)/,
+    'the identifier ends with background_rules::workspace_id of the canonical data folder',
+  );
+  assert.ok(!/DefaultHasher|std::hash::/.test(main.replace(/(^|\s)\/\/.*$/gm, '$1')), 'main.rs hashes nothing with the standard library hasher');
   // The identity Windows shows the notifications under: the per-data-folder identifier the toasts go
   // out with (`app.config().identifier`), registered for the current user, never the process's own
   // AUMID, which would detach the window from the icons pinned to the taskbar.

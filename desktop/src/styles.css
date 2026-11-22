@@ -2089,8 +2089,8 @@
 .schedule-label {
   font-size: var(--text-xs);
 }
-.schedule-row [data-scope='date-picker'][data-part='root'] {
-  flex: 0 0 168px;
+.schedule-row .date-field-row {
+  flex: 0 0 auto;
 }
 .time-field {
   box-sizing: border-box;
@@ -3003,4 +3003,11 @@
   font-size: var(--text-sm);
   font-weight: 600;
   white-space: nowrap;
+}
+
+/* A date field and, when the date is optional, the button that takes it away. */
+.date-field-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }

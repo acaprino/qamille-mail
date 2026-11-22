@@ -463,6 +463,7 @@ export default function SearchBar({
                     <div className="search-field">
                       <span>{mode === 'between' ? t('Dal giorno', 'From date') : t('Data', 'Date')}</span>
                       <DateField
+                        clearable
                         value={day}
                         onChange={(value) => (s.day = value)}
                         aria-label={mode === 'between' ? t('Dal giorno', 'From date') : t('Data', 'Date')}
@@ -474,6 +475,7 @@ export default function SearchBar({
                       <div className="search-field">
                         <span>{t('Al giorno incluso', 'Through date, inclusive')}</span>
                         <DateField
+                          clearable
                           value={end}
                           onChange={(value) => (s.end = value)}
                           aria-label={t('Al giorno incluso', 'Through date, inclusive')}

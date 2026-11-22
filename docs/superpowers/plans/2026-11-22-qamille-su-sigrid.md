@@ -144,6 +144,8 @@ Qamille, per decisione del proprietario, non ha librerie proprie di comportament
 
 - **R17. `Tabs`: gli attributi del chiamante su una scheda, un pulsante accanto alla scheda e un clic sulla scheda già scelta.** La fascia delle bozze aperte sopra il compositore (`ui/DraftTabs.tsx`) ne ha bisogno: una scheda per bozza con icona, titolo e segno di modifiche non salvate, un pulsante che la chiude, `aria-expanded`, `onFocus`. Anche gli id di scheda e pannello (`ids`) che oggi si impostano dopo il disegno (`ui/Tabs.tsx`). Con questo Qamille userebbe `Tabs` di Sigrid anche lì e butterebbe `DraftTabs`.
 
+- **R18. `Select`: una voce disattivata (`disabled`), `aria-required` e un'etichetta visibile.** Il `Select` di Qamille li ha (`ui/Select.tsx`): una voce `disabled` e `aria-required="true"` (la rubrica obbligatoria nel modulo del contatto) oggi non arrivano, e l'etichetta visibile è un `<label>` che scrive Qamille.
+
 ## Global Constraints
 
 > **Regola del proprietario (2026-11-22, prevale su tutto ciò che segue): «lavora direttamente in develop», «no worktrees».**

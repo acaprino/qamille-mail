@@ -235,7 +235,7 @@ export default function SearchBar({
     (
       firstControl.current ??
       document.querySelector<HTMLElement>(
-        '#search-filter-panel form [data-scope="select"][data-part="trigger"], #search-filter-panel form input',
+        '#search-filter-panel form [data-slot="select-trigger"], #search-filter-panel form input',
       )
     )?.focus();
   }

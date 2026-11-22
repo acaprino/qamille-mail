@@ -1835,7 +1835,7 @@
 }
 /* Recipients and the account picker sit on the row, not in a box of their own. */
 .field-row [data-scope='combobox'][data-part='root'],
-.field-row [data-scope='select'][data-part='root'] {
+.field-row [data-slot='select-trigger'] {
   flex: 1;
 }
 .field-row [data-scope='tags-input'][data-part='control'] {
@@ -1843,7 +1843,7 @@
   background: none;
   border-color: transparent;
 }
-.field-row [data-scope='select'][data-part='trigger'] {
+.field-row [data-slot='select-trigger'] {
   padding: 0 8px 0 0;
   background: none;
   border-color: transparent;
@@ -1968,7 +1968,7 @@
 .composer-panel > footer .signature-select {
   max-width: 170px;
 }
-.composer-panel > footer .signature-select [data-scope='select'][data-part='trigger'] {
+.composer-panel > footer .signature-select[data-slot='select-trigger'] {
   border-color: transparent;
   background: none;
   font-size: var(--text-2xs);

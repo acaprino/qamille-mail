@@ -4,7 +4,7 @@
 // a date picker, the thumb of a slider) is the widget's: first-letter search in a list must never archive the message.
 const OWN_KEYS =
   'input,textarea,select,[contenteditable]:not([contenteditable="false"]),' +
-  '[data-scope="select"],[data-scope="combobox"],[data-scope="tags-input"],[data-scope="date-picker"],' +
+  '[role="listbox"],[data-slot^="select"],[data-scope="combobox"],[data-scope="tags-input"],[data-scope="date-picker"],' +
   '[data-scope="slider"],[role="slider"]';
 
 export function shortcutIgnored(target: EventTarget | null): boolean {

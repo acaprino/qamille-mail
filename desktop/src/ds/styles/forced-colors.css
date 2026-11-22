@@ -136,11 +136,12 @@
   }
 
   /* Task 12: select. The chosen item, then the item the arrow keys are on (the later rule wins on an item that is both). */
-  [data-scope='select'][data-part='item'][data-state='checked'] {
+  [data-slot='select-item'][data-selected],
+  [data-slot='select-item'][aria-selected='true'] {
     outline: 2px solid Highlight;
     outline-offset: -2px;
   }
-  [data-scope='select'][data-part='item'][data-highlighted] {
+  [data-slot='select-item'][data-highlighted] {
     outline: 1px dashed Highlight;
     outline-offset: -1px;
   }

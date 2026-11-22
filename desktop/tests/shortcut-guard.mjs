@@ -19,8 +19,8 @@ test('shortcutIgnored: editing and widget targets are ignored, the page is not',
     const result = await page.evaluate(async () => {
       const { shortcutIgnored } = await import('/src/lib/shortcut-guard.ts');
       const cases = {
-        selectTrigger: '<div data-scope="select" data-part="root"><button id="t">x</button></div>',
-        selectItem: '<div data-scope="select" data-part="content"><div><span id="t">English</span></div></div>',
+        selectTrigger: '<button data-slot="select-trigger" id="t">x</button>',
+        selectItem: '<div data-slot="select-content" role="listbox"><div role="option"><span id="t">English</span></div></div>',
         comboboxInput: '<div data-scope="combobox"><div id="t">x</div></div>',
         tagsInput: '<div data-scope="tags-input"><span id="t">x</span></div>',
         datePicker: '<div data-scope="date-picker"><button id="t">12</button></div>',

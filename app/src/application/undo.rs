@@ -149,6 +149,28 @@ fn is_retryable(operation: &UndoOperation, error: &AppError) -> bool {
         && connectivity::is_retryable_connect_error(&error.message)
 }
 
+/// What is left of the queue when Qamille is asked to quit ([`UndoService::unsettled`]), by
+/// what quitting does to it: a `Pending` row stays in the queue and the next start carries it out;
+/// a `Committing` one dies with the process, and startup recovery marks it failed without
+/// retrying it ([`UndoService::recover_interrupted`], INV-008). Only `SendDraft` sends a message:
+/// an archive, a move, a schedule or a discarded draft is an action.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Unsettled {
+    /// Sends still in the queue (no connection, credentials the vault cannot open): the next start sends them.
+    pub sends: usize,
+    /// Sends on their way to the provider: quitting may stop them, and nothing sends them again.
+    pub sending: usize,
+    /// Other actions still in the queue: the next start carries them out.
+    pub actions: usize,
+    /// Other actions being confirmed: quitting may interrupt them, and the next start reports them failed.
+    pub confirming: usize,
+}
+impl Unsettled {
+    pub fn total(&self) -> usize {
+        self.sends + self.sending + self.actions + self.confirming
+    }
+}
+
 #[derive(Clone)]
 pub struct UndoService {
     context: Arc<ServiceContext>,
@@ -602,17 +624,24 @@ impl UndoService {
         }
         Ok(changed)
     }
-    /// The actions that have not reached the provider yet: `Pending` (undoable, due, or backing
-    /// off) and `Committing` (on their way). `Failed` rows are notices, not work.
-    pub fn unsettled(&self) -> AppResult<usize> {
+    /// The actions that have not reached the provider yet, by what quitting does to them
+    /// ([`Unsettled`]): `Pending` rows (undoable, due, or backing off) stay queued, `Committing`
+    /// ones are on their way. `Failed` rows are notices, not work.
+    pub fn unsettled(&self) -> AppResult<Unsettled> {
         // Polled while Qamille waits to quit: the shared snapshot, never a copy of the store.
-        Ok(self
-            .context
-            .read_shared()?
-            .undo_actions
-            .iter()
-            .filter(|a| matches!(a.status, UndoStatus::Pending | UndoStatus::Committing))
-            .count())
+        let store = self.context.read_shared()?;
+        let mut left = Unsettled::default();
+        for action in &store.undo_actions {
+            let send = matches!(action.operation, UndoOperation::SendDraft { .. });
+            match (action.status, send) {
+                (UndoStatus::Pending, true) => left.sends += 1,
+                (UndoStatus::Committing, true) => left.sending += 1,
+                (UndoStatus::Pending, false) => left.actions += 1,
+                (UndoStatus::Committing, false) => left.confirming += 1,
+                (UndoStatus::Failed, _) => {}
+            }
+        }
+        Ok(left)
     }
     /// One full queue pass, shared by both entry points: drain the
     /// connectivity wakes, read the snapshot, `prepare` it, claim every due
@@ -1258,14 +1287,27 @@ mod tests {
         }
 
         #[test]
-        fn unsettled_counts_pending_and_committing() {
+        fn unsettled_tells_queued_sends_from_sends_on_their_way_and_from_other_actions() {
+            let draft = |id, operation, status| UndoAction { operation, ..row(id, 0, status, NOW - 1) };
             let (undo, _, _) = service(vec![
                 row(1, 10, UndoStatus::Pending, NOW + 20_000),
                 row(2, 11, UndoStatus::Committing, NOW - 1),
                 row(3, 12, UndoStatus::Failed, NOW - 1),
+                draft(4, UndoOperation::SendDraft { draft_id: 20 }, UndoStatus::Pending),
+                draft(5, UndoOperation::SendDraft { draft_id: 21 }, UndoStatus::Pending),
+                draft(6, UndoOperation::SendDraft { draft_id: 22 }, UndoStatus::Committing),
+                draft(7, UndoOperation::SendDraft { draft_id: 23 }, UndoStatus::Failed),
+                // Scheduling and discarding a draft send nothing: they are actions like an archive.
+                draft(8, UndoOperation::ScheduleDraft { draft_id: 24, send_at: NOW }, UndoStatus::Pending),
+                draft(9, UndoOperation::DiscardDraft { draft_id: 25 }, UndoStatus::Committing),
             ]);
-            assert_eq!(undo.unsettled().unwrap(), 2);
-            assert_eq!(service(vec![]).0.unsettled().unwrap(), 0);
+            let left = undo.unsettled().unwrap();
+            // Queued rows stay for the next start; rows on their way are cut off by a quit and
+            // startup recovery fails them, never retries them (INV-008).
+            assert_eq!(left, Unsettled { sends: 2, sending: 1, actions: 2, confirming: 2 });
+            assert_eq!(left.total(), 7);
+            assert_eq!(service(vec![]).0.unsettled().unwrap(), Unsettled::default());
+            assert_eq!(Unsettled::default().total(), 0);
         }
     }
 

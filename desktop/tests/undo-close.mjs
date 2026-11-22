@@ -41,16 +41,19 @@ test('queued sends are sent before closing', async () => {
 });
 
 test('a send that did not leave asks, and keeping Qamille open vetoes', async () => {
+  // One send still queued, one on its way: the question words each (`unsent_text`), so it gets the
+  // queue as `undo_send_now` left it, not a single count that would call an archive a message.
+  const left = { remaining: 3, sends: 1, sending: 1, actions: 1, confirming: 0 };
   for (const [keepOpen, closes] of [[true, false], [false, true]]) {
     const fake = backend({
-      undo_send_now: () => ({ remaining: 1 }),
+      undo_send_now: () => left,
       restore_main_window: () => null,
       undo_quit_anyway: () => !keepOpen,
     });
     assert.equal(await createUndoQueueGuard(fake.call)(), closes);
     // The window comes back first (Esci from the tray: it is hidden), so the question is seen with it.
     assert.deepEqual(fake.commands(), ['undo_send_now', 'restore_main_window', 'undo_quit_anyway']);
-    assert.deepEqual(fake.log[2].args, { remaining: 1 });
+    assert.deepEqual(fake.log[2].args, { left: { sends: 1, sending: 1, actions: 1, confirming: 0 } });
   }
 });
 

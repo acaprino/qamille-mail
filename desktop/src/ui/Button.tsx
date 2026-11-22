@@ -7,7 +7,7 @@
 // a form says `type="submit"`.
 import type { ButtonHTMLAttributes, Ref } from 'react';
 import { Button as SigridButton } from '@acaprino/sigrid';
-import { cn } from '../ds/cn';
+import { cn } from './cn';
 import Tooltip from '../ds/primitives/Tooltip';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'icon' | 'text';

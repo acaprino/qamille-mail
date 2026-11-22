@@ -36,7 +36,7 @@ import { useStore } from '../lib/store';
 import { tick } from '../lib/tick';
 import { cn } from '../lib/utils';
 import type { Account, UndoAction } from '../lib/types';
-import { imeComposing } from '../ds/ime';
+import { imeComposing } from '../lib/ime';
 import './ActivityCenter.css';
 
 export type ActivityCenterProps = {

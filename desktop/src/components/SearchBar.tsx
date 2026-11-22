@@ -29,7 +29,7 @@ import { useReactive } from '../lib/store';
 import { tick } from '../lib/tick';
 import { cn } from '../lib/utils';
 import type { MailPage, Workspace } from '../lib/types';
-import { imeComposing } from '../ds/ime';
+import { imeComposing } from '../lib/ime';
 import { Input } from '../ui/Input';
 
 export type SearchBarProps = {

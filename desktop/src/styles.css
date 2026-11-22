@@ -278,76 +278,12 @@
 .reader-reply kbd {
   display: none;
 }
-.sidebar nav {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.sidebar nav button {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  text-align: left;
-  padding: 0 8px;
-  border-radius: var(--radius-md);
-  font-weight: 400;
-  color: var(--sidebar-text);
-  font-size: var(--text-sm);
-  height: var(--control-height);
-  flex-shrink: 0;
-}
 .sidebar nav button .sidebar-text {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.sidebar nav button:hover {
-  color: var(--sidebar-text-active);
-}
-@media (prefers-reduced-motion: reduce) {
-  .sidebar nav button:hover {
-    background: var(--sidebar-hover);
-  }
-}
-/* .sidebar-body scrolls and clips, so an outer focus ring would lose its sides. */
-.sidebar nav button:focus-visible {
-  outline-offset: -2px;
-}
-/* One accent to act with: the active item is a lighter pill of the column, not an accent fill. */
-.sidebar nav button.active {
-  background: var(--sidebar-active);
-  color: var(--sidebar-text-active);
-  font-weight: 500;
-}
-.sidebar nav button.active > svg {
-  color: var(--accent-on-sidebar);
-}
-.nav-count {
-  margin-left: auto;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-secondary);
-}
-.active .nav-count {
-  color: var(--text);
-  font-weight: 600;
-  padding: 0 6px;
-}
-/* The count also sits on a light surface (Contacts); in the dark column it takes the column's tones. */
-.sidebar .nav-count {
-  padding: 0 7px;
-  border-radius: var(--radius-full);
-  background: var(--sidebar-active);
-  color: var(--sidebar-text);
-}
-.sidebar .active .nav-count {
-  background: var(--accent);
-  color: var(--on-accent);
 }
 .ai-badge {
   margin-left: auto;

@@ -5,7 +5,7 @@
 // window. Sigrid's window has a close button of its own (its words name it).
 import { useRef, type CSSProperties, type HTMLAttributes } from 'react';
 import { DialogContent, DialogRoot } from '@acaprino/sigrid';
-import { imeComposing } from '../ds/ime';
+import { imeComposing } from '../lib/ime';
 import { useReturnFocus } from '../ds/focus-return';
 
 export type ModalProps = HTMLAttributes<HTMLDivElement> & {

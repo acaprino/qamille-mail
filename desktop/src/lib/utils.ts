@@ -1,1 +1,1 @@
-export { cn } from '../ds/cn';
+export { cn } from '../ui/cn';

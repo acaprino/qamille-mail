@@ -6,7 +6,7 @@
 // (asked of Sigrid as R18): an item written `disabled` is shown as any other.
 import { useId } from 'react';
 import { Select as SigridSelect } from '@acaprino/sigrid';
-import { cn } from '../ds/cn';
+import { cn } from './cn';
 
 export type SelectItem = { value: string; label: string; disabled?: boolean };
 

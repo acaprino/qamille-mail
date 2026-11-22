@@ -6,7 +6,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useFocusAfterStep } from '../../lib/focus-after-step';
 import Button from '../../ds/primitives/Button';
 import Field from '../../ds/primitives/Field';
-import GoogleMark from '../../ds/primitives/GoogleMark';
 import { call, errorText } from '../../lib/api';
 import { connectGoogle } from '../../lib/google-sign-in';
 import type { Account } from '../../lib/types';
@@ -238,7 +237,7 @@ export default function ServerConnect({ preset = null, consented, defaultDeviceN
           disabled={busy || (signUpWithGoogle && termsBlock(info?.legal, terms))}
           onClick={() => void signInWithBrowser('google')}
         >
-          <GoogleMark />
+          <img src="/brand/google.svg" alt="" width={18} height={18} />
           {preset && info?.google_signup ? tr('Continua con Google', 'Continue with Google') : tr('Accedi con Google', 'Sign in with Google')}
         </Button>
       )}

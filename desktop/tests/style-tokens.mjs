@@ -34,12 +34,6 @@ const ALLOWED = [
     text,
     why: 'the key of a colour name in Sigrid’s palette, never drawn',
   })),
-  // Google's «G» on the «Sign in with Google» buttons: Google's branding fixes its four colours.
-  ...['#EA4335', '#4285F4', '#FBBC05', '#34A853'].map((text) => ({
-    file: 'ds/primitives/GoogleMark',
-    text,
-    why: 'Google sign-in mark, colours fixed by Google branding',
-  })),
 ];
 
 const RULES = [

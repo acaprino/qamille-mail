@@ -17,7 +17,7 @@ import type { Draft, UndoAction, Workspace } from '../lib/types';
 import { cn } from '../lib/utils';
 import RecipientInput, { splitRecipients } from './contacts/RecipientInput';
 import RichEditor, { type RichEditorHandle } from './RichEditor';
-import { imeComposing } from '../ds/ime';
+import { imeComposing } from '../lib/ime';
 import './Composer.css';
 import { Input } from '../ui/Input';
 

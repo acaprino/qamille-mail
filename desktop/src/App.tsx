@@ -6,7 +6,7 @@ import { listen } from '@tauri-apps/api/event';
 import Sidebar from './components/Sidebar';
 import WindowControls from './components/WindowControls';
 import MailList from './components/MailList';
-import { imeComposing } from './ds/ime';
+import { imeComposing } from './lib/ime';
 import {
   arrowsMoveMail,
   isAppChord,

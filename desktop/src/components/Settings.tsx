@@ -3,7 +3,6 @@ import Button from '../ds/primitives/Button';
 import Checkbox from '../ds/primitives/Checkbox';
 import Field from '../ds/primitives/Field';
 import Icon from '../ds/primitives/Icon';
-import GoogleMark from '../ds/primitives/GoogleMark';
 import Select from '../ds/primitives/Select';
 import Switch from '../ds/primitives/Switch';
 import { call, desktop, errorText } from '../lib/api';
@@ -513,7 +512,7 @@ export default function Settings({
                   disabled={form.busy}
                   onClick={() => void signInWithGoogle()}
                 >
-                  <GoogleMark />
+                  <img src="/brand/google.svg" alt="" width={18} height={18} />
                   {form.googlePending
                     ? tr('Mostra avanzamento accesso', 'Show sign-in progress')
                     : hasGmail

@@ -3,7 +3,7 @@
 // the pages' own rules, which place a field by it. Sigrid's `FormField` takes the label, the help and the error as
 // props around one control; this one keeps the markup the app already has.
 import type { LabelHTMLAttributes } from 'react';
-import { cn } from '../ds/cn';
+import { cn } from './cn';
 
 export default function Field({ className, children, ...rest }: LabelHTMLAttributes<HTMLLabelElement>) {
   return (

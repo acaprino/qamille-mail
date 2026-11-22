@@ -20,6 +20,7 @@ import NoticesGallery from './gallery/NoticesGallery';
 // the blank lines stay, so two tasks never touch neighbouring lines.
 
 // Task 3: words
+import WordsGallery from './gallery/WordsGallery';
 
 // Task 4: switch
 
@@ -133,6 +134,8 @@ export default function Gallery({ which, props = {} }: GalleryProps) {
     // The Sigrid plan's insertion points for the cases (see above, under the imports).
 
     // Task 3: words
+    case 'words':
+      return <WordsGallery />;
 
     // Task 4: switch
 

@@ -602,6 +602,24 @@ try {
   // lines stay, so two tasks never touch neighbouring lines.
 
   // Task 3: words
+  {
+    // Sigrid's own words follow the interface language through Qamille's root (src/ui/SigridRoot.tsx).
+    const page = await context.newPage();
+    watch(page);
+    await mountGallery(page, 'words');
+    await expect(page.locator('[aria-label="Notices"]')).toHaveCount(1);
+    await expect(page.locator('[aria-label="Notifiche"]')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Italiano', exact: true }).click();
+    await expect(page.locator('[aria-label="Notifiche"]')).toHaveCount(1);
+    await expect(page.locator('[aria-label="Notices"]')).toHaveCount(0);
+    // The error notice announces itself in the language too.
+    await expect(page.locator('[aria-label="Notifiche"]')).toContainText('Errore');
+    await page.getByRole('button', { name: 'English', exact: true }).click();
+    await expect(page.locator('[aria-label="Notices"]')).toHaveCount(1);
+    await expect(page.locator('[aria-label="Notices"]')).toContainText('Error');
+    console.log('PASS Words: the notice region and the error word follow the interface language');
+    await page.close();
+  }
 
   // Task 10: toaster
 

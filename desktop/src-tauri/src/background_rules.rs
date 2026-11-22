@@ -100,17 +100,42 @@ pub struct QueueLeft {
     pub actions: u32,
     /// Other actions being confirmed by the provider.
     pub confirming: u32,
+    /// Sends that were queued when «Esci» asked and failed while it waited (no connection): they did
+    /// not leave, and their drafts are still in Drafts (`not_sent`).
+    pub failed: u32,
 }
 impl QueueLeft {
     pub fn total(&self) -> u32 {
-        self.sends.saturating_add(self.sending).saturating_add(self.actions).saturating_add(self.confirming)
+        self.sends
+            .saturating_add(self.sending)
+            .saturating_add(self.actions)
+            .saturating_add(self.confirming)
+            .saturating_add(self.failed)
     }
+}
+
+/// The sends that «Esci» made due and that did not leave: of the drafts whose send was queued when it
+/// asked (`started`), the ones no longer queued (`queued`) whose draft is still there (`drafts`). A sent
+/// draft leaves Drafts; one still queued is counted with the queue. Each draft once.
+pub fn not_sent(started: &[u64], queued: &[u64], drafts: &[u64]) -> u32 {
+    let mut left: Vec<u64> = started.iter().copied().filter(|id| !queued.contains(id) && drafts.contains(id)).collect();
+    left.sort_unstable();
+    left.dedup();
+    u32::try_from(left.len()).unwrap_or(u32::MAX)
 }
 
 /// The question when «Esci» finds actions of the undo queue that did not leave
 /// (`commands::undo::undo_quit_anyway`): one line per kind, each saying what quitting anyway does to
-/// it. What quitting may lose comes before what merely waits, and the sends before the actions.
+/// it. A send that already failed comes first, then what quitting may lose, then what merely waits,
+/// and the sends before the actions.
 pub fn unsent_text(italian: bool, left: QueueLeft) -> String {
+    let failed = match (italian, left.failed) {
+        (_, 0) => None,
+        (true, 1) => Some("1 messaggio non è partito: è rimasto nelle Bozze.".to_owned()),
+        (true, n) => Some(format!("{n} messaggi non sono partiti: sono rimasti nelle Bozze.")),
+        (false, 1) => Some("1 message was not sent: it is still in Drafts.".to_owned()),
+        (false, n) => Some(format!("{n} messages were not sent: they are still in Drafts.")),
+    };
     let sending = match (italian, left.sending) {
         (_, 0) => None,
         (true, 1) => Some("1 messaggio è in invio: uscendo potrebbe non partire, controlla Inviati.".to_owned()),
@@ -139,7 +164,7 @@ pub fn unsent_text(italian: bool, left: QueueLeft) -> String {
         (false, 1) => Some("1 mail action has not been completed yet. If you quit, it will be completed the next time Qamille starts.".to_owned()),
         (false, n) => Some(format!("{n} mail actions have not been completed yet. If you quit, they will be completed the next time Qamille starts.")),
     };
-    [sending, sends, confirming, actions].into_iter().flatten().collect::<Vec<_>>().join("\n")
+    [failed, sending, sends, confirming, actions].into_iter().flatten().collect::<Vec<_>>().join("\n")
 }
 
 /// What to do with `Qamille-worker.vbs`, the startup file of the old background worker, now that
@@ -307,7 +332,7 @@ mod tests {
 
     #[test]
     fn the_quit_question_says_what_quitting_does_to_each_kind_of_action() {
-        let left = |sends, sending, actions, confirming| QueueLeft { sends, sending, actions, confirming };
+        let left = |sends, sending, actions, confirming| QueueLeft { sends, sending, actions, confirming, failed: 0 };
         // A queued send stays in the queue, and the next start sends it. Not always for want of a
         // connection: credentials the vault cannot open hold it too.
         assert_eq!(unsent_text(true, left(1, 0, 0, 0)), "1 messaggio non è ancora partito. Se esci, partirà al prossimo avvio di Qamille.");
@@ -341,6 +366,34 @@ mod tests {
         );
         assert_eq!(left(1, 1, 2, 1).total(), 5);
         assert_eq!(QueueLeft::default().total(), 0);
+    }
+
+    #[test]
+    fn a_send_that_failed_while_quitting_is_said_first_and_is_in_drafts() {
+        // Network off: «Esci» made the send due, it failed during the wait, and the draft stayed. Never a
+        // silent quit: the question says it did not leave and where it is.
+        let failed = |failed| QueueLeft { failed, ..QueueLeft::default() };
+        assert_eq!(unsent_text(true, failed(1)), "1 messaggio non è partito: è rimasto nelle Bozze.");
+        assert_eq!(unsent_text(true, failed(2)), "2 messaggi non sono partiti: sono rimasti nelle Bozze.");
+        assert_eq!(unsent_text(false, failed(1)), "1 message was not sent: it is still in Drafts.");
+        assert_eq!(unsent_text(false, failed(3)), "3 messages were not sent: they are still in Drafts.");
+        assert_eq!(failed(2).total(), 2);
+        let both = QueueLeft { failed: 1, sending: 1, ..QueueLeft::default() };
+        assert_eq!(
+            unsent_text(false, both),
+            "1 message was not sent: it is still in Drafts.
+1 message is being sent: if you quit it may not leave, check Sent."
+        );
+    }
+
+    #[test]
+    fn a_send_queued_when_quitting_began_whose_draft_is_still_there_did_not_leave() {
+        // Drafts of the sends queued when «Esci» asked: 7 failed (no longer queued, its draft still
+        // there), 8 left (a sent draft is gone), 9 is still queued (counted as queued, not here).
+        assert_eq!(not_sent(&[7, 8, 9], &[9], &[7, 9, 42]), 1);
+        assert_eq!(not_sent(&[7, 7], &[], &[7]), 1);
+        assert_eq!(not_sent(&[], &[], &[1, 2]), 0);
+        assert_eq!(not_sent(&[3], &[3], &[3]), 0);
     }
 
     #[test]

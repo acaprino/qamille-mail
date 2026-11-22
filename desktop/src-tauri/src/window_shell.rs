@@ -217,18 +217,33 @@ fn pending_show() -> std::sync::MutexGuard<'static, Option<Placement>> {
 /// Win32 shows the window (`SetWindowPlacement` with `SW_SHOWMAXIMIZED`: Windows maximizes it on its
 /// monitor, with no frame at the normal size and no jump) and tao is told with `show()` right after,
 /// so its visible flag matches the window. With the flag left behind, tao's next change of a window
-/// flag (the maximize button) would hide the window.
+/// flag (the maximize button) would hide the window. tao's `show()` itself, still thinking the window
+/// hidden, rewrites its style without `WS_VISIBLE` and shows it again: the window would vanish for a
+/// frame or two (seen on the exe: 16-44 ms). So DWM keeps it out of sight (cloaked: composed, never
+/// on screen) from before the Win32 show until tao is told, and it appears once, maximized.
 pub fn show_main(window: &WebviewWindow) {
     let path = placement::first_show(&mut pending_show());
     #[cfg(windows)]
-    if path == ShowPath::Maximized && window.hwnd().is_ok_and(win::show_maximized) {
-        let _ = window.show();
-        // Safety net: if tao does not see the window maximized after the Win32 call, maximize it
-        // through tao, so its state and the maximize button stay right.
-        if !window.is_maximized().unwrap_or(true) {
-            let _ = window.maximize();
+    if path == ShowPath::Maximized
+        && let Ok(hwnd) = window.hwnd()
+    {
+        let cloaked = win::cloak(hwnd, true);
+        let shown = win::show_maximized(hwnd);
+        if shown {
+            let _ = window.show();
+            // Safety net: if tao does not see the window maximized after the Win32 call, maximize it
+            // through tao, so its state and the maximize button stay right.
+            if !window.is_maximized().unwrap_or(true) {
+                let _ = window.maximize();
+            }
         }
-        return;
+        // Always, whatever happened above: a window left cloaked would be on screen and invisible.
+        if cloaked {
+            win::cloak(hwnd, false);
+        }
+        if shown {
+            return;
+        }
     }
     let _ = window.show();
     if path == ShowPath::Maximized {
@@ -569,6 +584,15 @@ mod win {
     /// `GetWindowPlacement` keeps right) with the show command `SW_SHOWMAXIMIZED`. Windows maximizes
     /// it on the monitor the rectangle is on, and un-maximizing returns to that rectangle. Whether it
     /// worked, or the window is as it was.
+    /// DWM's cloak on the window (`DWMWA_CLOAK`): on, the window is composed but not shown. Whether
+    /// DWM took it.
+    pub fn cloak(hwnd: HWND, on: bool) -> bool {
+        use windows::Win32::Graphics::Dwm::{DWMWA_CLOAK, DwmSetWindowAttribute};
+        let value = BOOL::from(on);
+        // SAFETY: `value` lives across the call, and the size passed is its own.
+        unsafe { DwmSetWindowAttribute(hwnd, DWMWA_CLOAK, (&raw const value).cast(), std::mem::size_of::<BOOL>() as u32).is_ok() }
+    }
+
     pub fn show_maximized(hwnd: HWND) -> bool {
         let mut window_placement = WINDOWPLACEMENT { length: std::mem::size_of::<WINDOWPLACEMENT>() as u32, ..Default::default() };
         unsafe {

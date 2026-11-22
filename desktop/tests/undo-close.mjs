@@ -53,8 +53,21 @@ test('a send that did not leave asks, and keeping Qamille open vetoes', async ()
     assert.equal(await createUndoQueueGuard(fake.call)(), closes);
     // The window comes back first (Esci from the tray: it is hidden), so the question is seen with it.
     assert.deepEqual(fake.commands(), ['undo_send_now', 'restore_main_window', 'undo_quit_anyway']);
-    assert.deepEqual(fake.log[2].args, { left: { sends: 1, sending: 1, actions: 1, confirming: 0 } });
+    assert.deepEqual(fake.log[2].args, { left: { sends: 1, sending: 1, actions: 1, confirming: 0 }, failed: 0 });
   }
+});
+
+test('a send that failed while Qamille waited to quit asks too, and says so', async () => {
+  // Network off: the wait made the send due and it failed, so nothing is queued any more, but the
+  // message did not leave: `failed` counts it, and the question says it is in Drafts.
+  const fake = backend({
+    undo_send_now: () => ({ remaining: 1, sends: 0, sending: 0, actions: 0, confirming: 0, failed: 1 }),
+    restore_main_window: () => null,
+    undo_quit_anyway: () => false,
+  });
+  assert.equal(await createUndoQueueGuard(fake.call)(), false);
+  assert.deepEqual(fake.commands(), ['undo_send_now', 'restore_main_window', 'undo_quit_anyway']);
+  assert.deepEqual(fake.log[2].args, { left: { sends: 0, sending: 0, actions: 0, confirming: 0 }, failed: 1 });
 });
 
 test('session end sends only when the session really ends', async () => {

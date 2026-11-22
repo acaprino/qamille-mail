@@ -25,18 +25,21 @@ type SendResult = {
   actions: number;
   /** Other actions being confirmed: quitting may interrupt them. */
   confirming: number;
+  /** Sends that failed while the close waited (no connection): they did not leave, and are in Drafts. */
+  failed?: number;
 };
 
 /** The close guard, registered `last`: it sends, so it runs only once the editors let the window
  *  close. What did not leave brings the window back, if it was in the tray, and asks, saying what
  *  quitting does to each kind (`unsent_text`): «Resta aperto» vetoes the close, «Esci comunque»
- *  leaves the queued ones for the next start and may lose the ones on their way. */
+ *  leaves the queued ones for the next start and may lose the ones on their way. A send that failed
+ *  during the wait (no connection) asks too: it did not leave, and it is in Drafts. */
 export function createUndoQueueGuard(call: Call): CloseGuard {
   return async () => {
-    const { remaining, sends, sending, actions, confirming } = await call<SendResult>('undo_send_now', { waitMs: QUIT_WAIT_MS });
+    const { remaining, sends, sending, actions, confirming, failed = 0 } = await call<SendResult>('undo_send_now', { waitMs: QUIT_WAIT_MS });
     if (remaining <= 0) return true;
     await call('restore_main_window');
-    return await call<boolean>('undo_quit_anyway', { left: { sends, sending, actions, confirming } });
+    return await call<boolean>('undo_quit_anyway', { left: { sends, sending, actions, confirming }, failed });
   };
 }
 

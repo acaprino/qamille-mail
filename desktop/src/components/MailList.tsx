@@ -236,9 +236,8 @@ function MailRow({
   const content = (
     <>
       <label className="mail-check">
-        <input
+        <Checkbox
           className="mail-checkbox"
-          type="checkbox"
           tabIndex={tab}
           aria-label={`${t('Seleziona', 'Select')} ${email.subject || t('(Senza oggetto)', '(No subject)')}`}
           checked={checked}

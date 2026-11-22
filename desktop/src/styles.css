@@ -2641,8 +2641,8 @@
   background: var(--priority-bg);
   font-weight: 600;
 }
-/* The checkbox of a row is the native one, styled by tokens (rows stay plain markup, spec 7.6). It takes
-   the gutter of the unread dot when the pointer or the keyboard is on the row, or when it is ticked. */
+/* The checkbox of a row is Sigrid's (a button with role checkbox and data-state). It takes the gutter of the unread dot
+   when the pointer or the keyboard is on the row, or when it is ticked. */
 .mail-check {
   position: absolute;
   top: 7px;
@@ -2658,33 +2658,30 @@
 }
 .mail-check .mail-checkbox {
   position: static;
-  width: 16px;
-  height: 16px;
   margin: 0;
-  accent-color: var(--color-primary);
 }
 .mail-row:has(> .mail-open:hover) .mail-check,
 .mail-check:hover,
 .mail-check:focus-within,
-.mail-check:has(:checked) {
+.mail-check:has([data-state='checked']) {
   opacity: 1;
 }
 .mail-row:has(> .mail-open:hover) .unread-dot,
 .mail-row:has(.mail-check:hover) .unread-dot,
 .mail-row:has(.mail-check:focus-within) .unread-dot,
-.mail-row:has(.mail-checkbox:checked) .unread-dot {
+.mail-row:has(.mail-checkbox[data-state='checked']) .unread-dot {
   visibility: hidden;
 }
 /* While rows are being chosen, every row shows its box on the edge of the selection bar's own box, and the
    text moves over to make room instead of running into it. */
-.mail-list:has(.mail-checkbox:checked) .mail-check {
+.mail-list:has(.mail-checkbox[data-state='checked']) .mail-check {
   left: 8px;
   opacity: 1;
 }
-.mail-list:has(.mail-checkbox:checked) .mail-open {
+.mail-list:has(.mail-checkbox[data-state='checked']) .mail-open {
   padding-left: 36px;
 }
-.mail-list:has(.mail-checkbox:checked) .unread-dot {
+.mail-list:has(.mail-checkbox[data-state='checked']) .unread-dot {
   visibility: hidden;
 }
 /* The heading that takes the focus when no row is selected (restoreListFocus), or the Drafts page's when the

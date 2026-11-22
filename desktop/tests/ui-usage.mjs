@@ -28,9 +28,7 @@ const INSTEAD = {
 };
 // INV-003 exceptions: a native control that stays outside the primitives, with the reason.
 // The Calendar rail rows are <button role="checkbox"> (not a native checkbox, not flagged).
-const ALLOWED = [
-  { file: 'components/MailList.tsx', control: 'checkbox', class: 'mail-checkbox', reason: 'rows stay plain markup (spec 7.6)' },
-];
+const ALLOWED = [];
 const used = new Set();
 const words = (dir, keep) =>
   fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {

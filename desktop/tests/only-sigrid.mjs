@@ -218,3 +218,13 @@ test('an entry of PENDING whose files import nothing forbidden is stale', () => 
   });
   assert.deepEqual(staleEntries(root, ['src/ds/**', 'src/App.tsx', 'src/main.tsx']), ['src/App.tsx', 'src/main.tsx']);
 });
+
+test('package.json and the lockfile carry none of what Sigrid carries', () => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(desktop, 'package.json'), 'utf8'));
+  const declared = Object.keys({ ...manifest.dependencies, ...manifest.devDependencies, ...manifest.optionalDependencies });
+  const locked = Object.keys(JSON.parse(fs.readFileSync(path.join(desktop, 'package-lock.json'), 'utf8')).packages ?? {})
+    .filter((name) => name.startsWith('node_modules/'))
+    .map((name) => name.slice('node_modules/'.length).replace(/^.*node_modules\//, ''));
+  const found = [...declared, ...locked].filter((name) => forbiddenPackage(name));
+  assert.deepEqual([...new Set(found)], [], 'a package that Sigrid already carries is in package.json or the lockfile');
+});

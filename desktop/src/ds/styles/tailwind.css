@@ -20,6 +20,8 @@
 @source '../../../vendor/sigrid/src';
 @source not '../../../vendor/sigrid/src/internal/motion-impl.tsx';
 @source not '../../../vendor/sigrid/src/styles';
+/* The tests name classes to forbid them (cursor-pointer): they are not sources of classes. */
+@source not '../../../tests';
 
 /* Qamille's values for them, after Sigrid's own first-paint defaults. */
 @import '../../theme/compatto.css';

@@ -29,6 +29,20 @@ Lettura del proprietario, non sua parola: oggi Qamille ha un sistema suo (`deskt
 - Si usa solo il repository ufficiale `acaprino/toolkit`.
 - **Quando le forme del toolkit e di Qamille sono diverse, vince il toolkit** (strada A). Qamille tiene come parametri i colori «Compatto», il carattere, la densità e i raggi; il resto della forma, del testo e del movimento è quello del toolkit. Le differenze accettate sono elencate sotto, in «Differenze accettate».
 
+### Decisione del 2026-11-22: Qamille si basa solo su Sigrid
+
+«Qamille non deve avere nulla di questo, deve basarsi solo su Sigrid.» La decisione vince su questo documento dove i due sono diversi.
+
+- Ogni comportamento, primitiva, icona, carattere e animazione di Qamille viene da Sigrid.
+- Alla fine della migrazione Qamille non ha nessuna dipendenza diretta su ciò che Sigrid già porta: `@ark-ui/react`, `@base-ui/react`, `motion`, le librerie di icone, `clsx`, `class-variance-authority`, `tailwind-merge`, `@internationalized/date`, `tw-animate-css`.
+  - I pacchetti escono da `desktop/package.json` e dal lockfile.
+  - Un test fallisce se un file dell'app ne importa uno.
+- Anche i componenti di prodotto di Qamille (`RecipientsInput`, `NavList`, le righe della posta, le icone, ogni animazione) si costruiscono sulle sole esportazioni di Sigrid. Le copie di unlumen spariscono.
+- Ciò che a Sigrid manca si chiede a Sigrid. Non si scrive mai in Qamille.
+- Le librerie che Sigrid tiene dentro il suo bundle vanno bene, purché Qamille non ne abbia di proprie. Per questo non vale più la richiesta di dichiarare React, Ark e Motion come peer dependency esterne («Vincoli», «Il toolkit oggi»; «Scelte del costruttore», «Versioni»; sotto-progetto 2). La copia unica di Ark, Zag e Motion la dà la rimozione delle dipendenze di Qamille.
+- Sigrid tiene Base UI e Ark insieme, per decisione del proprietario dello stesso giorno (README di Sigrid, «The four layers»). L'obiettivo 4 («Tutto su Ark UI») non vale più.
+- Il piano è `docs/superpowers/plans/2026-11-22-qamille-su-sigrid.md`, e la regola si scrive nell'ADR-0011 v4.
+
 ## Obiettivi
 
 1. **Repository pubblico con release.** Il toolkit vive in `acaprino/toolkit` con licenza MIT: fatto. Il suo README oggi dice di usarlo da un checkout locale, con `npm ci`, `npm run build` e una dipendenza `file:`. Non ha ancora release.
@@ -40,7 +54,7 @@ Lettura del proprietario, non sua parola: oggi Qamille ha un sistema suo (`deskt
    - `comfortable`: 40 px.
 
    Altezze, spaziature interne, distanze e corpo del testo dei controlli sono token che cambiano con l'attributo. Vale dal primo disegno. Con un puntatore grossolano restano i 44 px, in ogni densità.
-4. **Tutto su Ark UI.** Le primitive oggi su Base UI passano ad Ark (dialog, sheet, select, popover, menu, checkbox, tooltip, toggle group, radio group, input), e Base UI esce dalle dipendenze.
+4. **Tutto su Ark UI.** Le primitive oggi su Base UI passano ad Ark (dialog, sheet, select, popover, menu, checkbox, tooltip, toggle group, radio group, input), e Base UI esce dalle dipendenze. *Superato il 2026-11-22: Base UI resta in Sigrid (vedi «Decisione del 2026-11-22»).*
 5. **Nessuna parola fissa.** Ogni testo visibile o accessibile delle primitive arriva dall'app, come prop o da un dizionario passato una volta.
 6. **Qamille sul toolkit.**
    - Qamille prende il toolkit con `npm run toolkit:sync`: ultima release, controllo degli SHA-256 e di `provenance.json`; senza rete resta la copia presente; una variabile `TOOLKIT_DIR` forza un checkout locale.
@@ -51,7 +65,7 @@ Lettura del proprietario, non sua parola: oggi Qamille ha un sistema suo (`deskt
 
 - In Qamille la scelta del tema da parte dell'utente: si farà dopo, come lavoro a parte.
 - Cambiare l'aspetto di Qamille o di Ethel.
-- Portare nel toolkit componenti di prodotto: per Qamille `RecipientsInput`, `NavList` e `Count`, per Ethel `Stack`, `Kanban` e `TaskSheet`. Restano nelle app, costruiti sulle primitive del toolkit.
+- Portare nel toolkit componenti di prodotto: per Qamille `RecipientsInput`, `NavList` e `Count`, per Ethel `Stack`, `Kanban` e `TaskSheet`. Restano nelle app, costruiti sulle primitive del toolkit. Per Qamille, dal 2026-11-22, sono costruiti sulle sole esportazioni di Sigrid: niente Ark, Motion o icone propri.
 
 ## Anti-obiettivi (un fallimento anche se funziona)
 
@@ -73,13 +87,13 @@ Lettura del proprietario, non sua parola: oggi Qamille ha un sistema suo (`deskt
   - il primo disegno lo decide `public/theme-boot.js`;
   - lo sfondo nativo è `--ground` (`tauri.conf.json` e `DARK_GROUND` in `native_feel.rs`);
   - devono restare verdi `tests/native-feel.mjs`, `tests/forced-colors.mjs`, `tests/contrast.mjs` e `tests/style-tokens.mjs`.
-- **CSP di Qamille.** `style-src 'self' 'unsafe-inline'`, `font-src 'self'`: il carattere resta locale, IBM Plex Sans in `public/fonts`.
+- **CSP di Qamille.** `style-src 'self' 'unsafe-inline'`, `font-src 'self'`: il carattere resta locale, IBM Plex Sans in `public/fonts`. Dal 2026-11-22 è quello di Sigrid (`fonts.css`), impacchettato da Vite: sempre locale.
 - **Lingue.** Qamille è in italiano e inglese, quindi le primitive non portano testo inglese fisso.
 - **Il toolkit oggi:**
   - intervalli con `^` e versioni diverse da Qamille (`motion` 14.6.0 contro 14.7.1, Tailwind 4.3.5 contro 4.3.3);
   - `dist/index.js` include dentro di sé Ark, Zag e Base UI.
 
-  La release deve fissare versioni esatte, e un solo valore per dipendenza nelle due app. React, Ark e Motion vanno dichiarati come peer dependency esterne al bundle, così ogni app ne ha una copia sola.
+  La release deve fissare versioni esatte, e un solo valore per dipendenza nelle due app. React, Ark e Motion vanno dichiarati come peer dependency esterne al bundle, così ogni app ne ha una copia sola. *Superato il 2026-11-22 per Ark e Motion: restano nel bundle di Sigrid, e Qamille non li ha più fra le sue dipendenze (vedi «Decisione del 2026-11-22»).*
 - **Ogni modifica al toolkit si fa in `acaprino/toolkit`**, il repository ufficiale. Nessun'altra copia è una fonte.
 
 ## Approcci considerati
@@ -154,7 +168,7 @@ Con la migrazione Qamille cambia in questi punti, e solo in questi:
   - La release contiene quindi, oltre a `dist`, i sorgenti che servono a `@source` e i fogli di `src/styles`.
 - **Versioni.**
   - `toolkit:sync` prende l'ultima release, senza pin, come per `artcraft-web`.
-  - Il toolkit dichiara React, Ark e Motion come peer dependency a versione esatta. Se non coincidono con quelle di Qamille, `toolkit:sync` si ferma con un errore, così un aggiornamento di quelle librerie in Qamille è sempre voluto.
+  - Il toolkit dichiara React, Ark e Motion come peer dependency a versione esatta. Se non coincidono con quelle di Qamille, `toolkit:sync` si ferma con un errore, così un aggiornamento di quelle librerie in Qamille è sempre voluto. *Dal 2026-11-22 vale solo per React: Ark e Motion restano nel bundle di Sigrid, e Qamille non li ha.*
   - I cambi visibili li fermano i test visivi di Qamille.
 
 ## Lasciato al costruttore
@@ -172,7 +186,7 @@ Ognuno ha il suo piano, scritto quando ci si arriva.
 
 1. **Release del toolkit.** Il repository pubblico c'è già (`acaprino/toolkit`, MIT, con una CI in `.github/workflows/ci.yml`).
    - Manca un workflow di release che, a ogni rilascio, pubblichi `dist`, il manifest SHA-256 e `provenance.json`.
-2. **Parametri e densità.** Raggi, ombre e carattere come parametri della definizione del tema; `data-density` con i tre livelli; peer dependency esterne e versioni esatte.
+2. **Parametri e densità.** Raggi, ombre e carattere come parametri della definizione del tema; `data-density` con i tre livelli; peer dependency esterne e versioni esatte (le peer dependency esterne non servono più dal 2026-11-22).
 3. **Primitive per Qamille.**
    - Le primitive restanti passano da Base UI ad Ark.
    - Arrivano quelle che mancano a Qamille: Switch, Tabs, Slider, Menu e Field.

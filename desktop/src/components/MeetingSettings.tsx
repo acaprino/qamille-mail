@@ -3,11 +3,11 @@
 // the Settings form (handed back through `onSettingsChange`), which the Save bar of Settings saves.
 // The transcription models live on the server: the app installs nothing.
 import { useEffect, useRef } from 'react';
-import Button from '../ds/primitives/Button';
-import Field from '../ds/primitives/Field';
-import Modal from '../ds/primitives/Modal';
-import Select from '../ds/primitives/Select';
-import Switch from '../ds/primitives/Switch';
+import Button from '../ui/Button';
+import Field from '../ui/Field';
+import Modal from '../ui/Modal';
+import Select from '../ui/Select';
+import Switch from '../ui/Switch';
 import { errorText } from '../lib/api';
 import { backendText, tr } from '../lib/i18n';
 import {

@@ -1,7 +1,7 @@
 import { listen } from '@tauri-apps/api/event';
 import { useEffect, useRef } from 'react';
-import Button from '../ds/primitives/Button';
-import Switch from '../ds/primitives/Switch';
+import Button from '../ui/Button';
+import Switch from '../ui/Switch';
 import { call, desktop, errorText } from '../lib/api';
 import { parseAppEvent } from '../lib/events';
 import { shortDate } from '../lib/regional';

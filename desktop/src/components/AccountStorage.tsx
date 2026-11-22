@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
-import Button from '../ds/primitives/Button';
-import Field from '../ds/primitives/Field';
-import Icon from '../ds/primitives/Icon';
-import Select from '../ds/primitives/Select';
-import Switch from '../ds/primitives/Switch';
+import Button from '../ui/Button';
+import Field from '../ui/Field';
+import Icon from '../ui/Icon';
+import Select from '../ui/Select';
+import Switch from '../ui/Switch';
 import { call, CommandError, errorText } from '../lib/api';
 import { tr } from '../lib/i18n';
 import { regionalLocale } from '../lib/regional';

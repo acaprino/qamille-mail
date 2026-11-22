@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
-import Button from '../ds/primitives/Button';
-import Icon from '../ds/primitives/Icon';
-import SidePanel from '../ds/primitives/SidePanel';
+import Button from '../ui/Button';
+import Icon from '../ui/Icon';
+import SidePanel from '../ui/SidePanel';
 import AttachedMessageView from './AttachedMessageView';
 import AttachmentPreview from './AttachmentPreview';
 import { isMessageAttachment } from '../lib/attached-message';

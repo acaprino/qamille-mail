@@ -1,9 +1,9 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
-import Button from '../ds/primitives/Button';
-import Count from '../ds/primitives/Count';
-import Icon from '../ds/primitives/Icon';
-import { NavItem, NavList } from '../ds/primitives/NavList';
-import Tooltip from '../ds/primitives/Tooltip';
+import Button from '../ui/Button';
+import Count from '../ui/Count';
+import Icon from '../ui/Icon';
+import { NavItem, NavList } from '../ui/NavList';
+import Tooltip from '../ui/Tooltip';
 import { desktop, initials } from '../lib/api';
 import { activityCenter, toggleActivityPanel } from '../lib/activity-center';
 import type { Activity } from '../lib/activity';

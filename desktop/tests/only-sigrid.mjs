@@ -2,7 +2,7 @@
 // Global Constraints). No file of desktop/src imports a package that Sigrid already carries (FORBIDDEN): what Sigrid
 // lacks is asked of Sigrid, never written in Qamille. During the move the files of PENDING still do; the list only
 // shrinks, and is empty at the end (Task 20, which also checks package.json and the lockfile).
-// The imports are read with TypeScript's own parser (as in ds-usage.mjs), so a comment or a string that names a
+// The imports are read with TypeScript's own parser (as in ui-usage.mjs), so a comment or a string that names a
 // package is not an import; the .css files are read for their @import and @plugin rules.
 //   node --test tests/only-sigrid.mjs
 import assert from 'node:assert/strict';

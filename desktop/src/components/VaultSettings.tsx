@@ -3,8 +3,8 @@
 // removing the passphrase needs the key open here; Windows vouches for this user, so the old
 // passphrase is not asked. The passphrase is never shown again and never saved.
 import { useEffect, useState } from 'react';
-import Button from '../ds/primitives/Button';
-import Field from '../ds/primitives/Field';
+import Button from '../ui/Button';
+import Field from '../ui/Field';
 import { call, errorText } from '../lib/api';
 import { tr } from '../lib/i18n';
 import { longEnough, MIN_TRANSFER_PASSPHRASE, type VaultStatus } from '../lib/vault';

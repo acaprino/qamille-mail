@@ -1,7 +1,7 @@
 // Modal section of the gallery: three openers, one per size. `onClose` counts and closes.
 import { useState } from 'react';
-import Button from '../../../src/ds/primitives/Button';
-import Modal from '../../../src/ds/primitives/Modal';
+import Button from '../../../src/ui/Button';
+import Modal from '../../../src/ui/Modal';
 
 type Size = 'sm' | 'md' | 'lg';
 

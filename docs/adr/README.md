@@ -31,6 +31,7 @@ run `index`; do not edit this block by hand.
 | ADR | Title | Governs | From task |
 |---|---|---|---|
 | [ADR-0006](<ADR-0006-pannello-allegati.md>) | Pannello laterale unico per gli allegati, mail allegate comprese | `desktop/src/components/AttachmentPanel.svelte`, `desktop/src/components/AttachedMessageView.svelte`, `desktop/src/components/Reader.svelte`, `app/src/domain/attached_message.rs`, `desktop/src/components`, `app/src/domain`, `mail-reader`, `attachments` | `brainstorm-eml-allegati` |
+| [ADR-0011 v4](<ADR-0011-v4-modulo-sistema-visivo.md>) | Qamille si basa solo su Sigrid: l'interfaccia sta in desktop/src/ui e desktop/src/theme, e nessuna libreria che Sigrid porta è una dipendenza di Qamille | `desktop/src/ui/**`, `desktop/src/theme/**`, `desktop/src/styles.css`, `desktop/package.json`, `desktop/vite.config.ts`, `desktop/tests/ui-usage.mjs`, `desktop/tests/only-sigrid.mjs`, `desktop/tests/style-tokens.mjs`, `desktop/tests/tokens-compatto.mjs`, `desktop/scripts/sync-sigrid.mjs`, `desktop/scripts/theme-css.mjs` | qamille-su-sigrid-2026-11-22 |
 
 ## Superseded
 

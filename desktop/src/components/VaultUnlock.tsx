@@ -6,8 +6,8 @@
 // Shown by the start-up notice and by Settings → Accounts. Errors come from the vault with a
 // `vault_*` code; errorText words them in the interface language (lib/vault.ts).
 import { useState, type ReactNode } from 'react';
-import Button from '../ds/primitives/Button';
-import Field from '../ds/primitives/Field';
+import Button from '../ui/Button';
+import Field from '../ui/Field';
 import { call, errorText } from '../lib/api';
 import { backendText, tr } from '../lib/i18n';
 import { retryable, type VaultStatus } from '../lib/vault';

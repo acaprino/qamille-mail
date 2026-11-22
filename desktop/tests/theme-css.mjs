@@ -11,7 +11,7 @@ const sigrid = await loadSigrid();
 const parameters = await loadParameters();
 const { COMPATTO, COMPATTO_TONE, QAMILLE_DENSITY } = parameters;
 
-// What Compatto is today (ds/tokens/theme.css), by Sigrid's token names.
+// What Compatto is today (theme/qamille-tokens.css), by Sigrid's token names.
 const KEPT = {
   light: { paper: '#f6f7f9', raised: '#ffffff', ink: '#111827', line: '#e3e6ea', accent: '#4338ca', primary: '#4f46e5' },
   dark: { paper: '#12161e', raised: '#1a202c', ink: '#e8ecf3', line: '#2a3240', accent: '#aeb0fa', primary: '#9a9cf8' },

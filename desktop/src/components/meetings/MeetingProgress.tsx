@@ -4,7 +4,7 @@
 // now; the page re-reads the meeting, this does not ask for anything. The block fades in and the
 // bar grows with a spring (no movement under prefers-reduced-motion).
 import { motion, useReducedMotion } from '../../ui/motion';
-import Button from '../../ds/primitives/Button';
+import Button from '../../ui/Button';
 import { tr } from '../../lib/i18n';
 import type { MeetingJob } from '../../lib/meetings';
 import MeetingNotice from './MeetingNotice';

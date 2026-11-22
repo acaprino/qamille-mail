@@ -3,17 +3,17 @@
 // «Change server». Connected: server, user, devices, change password, sign out, delete account.
 import { llmModelName } from '../lib/assistant-server';
 import { useEffect, useRef, useState } from 'react';
-import Button from '../ds/primitives/Button';
-import Checkbox from '../ds/primitives/Checkbox';
-import Field from '../ds/primitives/Field';
-import Modal from '../ds/primitives/Modal';
-import Select from '../ds/primitives/Select';
+import Button from '../ui/Button';
+import Checkbox from '../ui/Checkbox';
+import Field from '../ui/Field';
+import Modal from '../ui/Modal';
+import Select from '../ui/Select';
 import { call, errorText } from '../lib/api';
 import { backendText, tr } from '../lib/i18n';
 import type { AccountInfo, DeviceInfo } from '../lib/server-connect';
 import { revokeChoice, type MailboxRevoke, type SyncStatus } from '../lib/mailbox-sync';
 import { RevokeReport } from './MailboxSync';
-import { notify } from '../ds/primitives/Toaster';
+import { notify } from '../ui/Toaster';
 import { deleteWarning } from '../lib/subscription-usage';
 import { SERVER_GUIDE_URL } from '../lib/types';
 import ServerConnect from './server-connect/ServerConnect';

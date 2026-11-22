@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { useReducedMotion } from './ui/motion';
-import Button from './ds/primitives/Button';
-import Toaster, { notify as showNotice, type NoticeAction } from './ds/primitives/Toaster';
+import Button from './ui/Button';
+import Toaster, { notify as showNotice, type NoticeAction } from './ui/Toaster';
 import { listen } from '@tauri-apps/api/event';
 import Sidebar from './components/Sidebar';
 import WindowControls from './components/WindowControls';
@@ -36,7 +36,7 @@ import { installWindowCloseHandler, registerCloseGuard } from './lib/window-clos
 import { paintWindowBackground } from './lib/native-window';
 import { installWindowShell, windowAppearance, zoomWindow } from './lib/window-shell';
 import { installNotificationOpen } from './lib/notification-open';
-import Icon from './ds/primitives/Icon';
+import Icon from './ui/Icon';
 import UndoStack from './components/UndoStack';
 import { refreshActivity } from './lib/activity-center';
 import ActivityPage from './components/ActivityPage';

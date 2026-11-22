@@ -1,6 +1,7 @@
-/* The base and the shared controls of Qamille (ADR-0011). Page rules stay in styles.css. */
-@import '../tokens/theme.css';
-@import './ark.css';
+/* The base of Qamille (ADR-0011 v4): the element rules and the few rules for Sigrid's parts. Page rules stay in styles.css.
+   The imports keep this order, and stay before every rule, as CSS asks. */
+@import './qamille-tokens.css';
+@import '../ui/parts.css';
 @import './tailwind.css';
 * {
   box-sizing: border-box;
@@ -299,4 +300,4 @@ details[open] > summary::before {
   background: var(--color-line);
 }
 
-/* Overlays (ADR-0008): the three containers (SidePanel, Modal, Popover) are styled in ds/styles/ark/. */
+/* Overlays (ADR-0008): the three containers (SidePanel, Modal, Popover) are styled by Sigrid; ui/parts.css holds the helpers for what goes inside them. */

@@ -1,8 +1,8 @@
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from '../ui/motion';
 import { useEffect, useState } from 'react';
-import Button from '../ds/primitives/Button';
-import Count from '../ds/primitives/Count';
-import Icon from '../ds/primitives/Icon';
+import Button from '../ui/Button';
+import Count from '../ui/Count';
+import Icon from '../ui/Icon';
 import { cn } from '../lib/utils';
 import { undoLabel } from '../lib/undo';
 import {

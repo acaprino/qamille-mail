@@ -1,7 +1,7 @@
 // Checkbox and Switch, side by side: the same props, the same tests (primitives-controls.mjs).
 import { useState } from 'react';
-import Checkbox from '../../../src/ds/primitives/Checkbox';
-import Switch from '../../../src/ds/primitives/Switch';
+import Checkbox from '../../../src/ui/Checkbox';
+import Switch from '../../../src/ui/Switch';
 
 export default function CheckboxGallery({ props = {} }: { props?: Record<string, any> }) {
   const [box, setBox] = useState<boolean>(props.checked ?? false);

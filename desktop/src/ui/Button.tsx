@@ -8,7 +8,7 @@
 import type { ButtonHTMLAttributes, Ref } from 'react';
 import { Button as SigridButton } from '@acaprino/sigrid';
 import { cn } from './cn';
-import Tooltip from '../ds/primitives/Tooltip';
+import Tooltip from '../ui/Tooltip';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'icon' | 'text';
 

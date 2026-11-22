@@ -2,8 +2,8 @@
 // email → a code by mail (the same answer whether the email has an account or not) → code and new
 // password → back to «Sign in» with the email filled in. Every device of the account is signed out.
 import { useState } from 'react';
-import Button from '../../ds/primitives/Button';
-import Field from '../../ds/primitives/Field';
+import Button from '../../ui/Button';
+import Field from '../../ui/Field';
 import { call, errorText } from '../../lib/api';
 import { tr } from '../../lib/i18n';
 import { Input } from '../../ui/Input';

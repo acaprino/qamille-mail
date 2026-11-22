@@ -3,9 +3,9 @@
 // the glance, this is the record: filters, a "load more" that never moves what is on screen, and
 // the same words, tones and icons as the panel (`lib/activity-log.ts`).
 import { Fragment, useEffect, useRef } from 'react';
-import Button from '../ds/primitives/Button';
-import Icon from '../ds/primitives/Icon';
-import Tabs from '../ds/primitives/Tabs';
+import Button from '../ui/Button';
+import Icon from '../ui/Icon';
+import Tabs from '../ui/Tabs';
 import { call } from '../lib/api';
 import { displayableActivities, activitySeconds, isStale, type Activity } from '../lib/activity';
 import { activityCenter } from '../lib/activity-center';

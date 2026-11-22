@@ -2,8 +2,8 @@
 // matches for "ann"), a window keydown listener that stands for App.tsx's shortcut handler (same
 // guard, shortcutIgnored), and a Modal variant that counts its own closes.
 import { useEffect, useState } from 'react';
-import Modal from '../../../src/ds/primitives/Modal';
-import RecipientsInput from '../../../src/ds/primitives/RecipientsInput';
+import Modal from '../../../src/ui/Modal';
+import RecipientsInput from '../../../src/ui/RecipientsInput';
 import { shortcutIgnored } from '../../../src/lib/shortcut-guard';
 
 type Suggestion = { email: string; name?: string };

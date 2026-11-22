@@ -53,7 +53,7 @@ export async function restingShadow(page, locator) {
 }
 
 // The underline of a tab in the `underline` Tabs: unlumen's sliding highlight (data-part="highlight",
-// ds/primitives/Tabs.tsx) has replaced Compatto's 2px border-bottom. { height, color } of the bar
+// ui/Tabs.tsx) has replaced Compatto's 2px border-bottom. { height, color } of the bar
 // under the tab, or null when the tab has none.
 export const underline = (tab) =>
   tab.first().evaluate((node) => {

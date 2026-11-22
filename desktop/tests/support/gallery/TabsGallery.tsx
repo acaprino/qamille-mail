@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import Tabs from '../../../src/ds/primitives/Tabs';
+import Tabs from '../../../src/ui/Tabs';
 
 const items = [
   { value: 'all', label: 'All', count: 48 },

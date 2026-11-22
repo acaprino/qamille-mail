@@ -5,7 +5,7 @@
 // breathes (Motion), still when the system asks for reduced motion.
 import { motion, useReducedMotion } from '../../ui/motion';
 import { useEffect, useRef, useState } from 'react';
-import Icon from '../../ds/primitives/Icon';
+import Icon from '../../ui/Icon';
 import { tr } from '../../lib/i18n';
 import {
   captureActive,

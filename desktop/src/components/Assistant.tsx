@@ -1,6 +1,6 @@
 import { Fragment, useState } from 'react';
-import Button from '../ds/primitives/Button';
-import Icon from '../ds/primitives/Icon';
+import Button from '../ui/Button';
+import Icon from '../ui/Icon';
 import { call, errorText } from '../lib/api';
 import { backendText, tr } from '../lib/i18n';
 import type { Answer } from '../lib/types';

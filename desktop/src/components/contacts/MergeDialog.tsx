@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import Button from '../../ds/primitives/Button';
-import Checkbox from '../../ds/primitives/Checkbox';
-import Modal from '../../ds/primitives/Modal';
+import Button from '../../ui/Button';
+import Checkbox from '../../ui/Checkbox';
+import Modal from '../../ui/Modal';
 import { errorText } from '../../lib/api';
 import { bookLabel, tr } from '../../lib/i18n';
 import { useReactive } from '../../lib/store';

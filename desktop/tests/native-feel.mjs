@@ -63,7 +63,7 @@ function hardenHandler(event) {
 }
 
 check('1. interface text is not selectable and keeps the arrow cursor', () => {
-  const body = rule(read('src/ds/styles/system.css'), 'body');
+  const body = rule(read('src/theme/base.css'), 'body');
   assert.match(body, /user-select:\s*none/, 'body needs user-select: none');
   assert.match(body, /cursor:\s*default/, 'body needs cursor: default');
   const reminder = rule(read('src/reminder/reminder.css'), 'body');
@@ -72,7 +72,7 @@ check('1. interface text is not selectable and keeps the arrow cursor', () => {
 });
 
 check('2. fields, editors and reading content stay selectable', () => {
-  const css = read('src/ds/styles/system.css');
+  const css = read('src/theme/base.css');
   // pre/code: configurations and paths to paste elsewhere; alerts: errors to quote (audit T12).
   for (const selector of ['input', 'textarea', "[contenteditable]:not([contenteditable='false'])", '.selectable', '.reader-scroll', 'pre', 'code', "[role='alert']"]) {
     const { body } = ruleContaining(css, selector);
@@ -363,7 +363,7 @@ check('14. every WebView locks its root against overscroll (rule 4, audit Q5)', 
       .map(([, , body]) => body);
   const locked = (css, selector, declaration, why) =>
     assert.ok(bodiesOf(css, selector).some((body) => declaration.test(body)), why);
-  const system = read('src/ds/styles/system.css');
+  const system = read('src/theme/base.css');
   const reminder = read('src/reminder/reminder.css');
   // A precision touchpad or a touchscreen must never slide the whole view and uncover the window
   // background: on html (the scroller of the viewport) and on the document, in the main window and the chip.
@@ -1255,7 +1255,7 @@ check('29. Sigrid draws no web cursor of its own: the pointer stays the arrow (r
     for (const cursor of cursors) assert.ok(['not-allowed', 'progress', 'default'].includes(cursor), `${name} uses cursor-${cursor}: ask Sigrid to drop it`);
     if (cursors.some((cursor) => cursor !== 'default')) assert.ok(KNOWN.has(name), `${name} is a new file with a web cursor: ask Sigrid to drop it`);
   }
-  const system = stripComments(read('src/ds/styles/system.css'));
+  const system = stripComments(read('src/theme/base.css'));
   assert.match(system, /\[class\*='cursor-not-allowed'\],\s*\[class\*='cursor-progress'\]\s*\{\s*cursor:\s*default;/, "system.css must keep the arrow on Sigrid's disabled and busy controls");
 });
 

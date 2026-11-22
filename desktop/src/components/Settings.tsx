@@ -1,10 +1,10 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
-import Button from '../ds/primitives/Button';
-import Checkbox from '../ds/primitives/Checkbox';
-import Field from '../ds/primitives/Field';
-import Icon from '../ds/primitives/Icon';
-import Select from '../ds/primitives/Select';
-import Switch from '../ds/primitives/Switch';
+import Button from '../ui/Button';
+import Checkbox from '../ui/Checkbox';
+import Field from '../ui/Field';
+import Icon from '../ui/Icon';
+import Select from '../ui/Select';
+import Switch from '../ui/Switch';
 import { call, desktop, errorText } from '../lib/api';
 import { needsReconsent, providerItems as serverProviderItems, reconsentText, type LlmStatus } from '../lib/assistant-server';
 import type { Appearance } from '../lib/appearance';

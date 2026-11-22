@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import Button from '../ds/primitives/Button';
+import Button from '../ui/Button';
 import { tr } from '../lib/i18n';
 import { recipientView, type PersonIndex } from '../lib/people';
 import { tick } from '../lib/tick';

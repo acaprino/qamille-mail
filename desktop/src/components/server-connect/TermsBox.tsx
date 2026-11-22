@@ -2,7 +2,7 @@
 // documents in `GET /v1/info`. The texts are the owner's and live on the server's site: this box
 // only opens their addresses in the browser (`https://` only, INV-26) and tells the sign-up that
 // the person agreed. The version that goes back to the server is the one the server declared.
-import Checkbox from '../../ds/primitives/Checkbox';
+import Checkbox from '../../ui/Checkbox';
 import { call, errorText } from '../../lib/api';
 import { tr } from '../../lib/i18n';
 import type { LegalInfo } from '../../lib/server-connect';

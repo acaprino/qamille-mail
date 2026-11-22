@@ -6,8 +6,8 @@
 // controls. When a sign-in has set the old credentials of
 // another computer aside (`setAside`, from the workspace snapshot), it says where, once.
 import { useEffect, useRef, useState } from 'react';
-import Button from '../ds/primitives/Button';
-import Modal from '../ds/primitives/Modal';
+import Button from '../ui/Button';
+import Modal from '../ui/Modal';
 import { call } from '../lib/api';
 import { tr } from '../lib/i18n';
 import { VAULT_LOCKED_EVENT, type VaultStatus } from '../lib/vault';

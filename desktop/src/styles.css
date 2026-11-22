@@ -1,4 +1,4 @@
-@import './ds/styles/system.css';
+@import './theme/base.css';
 
 .button-row {
   display: flex;
@@ -1826,7 +1826,7 @@
   line-height: 1.65;
   overflow-wrap: anywhere;
 }
-/* The same ring as every field (ds/styles/system.css); the body is a contenteditable, so it shows it on click too. */
+/* The same ring as every field (theme/base.css); the body is a contenteditable, so it shows it on click too. */
 .rich-content:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 3px;

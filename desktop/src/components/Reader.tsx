@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react';
 import ConnectMailbox from './ConnectMailbox';
-import Button from '../ds/primitives/Button';
-import Icon from '../ds/primitives/Icon';
-import Menu, { type MenuItem } from '../ds/primitives/Menu';
+import Button from '../ui/Button';
+import Icon from '../ui/Icon';
+import Menu, { type MenuItem } from '../ui/Menu';
 import MessageHtml from './MessageHtml';
 import AttachmentPanel from './AttachmentPanel';
 import AddFromMail from './contacts/AddFromMail';

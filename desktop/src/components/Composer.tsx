@@ -1,10 +1,10 @@
 import { motion, useIsPresent, useReducedMotion, type Variants } from '../ui/motion';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
-import Button from '../ds/primitives/Button';
-import Tooltip from '../ds/primitives/Tooltip';
-import DateField from '../ds/primitives/DateField';
-import Icon from '../ds/primitives/Icon';
-import Select from '../ds/primitives/Select';
+import Button from '../ui/Button';
+import Tooltip from '../ui/Tooltip';
+import DateField from '../ui/DateField';
+import Icon from '../ui/Icon';
+import Select from '../ui/Select';
 import { call, errorText } from '../lib/api';
 import { calendarWords as dateWords } from '../lib/calendar-words';
 import { copiedDraft, type ComposerHandle, type ComposerState } from '../lib/composer';

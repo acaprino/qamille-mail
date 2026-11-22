@@ -1,11 +1,11 @@
 // Reads the custom properties of the app's look, by scheme, as the browser resolves them: the tokens only Qamille has
-// (desktop/src/ds/tokens/theme.css, the :root block and the :root[data-scheme='dark'] block) and the ones Sigrid's
+// (desktop/src/theme/qamille-tokens.css, the :root block and the :root[data-scheme='dark'] block) and the ones Sigrid's
 // engine computes (desktop/src/theme/compatto.css, generated), with every var() followed to its value. Pure file reads,
 // no browser. `light` and `dark` are complete maps: what a scheme does not redeclare falls back on :root.
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const THEME_CSS = path.resolve(import.meta.dirname, '../../src/ds/tokens/theme.css');
+export const THEME_CSS = path.resolve(import.meta.dirname, '../../src/theme/qamille-tokens.css');
 export const COMPATTO_CSS = path.resolve(import.meta.dirname, '../../src/theme/compatto.css');
 
 function declarations(block) {

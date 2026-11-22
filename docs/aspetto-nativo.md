@@ -227,3 +227,55 @@ salva file: non dà un token, e la notifica non ha azioni.
     rimette (`put_back_after_upgrade`): in tutti e due i casi, al successivo accesso Qamille parte nell'area di
     notifica, senza finestra. Annullare la disinstallazione a «Qamille è in esecuzione» non lo toglie.
     Nella cartella installata l'eseguibile ha il nome che usa l'hook (`${MAINBINARYNAME}`).
+28. Funzioni native della fase 3 (regole 26-33), sull'exe di release con cartelle dati usa e getta e account finti (IMAP e
+    SMTP su `127.0.0.1`), ogni scenario di guasto una volta sola. Stato al 2026-11-22, con la sessione di Windows bloccata
+    per tutta la prova (nessuna finestra può venire davanti, i toast e lo schermo non si vedono); commit e prove in
+    `audit-tauri-nativo.md`, «Stato della fase 3».
+    - **A.** Prima X dopo l'aggiornamento: l'avviso compare una volta; «Esci, e d'ora in poi chiudi» esce e la X seguente
+      chiude. *Osservato*: messaggio senza owner, una sola volta; OK resta nella tray; «Esci, e d'ora in poi chiudi
+      Qamille» esce e la X dopo chiude. L'icona nuova è fra quelle nascoste (sotto ^), come dice il messaggio.
+    - **B.** Q8: Annulla invio a 30 s, Invia, Esci dopo 2 s → la mail è in Inviati entro 40 s; di nuovo con la rete
+      staccata → la domanda, e «Resta aperto» lascia Qamille aperto. *Osservato* con la rete: in Inviati, uscita 2,9 s
+      dopo Invia; e un invio ancora in corso fa comparire la domanda («is being sent… check Sent»). **FAILED** con la
+      rete staccata: nessuna domanda, l'invio fallisce durante l'attesa e Qamille esce (la mail resta nelle Bozze).
+    - **C.** Ripristino dalla tray, da una seconda istanza a finestra nascosta e da ridotta a icona: finestra disegnata,
+      davanti, con il focus; CPU di `msedgewebview2` in 10 s più bassa a finestra nascosta. *Osservato*: la finestra
+      torna e la pagina passa a `visible` (a nascosta era `hidden`) in tutti e tre i modi. *Da fare*: davanti e con il
+      focus, «mai bianca» a occhio, e la CPU (a sessione bloccata anche la finestra visibile è coperta: 0,06 s visibile,
+      0,20 s nascosta, una misura che non dice niente).
+    - **D.** Avvio all'accesso: valore `Run` della copia con il nome e `--autostart`; l'exe con quella riga resta nella
+      tray senza dialoghi; spento come Gestione attività (`StartupApproved\Run`, primo byte `03`) → spento (Q22);
+      migrazione di un `Qamille-worker.vbs`. *Osservato*, registro e cartella Esecuzione automatica come prima alla fine.
+      *Da fare* (il proprietario): una disconnessione e un nuovo accesso veri.
+    - **E.** Posizione: stesso posto dopo la riapertura; `x` a 99999 → al centro del monitor principale; ingrandita →
+      riapre ingrandita senza un fotogramma alla misura normale, anche con `--autostart` e il primo ripristino.
+      *Osservato*, con un difetto: al primo show ingrandito la finestra sparisce per 16-44 ms e ricompare. *Da fare*:
+      secondo monitor (ce n'è uno solo).
+    - **F.** Notifiche con account finti: un invio programmato che fallisce (SMTP su `127.0.0.1:1`) e un account senza
+      password (`sign_in_required`) → due notifiche col nome e l'icona di Qamille; il clic riporta la finestra sulla
+      bozza o sulle Impostazioni. *Osservato*: chiave AUMID con `DisplayName` Qamille e `IconUri`, i due toast nel centro
+      notifiche di quell'identità, tolti alla fine con la chiave. *Da fare*: l'icona a occhio, il clic, la posta nuova a
+      finestra nascosta (serve un account vero).
+    - **G.** Nessuna valanga: account nuovo, storico, avvio dopo una notte, tre messaggi insieme → una. *Da fare* (serve
+      un account vero). *Osservato*: otto invii programmati falliti insieme danno otto toast, uno per bozza, e i thread
+      di Qamille restano 57 → 59 → 58 (con i toast non silenziati: Non disturbare non si tocca da uno script).
+    - **H.** mailto: clic in un messaggio → composer compilato; `"<exe>" "mailto:…"` a Qamille aperto e chiuso →
+      composer. *Osservato*; l'app di posta predefinita del proprietario solo letta, invariata. *Da fare* (il
+      proprietario): «Usa Qamille per i link mailto», sceglierlo in App predefinite, `start mailto:a@b.it`, poi rimettere
+      l'app di prima.
+    - **I.** Menu delle righe: tasto destro, Maiusc+F10, tasto Menu → al cursore o sotto la riga. *Osservato* allo zoom
+      dell'app 100 % e 125 %. *Da fare*: scala dello schermo al 150 %.
+    - **J.** File: «Mostra nella cartella» seleziona il file in Esplora risorse; «Apri» su un `.exe` salvato da un
+      allegato → Windows avvisa (Mark-of-the-Web). *Osservato*: il file salvato ha `ZoneId=3` e Esplora risorse lo
+      mostra selezionato. *Da fare*: «Apri» non ha mostrato niente né avviato il file, ma a sessione bloccata nemmeno
+      `Start-Process` da PowerShell mostra qualcosa: da rifare a sessione aperta.
+    - **K.** Professional (`QAMILLE_SERVER`): migrazione della chiave, la cartella da un altro utente di Windows, e
+      l'installer (installa, avvio all'accesso, notifiche e mailto, disinstalla: nessun valore `Run`, chiave AUMID o
+      mailto rimasti). *Da fare* (il proprietario, con un utente di Windows di prova; anche Qamille nella tray durante
+      la disinstallazione).
+    - Altro, *osservato*: due copie portatili insieme (due finestre, icone e identità); la lingua cambiata in
+      Impostazioni rinomina subito il menu dell'icona e la voce del menu di sistema; fine sessione a finestra nascosta
+      (bozza appena scritta salvata, invio annullabile in Inviati); WebView2 chiuso a finestra nascosta chiede «Qamille
+      deve ripartire» e il nuovo Qamille resta nella tray; un invio programmato scaduto con la cassaforte che non si
+      apre resta programmato e parte quando la chiave torna. *Da fare*: «Rispondi a tutti» da una riga solo remota
+      senza rete (serve una ricerca sul server di un account vero).

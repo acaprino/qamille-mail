@@ -149,20 +149,22 @@
   /* Task 13: popover, menu and tooltip. The current item of a menu (the keys' or the pointer's: its tint and its
      ring both go in a Contrast theme); the line between the groups is a background alone; the surfaces float with a
      shadow, so an edge separates them; a disabled item is grey. */
-  [data-scope='menu'][data-part='item'][data-highlighted] {
+  [data-slot='dropdown-menu-item'][data-highlighted],
+  [data-slot='dropdown-menu-checkbox-item'][data-highlighted] {
     outline: 1px dashed Highlight;
     outline-offset: -1px;
   }
-  [data-scope='menu'][data-part='separator'] {
+  [data-slot='dropdown-menu-separator'] {
     forced-color-adjust: none;
     background: CanvasText;
   }
-  [data-scope='popover'][data-part='content'],
-  [data-scope='menu'][data-part='content'],
-  [data-scope='tooltip'][data-part='content'] {
+  [data-slot='popover-content'],
+  [data-slot='dropdown-menu-content'],
+  [data-slot='tooltip-content'] {
     border: 1px solid CanvasText;
   }
-  [data-scope='menu'][data-part='item'][data-disabled] {
+  [data-slot='dropdown-menu-item'][data-disabled],
+  [data-slot='dropdown-menu-checkbox-item'][data-disabled] {
     color: GrayText;
   }
 

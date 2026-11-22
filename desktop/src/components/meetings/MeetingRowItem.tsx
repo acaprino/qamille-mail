@@ -13,6 +13,7 @@ import { Item, useIsPresent } from '../../ui/motion';
 import type { ReactNode } from 'react';
 import Button from '../../ui/Button';
 import Icon from '../../ui/Icon';
+import Progress from '../../ui/Progress';
 import { backendText, tr } from '../../lib/i18n';
 import { captureActive, stateLabel, type CaptureSnapshot } from '../../lib/meetings';
 import { clockLabel, type MeetingRow } from '../../lib/meetings-view';
@@ -156,16 +157,12 @@ export default function MeetingRowItem({
         <span className="item-title">{title}</span>
         {sub && <span className={cn('item-sub', row.status === 'failed' && 'danger')}>{sub}</span>}
         {row.job && (
-          <span
+          <Progress
             className="item-bar"
-            role="progressbar"
+            value={row.job.progress}
             aria-label={row.job.kind === 'transcribe' ? tr('Trascrizione', 'Transcription') : tr('Sintesi', 'Summary')}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={row.job.progress}
-          >
-            <span style={{ width: `${row.job.progress}%` }}></span>
-          </span>
+            size="sm"
+          />
         )}
       </span>
       {row.status === 'recording' ? (

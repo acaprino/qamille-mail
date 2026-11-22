@@ -4,6 +4,7 @@
 // now; the page re-reads the meeting, this does not ask for anything. The block fades in and the
 // bar grows with a spring (no movement under prefers-reduced-motion).
 import Button from '../../ui/Button';
+import Progress from '../../ui/Progress';
 import { useAppear } from '../../ui/motion';
 import { tr } from '../../lib/i18n';
 import type { MeetingJob } from '../../lib/meetings';
@@ -29,18 +30,7 @@ export default function MeetingProgress({ job, compact = false, busy = false, on
     : tr('Sintesi…', 'Summarizing…');
   const name = transcribing ? tr('Trascrizione', 'Transcription') : tr('Sintesi', 'Summary');
 
-  const bar = (
-    <div
-      className="bar"
-      role="progressbar"
-      aria-label={name}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={job.progress}
-    >
-      <span style={{ width: `${job.progress}%` }} />
-    </div>
-  );
+  const bar = <Progress value={job.progress} aria-label={name} size="sm" />;
   const cancel = (
     <Button variant="secondary" aria-busy={busy ? 'true' : undefined} onClick={oncancel}>
       {tr('Annulla', 'Cancel')}

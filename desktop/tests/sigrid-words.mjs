@@ -40,11 +40,14 @@ const SAMPLES = {
   'attachments.fileOverLimit': [['preventivo.pdf', '25 MB']],
   'attachments.filesOverLimit': [[3, '25 MB']],
   'viewer.page': [[2, 5]],
+  'steps.summary': [[2, 4]],
+  'progress.value': [[45, 100]],
 };
 
 // Words that are the same in both languages, by path. A word is listed here on purpose, with the reason.
 const SAME = new Set([
   'common.keysTogether', // «Ctrl + K»: a key combination reads the same
+  'progress.value', // «45%»: a percentage reads the same
   'duration.short', // «1h 30m»: the same abbreviations
   'kinds.file', // «file» is the Italian word too
   'kinds.email',

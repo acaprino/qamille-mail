@@ -76,6 +76,22 @@ const ENGLISH: Words = {
   search: {
     clear: 'Clear the search',
   },
+  list: {
+    unread: 'Unread',
+  },
+  palette: {
+    placeholder: 'Type a command',
+    empty: 'No command found',
+  },
+  shell: {
+    skip: 'Skip to the content',
+  },
+  window: {
+    minimize: 'Minimize',
+    maximize: 'Maximize',
+    restore: 'Restore',
+    close: 'Close',
+  },
   combobox: {
     empty: 'No results',
     trigger: 'Show the options',
@@ -192,6 +208,22 @@ const ITALIAN: Words = {
   },
   search: {
     clear: 'Cancella la ricerca',
+  },
+  list: {
+    unread: 'Non letto',
+  },
+  palette: {
+    placeholder: 'Scrivi un comando',
+    empty: 'Nessun comando trovato',
+  },
+  shell: {
+    skip: 'Vai al contenuto',
+  },
+  window: {
+    minimize: 'Riduci a icona',
+    maximize: 'Ingrandisci',
+    restore: 'Ripristina',
+    close: 'Chiudi',
   },
   combobox: {
     empty: 'Nessun risultato',

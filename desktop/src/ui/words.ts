@@ -6,7 +6,7 @@
 // The `import type` leaves no trace at run time, so this module loads under plain Node (the test) and never pulls
 // Sigrid's bundle in by itself. Never call `tr()` inside: it reads the language when it is called, and the two
 // objects are constants, one per language, so `WordsProvider` always gets the same object for a language.
-import type { Words } from '@acaprino/sigrid';
+import type { Words, WordsOverride } from '@acaprino/sigrid';
 
 const plural = (count: number, one: string, many: string) => (count === 1 ? `1 ${one}` : `${count} ${many}`);
 
@@ -247,3 +247,42 @@ const ITALIAN: Words = {
 export function qamilleWords(italian: boolean): Words {
   return italian ? ITALIAN : ENGLISH;
 }
+
+/**
+ * The words of the chips of the recipients' field (`labels`): a chip there is a person or an address, not a label, so the
+ * sentences say «recipient». A `WordsProvider` around the field gives them to Sigrid's ChipsInput, which merges them over the
+ * app's words.
+ */
+export function recipientWords(italian: boolean): WordsOverride {
+  return italian ? RECIPIENTS_ITALIAN : RECIPIENTS_ENGLISH;
+}
+
+const RECIPIENTS_ENGLISH: WordsOverride = {
+  labels: {
+    remove: (name) => `Remove ${name}`,
+    added: (name) => `${name} added`,
+    pasted: (count) => `Pasted ${count} recipients`,
+    removed: (name) => `${name} removed`,
+    selected: (name) => `${name} selected. Press Backspace or Delete to remove it.`,
+    noneSelected: 'No recipient selected',
+    count: (count) => (count === 1 ? '1 recipient' : `${count} recipients`),
+    removeAll: 'Remove all recipients',
+    suggestions: 'Suggestions',
+    invalid: 'not a valid address',
+  },
+};
+
+const RECIPIENTS_ITALIAN: WordsOverride = {
+  labels: {
+    remove: (name) => `Rimuovi ${name}`,
+    added: (name) => `${name} aggiunto`,
+    pasted: (count) => `Incollati ${count} destinatari`,
+    removed: (name) => `${name} rimosso`,
+    selected: (name) => `${name} selezionato. Backspace o Canc per rimuoverlo.`,
+    noneSelected: 'Nessun destinatario selezionato',
+    count: (count) => (count === 1 ? '1 destinatario' : `${count} destinatari`),
+    removeAll: 'Rimuovi tutti i destinatari',
+    suggestions: 'Suggerimenti',
+    invalid: 'indirizzo non valido',
+  },
+};

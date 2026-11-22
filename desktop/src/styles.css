@@ -1834,7 +1834,7 @@
   font-size: var(--text-xs);
 }
 /* Recipients and the account picker sit on the row, not in a box of their own. */
-.field-row [data-scope='combobox'][data-part='root'],
+.field-row .recipients-box,
 .field-row [data-slot='select-trigger'] {
   flex: 1;
 }
@@ -3010,4 +3010,15 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+
+/* The box of the recipients' field: no border or room of the fieldset it sits in (it only carries `disabled`), and it grows
+   to --recipients-max and then scrolls. */
+.recipients-box {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  max-height: var(--recipients-max, 96px);
+  overflow-y: auto;
 }

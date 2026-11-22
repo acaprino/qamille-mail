@@ -152,7 +152,7 @@ set "SHOWN="
 set "RUNNING=0"
 for /f "usebackq delims=" %%N in (`powershell -NoProfile -NonInteractive -Command "$d = [IO.Path]::GetFullPath('%INSTALL%') + '\'; @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($d, [StringComparison]::OrdinalIgnoreCase) }).Count"`) do set "RUNNING=%%N"
 if "%RUNNING%"=="0" goto :install_copy
-if not defined SHOWN echo     %APP% is running from %INSTALL%: close it, the install goes on by itself.
+if not defined SHOWN echo     %APP% is running from %INSTALL%: quit it with Esci / Quit in the menu of its tray icon - the X only hides it there - and the install goes on by itself.
 set "SHOWN=1"
 ping -n 4 127.0.0.1 >nul
 goto :install_wait

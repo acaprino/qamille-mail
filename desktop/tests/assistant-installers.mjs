@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 // The Ark Switch hides its native input: read the state by role, click the visible track.
 const flip = name => page.locator('[data-scope="switch"][data-part="root"]', { hasText: name }).locator('[data-part="control"]').click();
 const base = process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:5187';
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const context = await browser.newContext({ locale: 'en-US' });
 const page = await context.newPage();
 const errors = [];

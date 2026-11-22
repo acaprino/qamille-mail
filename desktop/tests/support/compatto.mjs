@@ -6,7 +6,7 @@ export const previewUrl = process.env.QAMILLE_PREVIEW_URL ?? 'http://127.0.0.1:1
 
 // Returns { browser, context, page, errors }. `theme` is 'light' or 'dark'; `size` is { width, height }.
 export async function openApp({ theme = 'light', size = { width: 1440, height: 900 } } = {}) {
-  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   const context = await browser.newContext({ locale: 'en-US', viewport: size, colorScheme: theme });
   const page = await context.newPage();
   const errors = [];

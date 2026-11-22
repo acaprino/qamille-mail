@@ -5,7 +5,7 @@ import { openAllGroups } from './support/groups.mjs';
 // Browser preview only: it slows the mock backend through `window.__previewCommandDelay`
 // (src/lib/preview.ts). INV-006: a triage action disables only the element acted on, and
 // only until the backend has accepted it; opening the next message never holds the interface.
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const context = await browser.newContext({
   locale: 'en-US',
   viewport: { width: 1440, height: 900 },

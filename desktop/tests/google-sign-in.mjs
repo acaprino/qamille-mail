@@ -3,7 +3,7 @@ import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 
 const base = process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:5187';
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1280, height: 900 } });
 const page = await context.newPage();
 const errors = [];
@@ -50,7 +50,9 @@ await page.route('**/__google-sign-in-test*', route => route.fulfill({
 
 const dialog = () => page.getByRole('dialog', { name: 'Sign in with Google', exact: true });
 const signIn = () => page.getByRole('button', { name: 'Sign in with Google', exact: true });
-const calls = () => page.evaluate(() => window.signInCalls.map(call => call.command));
+// The Settings page reads its own status when it opens: those reads are not what this test is about.
+const STATUS = ['notifications_get', 'mail_handler_status', 'close_to_tray_get', 'autostart_status', 'app_edition', 'server_llm_status', 'sync_status', 'vault_status'];
+const calls = () => page.evaluate((status) => window.signInCalls.map(call => call.command).filter((command) => !status.includes(command)), STATUS);
 async function openAccounts(query = '') {
   await page.goto(`${base}/__google-sign-in-test${query}`);
   await page.getByRole('button', { name: 'Accounts', exact: true }).click();

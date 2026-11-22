@@ -36,7 +36,7 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
   assert.ok(ready, `Preview server did not start: ${serverOutput}`);
-  browser = await chromium.launch({ channel: 'msedge', headless: true });
+  browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   const page = await browser.newPage({ locale: 'en-US', viewport: { width: 1400, height: 1000 } });
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));

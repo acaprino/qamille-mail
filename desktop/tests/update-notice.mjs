@@ -8,7 +8,7 @@ import { chromium, expect } from '@playwright/test';
 
 const base = process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:1420';
 const shots = process.env.UPDATE_NOTICE_SHOTS;
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const errors = [];
 const ready = { version: '1.2.0', notes: 'Faster search.\nSigned installer.' };
 

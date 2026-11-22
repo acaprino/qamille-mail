@@ -14,7 +14,7 @@ const root = path.resolve(import.meta.dirname, '..');
 const sample = JSON.parse(await fs.readFile(path.join(root, 'src/lib/sample.json'), 'utf8'));
 
 const ACCENT = 'rgb(79, 70, 229)';
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const errors = [];
 
 async function open({ fixture = sample, size = { width: 1440, height: 900 }, locale = 'en-US', threads = false } = {}) {

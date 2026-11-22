@@ -12,7 +12,7 @@ import { previewUrl } from './support/compatto.mjs';
 const ZOOMED = { width: 500, height: 320 };
 const roomy = { width: 1440, height: 900 };
 
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const errors = [];
 async function start({ init, size = roomy } = {}) {
   const context = await browser.newContext({ locale: 'en-US', viewport: size });

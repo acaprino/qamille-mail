@@ -53,7 +53,7 @@ await step('index.html preloads no font: the files are hashed by the build', () 
   assert.ok(!/<link[^>]*rel="preload"[^>]*as="font"/.test(html), 'index.html still preloads a font');
 });
 
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 try {
   const context = await browser.newContext({
     locale: 'en-US',

@@ -24,7 +24,7 @@ const foreign = {
   body: 'OTHER ACCOUNT MUST NOT PRINT',
 };
 fixture.emails.push(reply, foreign);
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const page = await browser.newPage({
   locale: 'en-US',
   viewport: { width: 1440, height: 900 },

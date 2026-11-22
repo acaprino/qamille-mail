@@ -23,7 +23,7 @@ try {
   const base = server.resolvedUrls?.local?.[0]?.replace(/\/$/, '');
   assert.ok(base, 'vite preview did not report its address');
 
-  browser = await chromium.launch({ channel: 'msedge', headless: true });
+  browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   for (const scheme of ['dark', 'light']) {
     const context = await browser.newContext({ colorScheme: scheme, viewport: { width: 1280, height: 800 } });
     const page = await context.newPage();

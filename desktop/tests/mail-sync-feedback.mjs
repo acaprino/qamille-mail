@@ -8,7 +8,7 @@ import fs from 'node:fs/promises';
 
 const base = process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:5187';
 const sample = JSON.parse(await fs.readFile(new URL('../src/lib/sample.json', import.meta.url), 'utf8'));
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const page = await browser.newPage({ locale: 'en-US', viewport: { width: 1280, height: 900 } });
 const errors = [];
 page.on('pageerror', error => errors.push(error.message));

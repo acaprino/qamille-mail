@@ -59,7 +59,7 @@ const CASES = [
   console.log('PASS diffParts names each property apart and each part that only one page has, radii aside');
 }
 
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const errors = [];
 const failures = [];
 try {

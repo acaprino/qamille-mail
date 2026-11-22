@@ -4,7 +4,7 @@ import { openAllGroups } from './support/groups.mjs';
 const native = process.env.QAMILLE_CDP;
 const browser = native
   ? await chromium.connectOverCDP(native)
-  : await chromium.launch({ channel: 'msedge', headless: true });
+  : await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const context = native
   ? browser.contexts()[0]
   : await browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 900 } });

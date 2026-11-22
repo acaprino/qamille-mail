@@ -31,7 +31,7 @@ const resolved = (page, property, token) =>
   );
 
 // ---------- RecipientsInput alone (gallery) ----------
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const context = await browser.newContext({ locale: 'en-US', viewport: { width: 900, height: 700 } });
 const gallery = async (props = {}) => {
   const page = await context.newPage();

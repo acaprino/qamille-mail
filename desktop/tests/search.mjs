@@ -48,7 +48,7 @@ assert.deepEqual(search.markedParts('A proposal for Q4', ['proposal']), [
 console.log('PASS query builders preserve boolean groups, quoted phrases and calendar ranges');
 if (process.argv.includes('--utilities-only')) process.exit(0);
 
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const context = await browser.newContext({
   viewport: { width: 1440, height: 1000 },
   locale: 'en-US',

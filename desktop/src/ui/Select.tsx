@@ -4,11 +4,12 @@
 // `label` is the visible label and the button's name, and the open list carries it too; without it pass `aria-label`. `onChange` is told the new value
 // ('' = nothing chosen). `className` goes on the button. Sigrid's Select has no `aria-required` (asked of Sigrid as R18)
 // and no disabled item (the app has none).
-import { useId } from 'react';
+import { useId, type ReactNode } from 'react';
 import { Select as SigridSelect } from '@acaprino/sigrid';
 import { cn } from './cn';
 
-export type SelectItem = { value: string; label: string };
+/** `mark` is drawn before the item's name in the open list (a coloured shape, for example). */
+export type SelectItem = { value: string; label: string; mark?: ReactNode };
 
 export type SelectProps = {
   value: string;
@@ -30,6 +31,7 @@ export default function Select({ value, onChange, items, label, placeholder, 'ar
     <SigridSelect
       id={id}
       options={items.map(({ value: itemValue, label: itemLabel }) => ({ value: itemValue, label: itemLabel }))}
+      renderMark={(option) => items.find((item) => item.value === option.value)?.mark}
       value={value}
       onValueChange={(next) => onChange?.(next)}
       aria-label={label ?? ariaLabel}

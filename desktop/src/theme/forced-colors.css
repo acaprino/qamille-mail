@@ -28,11 +28,10 @@
   .mail-row.selected,
   .reply-row.selected,
   .contact-row.active,
-  .sidebar nav [aria-current='page'],
+  [data-slot='sidebar'] [aria-current='page'],
   .settings-nav button.active,
   .composer-tab.active,
   .attachment.active,
-  .profile.active,
   .mail-display button.active,
   .format-toolbar button.active,
   .search-filter-button.active {
@@ -50,19 +49,6 @@
     forced-color-adjust: none;
     background: Highlight;
     border-color: Highlight;
-  }
-
-  /* The sidebar's own thin scrollbar: its thumb is the muted text colour at a fraction of its
-     strength over nothing, which the theme turns into the column's colour. A solid thumb in the
-     text colour, Highlight under the pointer; the border is the gap the app leaves round it. */
-  .sidebar .sidebar-body::-webkit-scrollbar-thumb,
-  .sidebar:hover .sidebar-body::-webkit-scrollbar-thumb {
-    border-color: Canvas;
-    background: CanvasText padding-box;
-  }
-  .sidebar .sidebar-body::-webkit-scrollbar-thumb:hover,
-  .sidebar .sidebar-body::-webkit-scrollbar-thumb:active {
-    background-color: Highlight;
   }
 
   /* Chips, tags and counts are tinted pills: a border keeps their shape. */

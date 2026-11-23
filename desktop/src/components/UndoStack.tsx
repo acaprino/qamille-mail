@@ -52,13 +52,25 @@ export default function UndoStack({ actions, undo, dismiss }: UndoStackProps) {
   const giveUp = (action: UndoAction) => busyWhile(action.id, () => dismiss(action.id));
 
   if (!visible.length) return null;
+  // Failed confirmations pile up (every close of the app with work in flight leaves some): from two on they are one notice
+  // with a way to dismiss them all, not a card each that covers the sidebar.
+  const failed = visible.filter((action) => action.status === 'failed');
+  const grouped = failed.length > 1;
+  const shown = grouped ? visible.filter((action) => action.status !== 'failed') : visible;
   return (
     <section
       className="undo-stack"
       aria-label={tr('Azioni recenti sulle email', 'Recent email actions')}
     >
       <Presence>
-        {[...visible].reverse().map((action) => (
+        {grouped && (
+          <FailedGroup
+            key="failed-group"
+            actions={failed}
+            onDismissAll={() => void Promise.all(failed.map((action) => dismiss(action.id)))}
+          />
+        )}
+        {[...shown].reverse().map((action) => (
           <Notice
             key={action.id}
             action={action}
@@ -71,6 +83,27 @@ export default function UndoStack({ actions, undo, dismiss }: UndoStackProps) {
         ))}
       </Presence>
     </section>
+  );
+}
+
+/** Several failed confirmations in one notice: how many, why, and one button to dismiss them all. */
+function FailedGroup({ actions, onDismissAll }: { actions: UndoAction[]; onDismissAll: () => void }) {
+  const why = actions[0]?.error ? backendText(actions[0].error) : null;
+  return (
+    <Item className="undo-notice failed" data-failed-group>
+      <span className="undo-icon">
+        <Icon name="info" size={18} />
+      </span>
+      <div className="undo-copy">
+        <strong role="status">
+          {tr(`${actions.length} azioni non confermate`, `${actions.length} actions not confirmed`)}
+        </strong>
+        {why ? <p role="alert">{why}</p> : null}
+      </div>
+      <Button variant="secondary" type="button" onClick={onDismissAll}>
+        {tr('Ignora tutte', 'Dismiss all')}
+      </Button>
+    </Item>
   );
 }
 

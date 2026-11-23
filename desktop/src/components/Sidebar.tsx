@@ -1,12 +1,16 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
-import Avatar from '../ui/Avatar';
-import Kbd from '../ui/Kbd';
-import Button from '../ui/Button';
+// The sidebar, drawn by Sigrid's Sidebar: the column when it is wide, the rail of icons when it is shrunk (its own button at the
+// foot shrinks and widens it). Above the groups, the app's name and the account in use (a Select: «All accounts» or one);
+// then the groups of rows: write, the folders, the labels, the places of the workspace with the history and the settings.
+// The activity center sits at the foot. A row is a NavItem with a plain name, so the rail shows it as an icon with its name
+// as a hint.
+import type { CSSProperties } from 'react';
 import Count from '../ui/Count';
 import Icon from '../ui/Icon';
-import { NavItem, NavList } from '../ui/NavList';
-import Tooltip from '../ui/Tooltip';
-import { desktop, initials } from '../lib/api';
+import Kbd from '../ui/Kbd';
+import { NavItem } from '../ui/NavList';
+import Select from '../ui/Select';
+import { Sidebar as ShellSidebar, SidebarGroup } from '../ui/Sidebar';
+import { desktop } from '../lib/api';
 import { activityCenter, toggleActivityPanel } from '../lib/activity-center';
 import type { Activity } from '../lib/activity';
 import { folderLabel, tr } from '../lib/i18n';
@@ -51,6 +55,9 @@ const tools: [Folder, string][] = [
 const iconSize = 16;
 const iconStroke = 1.8;
 
+/** A coloured dot: the colour of a label or of an account. */
+const dot = (color: string) => <span className="label-dot" style={{ '--dot': color } as CSSProperties} />;
+
 export default function Sidebar({
   workspace,
   view,
@@ -66,141 +73,35 @@ export default function Sidebar({
   showAllActivity,
 }: SidebarProps) {
   const center = useStore(activityCenter);
-  // Collapsed, a row is only an icon: it keeps its aria-label and gets a hint instead of a title
-  // attribute. Expanded, the row says its own name and stays a plain <button>.
-  const hint = (text: string) => (collapsed ? text : undefined);
-  const row = (text: string, own: ButtonHTMLAttributes<HTMLButtonElement>, content: ReactNode) =>
-    collapsed ? (
-      <Tooltip text={text}>
-        <button {...own}>{content}</button>
-      </Tooltip>
-    ) : (
-      <button {...own}>{content}</button>
-    );
-  const toggleLabel = collapsed
-    ? tr('Espandi la barra laterale', 'Expand sidebar')
-    : tr('Comprimi la barra laterale', 'Collapse sidebar');
-
+  const icon = (name: string) => <Icon name={name} size={iconSize} stroke={iconStroke} />;
+  const header = (
+    <div className="flex flex-col gap-3">
+      <div className="brand" data-tauri-drag-region={desktop ? '' : undefined}>
+        <span className="brand-mark">
+          <svg width="11" height="14" viewBox="0 0 21 25" fill="none" aria-hidden="true">
+            <path d="M12 1 2 14h8l-1 10 10-14h-8l1-9Z" fill="currentColor" />
+          </svg>
+        </span>
+        <span>Qamille</span>
+      </div>
+      <Select
+        aria-label={tr('Account', 'Account')}
+        value={accountId === null ? 'all' : String(accountId)}
+        onChange={(value) => selectAccount(value === 'all' ? null : Number(value))}
+        items={[
+          { value: 'all', label: tr('Tutti gli account', 'All accounts') },
+          ...workspace.accounts.map((account) => ({ value: String(account.id), label: account.name, mark: dot(hexOf(account.color)) })),
+        ]}
+      />
+    </div>
+  );
   return (
-    <aside className={collapsed ? 'sidebar collapsed' : 'sidebar'} aria-label={tr('Barra laterale', 'Sidebar')}>
-      <div className="sidebar-heading" data-tauri-drag-region={desktop ? '' : undefined}>
-        <div className="brand" data-tauri-drag-region={desktop ? '' : undefined}>
-          <span className="brand-mark">
-            <svg width="11" height="14" viewBox="0 0 21 25" fill="none" aria-hidden="true">
-              <path d="M12 1 2 14h8l-1 10 10-14h-8l1-9Z" fill="currentColor" />
-            </svg>
-          </span>
-          <span className="sidebar-text">Qamille</span>
-        </div>
-        <Button
-          variant="icon"
-          className="sidebar-toggle"
-          onClick={toggleCollapsed}
-          aria-label={toggleLabel}
-          tip={toggleLabel}
-          aria-expanded={!collapsed}
-          aria-controls="sidebar-navigation"
-        >
-          <Icon name={collapsed ? 'sidebar-open' : 'sidebar-close'} size={iconSize} stroke={iconStroke} />
-        </Button>
-      </div>
-      <Button
-        variant="primary"
-        className="compose-main"
-        onClick={compose}
-        tip={collapsed ? tr('Nuovo messaggio', 'New message') : undefined}
-        shortcut={collapsed ? 'N' : undefined}
-        aria-keyshortcuts="N"
-        aria-label={collapsed ? tr('Nuovo messaggio', 'New message') : undefined}
-      >
-        <Icon name="edit" size={iconSize} stroke={iconStroke} />
-        <span className="sidebar-text">{tr('Nuovo messaggio', 'New message')}</span>
-        <Kbd>N</Kbd>
-      </Button>
-      <div className="sidebar-body" id="sidebar-navigation">
-        <div className="sidebar-label sidebar-text">{tr('Account', 'Accounts')}</div>
-        <NavList className="accounts-nav" aria-label={tr('Account', 'Accounts')} group="accounts">
-          <NavItem
-            hint={hint(tr('Tutti gli account', 'All accounts'))}
-            active={accountId === null}
-            onClick={() => selectAccount(null)}
-            aria-label={tr('Tutti gli account', 'All accounts')}
-            aria-pressed={accountId === null}
-            icon={
-              <Avatar name={tr('Tutti gli account', 'All accounts')} size="xs" decorative className="bg-sidebar-selected text-sidebar-accent">
-                <Icon name="inbox" size={12} stroke={iconStroke} />
-              </Avatar>
-            }
-          >
-            <span className="sidebar-text">{tr('Tutti gli account', 'All accounts')}</span>
-          </NavItem>
-          {workspace.accounts.map((account) => (
-            <NavItem
-              key={account.id}
-              hint={hint(account.name)}
-              active={accountId === account.id}
-              onClick={() => selectAccount(account.id)}
-              aria-label={collapsed ? tr(`Passa a ${account.name}`, `Switch to ${account.name}`) : undefined}
-              title={collapsed ? undefined : `${account.name} · ${account.email}`}
-              aria-pressed={accountId === account.id}
-              icon={<Avatar name={account.name} color={hexOf(account.color)} size="xs" decorative />}
-            >
-              <span className="account-details sidebar-text">
-                <strong>{account.name}</strong>
-                <small>{account.email}</small>
-              </span>
-            </NavItem>
-          ))}
-        </NavList>
-        <NavList aria-label={tr('Cartelle della posta', 'Mail folders')} group="views">
-          {primary.map(([id, icon]) => (
-            <NavItem
-              key={id}
-              hint={hint(`${folderLabel(id)}${workspace.counts[id] ? ` · ${workspace.counts[id]}` : ''}`)}
-              active={view === id}
-              onClick={() => navigate(id)}
-              aria-label={collapsed ? folderLabel(id) : undefined}
-              icon={<Icon name={icon} size={iconSize} stroke={iconStroke} />}
-              end={!!workspace.counts[id] && <Count value={workspace.counts[id]} className="nav-count" />}
-            >
-              <span className="sidebar-text">{folderLabel(id)}</span>
-            </NavItem>
-          ))}
-        </NavList>
-        <div className="sidebar-label sidebar-text">
-          {tr('Etichette', 'Labels')} <span>{workspace.labels.length}</span>
-        </div>
-        <NavList aria-label={tr('Etichette', 'Labels')} className="labels-nav" group="views">
-          {workspace.labels.map((label, i) => (
-            <NavItem
-              key={label}
-              hint={hint(label)}
-              active={view === `label:${label}`}
-              onClick={() => navigate(`label:${label}`)}
-              aria-label={label}
-              icon={<span className="label-dot" style={{ '--dot': `var(--label-${(i % 5) + 1})` } as React.CSSProperties} />}
-            >
-              <span className="sidebar-text">{label}</span>
-            </NavItem>
-          ))}
-        </NavList>
-      </div>
-      <div className="sidebar-bottom">
-        <NavList className="tools-nav" aria-label={tr('Spazio di lavoro', 'Workspace')} group="views">
-          {tools.map(([id, icon]) => (
-            <NavItem
-              key={id}
-              hint={hint(folderLabel(id))}
-              active={view === id}
-              onClick={() => navigate(id)}
-              aria-label={collapsed ? folderLabel(id) : undefined}
-              icon={<Icon name={icon} size={iconSize} stroke={iconStroke} />}
-              end={id === 'Assistant' ? <span className="ai-badge">AI</span> : undefined}
-            >
-              <span className="sidebar-text">{folderLabel(id)}</span>
-            </NavItem>
-          ))}
-        </NavList>
+    <ShellSidebar
+      aria-label={tr('Barra laterale', 'Sidebar')}
+      collapsed={collapsed}
+      onCollapsedChange={() => toggleCollapsed()}
+      header={header}
+      footer={
         <ActivityCenter
           activities={activities}
           undoActions={undoActions}
@@ -208,44 +109,59 @@ export default function Sidebar({
           openActivity={openActivity}
           showAll={showAllActivity}
         />
-        <div className="profile-row">
-          {row(
-            folderLabel('Settings'),
-            {
-              className: view === 'Settings' ? 'active profile' : 'profile',
-              onClick: () => navigate('Settings'),
-              'aria-label': collapsed ? folderLabel('Settings') : undefined,
-              'aria-current': view === 'Settings' ? 'page' : undefined,
-            },
-            <>
-              <Avatar name={workspace.settings.user_name} size="xs" decorative className="bg-sidebar-selected text-sidebar-selected-ink" />
-              <span className="sidebar-text">
-                <strong>{workspace.settings.user_name}</strong>
-                <small>{tr('Spazio personale', 'Personal workspace')}</small>
-              </span>
-              {/* The gear is decorative: the name of the button has to say where it leads. */}
-              <span className="visually-hidden">{folderLabel('Settings')}</span>
-              <Icon name="settings" size={iconSize} stroke={iconStroke} />
-            </>,
-          )}
-          {/* The history button is a sibling of the profile button, not inside it: buttons do not nest.
-              A dot on it means an error or a failed action the user has not seen yet. */}
-          {row(
-            tr('Cronologia delle attività', 'Activity history'),
-            {
-              className: `activity-toggle${center.open ? ' on' : ''}${center.unseen > 0 ? ' has-unseen' : ''}`,
-              onClick: toggleActivityPanel,
-              'aria-label':
-                center.unseen > 0
-                  ? tr('Cronologia delle attività: ci sono errori da vedere', 'Activity history: there are errors to see')
-                  : tr('Cronologia delle attività', 'Activity history'),
-              'aria-expanded': center.open,
-              'aria-controls': 'activity-panel',
-            },
-            <Icon name="history" size={iconSize} stroke={iconStroke} />,
-          )}
-        </div>
-      </div>
-    </aside>
+      }
+    >
+      <SidebarGroup>
+        <NavItem className="compose-main" icon={icon('edit')} end={<Kbd>N</Kbd>} aria-keyshortcuts="N" onClick={compose}>
+          {tr('Nuovo messaggio', 'New message')}
+        </NavItem>
+      </SidebarGroup>
+      <SidebarGroup label={tr('Cartelle', 'Folders')}>
+        {primary.map(([id, name]) => (
+          <NavItem
+            key={id}
+            active={view === id}
+            onClick={() => navigate(id)}
+            icon={icon(name)}
+            end={workspace.counts[id] ? <Count value={workspace.counts[id]} /> : undefined}
+          >
+            {folderLabel(id)}
+          </NavItem>
+        ))}
+      </SidebarGroup>
+      <SidebarGroup label={tr('Etichette', 'Labels')} collapsible defaultOpen={false}>
+        {workspace.labels.map((label, i) => (
+          <NavItem key={label} active={view === `label:${label}`} onClick={() => navigate(`label:${label}`)} icon={dot(`var(--label-${(i % 5) + 1})`)}>
+            {label}
+          </NavItem>
+        ))}
+      </SidebarGroup>
+      <SidebarGroup label={tr('Spazio di lavoro', 'Workspace')}>
+        {tools.map(([id, name]) => (
+          <NavItem key={id} active={view === id} onClick={() => navigate(id)} icon={icon(name)} end={id === 'Assistant' ? <Count value="AI" /> : undefined}>
+            {folderLabel(id)}
+          </NavItem>
+        ))}
+        {/* A count on the history means an error or a failed action the user has not seen yet. */}
+        <NavItem
+          className="activity-toggle"
+          icon={icon('history')}
+          onClick={toggleActivityPanel}
+          aria-expanded={center.open}
+          aria-controls="activity-panel"
+          aria-label={
+            center.unseen > 0
+              ? tr('Cronologia delle attività: ci sono errori da vedere', 'Activity history: there are errors to see')
+              : tr('Cronologia delle attività', 'Activity history')
+          }
+          end={center.unseen > 0 ? <Count value={center.unseen} /> : undefined}
+        >
+          {tr('Cronologia delle attività', 'Activity history')}
+        </NavItem>
+        <NavItem active={view === 'Settings'} icon={icon('settings')} description={workspace.settings.user_name} onClick={() => navigate('Settings')}>
+          {folderLabel('Settings')}
+        </NavItem>
+      </SidebarGroup>
+    </ShellSidebar>
   );
 }

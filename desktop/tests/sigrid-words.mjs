@@ -65,6 +65,9 @@ const SAME = new Set([
   'kinds.link',
   'attachments.link',
   'viewer.zoom',
+  'keys.ctrl', // the name of the key on the keyboard, in both languages
+  'keys.cmd',
+  'keys.alt',
   'colors.names.#9bb53a', // Lime
   'colors.names.#c64fb5', // Magenta
 ]);

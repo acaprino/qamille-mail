@@ -83,6 +83,15 @@ const ENGLISH: Words = {
   palette: {
     placeholder: 'Type a command',
     empty: 'No command found',
+    command: 'Commands',
+    keys: 'Keys',
+  },
+  keys: {
+    ctrl: 'Ctrl',
+    cmd: 'Cmd',
+    alt: 'Alt',
+    option: 'Option',
+    shift: 'Shift',
   },
   shell: {
     skip: 'Skip to the content',
@@ -267,6 +276,15 @@ const ITALIAN: Words = {
   palette: {
     placeholder: 'Scrivi un comando',
     empty: 'Nessun comando trovato',
+    command: 'Comandi',
+    keys: 'Tasti',
+  },
+  keys: {
+    ctrl: 'Ctrl',
+    cmd: 'Cmd',
+    alt: 'Alt',
+    option: 'Opzione',
+    shift: 'Maiusc',
   },
   shell: {
     skip: 'Vai al contenuto',

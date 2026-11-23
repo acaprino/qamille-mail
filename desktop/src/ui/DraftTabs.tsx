@@ -22,22 +22,14 @@ type OwnProps = Record<string, unknown> & { onClick?: (event: unknown) => void; 
 
 export default function DraftTabs({ value, items, 'aria-label': ariaLabel, ids, onPick, tab, after }: DraftTabsProps) {
   const root = useRef<HTMLDivElement>(null);
-  // Sigrid's tabs give their own ids and point the chosen tab at a panel of their own: the caller's panels have other ids.
+  // The ids the caller asked for go to Sigrid (Ark finds the tabs by them for the arrows); a tab points at a panel only when named.
   useLayoutEffect(() => {
-    const triggers = [...(root.current?.querySelectorAll<HTMLElement>('[role="tab"]') ?? [])];
-    triggers.forEach((element, index) => {
-      const item = items[index];
-      if (!item) return;
-      const id = ids?.trigger?.(item.value);
-      if (id) element.id = id;
-      const panel = ids?.content?.(item.value);
-      if (panel && item.value === value) element.setAttribute('aria-controls', panel);
-      else element.removeAttribute('aria-controls');
-    });
+    if (ids?.content) return;
+    root.current?.querySelectorAll<HTMLElement>('[role="tab"]').forEach((element) => element.removeAttribute('aria-controls'));
   });
   return (
     <div ref={root} style={{ display: 'contents' }}>
-      <SigridTabs value={value} activation="manual" onValueChange={(next) => onPick?.(next)}>
+      <SigridTabs value={value} activation="manual" onValueChange={(next) => onPick?.(next)} {...(ids ? { ids } : {})}>
         <TabsList aria-label={ariaLabel}>
           {items.map((item) => {
             const { onClick, onKeyDown, ...own } = (item.props ?? {}) as OwnProps;

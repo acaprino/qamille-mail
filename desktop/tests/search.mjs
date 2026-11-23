@@ -152,11 +152,10 @@ try {
   });
   await page.getByRole('button', { name: 'Apply filter', exact: true }).click();
   await settled();
-  await page.getByRole('button', { name: 'Apply filter', exact: true }).click();
   await page
     .locator('.mail-open', { hasText: 'Q4 proposal: can you review by Thursday?' })
     .waitFor();
-  assert.equal(await page.locator('.mail-open').count(), 1);
+  await expect(page.locator('.mail-open')).toHaveCount(1);
   await page.getByRole('button', { name: /^When/ }).click();
   await page.getByLabel('Date', { exact: true }).press('Escape');
   assert.equal(

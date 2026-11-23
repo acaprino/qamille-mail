@@ -4,6 +4,7 @@
 //
 //   node tests/compatto-list.mjs      (QAMILLE_PREVIEW_URL names a Vite of your own, not 1420)
 import { chromium, expect } from '@playwright/test';
+import { pickDate } from './support/dates.mjs';
 import assert from './support/soft-assert.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -211,14 +212,12 @@ try {
   await mode.click();
   await page.getByRole('option', { name: 'Date range' }).click();
   await expect(mode).toContainText('Date range');
-  const from = panel.getByRole('textbox', { name: 'From date' });
-  const through = panel.getByRole('textbox', { name: 'Through date, inclusive' });
-  await from.fill('2026-10-15');
-  await from.press('Enter');
-  await through.fill('2026-10-20');
-  await through.press('Enter');
-  await expect(from).toHaveValue('10/15/2026');
-  await expect(through).toHaveValue('10/20/2026');
+  const from = panel.getByLabel('From date', { exact: true });
+  const through = panel.getByLabel('Through date, inclusive', { exact: true });
+  await pickDate(page, from, '2026-10-15');
+  await pickDate(page, through, '2026-10-20');
+  await expect(from).toContainText('October 15, 2026');
+  await expect(through).toContainText('October 20, 2026');
   assert.equal(await natives(), 0, 'still none with the dates open');
   await panel.getByRole('button', { name: 'Apply filter', exact: true }).click();
   await expect(search).toHaveValue(/between:2026-10-15\.\.2026-10-20/);

@@ -58,7 +58,7 @@ try {
     await expect(dialog.getByRole('button', { name: 'Manage subscription' })).toBeVisible();
     assert.equal(await dialog.getByLabel('Password').count(), 0);
     await dialog.getByRole('button', { name: 'Confirm with Google and delete' }).click();
-    await expect(page.getByText('Account deleted')).toBeVisible();
+    // (The page reloads at once: the notice of the deletion goes with it, the sign-in screen is what is seen.)
     await expect(page.getByRole('button', { name: 'Sign in to Qamille', exact: true })).toBeVisible();
     console.log('PASS an account without password is deleted after signing in with Google again');
     await context.close();

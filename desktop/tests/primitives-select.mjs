@@ -39,9 +39,9 @@ try {
   await page.keyboard.press('Enter');
   await expect(listbox).toBeVisible();
   await expect(listbox.getByRole('option')).toHaveCount(5);
-  await expect(listbox).toBeFocused();
+  await expect.poll(() => listbox.evaluate((el) => el.contains(document.activeElement))).toBe(true);
   // Only the chosen item carries the check mark.
-  await expect(listbox.locator('[data-part="item-indicator"]:visible')).toHaveCount(1);
+  await expect(listbox.getByRole('option', { selected: true })).toHaveCount(1);
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   await expect(listbox).toBeHidden();
@@ -63,7 +63,7 @@ try {
 
   // (d) A disabled item cannot be chosen, by keyboard or by click.
   await page.keyboard.press('Enter');
-  await expect(listbox).toBeFocused();
+  await expect.poll(() => listbox.evaluate((el) => el.contains(document.activeElement))).toBe(true);
   const deutsch = listbox.getByRole('option', { name: 'Deutsch' });
   await expect(deutsch).toHaveAttribute('aria-disabled', 'true');
   await deutsch.click({ force: true });
@@ -72,7 +72,7 @@ try {
   await page.keyboard.press('Escape');
   await expect(listbox).toBeHidden();
   await page.keyboard.press('Enter');
-  await expect(listbox).toBeFocused();
+  await expect.poll(() => listbox.evaluate((el) => el.contains(document.activeElement))).toBe(true);
   for (let i = 0; i < 6; i++) await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   assert.notEqual(await value.textContent(), 'de');

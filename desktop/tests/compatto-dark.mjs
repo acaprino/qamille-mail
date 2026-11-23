@@ -276,14 +276,13 @@ async function section(name, run) {
 
   await section('date', async () => {
     const accent = await open('date');
-    const control = page.locator('[data-scope="date-picker"][data-part="control"]').first();
+    const control = page.getByLabel('Due date', { exact: true });
     await assertFieldBorder(page, control, 'date field');
-    const input = page.getByRole('textbox', { name: 'Due date' });
-    await input.focus();
+    await control.focus();
     await page.keyboard.press('Shift');
     await assertRing(page, control, 'date field', accent);
     console.log('ok   focus ring of date field');
-    await page.locator('[data-scope="date-picker"][data-part="trigger"]').first().click();
+    await control.click();
     await page.locator('[data-scope="date-picker"][data-part="content"]').first().waitFor();
     await audit(page, 'date field (calendar open)', ['[data-scope="date-picker"][data-part="content"]', '[data-scope="date-picker"][data-part="control"]']);
     const day = page.locator('[data-scope="date-picker"][data-part="table-cell-trigger"][tabindex="0"]').first();

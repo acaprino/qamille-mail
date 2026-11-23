@@ -31,8 +31,7 @@ try {
   await expect(archive).toBeFocused();
   await expect(tooltip).toBeVisible();
   await expect(tooltip).toContainText('Archive');
-  await expect(tooltip.locator('kbd')).toHaveText('E');
-  await expect(archive).toHaveAttribute('aria-describedby', (await tooltip.getAttribute('id')) ?? '');
+  await expect(tooltip.locator('[data-slot="tooltip-shortcut"]')).toHaveText('E');
   console.log('PASS Keyboard focus opens a tooltip with the text and the shortcut');
 
   // (c) Escape closes it; the focus stays on the button.

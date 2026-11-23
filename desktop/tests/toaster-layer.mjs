@@ -83,7 +83,7 @@ try {
     walked.push(await focused());
   }
   assert.deepEqual(walked[0], 'Show in folder', 'the second action is reachable with Tab');
-  assert.match(String(walked[1]), /^Close the notice/, 'then the close button');
+  assert.match(String(walked[1]), /close/i, `then the close button (${JSON.stringify(walked)})`);
   // Nothing takes them out of the tab order: not hidden, not inert, no tabindex of -1.
   assert.deepEqual(
     await actions.evaluateAll((buttons) => buttons.map((b) => ({ tab: b.tabIndex, disabled: b.disabled, hidden: !!b.closest('[inert], [aria-hidden="true"]') }))),

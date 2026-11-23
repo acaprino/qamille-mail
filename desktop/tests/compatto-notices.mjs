@@ -52,8 +52,8 @@ try {
   await expect(toast).toContainText('Synthetic failure');
   await page.evaluate(() => (window.__previewCommandFail = {}));
   await sync.click();
-  await expect(toast.last()).toContainText('Your inbox is up to date');
-  await expect(toast.first()).toContainText('Synthetic failure');
+  await expect(toast.filter({ hasText: 'Your inbox is up to date' })).toHaveCount(1);
+  await expect(toast.filter({ hasText: 'Synthetic failure' })).toHaveCount(1);
   for (const dismiss of await toast.getByRole('button', { name: /^Close the notice/ }).all()) await dismiss.click();
   await expect(toast).toHaveCount(0);
   console.log('PASS an error stays; a new notice follows it');

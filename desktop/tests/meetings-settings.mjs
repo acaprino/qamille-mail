@@ -63,7 +63,7 @@ const options = async (name) => {
   await popup.getByRole('option').first().waitFor();
   const listed = await popup.getByRole('option').allTextContents();
   await page.keyboard.press('Escape');
-  await popup.waitFor({ state: 'hidden' });
+  await expect(combo(name)).toHaveAttribute('aria-expanded', 'false');
   return listed.map((text) => text.trim());
 };
 const megabytes = (bytes) => `${(bytes / 1_048_576).toFixed(1)} MB`;

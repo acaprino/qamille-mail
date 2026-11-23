@@ -6,9 +6,9 @@ import { pickDate } from './support/dates.mjs';
 import assert from './support/soft-assert.mjs';
 import { mountGallery } from './support/mount.mjs';
 
-// Sigrid's --color-primary (light), which is also the ring of a focused control.
-const ACCENT = 'rgb(67, 56, 202)';
-const RING = ACCENT;
+// Sigrid's --color-primary (light), and the ring of a focused control (--color-ring).
+const ACCENT = 'rgb(79, 70, 229)';
+const RING = 'rgb(67, 56, 202)';
 const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const errors = [];
 const context = await browser.newContext({

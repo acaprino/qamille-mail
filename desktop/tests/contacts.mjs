@@ -195,7 +195,7 @@ try {
     await expect(order.getByRole('listitem').first()).not.toContainText('Local');
     await page.getByLabel('Address names never treated as one person (comma-separated)').fill('ciao, info');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   });
 
   assert.deepEqual(errors, [], `Page errors: ${errors.join('; ')}`);

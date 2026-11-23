@@ -61,6 +61,7 @@ try {
     // (The page reloads at once: the notice of the deletion goes with it, the sign-in screen is what is seen.)
     await page.waitForLoadState('load');
     const said = (await page.locator('body').innerText()).replace(/\s+/g, ' ').slice(0, 300);
+    console.log(`MOTION page says after the reload: ${said}`);
     await expect(page.getByRole('button', { name: 'Sign in to Qamille', exact: true }), said).toBeVisible();
     console.log('PASS an account without password is deleted after signing in with Google again');
     await context.close();

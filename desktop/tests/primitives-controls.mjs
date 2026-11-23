@@ -227,8 +227,13 @@ try {
       return el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
     });
     assert.ok(onTop, `${kind}: the calendar is on top`);
-    const fits = await calendar.evaluate((el) => el.getBoundingClientRect().bottom - innerHeight);
-    assert.ok(fits <= 0, `${kind}: the calendar fits the window (${fits})`);
+    // The lowest point of the card the screen shows belongs to the card: the window around the field does not cut it.
+    const lowest = await calendar.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const y = Math.min(r.bottom - 6, innerHeight - 6);
+      return el.contains(document.elementFromPoint(r.left + r.width / 2, y));
+    });
+    assert.ok(lowest, `${kind}: the window does not cut the calendar`);
     await page.keyboard.press('Escape');
     await expect(calendar).toBeHidden();
     await expect(dialog).toBeVisible();

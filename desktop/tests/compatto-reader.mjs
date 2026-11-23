@@ -70,6 +70,7 @@ try {
     await expect(tip).toContainText(label);
     const text = (await tip.innerText()).replace(/\s+/g, ' ').trim();
     const keys = await tip.locator('[data-slot="tooltip-shortcut"]').count();
+    console.log(`MOTION tip of ${name}: ${JSON.stringify({ text, keys, html: (await tip.innerHTML()).slice(0, 400) })}`);
     await page.keyboard.press('Escape');
     await expect(tip).toHaveCount(0);
     return { text, keys };

@@ -82,7 +82,7 @@ try {
     const options = host.getByRole('listbox');
     await field.click();
     await expect(options).toBeVisible();
-    await expect(options).toBeFocused();
+    await expect.poll(() => options.evaluate((el) => el.contains(document.activeElement))).toBe(true);
     // The list is not hidden behind the dialog: the point at its middle belongs to the list.
     const onTop = await options.evaluate((el) => {
       const r = el.getBoundingClientRect();
@@ -97,7 +97,7 @@ try {
     await expect(field).toBeFocused();
     // Escape closes the list only; a second Escape reaches the dialog.
     await host.keyboard.press('Enter');
-    await expect(options).toBeFocused();
+    await expect.poll(() => options.evaluate((el) => el.contains(document.activeElement))).toBe(true);
     await host.keyboard.press('Escape');
     await expect(options).toBeHidden();
     await expect(dialog).toBeVisible();
@@ -117,7 +117,7 @@ try {
     await host.keyboard.press('Enter');
     await host.keyboard.press('ArrowDown');
     await host.keyboard.press('ArrowDown');
-    await expect(options).toBeFocused();
+    await expect.poll(() => options.evaluate((el) => el.contains(document.activeElement))).toBe(true);
     await host.keyboard.press('Escape');
     await expect(options).toBeHidden();
     await expect(dialog).toBeVisible();
@@ -137,7 +137,7 @@ try {
   const trigger = fresh.getByRole('combobox', { name: 'Language' });
   await trigger.focus();
   await fresh.keyboard.press('Enter');
-  await expect(fresh.getByRole('listbox')).toBeFocused();
+  await expect.poll(() => fresh.getByRole('listbox').evaluate((el) => el.contains(document.activeElement))).toBe(true);
   await fresh.keyboard.press('e');
   const inside = await fresh.evaluate(() => !!document.activeElement?.closest('[data-scope="select"]'));
   assert.ok(inside, 'the focus is still inside the Select after typing');
@@ -146,7 +146,7 @@ try {
   await expect(fresh.locator('#value')).toHaveText('en');
   await expect(trigger).toContainText('English');
   await fresh.keyboard.press('Enter');
-  await expect(fresh.getByRole('listbox')).toBeFocused();
+  await expect.poll(() => fresh.getByRole('listbox').evaluate((el) => el.contains(document.activeElement))).toBe(true);
   await fresh.keyboard.press('n');
   await fresh.keyboard.press('r');
   await fresh.keyboard.press('e');

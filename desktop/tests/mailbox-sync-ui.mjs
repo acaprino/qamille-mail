@@ -56,7 +56,7 @@ try {
     await expect(general).toBeChecked();
     await general.uncheck({ force: true });
     await expect(section.getByRole('status')).toContainText(/Off: your mailboxes stay on this computer only/);
-    await general.click();
+    await general.click({ force: true });
     await expect(general).toBeChecked();
     await expect(section.getByText('alex@studio-example.com')).toBeVisible();
     console.log('PASS consent line, status, removal notice and the switches');

@@ -52,7 +52,7 @@ try {
     assert.ok(options.some((text) => text.startsWith('Use your own key')), options.join('|'));
     await page.getByRole('option', { name: 'Qamille server' }).click();
     assert.equal(await page.getByLabel('API key').count(), 0, 'no key for the server provider');
-    assert.equal(await page.locator('[role="alert"], [data-scope="toast"]').count(), 0, 'no warning when the consent is current');
+    assert.equal(await page.locator('[role="alert"], [data-scope="toast"][data-part="root"]').count(), 0, 'no warning when the consent is current');
     await context.close();
   }
   // The server changed its provider: a warning and «Confirm».

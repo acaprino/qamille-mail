@@ -74,7 +74,7 @@ await page.addInitScript(({ settings, account }) => {
 const count = (command) => page.evaluate(name => window.calls.filter(call => call === name).length, command);
 const indicator = page.locator('.activity-indicator');
 const line = indicator.locator('.activity-line');
-const toast = page.locator('[data-scope="toast"]');
+const toast = page.locator('[data-scope="toast"][data-part="root"]');
 const sync = page.getByRole('button', { name: 'Sync mail', exact: true });
 // Waits until the app has not called the backend for 300 ms (at most 5 s).
 const quiet = () => page.evaluate(async () => {

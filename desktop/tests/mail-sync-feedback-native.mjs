@@ -54,7 +54,7 @@ try {
   await expect.poll(async () => (await status()).accounts[0]?.phase).toBe('error');
   // Typed `sync-progress` events feed the activity indicator; the failure is a separate alert
   // (ADR-0007 decision 7, INV-009). The old `.sync-feedback` overlay no longer exists.
-  const alert = page.locator('[data-scope="toast"]:has([data-slot="toast-error"])');
+  const alert = page.locator('[data-scope="toast"][data-part="root"]:has([data-slot="toast-error"])');
   const indicator = page.locator('.activity-indicator');
   await expect(alert).toContainText('Sync incomplete');
   await expect(alert).toContainText('Reconnect this mail account in Settings');

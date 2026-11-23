@@ -209,7 +209,7 @@ try {
     const passesBefore = await passes();
     await page.evaluate(() => (window.__previewCommandFail = { queue_mail_action: 'Synthetic refusal' }));
     await done.click();
-    await expect(page.locator('[role="alert"], [data-scope="toast"]')).toContainText('Synthetic refusal');
+    await expect(page.locator('[role="alert"], [data-scope="toast"][data-part="root"]').filter({ hasText: 'Synthetic refusal' }).first()).toBeVisible();
     await expect(done).toBeEnabled();
     await expect(heading(subjects.a)).toBeVisible();
     await expect(row(subjects.a)).toHaveCount(1);
@@ -226,7 +226,7 @@ try {
     await page.evaluate(() => (window.__previewCommandFail = { read_mail: 'Synthetic read failure' }));
     await reader.getByRole('button', { name: 'Pin message', exact: true }).click();
     await expect(undos).toHaveCount(1);
-    await expect(page.locator('[role="alert"], [data-scope="toast"]')).toContainText('Synthetic read failure');
+    await expect(page.locator('[role="alert"], [data-scope="toast"][data-part="root"]').filter({ hasText: 'Synthetic read failure' }).first()).toBeVisible();
     await expect(reader.getByRole('button', { name: 'Pin message', exact: true })).toBeEnabled();
     // One reload for the action itself and one more for the failure.
     await expect.poll(passes).toBeGreaterThanOrEqual(passesBefore + 2);

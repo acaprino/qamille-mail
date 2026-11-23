@@ -153,8 +153,10 @@ try {
   const actions = async () => (await notice.getByRole('button').allTextContents()).map((text) => text.trim()).filter((text) => text && !/^[×✕x]$/i.test(text));
   assert.deepEqual(await actions(), ['Open', 'Show in folder'], 'the export offers both actions');
   await notice.getByRole('button', { name: 'Show in folder' }).click();
-  await expect(notice).toContainText('The browser preview cannot open saved files');
-  assert.deepEqual(await actions(), []);
+  // The failure is a notice of its own, after the export's.
+  const failed = notice.filter({ hasText: 'The browser preview cannot open saved files' });
+  await expect(failed).toHaveCount(1);
+  assert.deepEqual((await failed.getByRole('button').allTextContents()).map((text) => text.trim()).filter((text) => text && !/^[×✕x]$/i.test(text)), []);
   assert.ok((await desktopLike.evaluate(() => window.__previewCalls)).includes('saved_file_reveal'), 'the click reaches saved_file_reveal');
   await desktopLike.close();
   console.log('PASS an export with a token offers Open and Show in folder; a failing action says why');

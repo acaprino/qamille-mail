@@ -42,6 +42,17 @@ const SAMPLES = {
   'viewer.page': [[2, 5]],
   'steps.summary': [[2, 4]],
   'progress.value': [[45, 100]],
+  'list.more': [[2]],
+  'table.sortBy': [['Dimensione']],
+  'graph.open': [['Lavoro']],
+  'graph.close': [['Lavoro']],
+  'graph.closed': [['Lavoro', 3]],
+  'graph.add': [['Lavoro']],
+  'reorder.handle': [['Posta in arrivo']],
+  'reorder.taken': [['Posta in arrivo', 2, 5]],
+  'reorder.moved': [['Posta in arrivo', 3, 5]],
+  'reorder.put': [['Posta in arrivo', 3, 5]],
+  'reorder.back': [['Posta in arrivo']],
 };
 
 // Words that are the same in both languages, by path. A word is listed here on purpose, with the reason.

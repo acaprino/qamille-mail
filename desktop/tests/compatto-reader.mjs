@@ -60,22 +60,24 @@ try {
 
   // (b) Tips: only the real shortcuts. Archive E, Reply R; the others have none.
   const tip = page.locator('[data-slot="tooltip-content"]').last();
-  const tipOf = async (name) => {
+  // The card of the button before it may still be fading when this one opens: wait for the one that says `label`.
+  const tipOf = async (name, label) => {
     await named(name).focus();
     await page.keyboard.press('Shift+Tab');
     await page.keyboard.press('Tab');
     await expect(named(name)).toBeFocused();
     await expect(tip).toBeVisible();
+    await expect(tip).toContainText(label);
     const text = (await tip.innerText()).replace(/\s+/g, ' ').trim();
     const keys = await tip.locator('[data-slot="tooltip-shortcut"]').count();
     await page.keyboard.press('Escape');
     await expect(tip).toHaveCount(0);
     return { text, keys };
   };
-  assert.deepEqual(await tipOf('Archive message'), { text: 'Archive E', keys: 1 });
-  assert.deepEqual(await tipOf('Reply'), { text: 'Reply R', keys: 1 });
+  assert.deepEqual(await tipOf('Archive message', 'Archive'), { text: 'Archive E', keys: 1 });
+  assert.deepEqual(await tipOf('Reply', 'Reply'), { text: 'Reply R', keys: 1 });
   for (const [name, text] of [['Move message to trash', 'Move to trash'], ['Snooze until tomorrow', 'Snooze until tomorrow'], ['Done', 'Done']]) {
-    assert.deepEqual(await tipOf(name), { text, keys: 0 }, `${name} has a tip and no shortcut`);
+    assert.deepEqual(await tipOf(name, text), { text, keys: 0 }, `${name} has a tip and no shortcut`);
   }
   console.log('PASS Tips show E on Archive and R on Reply, nothing on the others');
 

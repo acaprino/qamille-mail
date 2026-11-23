@@ -232,7 +232,9 @@ try {
           for (const key of ['Tab', 'Shift+Tab']) {
             for (let i = 0; i < 8; i++) {
               await page.keyboard.press(key);
-              if (!(await focusIn(panel))) throw new Error(`${key} number ${i + 1} took the focus out of the ${surface}`);
+              // Wrapping goes through a focus guard, and the focus is handed back a moment later.
+              const stays = await expect.poll(() => focusIn(panel), { timeout: 1500 }).toBe(true).then(() => true, () => false);
+              if (!stays) throw new Error(`${key} number ${i + 1} took the focus out of the ${surface}`);
             }
           }
           await expect(panel).toBeVisible();

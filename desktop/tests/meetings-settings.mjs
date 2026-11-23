@@ -58,6 +58,7 @@ async function openMeetings() {
 }
 const combo = (name) => content.getByRole('combobox', { name, exact: true });
 const options = async (name) => {
+  await expect(page.getByRole('listbox')).toHaveCount(0);
   await combo(name).click();
   // A list that was closed may stay in the page, hidden: the one looked at is the one that shows.
   const popup = page.locator('[data-slot="select-content"]:visible');

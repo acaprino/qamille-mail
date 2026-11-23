@@ -62,7 +62,7 @@ try {
     await dialog.getByRole('button', { name: 'Confirm with Google and delete' }).click();
     await page.waitForFunction(() => !window.__beforeReload, null, { timeout: 15000 }).catch(() => {});
     await page.waitForLoadState('load');
-    const signIn = page.getByRole('button', { name: 'Sign in to Qamille', exact: true });
+    const signIn = page.getByText('Sign in to Qamille', { exact: true });
     try {
       await expect(signIn).toBeVisible({ timeout: 15000 });
     } catch (error) {

@@ -10,7 +10,10 @@
 // The copy is replaced without ever being lost: the new one is written to vendor/sigrid.part, the old one is renamed
 // to vendor/sigrid.old, the new one is renamed into place, and the old one is deleted last. If a sync stops half-way,
 // the next one puts vendor/sigrid.old back.
-// The official repository is the only source. Not part of predev/prebuild: nothing imports Sigrid yet.
+// Sigrid's LICENSE, THIRD_PARTY.md (which also lists what Sigrid bundles) and provenance.json are copied to
+// public/sigrid-licenses/ (generated, ignored by git), so they travel in the exe; a package without them is refused.
+// The official repository is the only source. It runs in predev and prebuild, after artcraft:sync, and in CI: Qamille
+// reaches vendor/sigrid through an alias (vite.config.ts, tsconfig.json), and without it the build stops.
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync } from 'node:fs';
@@ -85,7 +88,27 @@ function verify(dir, tag) {
     const belongs = version === null ? '' : `, which is the tag ${SIGRID_TAG_PREFIX}${version}`;
     throw new Error(`sigrid: the release ${tag} holds a package whose provenance.json says version ${JSON.stringify(version)}${belongs}. A package was uploaded to the wrong release.`);
   }
+  requireNotices(provenance);
   return provenance;
+}
+
+// The notices the exe carries (public/sigrid-licenses): Sigrid's licence, and THIRD_PARTY.md, which also lists the
+// libraries Sigrid bundles. A package (checked: its files are those of its provenance.json) that lacks one is refused.
+const NOTICES = ['LICENSE', 'THIRD_PARTY.md'];
+function requireNotices(provenance) {
+  for (const name of NOTICES) {
+    if (!Object.hasOwn(provenance.files, name)) throw new Error(`sigrid: the package has no ${name}, and the exe must carry Sigrid's licence and third-party notices (public/sigrid-licenses).`);
+  }
+}
+
+// Copies the notices and provenance.json of vendor/sigrid to public/sigrid-licenses, which Vite puts in the build.
+// The folder is written again at every sync, so a notice that a newer release no longer has does not stay.
+function writeLicences(desktop) {
+  const from = join(desktop, 'vendor', 'sigrid');
+  const to = join(desktop, 'public', 'sigrid-licenses');
+  rmSync(to, { recursive: true, force: true });
+  mkdirSync(to, { recursive: true });
+  for (const name of [...NOTICES, 'provenance.json']) cpSync(join(from, name), join(to, name));
 }
 
 // A release from the cache that fails its checks is taken out of the cache: its .complete marker was written before the
@@ -177,10 +200,16 @@ export function replaceVendor(dir, desktop, rename = renameRetrying) {
 
 // A sync that stopped after putting the old copy aside and before the new one was in place leaves vendor/sigrid.old
 // and no vendor/sigrid: that is the last good copy, and it goes back. A sigrid.old beside a vendor/sigrid is what
-// a sync left when it stopped before deleting it, and is removed.
+// a sync left when it stopped before deleting it, and is removed. A vendor/sigrid.part is a copy that was never put
+// in place (the sync stopped while writing it): never a good copy, it is removed whatever the sync does next.
 function restoreInterrupted(desktop, log) {
   const target = join(desktop, 'vendor', 'sigrid');
   const old = `${target}.old`;
+  try {
+    rmSync(`${target}.part`, { recursive: true, force: true });
+  } catch {
+    // A locked file: replaceVendor clears it before it writes a new one.
+  }
   if (!existsSync(old)) return;
   if (existsSync(target)) {
     try {
@@ -228,8 +257,10 @@ function install(release, desktop, log) {
     const advice = `Check the network (the latest release of ${SIGRID_REPO}'s main), or set SIGRID_DIR to a checkout of Sigrid.`;
     const kept = join(desktop, 'vendor', 'sigrid');
     if (!existsSync(kept)) throw new Error(`sigrid: no release of ${SIGRID_REPO}'s main reachable and no copy in vendor/sigrid. ${advice}`);
-    const { problems } = inspect(kept);
+    const { provenance: keptProvenance, problems } = inspect(kept);
     if (problems.length) throw new Error(`sigrid: no release of ${SIGRID_REPO}'s main reachable, and the copy in vendor/sigrid fails its checks against provenance.json. ${advice}\n  ${problems.join('\n  ')}`);
+    requireNotices(keptProvenance);
+    writeLicences(desktop);
     log("sigrid: no release of Sigrid's main reachable, keeping the existing copy");
     return;
   }
@@ -242,6 +273,7 @@ function install(release, desktop, log) {
   }
   checkPeers(dir, desktop, log);
   replaceVendor(dir, desktop);
+  writeLicences(desktop);
   log(`sigrid: ${tag ?? `v${provenance.version}`} (${provenance.commit.slice(0, 7)}) synced`);
 }
 

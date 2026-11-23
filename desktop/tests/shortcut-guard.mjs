@@ -11,7 +11,7 @@ import { chromium } from '@playwright/test';
 const base = process.env.QAMILLE_PREVIEW_URL;
 
 test('shortcutIgnored: editing and widget targets are ignored, the page is not', { skip: !base && 'QAMILLE_PREVIEW_URL not set' }, async () => {
-  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   try {
     const page = await browser.newPage();
     await page.route('**/__guard', (route) => route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body></body></html>' }));
@@ -19,8 +19,8 @@ test('shortcutIgnored: editing and widget targets are ignored, the page is not',
     const result = await page.evaluate(async () => {
       const { shortcutIgnored } = await import('/src/lib/shortcut-guard.ts');
       const cases = {
-        selectTrigger: '<div data-scope="select" data-part="root"><button id="t">x</button></div>',
-        selectItem: '<div data-scope="select" data-part="content"><div><span id="t">English</span></div></div>',
+        selectTrigger: '<button data-slot="select-trigger" id="t">x</button>',
+        selectItem: '<div data-slot="select-content" role="listbox"><div role="option"><span id="t">English</span></div></div>',
         comboboxInput: '<div data-scope="combobox"><div id="t">x</div></div>',
         tagsInput: '<div data-scope="tags-input"><span id="t">x</span></div>',
         datePicker: '<div data-scope="date-picker"><button id="t">12</button></div>',
@@ -61,7 +61,7 @@ test('shortcutIgnored: editing and widget targets are ignored, the page is not',
 });
 
 test('shortcutCoveredByLayer: a focused dialog, popover or menu, or any open modal, keeps the keys from the page', { skip: !base && 'QAMILLE_PREVIEW_URL not set' }, async () => {
-  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   try {
     const page = await browser.newPage();
     await page.route('**/__guard', (route) => route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body></body></html>' }));
@@ -83,11 +83,12 @@ test('shortcutCoveredByLayer: a focused dialog, popover or menu, or any open mod
         menu: at('<div role="menu"><div role="menuitem" id="t">x</div></div>'),
         // The focus is on the page (e.g. <body>) while a modal confirmation is open over it.
         openModal: at('<div role="dialog" aria-modal="true" data-state="open"></div><button id="t">x</button>'),
+        sigridModal: at('<div role="dialog" aria-modal="true" data-open></div><button id="t">x</button>'),
         closedModal: at('<div role="dialog" aria-modal="true" data-state="closed" hidden></div><button id="t">x</button>'),
         nonModalOutside: at('<div role="dialog" aria-modal="false" data-state="open"></div><button id="t">x</button>'),
       };
     });
-    for (const name of ['sidePanel', 'popover', 'menu', 'openModal']) assert.equal(result[name], true, `${name} must cover the page`);
+    for (const name of ['sidePanel', 'popover', 'menu', 'openModal', 'sigridModal']) assert.equal(result[name], true, `${name} must cover the page`);
     for (const name of ['plain', 'closedModal', 'nonModalOutside']) assert.equal(result[name], false, `${name} must not cover the page`);
   } finally {
     await browser.close();
@@ -95,7 +96,7 @@ test('shortcutCoveredByLayer: a focused dialog, popover or menu, or any open mod
 });
 
 test('arrowsMoveMail: only the page, the list and the reader move the open message', { skip: !base && 'QAMILLE_PREVIEW_URL not set' }, async () => {
-  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   try {
     const page = await browser.newPage();
     await page.route('**/__guard', (route) => route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><body></body></html>' }));
@@ -154,7 +155,7 @@ test('isAppChord: Ctrl or Meta without Alt, so AltGr (Ctrl+Alt on Windows) is no
 // The window-wide keyboard() of App.tsx, in the preview with the sample mailbox: where the arrows
 // act, which chords count, and what Esc does in the search field.
 test('App keyboard(): arrows only from the page, the list or the reader; AltGr is not a chord; Esc clears the search', { skip: !base && 'QAMILLE_PREVIEW_URL not set' }, async () => {
-  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   try {
     const page = await browser.newPage({ locale: 'en-US', viewport: { width: 1440, height: 900 } });
     const errors = [];

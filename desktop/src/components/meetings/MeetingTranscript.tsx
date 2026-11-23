@@ -5,8 +5,8 @@
 // meeting (the reader may have scrolled away). Both top-level elements carry `meeting-transcript`,
 // the class its rules are scoped under.
 import { useEffect, useRef } from 'react';
-import Button from '../../ds/primitives/Button';
-import Icon from '../../ds/primitives/Icon';
+import Button from '../../ui/Button';
+import Icon from '../../ui/Icon';
 import { tr } from '../../lib/i18n';
 import type { MeetingDetail } from '../../lib/meetings';
 import { transcriptRows } from '../../lib/meetings-view';

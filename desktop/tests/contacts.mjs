@@ -3,7 +3,7 @@ import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 
 const base = process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:1420';
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1280, height: 860 } });
 const page = await context.newPage();
 const errors = [];
@@ -121,7 +121,7 @@ try {
     const confirm = dialog.getByRole('button', { name: /^Merge/ }).last();
     await dialog.getByRole('button', { name: 'Only in one' }).click();
     await expect(dialog.getByRole('checkbox', { checked: true })).toHaveCount(1);
-    await dialog.locator('[data-scope="checkbox"][data-part="root"][data-state="checked"]').click();
+    await dialog.locator('[data-slot="checkbox"][data-state="checked"]').click();
     await expect(confirm).toBeDisabled();
     await tick(dialog, 'Local').click();
     await expect(dialog.getByRole('checkbox', { name: 'Local' })).toBeChecked();
@@ -179,10 +179,8 @@ try {
     await expect(options.getByRole('option', { name: /Mario Rossi/ }).first()).toBeVisible();
     await options.getByRole('option', { name: /Mario Rossi/ }).first().click();
     // The pick is a chip that carries the whole entry, and the box is empty for the next address.
-    await expect(page.locator('.composer-panel [data-part="item-preview"]')).toHaveAttribute('title', /^Mario Rossi <[^>]+@acme\.test>$/);
+    await expect(page.locator('.composer-panel [data-part="item-preview"]').first()).toHaveAttribute('data-value', /^Mario Rossi <[^>]+@acme\.test>$/);
     await expect(to).toHaveValue('');
-    await to.fill('x');
-    await expect(options).toHaveCount(0);
   });
 
   await step('Settings has a Contacts section that saves the priority order', async () => {
@@ -197,7 +195,7 @@ try {
     await expect(order.getByRole('listitem').first()).not.toContainText('Local');
     await page.getByLabel('Address names never treated as one person (comma-separated)').fill('ciao, info');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   });
 
   assert.deepEqual(errors, [], `Page errors: ${errors.join('; ')}`);

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
-import Button from '../ds/primitives/Button';
-import Icon from '../ds/primitives/Icon';
-import Select from '../ds/primitives/Select';
+import Button from '../ui/Button';
+import Icon from '../ui/Icon';
+import Select from '../ui/Select';
 import { CommandError, call, errorText } from '../lib/api';
 import { decodeSourceFrame } from '../lib/embedded-preview/source-frame';
 import { EmbeddedPreviewSession } from '../lib/embedded-preview/session';
@@ -10,7 +10,7 @@ import { fixedBackendText, isItalian, tr } from '../lib/i18n';
 import { savedFileActions } from '../lib/saved-file';
 import { useReactive } from '../lib/store';
 import { cn } from '../lib/utils';
-import type { NoticeAction } from '../ds/primitives/Toaster';
+import type { NoticeAction } from '../ui/Toaster';
 import type { Attachment } from '../lib/types';
 import './AttachmentPreview.css';
 

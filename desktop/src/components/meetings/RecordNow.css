@@ -1,6 +1,6 @@
 /* The surface is the design system's popover, made for menus; this one holds a small form. It is
    drawn in a portal, so its rules hang on its own class, not on the page. */
-[data-scope='popover'][data-part='content'].record-popover {
+.record-popover {
   width: 300px;
   padding: 14px;
 
@@ -18,7 +18,7 @@
     margin: 0;
     font-size: var(--text-xs);
     line-height: 1.4;
-    color: var(--muted);
+    color: var(--color-ink-mute);
   }
   & .record-sources svg {
     flex: none;
@@ -51,5 +51,5 @@
   margin: -4px 0 0;
   font-size: var(--text-xs);
   text-align: right;
-  color: var(--muted);
+  color: var(--color-ink-mute);
 }

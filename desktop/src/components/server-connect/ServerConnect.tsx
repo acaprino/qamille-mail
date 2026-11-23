@@ -4,9 +4,8 @@
 // this component's state only while the form is open.
 import { useEffect, useRef, useState } from 'react';
 import { useFocusAfterStep } from '../../lib/focus-after-step';
-import Button from '../../ds/primitives/Button';
-import Field from '../../ds/primitives/Field';
-import GoogleMark from '../../ds/primitives/GoogleMark';
+import Button from '../../ui/Button';
+import Field from '../../ui/Field';
 import { call, errorText } from '../../lib/api';
 import { connectGoogle } from '../../lib/google-sign-in';
 import type { Account } from '../../lib/types';
@@ -36,6 +35,7 @@ import {
   type Probe,
   type ServerInfo,
 } from '../../lib/server-connect';
+import { Input, Textarea } from '../../ui/Input';
 
 export type ServerConnectProps = {
   /** The Professional address; absent in the self-hosted build. */
@@ -237,7 +237,7 @@ export default function ServerConnect({ preset = null, consented, defaultDeviceN
           disabled={busy || (signUpWithGoogle && termsBlock(info?.legal, terms))}
           onClick={() => void signInWithBrowser('google')}
         >
-          <GoogleMark />
+          <img src="/brand/google.svg" alt="" width={18} height={18} />
           {preset && info?.google_signup ? tr('Continua con Google', 'Continue with Google') : tr('Accedi con Google', 'Sign in with Google')}
         </Button>
       )}
@@ -252,7 +252,7 @@ export default function ServerConnect({ preset = null, consented, defaultDeviceN
           <h3>{tr('Server', 'Server')}</h3>
           <Field>
             {tr('Indirizzo del server', 'Server address')}
-            <input
+            <Input
               value={form.url}
               placeholder="https://calcolo.example"
               autoComplete="url"
@@ -295,7 +295,7 @@ export default function ServerConnect({ preset = null, consented, defaultDeviceN
             <summary>{tr('Autorità di certificazione personalizzata', 'Custom certificate authority')}</summary>
             <Field>
               {tr('Certificato PEM della tua organizzazione', "Your organization's PEM certificate")}
-              <textarea value={caPem} rows={4} onChange={(e) => setCaPem(e.currentTarget.value)} />
+              <Textarea value={caPem} rows={4} onChange={(e) => setCaPem(e.currentTarget.value)} />
             </Field>
             <Button
               variant="secondary"
@@ -387,12 +387,12 @@ export default function ServerConnect({ preset = null, consented, defaultDeviceN
           {googleBlock(true)}
           <Field>
             {tr('Username o email', 'Username or email')}
-            <input value={form.identifier} autoComplete="username" onChange={(e) => setForm({ ...form, identifier: e.currentTarget.value })} />
+            <Input value={form.identifier} autoComplete="username" onChange={(e) => setForm({ ...form, identifier: e.currentTarget.value })} />
           </Field>
           <div className="field-with-link">
             <Field>
               {tr('Password', 'Password')}
-              <input type="password" value={form.password} autoComplete="current-password" onChange={(e) => setForm({ ...form, password: e.currentTarget.value })} />
+              <Input type="password" value={form.password} autoComplete="current-password" onChange={(e) => setForm({ ...form, password: e.currentTarget.value })} />
             </Field>
             {info?.password_reset && (
               <Button variant="text" type="button" className="field-link" onClick={() => setSide('reset')}>
@@ -448,11 +448,11 @@ export default function ServerConnect({ preset = null, consented, defaultDeviceN
           </p>
           <Field>
             {tr('Nuova password', 'New password')}
-            <input type="password" value={newPassword} autoComplete="new-password" onChange={(e) => setNewPassword(e.currentTarget.value)} />
+            <Input type="password" value={newPassword} autoComplete="new-password" onChange={(e) => setNewPassword(e.currentTarget.value)} />
           </Field>
           <Field>
             {tr('Ripeti la nuova password', 'Repeat the new password')}
-            <input type="password" value={repeat} autoComplete="new-password" onChange={(e) => setRepeat(e.currentTarget.value)} />
+            <Input type="password" value={repeat} autoComplete="new-password" onChange={(e) => setRepeat(e.currentTarget.value)} />
           </Field>
           <div className="button-row">
             <Button variant="primary" type="submit" disabled={busy || newPassword.length < 10}>

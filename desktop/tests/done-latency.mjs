@@ -5,7 +5,7 @@ import { openAllGroups } from './support/groups.mjs';
 // Browser preview only: it slows the mock backend through `window.__previewCommandDelay`
 // (src/lib/preview.ts). INV-006: a triage action disables only the element acted on, and
 // only until the backend has accepted it; opening the next message never holds the interface.
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const context = await browser.newContext({
   locale: 'en-US',
   viewport: { width: 1440, height: 900 },
@@ -92,7 +92,7 @@ try {
     await done.click();
     // Every other control stays usable: no row pin is disabled, and one can be used now.
     await expect(page.locator('.row-pin:disabled')).toHaveCount(0, { timeout: 300 });
-    await row(subjects.c).locator('.row-pin').click({ timeout: 300 });
+    await row(subjects.c).locator('.row-pin').click({ timeout: 300, force: true });
     await expect(undos).toHaveCount(2, { timeout: 500 });
     assert.equal(count(await calls(), 'queue_mail_action') - before, 2);
   });
@@ -115,7 +115,7 @@ try {
     // Another message is untouched: its pin works now and queues its own action.
     const otherPin = row(subjects.c).locator('.row-pin');
     await expect(otherPin).toBeEnabled();
-    await otherPin.click();
+    await otherPin.click({ force: true });
     await expect
       .poll(async () => count(await calls(), 'queue_mail_action') - before, { message: 'Done and the other pin' })
       .toBe(2);
@@ -209,7 +209,7 @@ try {
     const passesBefore = await passes();
     await page.evaluate(() => (window.__previewCommandFail = { queue_mail_action: 'Synthetic refusal' }));
     await done.click();
-    await expect(page.getByRole('alert')).toContainText('Synthetic refusal');
+    await expect(page.locator('[role="alert"], [data-scope="toast"][data-part="root"]').filter({ hasText: 'Synthetic refusal' }).first()).toBeVisible();
     await expect(done).toBeEnabled();
     await expect(heading(subjects.a)).toBeVisible();
     await expect(row(subjects.a)).toHaveCount(1);
@@ -226,7 +226,7 @@ try {
     await page.evaluate(() => (window.__previewCommandFail = { read_mail: 'Synthetic read failure' }));
     await reader.getByRole('button', { name: 'Pin message', exact: true }).click();
     await expect(undos).toHaveCount(1);
-    await expect(page.getByRole('alert')).toContainText('Synthetic read failure');
+    await expect(page.locator('[role="alert"], [data-scope="toast"][data-part="root"]').filter({ hasText: 'Synthetic read failure' }).first()).toBeVisible();
     await expect(reader.getByRole('button', { name: 'Pin message', exact: true })).toBeEnabled();
     // One reload for the action itself and one more for the failure.
     await expect.poll(passes).toBeGreaterThanOrEqual(passesBefore + 2);
@@ -342,7 +342,7 @@ try {
     await tp.evaluate(
       () => (window.__previewCommandFail = { queue_mail_action: 'Synthetic refusal' }),
     );
-    await expect(tp.getByRole('alert')).toContainText('Synthetic refusal');
+    await expect(tp.locator('[data-scope="toast"][data-part="root"]').filter({ hasText: 'Synthetic refusal' })).toBeVisible();
     await expect(tThreadPin).toBeEnabled();
     await expect(tReaderPin).toBeEnabled();
     await expect(tUndos).toHaveCount(1);

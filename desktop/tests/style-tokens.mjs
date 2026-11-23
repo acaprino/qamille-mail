@@ -1,11 +1,14 @@
-// Every visual value comes from desktop/src/ds/tokens/theme.css (ADR-0008, ADR-0009, ADR-0011).
+// Every visual value comes from desktop/src/theme/qamille-tokens.css (ADR-0008, ADR-0009, ADR-0011).
 // Fails on literal colors, z-index layers, radii and pixel font sizes anywhere else in src/.
 // Run: node tests/style-tokens.mjs
 import fs from 'node:fs';
 import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '../src');
-const THEME = path.join(root, 'ds/tokens/theme.css');
+const THEME = path.join(root, 'theme/qamille-tokens.css');
+// The look Sigrid's engine computes: its parameters (the one place Compatto's colours are written, now) and the
+// stylesheet generated from them (scripts/theme-css.mjs): colours by definition.
+const GENERATED_THEME = [path.join(root, 'theme/compatto.css'), path.join(root, 'theme/compatto.ts')];
 
 // Literal values that cannot be tokens, with the reason.
 const ALLOWED = [
@@ -21,11 +24,15 @@ const ALLOWED = [
     why: 'calendar identity palette, one color per calendar',
   })),
   { file: 'components/Calendar', text: 'calc(var(--radius-md) - 2px', why: 'inner radius derived from a token' },
-  // Google's «G» on the «Sign in with Google» buttons: Google's branding fixes its four colours.
-  ...['#EA4335', '#4285F4', '#FBBC05', '#34A853'].map((text) => ({
-    file: 'ds/primitives/GoogleMark',
+  // Sigrid names its palette's eighteen colours by their hexadecimal value: the names Qamille gives them in each
+  // language are keyed by it (src/ui/words.ts). They are lookup keys, never drawn.
+  ...[
+    '#e34432', '#ee6449', '#e8772e', '#a0714a', '#f5a623', '#9bb53a', '#78a271', '#2f9e6e', '#6b9fa0',
+    '#1fa3b4', '#297abc', '#6b7a8f', '#4452c4', '#7b68ee', '#a35fd0', '#c64fb5', '#e5659a', '#b83a58',
+  ].map((text) => ({
+    file: 'ui/words',
     text,
-    why: 'Google sign-in mark, colours fixed by Google branding',
+    why: 'the key of a colour name in Sigrid’s palette, never drawn',
   })),
 ];
 
@@ -40,9 +47,8 @@ const RULES = [
 function files(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const full = path.join(dir, entry.name);
-    // ds/unlumen is checked too: the vendored components read the tokens like the rest (ADR-0011 v3 INV-008).
     if (entry.isDirectory()) return files(full);
-    return /\.(css|tsx?)$/.test(entry.name) && full !== THEME ? [full] : [];
+    return /\.(css|tsx?)$/.test(entry.name) && full !== THEME && !GENERATED_THEME.includes(full) ? [full] : [];
   });
 }
 

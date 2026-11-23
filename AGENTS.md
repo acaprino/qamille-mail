@@ -31,8 +31,15 @@
 - Una release il cui tag non è `v<versione di provenance.json>`, o con file che non corrispondono a `provenance.json`,
   è rifiutata; se veniva dalla cache (`desktop/.cache/sigrid`), la sua cartella viene rimossa e il lancio
   successivo la scarica di nuovo.
-- `sigrid:sync` è manuale: non fa parte di `predev` né di `prebuild` (a differenza di `artcraft:sync`), quindi va
-  lanciato a mano quando serve una versione nuova di Sigrid.
+- `sigrid:sync` parte da sé con `predev` e `prebuild`, dopo `artcraft:sync`, e nella CI; la release ci passa con
+  `npm run build`. Senza la copia, `vite.config.ts` ferma dev e build («Sigrid manca»). Il sync copia anche `LICENSE`,
+  `THIRD_PARTY.md` e `provenance.json` in `desktop/public/sigrid-licenses/` (generata), che va nell'exe.
+- Qamille raggiunge la copia con un alias di Vite e un `paths` di TypeScript su `@acaprino/sigrid`, senza voce in
+  `package.json` né nel lockfile: una voce sarebbe un pin.
+- **Qamille si basa solo su Sigrid.** Comportamenti, primitive, icone e movimento vengono da Sigrid, e ciò che manca si
+  chiede a `acaprino/sigrid`. Solo `desktop/src/ui/**` e `desktop/src/theme/**` importano `@acaprino/sigrid`
+  (`tests/ds-usage.mjs`, INV-009), e nessun file importa le librerie che Sigrid porta già: lo controlla
+  `desktop/tests/only-sigrid.mjs` (`FORBIDDEN`; `PENDING` elenca i file ancora da liberare e si accorcia soltanto).
 - `SIGRID_DIR` forza un checkout locale di Sigrid (modifiche non ancora rilasciate): lo script esegue lì
   `npm run release -- --skip-test` e prende il pacchetto da `release/`. Quel comando ha bisogno delle dipendenze del
   checkout: `npm ci` una volta lì dentro, prima del primo `sigrid:sync` con `SIGRID_DIR`.

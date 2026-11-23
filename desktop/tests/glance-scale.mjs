@@ -111,7 +111,7 @@ try {
     if (i === 59) throw new Error(`Preview did not start: ${output}`);
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
-  browser = await chromium.launch({ channel: 'msedge', headless: true });
+  browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 
   // ---- 1. the preview, at every scale and size ----
   for (const deviceScaleFactor of [1, 1.25, 1.5, 2]) {

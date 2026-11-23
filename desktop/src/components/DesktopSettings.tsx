@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import MailtoSettings from './MailtoSettings';
-import Switch from '../ds/primitives/Switch';
+import Switch from '../ui/Switch';
 import NotificationSettings from './NotificationSettings';
 import { call, errorText } from '../lib/api';
 import { tr } from '../lib/i18n';

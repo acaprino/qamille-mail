@@ -6,14 +6,14 @@ export const previewUrl = process.env.QAMILLE_PREVIEW_URL ?? 'http://127.0.0.1:1
 
 // Returns { browser, context, page, errors }. `theme` is 'light' or 'dark'; `size` is { width, height }.
 export async function openApp({ theme = 'light', size = { width: 1440, height: 900 } } = {}) {
-  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   const context = await browser.newContext({ locale: 'en-US', viewport: size, colorScheme: theme });
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(previewUrl);
   await page.locator('.compose-main').waitFor();
-  if (theme === 'dark') await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'));
+  if (theme === 'dark') await page.evaluate(() => (document.documentElement.dataset.scheme = 'dark'));
   return { browser, context, page, errors };
 }
 
@@ -45,7 +45,7 @@ export const tokenAs = (page, name, property = 'color') =>
   );
 
 // A control at rest carries at most the soft --shadow-sm of the unlumen look (a primary button adds its
-// inset top highlight after it), never the floating --shadow. Under Compatto --shadow-sm was `none`.
+// inset top highlight after it), never the floating --elevation-lg. Under Compatto --shadow-sm was `none`.
 export async function restingShadow(page, locator) {
   const shadow = await css(locator, 'box-shadow');
   const soft = await tokenAs(page, '--shadow-sm', 'box-shadow');
@@ -53,7 +53,7 @@ export async function restingShadow(page, locator) {
 }
 
 // The underline of a tab in the `underline` Tabs: unlumen's sliding highlight (data-part="highlight",
-// ds/primitives/Tabs.tsx) has replaced Compatto's 2px border-bottom. { height, color } of the bar
+// ui/Tabs.tsx) has replaced Compatto's 2px border-bottom. { height, color } of the bar
 // under the tab, or null when the tab has none.
 export const underline = (tab) =>
   tab.first().evaluate((node) => {

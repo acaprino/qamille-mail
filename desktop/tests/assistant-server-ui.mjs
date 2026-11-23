@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { chromium } from '@playwright/test';
 
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const errors = [];
 async function open(server) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'en-US' });
@@ -52,7 +52,7 @@ try {
     assert.ok(options.some((text) => text.startsWith('Use your own key')), options.join('|'));
     await page.getByRole('option', { name: 'Qamille server' }).click();
     assert.equal(await page.getByLabel('API key').count(), 0, 'no key for the server provider');
-    assert.equal(await page.getByRole('alert').count(), 0, 'no warning when the consent is current');
+    assert.equal(await page.locator('[role="alert"], [data-scope="toast"][data-part="root"]').count(), 0, 'no warning when the consent is current');
     await context.close();
   }
   // The server changed its provider: a warning and «Confirm».

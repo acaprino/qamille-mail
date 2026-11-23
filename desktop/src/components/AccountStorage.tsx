@@ -1,15 +1,16 @@
 import { useEffect, useRef } from 'react';
-import Button from '../ds/primitives/Button';
-import Field from '../ds/primitives/Field';
-import Icon from '../ds/primitives/Icon';
-import Select from '../ds/primitives/Select';
-import Switch from '../ds/primitives/Switch';
+import Button from '../ui/Button';
+import Field from '../ui/Field';
+import Icon from '../ui/Icon';
+import Select from '../ui/Select';
+import Switch from '../ui/Switch';
 import { call, CommandError, errorText } from '../lib/api';
 import { tr } from '../lib/i18n';
 import { regionalLocale } from '../lib/regional';
 import { useReactive } from '../lib/store';
 import type { Account, AccountStoragePolicy, AccountStorageStatus } from '../lib/types';
 import './AccountStorage.css';
+import { Input } from '../ui/Input';
 
 export type AccountStorageProps = {
   accounts: Account[];
@@ -220,7 +221,7 @@ export default function AccountStorage({ accounts, changed, notify }: AccountSto
                   <>
                     <Field>
                       {tr('Limite in GB', 'Limit in GB')}
-                      <input
+                      <Input
                         type="number"
                         aria-label={tr(
                           "Limite dell'archivio dell'account in GB",

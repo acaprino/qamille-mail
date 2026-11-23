@@ -1,7 +1,7 @@
 // The head of the detail: the title and, under it, when, how long and who (the guests of the
 // linked calendar event), with the "more" menu on the right. A meeting being recorded or
 // processed has no menu (there is nothing to rename or delete yet), and one to recover says so.
-import Icon from '../../ds/primitives/Icon';
+import Icon from '../../ui/Icon';
 import { tr } from '../../lib/i18n';
 import type { MeetingDetail } from '../../lib/meetings';
 import { formatDateTime } from '../../lib/regional';

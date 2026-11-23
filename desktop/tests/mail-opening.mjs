@@ -22,7 +22,7 @@ try {
     if (i === 59) throw new Error(`Preview did not start: ${output}`);
     await new Promise(resolve => setTimeout(resolve, 200));
   }
-  browser = await chromium.launch({ channel: 'msedge', headless: true });
+  browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   const page = await browser.newPage({ locale: 'en-US', viewport: { width: 1440, height: 1000 } });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -201,7 +201,7 @@ try {
   await row(subjects.b).locator('.mail-open').click();
   await expect(row(subjects.b)).not.toHaveClass(/unread/, { timeout: 100 });
   await expect.poll(inboxCount, { timeout: 100 }).toBe(intact - 1);
-  await expect(page.getByRole('alert')).toContainText('Synthetic markAsSeen failure');
+  await expect(page.locator('[role="alert"], [data-scope="toast"][data-part="root"]').filter({ hasText: 'Synthetic markAsSeen failure' }).first()).toBeVisible();
   await expect(row(subjects.b)).toHaveClass(/unread/);
   await expect.poll(inboxCount).toBe(intact);
   await expect(heading(subjects.b)).toBeVisible();

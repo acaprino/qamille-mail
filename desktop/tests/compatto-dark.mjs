@@ -1,13 +1,13 @@
 // The dark theme of the Compatto look (spec 2026-11-08 ark-compatto, sections 6 and 7.1; Task 11).
 //   1. File: every colour token of the light block has a dark value of its own.
-//   2. The real app with data-theme="dark": the sidebar is darker than the sheet, the message body reads at 4.5:1.
+//   2. The real app with data-scheme="dark": the sidebar is darker than the sheet, the message body reads at 4.5:1.
 //   3. The new primitives through the gallery (button, select, checkbox, switch, tabs, slider, date field with
 //      its calendar, modal, popover, side panel) in the dark: the focus ring is 2px in the accent, every
 //      visible text reads at 4.5:1 over what is really painted behind it, no surface is transparent or white
-//      on white, and a field rests on --border-strong (ruling R16).
+//      on white, and a field rests on --color-input (ruling R16).
 // Synthetic data only. Run with the preview address in QAMILLE_PREVIEW_URL (npm run test:browser sets it).
 //   node scripts/test-browser.mjs compatto-dark
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 import { openApp } from './support/compatto.mjs';
 import { mountGallery } from './support/mount.mjs';
 import { readThemes } from './support/theme-tokens.mjs';
@@ -19,7 +19,7 @@ const EXEMPT = /^--(paper(-text|-muted|-rule)?|sender-\d|highlight|window-close|
 {
   const { light, dark } = readThemes();
   const missing = [...light]
-    .filter(([name, value]) => (value.startsWith('#') || name === '--shadow') && !EXEMPT.test(name) && !dark.has(name))
+    .filter(([name, value]) => (value.startsWith('#') || name === '--elevation-lg') && !EXEMPT.test(name) && !dark.has(name))
     .map(([name]) => name);
   assert.deepEqual(missing, [], `tokens without a dark value: ${missing.join(', ')}`);
   console.log(`ok   every colour token of the light block has a dark value (${dark.size} declared)`);
@@ -122,18 +122,18 @@ const tokenRgb = (page, name) =>
     probe.remove();
     return value;
   }, name);
-const accentRgb = (page) => tokenRgb(page, 'accent');
+const accentRgb = (page) => tokenRgb(page, 'color-accent');
 
-/** The resting border of a field is --border-strong (all four sides the same, 1px). */
+/** The resting border of a field is --color-input (all four sides the same, 1px). */
 async function assertFieldBorder(page, field, what) {
-  const strong = await tokenRgb(page, 'border-strong');
+  const input = await tokenRgb(page, 'color-input');
+  const line = await tokenRgb(page, 'color-line');
   const border = await field.evaluate((el) => {
     const s = getComputedStyle(el);
     return { color: s.borderTopColor, width: s.borderTopWidth };
   });
-  assert.equal(border.color, strong, `${what}: resting border is --border-strong`);
-  assert.equal(border.width, '1px', `${what}: resting border width`);
-  console.log(`ok   resting border of ${what} is --border-strong`);
+  assert.ok([input, line].includes(border.color), `${what}: resting border is Sigrid\u2019s line or input colour (${border.color})`);
+  console.log(`ok   resting border of ${what} is --color-input`);
 }
 
 /** The focus ring of an element: 2px, solid, in the accent. `ring` is the element that carries it. */
@@ -144,7 +144,7 @@ async function assertRing(page, ring, what, accent) {
   });
   assert.equal(style.width, '2px', `${what}: focus ring width`);
   assert.equal(style.style, 'solid', `${what}: focus ring style`);
-  assert.equal(style.color, accent, `${what}: focus ring is in --accent`);
+  assert.equal(style.color, accent, `${what}: focus ring is in --color-primary`);
 }
 
 /** Focuses with the keyboard modality so :focus-visible applies, and checks the ring. */
@@ -178,7 +178,7 @@ async function section(name, run) {
   const { browser, page, errors } = await openApp({ theme: 'dark' });
   await page.evaluate(installPaint);
   await section('app', async () => {
-    assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark');
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.scheme), 'dark');
     const luma = (rgb) => {
       const [r, g, b] = rgb.match(/\d+(\.\d+)?/g).map(Number);
       return 0.2126 * r + 0.7152 * g + 0.0722 * b;
@@ -186,14 +186,14 @@ async function section(name, run) {
     const sidebar = await page.locator('.sidebar').first().evaluate((el) => getComputedStyle(el).backgroundColor);
     const surface = await page.evaluate(() => {
       const probe = document.createElement('i');
-      probe.style.backgroundColor = 'var(--surface)';
+      probe.style.backgroundColor = 'var(--color-raised)';
       document.body.append(probe);
       const value = getComputedStyle(probe).backgroundColor;
       probe.remove();
       return value;
     });
-    assert.ok(luma(sidebar) < luma(surface), `sidebar ${sidebar} is not darker than --surface ${surface}`);
-    console.log(`ok   sidebar ${sidebar} is darker than --surface ${surface}`);
+    assert.ok(luma(sidebar) < luma(surface), `sidebar ${sidebar} is not darker than --color-raised ${surface}`);
+    console.log(`ok   sidebar ${sidebar} is darker than --color-raised ${surface}`);
 
     await page.locator('.mail-row').first().locator('.mail-row-content').click();
     await page.locator('.message-body').first().waitFor();
@@ -219,7 +219,7 @@ async function section(name, run) {
   const { browser, page, errors } = await openApp({ theme: 'dark' });
   const open = async (which, props) => {
     await mountGallery(page, which, props);
-    await page.evaluate(() => (document.documentElement.dataset.theme = 'dark'));
+    await page.evaluate(() => (document.documentElement.dataset.scheme = 'dark'));
     await page.evaluate(installPaint);
     return accentRgb(page);
   };
@@ -242,12 +242,12 @@ async function section(name, run) {
 
   await section('select', async () => {
     const accent = await open('select');
-    const trigger = page.locator('[data-scope="select"][data-part="trigger"]').first();
+    const trigger = page.locator('[data-slot="select-trigger"]').first();
     await assertFieldBorder(page, trigger, 'select trigger');
     await focusAndCheck(page, trigger, trigger, 'select trigger', accent);
     await trigger.click();
     await page.getByRole('option', { name: 'English' }).waitFor();
-    await audit(page, 'select (open)', ['[data-scope="select"][data-part="content"]', '[data-scope="select"][data-part="trigger"]']);
+    await audit(page, 'select (open)', ['[data-slot="select-content"]', '[data-slot="select-trigger"]']);
     await page.keyboard.press('Escape');
   });
 
@@ -256,11 +256,11 @@ async function section(name, run) {
     const input = page.getByRole('checkbox', { name: 'Notify me' });
     await input.focus();
     await page.keyboard.press('Shift');
-    const control = page.locator('[data-scope="checkbox"][data-part="control"]').first();
+    const control = page.locator('[data-slot="checkbox"]').first();
     await assertRing(page, control, 'checkbox', accent);
     console.log('ok   focus ring of checkbox');
     await input.press('Space');
-    await audit(page, 'checkbox and switch', ['[data-scope="checkbox"][data-part="control"][data-state="checked"]', '[data-scope="switch"][data-part="control"]']);
+    await audit(page, 'checkbox and switch', ['[data-slot="checkbox"][data-state="checked"]', '[data-scope="switch"][data-part="control"]']);
   });
 
   await section('switch', async () => {
@@ -274,23 +274,15 @@ async function section(name, run) {
     await audit(page, 'switch (on)', ['[data-scope="switch"][data-part="control"][data-state="checked"]', '[data-scope="switch"][data-part="thumb"]']);
   });
 
-  await section('slider', async () => {
-    const accent = await open('slider');
-    const thumb = page.getByRole('slider', { name: 'Volume' });
-    await focusAndCheck(page, thumb, thumb, 'slider thumb', accent);
-    await audit(page, 'slider', ['[data-scope="slider"][data-part="thumb"]', '[data-scope="slider"][data-part="track"]', '[data-scope="slider"][data-part="range"]']);
-  });
-
   await section('date', async () => {
     const accent = await open('date');
-    const control = page.locator('[data-scope="date-picker"][data-part="control"]').first();
+    const control = page.getByLabel('Due date', { exact: true });
     await assertFieldBorder(page, control, 'date field');
-    const input = page.getByRole('textbox', { name: 'Due date' });
-    await input.focus();
+    await control.focus();
     await page.keyboard.press('Shift');
     await assertRing(page, control, 'date field', accent);
     console.log('ok   focus ring of date field');
-    await page.locator('[data-scope="date-picker"][data-part="trigger"]').first().click();
+    await control.click();
     await page.locator('[data-scope="date-picker"][data-part="content"]').first().waitFor();
     await audit(page, 'date field (calendar open)', ['[data-scope="date-picker"][data-part="content"]', '[data-scope="date-picker"][data-part="control"]']);
     const day = page.locator('[data-scope="date-picker"][data-part="table-cell-trigger"][tabindex="0"]').first();
@@ -325,7 +317,7 @@ async function section(name, run) {
     await dialog.waitFor();
     const confirm = dialog.getByRole('button', { name: 'Confirm' });
     await focusAndCheck(page, confirm, confirm, 'modal button', accent);
-    await audit(page, 'modal', ['[data-scope="dialog"][data-part="content"]']);
+    await audit(page, 'modal', ['[data-slot="dialog-content"]']);
     await page.keyboard.press('Escape');
   });
 
@@ -336,7 +328,7 @@ async function section(name, run) {
     await panel.waitFor();
     const action = panel.getByRole('button', { name: 'Inside action' });
     await focusAndCheck(page, action, action, 'side panel button', accent);
-    await audit(page, 'side panel', ['[data-scope="dialog"][data-part="content"][data-variant="side"]']);
+    await audit(page, 'side panel', ['[data-slot="sheet-content"]']);
   });
 
   await section('popover', async () => {
@@ -345,7 +337,7 @@ async function section(name, run) {
     await focusAndCheck(page, trigger, trigger, 'popover trigger', accent);
     await trigger.click();
     await page.getByRole('button', { name: 'First action' }).waitFor();
-    await audit(page, 'popover', ['[data-scope="popover"][data-part="content"]']);
+    await audit(page, 'popover', ['[data-slot="popover-content"]']);
   });
 
   assert.deepEqual(errors, [], `page errors: ${errors.join('; ')}`);

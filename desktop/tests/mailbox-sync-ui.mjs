@@ -3,7 +3,7 @@
 // Synthetic data only; the preview plays the server.
 import { chromium, expect } from '@playwright/test';
 
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const errors = [];
 async function open(server) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'en-US' });
@@ -54,9 +54,9 @@ try {
     await expect(section.getByRole('alert')).toHaveCount(0);
     const general = section.getByRole('switch', { name: /Sync my mailboxes between my computers/ });
     await expect(general).toBeChecked();
-    await general.uncheck();
+    await general.uncheck({ force: true });
     await expect(section.getByRole('status')).toContainText(/Off: your mailboxes stay on this computer only/);
-    await general.click();
+    await general.click({ force: true });
     await expect(general).toBeChecked();
     await expect(section.getByText('alex@studio-example.com')).toBeVisible();
     console.log('PASS consent line, status, removal notice and the switches');

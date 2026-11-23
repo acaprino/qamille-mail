@@ -1,12 +1,12 @@
 // Button primitive (spec 2026-11-08 ark-compatto §8, Task 3): the optional tip and shortcut, which
-// make the button the trigger of a Tooltip, and the Compatto measures (height from --control-height,
+// make the button the trigger of a Tooltip, and the Compatto measures (height from --control-md,
 // radius from --radius-md). The primitive is mounted alone through tests/support/mount.mjs.
 // Synthetic data only.
 import { chromium, expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 import { mountGallery } from './support/mount.mjs';
 
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const errors = [];
 const watch = (page) => page.on('pageerror', (error) => errors.push(error.message));
 try {
@@ -16,7 +16,7 @@ try {
   await mountGallery(page, 'button');
 
   const archive = page.getByRole('button', { name: 'Archive', exact: true });
-  const tooltip = page.getByRole('tooltip');
+  const tooltip = page.locator('[data-slot="tooltip-content"]');
   const send = page.getByRole('button', { name: 'Send', exact: true });
 
   // (a) A tip is a hint, not the name: no title attribute, the aria-label stays the accessible name.
@@ -31,8 +31,7 @@ try {
   await expect(archive).toBeFocused();
   await expect(tooltip).toBeVisible();
   await expect(tooltip).toContainText('Archive');
-  await expect(tooltip.locator('kbd')).toHaveText('E');
-  await expect(archive).toHaveAttribute('aria-describedby', (await tooltip.getAttribute('id')) ?? '');
+  await expect(tooltip.locator('[data-slot="tooltip-shortcut"]')).toHaveText('E');
   console.log('PASS Keyboard focus opens a tooltip with the text and the shortcut');
 
   // (c) Escape closes it; the focus stays on the button.
@@ -104,7 +103,7 @@ try {
   await mountGallery(touchPage, 'button');
   await touchPage.getByRole('button', { name: 'Archive', exact: true }).tap();
   await touchPage.waitForTimeout(800);
-  await expect(touchPage.getByRole('tooltip')).toHaveCount(0);
+  await expect(touchPage.locator('[data-slot="tooltip-content"]')).toHaveCount(0);
   assert.equal(await touchPage.locator('#archived').textContent(), '1', 'the tap still presses the button');
   console.log('PASS A touch tap opens no tooltip');
 

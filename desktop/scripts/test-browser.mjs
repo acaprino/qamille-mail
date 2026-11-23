@@ -17,14 +17,15 @@ const tests = path.join(desktop, 'tests');
 const NODE_TEST = new Set([
   'activity', 'assistant-server', 'backend-text', 'calendar-gate', 'close-guards', 'calendar-series', 'conversation-rows', 'events', 'github-release',
   'meetings-follow', 'meetings-highlight', 'meetings-preview', 'meetings-view', 'people', 'preview-search', 'regional', 'reply-all', 'shortcut-guard', 'thread-tree',
-  'sigrid-sync', 'undo-notices', 'undo-close', 'mailto', 'row-menu', 'notification-open',
+  'sigrid-sync', 'sigrid-wiring', 'sigrid-words', 'theme-css', 'undo-notices', 'undo-close', 'mailto', 'row-menu', 'notification-open',
 ]);
 // Tools and checks that are not browser tests of the preview, or take arguments.
-// glance-scale also drives the built executable; ds-export runs two full exports (minutes each).
-// Both have their own scripts and are not run here.
+// glance-scale also drives the built executable;
+// build-check and first-paint make a production build of their own (node tests/build-check.mjs, node tests/first-paint.mjs).
+// They are run by themselves, not here.
 const OTHERS = new Set([
-  'capture', 'style-tokens', 'ds-usage', 'visual-snapshot', 'visual-compare', 'release-theme-probe',
-  'glance-scale', 'ds-export', 'tokens-compatto', 'contrast',
+  'capture', 'style-tokens', 'ui-usage', 'visual-snapshot', 'visual-compare', 'release-theme-probe',
+  'glance-scale', 'tokens-compatto', 'contrast', 'build-check', 'first-paint',
 ]);
 
 const all = fs
@@ -91,7 +92,15 @@ try {
     console.log(`${passed ? 'ok  ' : 'FAIL'} ${name} (${seconds}s)${timedOut ? ' TIMED OUT after 300 s' : ''}`);
     if (!passed) {
       failures.push(name);
-      console.log(text.split('\n').filter((line) => line.trim()).slice(-25).join('\n'));
+      const lines = text.split('\n').filter((line) => line.trim());
+      // The failures a test tells and goes on from (SOFT FAIL, FAIL STEP) are all printed; of the rest, the last of it.
+      const told = lines.filter((line) => /^(SOFT FAIL|FAIL STEP|MOTION)/.test(line));
+      // What went wrong first (the error, its locator, the line of the test) comes before the tail, which is often a page snapshot.
+      const first = lines
+        .filter((line) => /^\s*(\w*Error\b|Locator:|Expected|Received|.*waiting for|.*tests[\\/][\w-]+\.mjs:\d+)/.test(line))
+        .slice(0, 14)
+        .map((line) => line.slice(0, 240));
+      console.log([...told.slice(0, 160), ...first, ...lines.slice(-40)].join('\n'));
     }
   }
 } finally {

@@ -1,14 +1,15 @@
-import { MotionConfig } from 'motion/react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './styles.css';
 // Last: the Contrast-theme rules must win over every page rule (docs/aspetto-nativo.md).
-import './ds/styles/forced-colors.css';
+import './theme/forced-colors.css';
 import { appearancePreference, resolvedAppearance, systemPrefersDark } from './lib/appearance';
 import { call, desktop } from './lib/api';
 import { installBrowserGuards } from './lib/browser-guards';
+import { startMotion } from './ui/motion';
+import { SigridRoot } from './ui/SigridRoot';
 
-document.documentElement.dataset.theme = resolvedAppearance(appearancePreference(), systemPrefersDark());
+document.documentElement.dataset.scheme = resolvedAppearance(appearancePreference(), systemPrefersDark());
 installBrowserGuards();
 
 // With no error boundary, an error while rendering or in an effect makes React remove the whole
@@ -21,9 +22,12 @@ function pageFailed(error: unknown) {
 }
 
 // No StrictMode: the root talks to the backend on mount, and its effects must run once.
-// MotionConfig: every Motion animation (Tabs, NavList, Apple Switch, rows) honours reduced motion.
-createRoot(document.getElementById('app')!, { onUncaughtError: pageFailed }).render(
-  <MotionConfig reducedMotion="user">
-    <App />
-  </MotionConfig>,
-);
+// SigridRoot: Sigrid's words and motion (it honours the system's reduced-motion setting).
+// Sigrid's chunk with Motion first, so the lists render once, already able to move (a few ms from the app's own files).
+void startMotion().then(() => {
+  createRoot(document.getElementById('app')!, { onUncaughtError: pageFailed }).render(
+    <SigridRoot>
+      <App />
+    </SigridRoot>,
+  );
+});

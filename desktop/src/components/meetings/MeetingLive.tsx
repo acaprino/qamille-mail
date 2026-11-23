@@ -6,8 +6,8 @@
 // while the answer is awaited (a disabled button drops the keyboard focus for good): a press during
 // that time is ignored, and the panel says `aria-busy`.
 import { useRef, useState } from 'react';
-import Button from '../../ds/primitives/Button';
-import Icon from '../../ds/primitives/Icon';
+import Button from '../../ui/Button';
+import Icon from '../../ui/Icon';
 import { errorText } from '../../lib/api';
 import { tr } from '../../lib/i18n';
 import { meetingCall, publishCapture, stateLabel, type CaptureSnapshot, type MeetingDetail } from '../../lib/meetings';

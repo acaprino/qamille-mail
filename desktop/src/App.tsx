@@ -1,12 +1,13 @@
 import { Suspense, lazy, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
-import { useReducedMotion } from 'motion/react';
-import Button from './ds/primitives/Button';
-import Toaster, { notify as showNotice, type NoticeAction } from './ds/primitives/Toaster';
+import Kbd from './ui/Kbd';
+import { useLand } from './ui/motion';
+import Button from './ui/Button';
+import Toaster, { notify as showNotice, type NoticeAction } from './ui/Toaster';
 import { listen } from '@tauri-apps/api/event';
 import Sidebar from './components/Sidebar';
 import WindowControls from './components/WindowControls';
 import MailList from './components/MailList';
-import { imeComposing } from './ds/ime';
+import { imeComposing } from './lib/ime';
 import {
   arrowsMoveMail,
   isAppChord,
@@ -36,7 +37,7 @@ import { installWindowCloseHandler, registerCloseGuard } from './lib/window-clos
 import { paintWindowBackground } from './lib/native-window';
 import { installWindowShell, windowAppearance, zoomWindow } from './lib/window-shell';
 import { installNotificationOpen } from './lib/notification-open';
-import Icon from './ds/primitives/Icon';
+import Icon from './ui/Icon';
 import UndoStack from './components/UndoStack';
 import { refreshActivity } from './lib/activity-center';
 import ActivityPage from './components/ActivityPage';
@@ -77,6 +78,7 @@ import type {
   Workspace,
   UndoAction,
 } from './lib/types';
+import { Input } from './ui/Input';
 
 // The composer dock is only needed once a draft is open: it is loaded on demand.
 const ComposerDock = lazy(() => import('./components/ComposerDock'));
@@ -283,7 +285,6 @@ export default function App() {
   const settingsPanel = useRef<SettingsHandle>(null);
   const searchElement = useRef<HTMLInputElement>(null);
   const content = useRef<HTMLDivElement>(null);
-  const reduceMotion = useReducedMotion();
 
   // The page has drawn: without this, src-tauri/src/recovery.rs offers to reload after 15 s. App's
   // first effect, not a frame after render() in main.tsx: a render that throws never commits, so an
@@ -1503,7 +1504,7 @@ export default function App() {
   const darkNow = dark();
   const italianNow = isItalian();
   useLayoutEffect(() => {
-    document.documentElement.dataset.theme = darkNow;
+    document.documentElement.dataset.scheme = darkNow;
     saveAppearance(s.appearance);
     void paintWindowBackground();
     void windowAppearance(s.appearance, italianNow);
@@ -1537,16 +1538,8 @@ export default function App() {
     if (s.openedShownOnly.size) s.openedShownOnly = new Set();
   }, [s.view, s.accountId]);
 
-  // The main view fades in when it changes (enter only: two views never share the screen).
-  const firstView = useRef(true);
-  useLayoutEffect(() => {
-    if (firstView.current) {
-      firstView.current = false;
-      return;
-    }
-    if (reduceMotion || typeof content.current?.animate !== 'function') return;
-    content.current.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 120, easing: 'ease-out' });
-  }, [s.view]);
+  // The main view settles into place when it changes (enter only: two views never share the screen).
+  useLand(content, s.view);
 
   useEffect(() => {
     void init();
@@ -1784,7 +1777,7 @@ export default function App() {
               {mailView && (
                 <div className="global-search">
                   <Icon name="search" size={18} />
-                  <input
+                  <Input
                     ref={searchElement}
                     value={s.searchInput}
                     onChange={(event) => {
@@ -1810,7 +1803,7 @@ export default function App() {
                     aria-keyshortcuts="Control+K"
                     placeholder={tr('Cerca una persona, una parola o una data', 'Search a person, a word or a date')}
                   />
-                  <kbd>Ctrl K</kbd>
+                  <Kbd>Ctrl K</Kbd>
                 </div>
               )}
               <div className="topbar-end">

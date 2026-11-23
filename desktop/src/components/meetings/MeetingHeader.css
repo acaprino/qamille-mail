@@ -12,7 +12,7 @@
   }
   & .detail-title {
     margin: 0;
-    font-size: var(--text-2xl);
+    font-size: var(--text-xl);
     font-weight: 600;
     text-wrap: balance;
   }
@@ -22,7 +22,7 @@
     align-items: center;
     gap: 4px 14px;
     font-size: var(--text-sm);
-    color: var(--muted);
+    color: var(--color-ink-mute);
   }
   & .detail-meta span {
     display: inline-flex;
@@ -32,8 +32,8 @@
   & .tag {
     padding: 1px 7px;
     font-size: var(--text-2xs);
-    color: var(--danger);
-    background: var(--danger-bg);
+    color: var(--color-destructive);
+    background: var(--color-destructive-soft);
     border: 1px solid var(--danger-border);
     border-radius: var(--radius-full);
   }

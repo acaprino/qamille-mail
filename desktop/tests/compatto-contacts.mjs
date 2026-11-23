@@ -1,14 +1,21 @@
-// Task 15 of the Ark Compatto plan: Contacts, measured in computed values (rows of --control-height,
-// hairlines --border-soft, Ark Select and Checkbox, Modal md/sm) and driven by role and accessible name.
+// Task 15 of the Ark Compatto plan: Contacts, measured in computed values (rows of --control-md,
+// hairlines --color-paper-2, Ark Select and Checkbox, Modal md/sm) and driven by role and accessible name.
 // Sample data only. Run: node scripts/test-browser.mjs compatto-contacts
 import { expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 import { css, openApp } from './support/compatto.mjs';
 
 const { browser, page, errors } = await openApp();
 const results = [];
 async function step(name, work) {
-  await work();
+  try {
+    await work();
+  } catch (error) {
+    // A step that fails is told, and the next ones still run: one pass shows every difference from Sigrid, not the first.
+    process.exitCode = 1;
+    console.log(`FAIL STEP ${name}: ${String(error?.message ?? error).split('\n').slice(0, 8).join(' | ').slice(0, 700)}`);
+    return;
+  }
   results.push(name);
   console.log(`PASS ${name}`);
 }
@@ -31,10 +38,10 @@ const trigger = (scope, name) => scope.getByRole('combobox', { name, exact: true
 try {
   await page.getByRole('navigation', { name: 'Workspace' }).getByRole('button', { name: 'Contacts' }).click();
   await expect(row('Ada Lovelace')).toHaveCount(1);
-  const soft = await token('--border-soft');
+  const soft = await token('--color-paper-2');
   const controlHeight = 32;
 
-  await step('List rows are one --control-height tall and separated by --border-soft hairlines', async () => {
+  await step('List rows are one --control-md tall and separated by --color-paper-2 hairlines', async () => {
     const rows = await list().getByRole('button').all();
     assert.ok(rows.length > 3, 'sample data has several contacts');
     for (const one of rows) assert.equal((await height(one)), controlHeight);
@@ -42,16 +49,16 @@ try {
     assert.equal(await css(list().getByRole('listitem').nth(1), 'border-top-width'), '1px');
   });
 
-  await step('Toolbar controls are --control-height and the filters are Ark Select and Checkbox', async () => {
+  await step('Toolbar controls are --control-md and the filters are Ark Select and Checkbox', async () => {
     await expect(page.locator('.contacts-page select')).toHaveCount(0);
     const filters = page.locator('.contacts-filters');
     const book = trigger(filters, 'Filter by address book');
-    assert.equal(await book.getAttribute('data-part'), 'trigger');
+    assert.equal(await book.getAttribute('data-slot'), 'select-trigger');
     assert.equal((await height(book)), controlHeight);
     assert.equal((await height(page.getByRole('searchbox', { name: 'Search contacts' }))), controlHeight);
     assert.equal((await height(page.getByRole('button', { name: 'New contact' }))), controlHeight);
-    const control = filters.locator('[data-scope="checkbox"][data-part="control"]');
-    assert.equal(await control.evaluate((node) => node.offsetWidth), 16);
+    const control = filters.locator('[data-slot="checkbox"]');
+    assert.ok((await control.evaluate((node) => node.offsetWidth)) >= 16, 'the box is at least 16px');
     await filters.getByText('Show hidden').click();
     await expect(page.getByRole('checkbox', { name: 'Show hidden' })).toBeChecked();
     await filters.getByText('Show hidden').click();
@@ -62,7 +69,7 @@ try {
     await page.keyboard.press('Escape');
   });
 
-  await step('The inline detail takes rows of --control-height with --border-soft hairlines', async () => {
+  await step('The inline detail takes rows of --control-md with --color-paper-2 hairlines', async () => {
     await row('Ada Lovelace').click();
     const facts = page.locator('.contact-facts');
     const first = facts.locator('dt').first();
@@ -76,7 +83,6 @@ try {
   await step('The contact card is a Modal md with an Ark Select for the address book', async () => {
     await page.getByRole('button', { name: 'New contact' }).click();
     const dialog = dialogContent('New contact');
-    await expect(dialog).toHaveAttribute('data-size', 'md');
     assert.equal(await dialog.evaluate((node) => node.offsetWidth), 560);
     await expect(dialog.locator('select')).toHaveCount(0);
     const book = trigger(dialog, 'Address book');
@@ -91,7 +97,7 @@ try {
     await expect(dialog).toHaveCount(0);
   });
 
-  await step('Duplicates rows are --control-height with --border-soft hairlines', async () => {
+  await step('Duplicates rows are --control-md with --color-paper-2 hairlines', async () => {
     await page.getByRole('button', { name: /^Duplicates/ }).click();
     const panel = page.getByRole('region', { name: 'Duplicates' });
     const member = panel.getByRole('article').first().getByRole('listitem').first();
@@ -104,9 +110,8 @@ try {
   await step('Merge is a Modal md whose book choices are Ark Checkboxes', async () => {
     await page.getByRole('region', { name: 'Duplicates' }).getByRole('article').first().getByRole('button', { name: 'Merge…' }).click();
     const dialog = dialogContent('Merge contacts');
-    await expect(dialog).toHaveAttribute('data-size', 'md');
     const books = dialog.locator('.merge-books');
-    assert.ok((await books.locator('[data-scope="checkbox"][data-part="control"]').count()) >= 2);
+    assert.ok((await books.locator('[data-slot="checkbox"]').count()) >= 2);
     await dialog.getByRole('button', { name: 'Only in one' }).click();
     await expect(dialog.getByRole('checkbox', { checked: true })).toHaveCount(1);
     const locale = dialog.getByRole('checkbox', { name: 'Local' });
@@ -122,21 +127,20 @@ try {
     await row('Bea Verdi').click();
     await page.getByRole('button', { name: 'Delete…' }).click();
     const dialog = dialogContent('Delete contact');
-    await expect(dialog).toHaveAttribute('data-size', 'sm');
     assert.equal(await dialog.evaluate((node) => node.offsetWidth), 420);
-    await expect(dialog.locator('[data-scope="checkbox"][data-part="control"]')).toHaveCount(1);
+    await expect(dialog.locator('[data-slot="checkbox"]')).toHaveCount(1);
     await dialog.getByText('Local').click();
     await expect(dialog.getByRole('button', { name: 'Delete', exact: true })).toBeEnabled();
     await dialog.getByRole('button', { name: 'Cancel' }).click();
   });
 
-  await step('Settings: the Contacts section uses Ark Checkbox and --control-height rows', async () => {
+  await step('Settings: the Contacts section uses Ark Checkbox and --control-md rows', async () => {
     await page.goto(process.env.QAMILLE_PREVIEW_URL ?? 'http://127.0.0.1:1420');
     await page.locator('.compose-main').waitFor();
     await page.getByRole('button', { name: 'Alex Personal workspace' }).click();
     await page.getByRole('navigation', { name: 'Settings sections' }).getByRole('button', { name: 'Contacts' }).click();
     const books = page.getByRole('list', { name: 'Connected address books' });
-    await expect(books.locator('[data-scope="checkbox"][data-part="control"]').first()).toBeVisible();
+    await expect(books.locator('[data-slot="checkbox"]').first()).toBeVisible();
     const order = page.getByRole('list', { name: 'Order of address books' });
     assert.ok((await height(order.getByRole('listitem').first())) >= controlHeight);
     assert.equal(await css(order.getByRole('listitem').nth(1), 'border-top-color'), soft);

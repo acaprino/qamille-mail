@@ -1,4 +1,4 @@
-// WCAG 2.x contrast of the pairs of the theme, measured on src/ds/tokens/theme.css. Every text pair has to
+// WCAG 2.x contrast of the pairs of the theme, measured on src/theme/qamille-tokens.css and src/theme/compatto.css. Every text pair has to
 // reach 4.5:1; the non-text pairs of the dark theme (field border, chosen tab, focus ring) 3:1. The themes to check are the arguments (one or more of `light`, `dark`); the dark block falls
 // back on the :root value for a token it does not redeclare. Pure file check.
 //   node tests/contrast.mjs light
@@ -17,35 +17,35 @@ const FLOOR_UI = 3;
 /** [foreground token, background token]. */
 const PAIRS = [
   // Content on the white sheet
-  ['text', 'surface'],
-  ['text-secondary', 'surface'],
-  ['muted', 'surface'],
-  ['accent-text', 'surface'],
-  ['accent-hover', 'surface'],
-  ['accent-text', 'selection'],
-  ['accent-text', 'badge'], // the count chip; dark --badge is picked to keep this at 4.5:1
-  ['accent-text', 'avatar'],
+  ['color-ink', 'color-raised'],
+  ['color-ink-soft', 'color-raised'],
+  ['color-ink-mute', 'color-raised'],
+  ['color-accent', 'color-raised'],
+  ['color-accent', 'color-raised'],
+  ['color-accent', 'color-selected'],
+  ['color-accent', 'badge'], // the count chip; dark --badge is picked to keep this at 4.5:1
+  ['color-accent', 'avatar'],
   // Content on the filled accent
-  ['on-accent', 'accent'],
-  ['on-accent', 'accent-hover'],
-  ['on-accent-soft', 'accent'],
+  ['color-primary-foreground', 'color-primary'],
+  ['color-primary-foreground', 'color-accent'],
+  ['on-accent-soft', 'color-primary'],
   // Dark sidebar
-  ['sidebar-text', 'sidebar'],
-  ['sidebar-muted', 'sidebar'],
-  ['accent-on-sidebar', 'sidebar'],
-  ['sidebar-text', 'sidebar-hover'],
-  ['sidebar-text-active', 'sidebar-active'],
-  ['sidebar-muted', 'sidebar-active'],
-  ['accent-on-sidebar', 'sidebar-active'],
+  ['color-sidebar-ink', 'color-sidebar-paper'],
+  ['color-sidebar-mute', 'color-sidebar-paper'],
+  ['color-sidebar-accent', 'color-sidebar-paper'],
+  ['color-sidebar-ink', 'sidebar-hover'],
+  ['color-sidebar-selected-ink', 'color-sidebar-selected'],
+  ['color-sidebar-mute', 'color-sidebar-selected'],
+  ['color-sidebar-accent', 'color-sidebar-selected'],
 ];
 /** Non-text pairs, measured on the dark theme only (the light values are the ones the user approved in the
- *  mockup, where --border-strong is #dde1e7 on white). The resting border of a field is --border-strong
+ *  mockup, where --color-input is #dde1e7 on white). The resting border of a field is --color-input
  *  (ruling R16: input, textarea, select, the Select and DateField controls); the chosen tab and the focus
- *  ring are drawn in --accent. */
+ *  ring are drawn in --color-primary. */
 const UI_PAIRS = [
-  ['border-strong', 'surface'],
-  ['accent', 'surface'],
-  ['accent', 'ground'],
+  ['color-input', 'color-raised'],
+  ['color-primary', 'color-raised'],
+  ['color-primary', 'color-paper'],
 ];
 
 const parse = (value, name) => {

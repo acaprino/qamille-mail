@@ -3,11 +3,11 @@
 // destructive one listed first, which the menu moves to the end), plus the same two items in a Popover
 // and in a Menu, side by side, so the test can tell that the two look the same.
 import { useState } from 'react';
-import Button from '../../../src/ds/primitives/Button';
-import Icon from '../../../src/ds/primitives/Icon';
-import Menu from '../../../src/ds/primitives/Menu';
-import Modal from '../../../src/ds/primitives/Modal';
-import Popover from '../../../src/ds/primitives/Popover';
+import Button from '../../../src/ui/Button';
+import Icon from '../../../src/ui/Icon';
+import Menu from '../../../src/ui/Menu';
+import Modal from '../../../src/ui/Modal';
+import Popover from '../../../src/ui/Popover';
 
 export default function MenuSection() {
   const [picked, setPicked] = useState<string[]>([]);

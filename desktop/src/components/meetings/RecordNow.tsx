@@ -8,10 +8,10 @@
 // closes it, and the recording that start began would otherwise disable the trigger under it
 // and throw the focus to the page.
 import { useRef, useState } from 'react';
-import Button from '../../ds/primitives/Button';
-import Field from '../../ds/primitives/Field';
-import Icon from '../../ds/primitives/Icon';
-import Popover from '../../ds/primitives/Popover';
+import Button from '../../ui/Button';
+import Field from '../../ui/Field';
+import Icon from '../../ui/Icon';
+import Popover from '../../ui/Popover';
 import { errorText } from '../../lib/api';
 import { tr } from '../../lib/i18n';
 import {
@@ -23,6 +23,7 @@ import {
 } from '../../lib/meetings';
 import { pickDevices } from '../../lib/meetings-view';
 import './RecordNow.css';
+import { Input } from '../../ui/Input';
 
 export type RecordNowProps = {
   settings: { meeting_microphone: string; meeting_system_audio: string };
@@ -86,7 +87,7 @@ export default function RecordNow({ settings, live, notify, onstarted }: RecordN
     <>
       <Popover
         open={open}
-        onOpenChange={setOpen}
+        onOpenChange={(next) => setOpen(next && !recording)}
         label={tr('Registra ora', 'Record now')}
         className="record-popover"
         trigger={
@@ -114,7 +115,7 @@ export default function RecordNow({ settings, live, notify, onstarted }: RecordN
         >
           <Field>
             <span>{tr('Nome (facoltativo)', 'Name (optional)')}</span>
-            <input
+            <Input
               value={name}
               onChange={(event) => setName(event.currentTarget.value)}
               maxLength={300}

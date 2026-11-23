@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import Button from '../ds/primitives/Button';
-import Icon from '../ds/primitives/Icon';
+import Button from '../ui/Button';
+import Icon from '../ui/Icon';
 import MessageHtml from './MessageHtml';
 import { call, errorText, fullDate } from '../lib/api';
 import { humanSize } from '../lib/file-size';

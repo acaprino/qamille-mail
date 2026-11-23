@@ -19,7 +19,7 @@ async function shoot(page, name) {
   await page.setViewportSize({ width: 1280, height: 900 });
 }
 
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const errors = [];
 async function start(server) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'en-US' });

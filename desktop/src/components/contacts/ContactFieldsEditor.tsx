@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
-import Button from '../../ds/primitives/Button';
-import Field from '../../ds/primitives/Field';
-import Icon from '../../ds/primitives/Icon';
+import Button from '../../ui/Button';
+import Field from '../../ui/Field';
+import Icon from '../../ui/Icon';
 import { tr } from '../../lib/i18n';
 import type { ContactFields, Labeled } from '../../lib/types';
+import { Input, Textarea } from '../../ui/Input';
 
 export type ContactFieldsEditorProps = {
   fields: ContactFields;
@@ -40,14 +41,14 @@ export default function ContactFieldsEditor({ fields, onFieldsChange }: ContactF
       <legend>{title}</legend>
       {fields[key].map((item, index) => (
         <div className="contact-item" key={index}>
-          <input
+          <Input
             className="contact-item-label"
             aria-label={`${single} ${index + 1} ${tr('etichetta', 'label')}`}
             placeholder={tr('lavoro, casa…', 'work, home…')}
             value={item.label}
             onChange={(event) => edit(key, index, { label: event.currentTarget.value })}
           />
-          <input
+          <Input
             aria-label={`${single} ${index + 1}`}
             value={item.value}
             onChange={(event) => edit(key, index, { value: event.currentTarget.value })}
@@ -74,7 +75,7 @@ export default function ContactFieldsEditor({ fields, onFieldsChange }: ContactF
     <div className="contact-fields">
       <Field>
         {tr('Nome', 'Name')}
-        <input
+        <Input
           value={fields.name}
           onChange={(event) => change({ name: event.currentTarget.value })}
           autoComplete="off"
@@ -83,7 +84,7 @@ export default function ContactFieldsEditor({ fields, onFieldsChange }: ContactF
       <div className="contact-row-pair">
         <Field>
           {tr('Azienda', 'Company')}
-          <input
+          <Input
             value={fields.org}
             onChange={(event) => change({ org: event.currentTarget.value })}
             autoComplete="off"
@@ -91,7 +92,7 @@ export default function ContactFieldsEditor({ fields, onFieldsChange }: ContactF
         </Field>
         <Field>
           {tr('Ruolo', 'Job title')}
-          <input
+          <Input
             value={fields.title}
             onChange={(event) => change({ title: event.currentTarget.value })}
             autoComplete="off"
@@ -113,7 +114,7 @@ export default function ContactFieldsEditor({ fields, onFieldsChange }: ContactF
       )}
       <Field>
         {tr('Compleanno (AAAA-MM-GG)', 'Birthday (YYYY-MM-DD)')}
-        <input
+        <Input
           value={fields.birthday}
           onChange={(event) => change({ birthday: event.currentTarget.value })}
           placeholder="1990-04-23"
@@ -121,7 +122,7 @@ export default function ContactFieldsEditor({ fields, onFieldsChange }: ContactF
       </Field>
       <Field>
         {tr('Note', 'Notes')}
-        <textarea
+        <Textarea
           rows={3}
           value={fields.notes}
           onChange={(event) => change({ notes: event.currentTarget.value })}

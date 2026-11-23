@@ -3,12 +3,13 @@
 // removing the passphrase needs the key open here; Windows vouches for this user, so the old
 // passphrase is not asked. The passphrase is never shown again and never saved.
 import { useEffect, useState } from 'react';
-import Button from '../ds/primitives/Button';
-import Field from '../ds/primitives/Field';
+import Button from '../ui/Button';
+import Field from '../ui/Field';
 import { call, errorText } from '../lib/api';
 import { tr } from '../lib/i18n';
 import { longEnough, MIN_TRANSFER_PASSPHRASE, type VaultStatus } from '../lib/vault';
 import VaultUnlock from './VaultUnlock';
+import { Input } from '../ui/Input';
 
 type Props = {
   notify: (message: string, error?: boolean) => void;
@@ -108,7 +109,7 @@ export default function VaultSettings({ notify, changed }: Props) {
               >
                 <Field>
                   {tr('Nuova frase di trasferimento', 'New transfer passphrase')}
-                  <input
+                  <Input
                     type="password"
                     value={passphrase}
                     autoComplete="new-password"
@@ -118,7 +119,7 @@ export default function VaultSettings({ notify, changed }: Props) {
                 </Field>
                 <Field>
                   {tr('Ripeti la frase', 'Repeat the passphrase')}
-                  <input
+                  <Input
                     type="password"
                     value={repeat}
                     autoComplete="new-password"

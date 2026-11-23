@@ -174,7 +174,7 @@ try {
       else await expect(boxes[i]).not.toBeChecked();
     }
     // Each save went out with the revision the answer before it brought: none was refused.
-    await expect(page.locator('.toast, [role="alert"]')).toHaveCount(0);
+    await expect(page.locator('[data-scope="toast"][data-part="root"], [role="alert"]')).toHaveCount(0);
     await api('meeting_preview_delay', { ms: 0 });
   });
 

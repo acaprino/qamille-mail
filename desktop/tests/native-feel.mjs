@@ -63,7 +63,7 @@ function hardenHandler(event) {
 }
 
 check('1. interface text is not selectable and keeps the arrow cursor', () => {
-  const body = rule(read('src/ds/styles/system.css'), 'body');
+  const body = rule(read('src/theme/base.css'), 'body');
   assert.match(body, /user-select:\s*none/, 'body needs user-select: none');
   assert.match(body, /cursor:\s*default/, 'body needs cursor: default');
   const reminder = rule(read('src/reminder/reminder.css'), 'body');
@@ -72,7 +72,7 @@ check('1. interface text is not selectable and keeps the arrow cursor', () => {
 });
 
 check('2. fields, editors and reading content stay selectable', () => {
-  const css = read('src/ds/styles/system.css');
+  const css = read('src/theme/base.css');
   // pre/code: configurations and paths to paste elsewhere; alerts: errors to quote (audit T12).
   for (const selector of ['input', 'textarea', "[contenteditable]:not([contenteditable='false'])", '.selectable', '.reader-scroll', 'pre', 'code', "[role='alert']"]) {
     const { body } = ruleContaining(css, selector);
@@ -90,7 +90,8 @@ check('2. fields, editors and reading content stay selectable', () => {
   // Rule 3: no hand cursor on the app's controls, in any stylesheet or Tailwind class.
   const dir = path.join(desktop, 'src');
   for (const file of fs.readdirSync(dir, { recursive: true }).filter((f) => /\.(css|tsx)$/.test(f))) {
-    const text = stripComments(fs.readFileSync(path.join(dir, file), 'utf8'));
+    // The one place that names Sigrid's cursor classes is the rule that keeps the arrow on them (check 29).
+    const text = stripComments(fs.readFileSync(path.join(dir, file), 'utf8')).replaceAll(/\[class\*='cursor-(?:not-allowed|progress)'\]/g, '');
     assert.ok(!/cursor:\s*(pointer|not-allowed)|\bcursor-(pointer|not-allowed)\b/.test(text), `${file}: a hand or "not allowed" cursor on a control (docs/aspetto-nativo.md rule 3)`);
   }
 });
@@ -120,21 +121,22 @@ check('3. the startup script picks the same theme as the app', () => {
     };
     context.window = { matchMedia: (q) => ({ matches: q === '(prefers-color-scheme: dark)' && systemDark }), ...context };
     vm.runInNewContext(script, context);
-    assert.equal(dataset.theme, want, `saved=${saved} systemDark=${systemDark}`);
+    assert.equal(dataset.scheme, want, `saved=${saved} systemDark=${systemDark}`);
   }
 });
 
-check('4. native window backgrounds match --ground in theme.css (what html, body and .app-shell paint)', () => {
-  const theme = stripComments(read('src/ds/tokens/theme.css'));
-  const light = theme.match(/:root\s*\{[^}]*?--ground:\s*([^;]+);/);
-  const dark = theme.match(/:root\[data-theme='dark'\]\s*\{[^}]*?--ground:\s*([^;]+);/);
-  assert.ok(light && dark, 'theme.css must define --ground for :root and dark');
+check('4. native window backgrounds match --color-paper, which is the paper of Sigrid in src/theme/compatto.css (what html, body and .app-shell paint)', () => {
+  // --color-paper is the page colour of each scheme (compatto.css, generated from Sigrid's engine).
+  const theme = stripComments(read('src/theme/compatto.css'));
+  const light = theme.match(/:root\[data-scheme='light'\]\s*\{[^}]*?--color-paper:\s*([^;]+);/);
+  const dark = theme.match(/:root\[data-scheme='dark'\]\s*\{[^}]*?--color-paper:\s*([^;]+);/);
+  assert.ok(light && dark, 'compatto.css must define --color-paper for light and dark');
   const conf = JSON.parse(read('src-tauri/tauri.conf.json'));
-  assert.equal(hex(conf.app.windows[0].backgroundColor), hex(light[1]), 'tauri.conf.json backgroundColor ≠ light --ground');
+  assert.equal(hex(conf.app.windows[0].backgroundColor), hex(light[1]), 'tauri.conf.json backgroundColor ≠ light --color-paper');
   const rust = read('src-tauri/src/native_feel.rs').match(/DARK_GROUND: Color = Color\(0x(\w\w), 0x(\w\w), 0x(\w\w), 0xff\)/);
   assert.ok(rust, 'native_feel.rs must define DARK_GROUND');
-  assert.equal(rust.slice(1, 4).join('').toLowerCase(), hex(dark[1]), 'DARK_GROUND ≠ dark --ground');
-  assert.match(read('src/lib/native-window.ts'), /getPropertyValue\('--ground'\)/, 'paintWindowBackground must follow --ground');
+  assert.equal(rust.slice(1, 4).join('').toLowerCase(), hex(dark[1]), 'DARK_GROUND ≠ dark --color-paper');
+  assert.match(read('src/lib/native-window.ts'), /getPropertyValue\('--color-paper'\)/, 'paintWindowBackground must follow --color-paper');
 });
 
 check('5. every window gets the WebView2 hardening', () => {
@@ -175,7 +177,7 @@ check('6. the page keeps the native window background in step', () => {
 
 // Node strips the type annotations of this dependency-free module.
 const { windowColor } = await import(pathToFileURL(path.join(desktop, 'src/lib/native-window.ts')).href);
-check('7. --ground values become window colors', () => {
+check('7. --color-paper values become window colors', () => {
   assert.deepEqual(windowColor(' #1d2431'), [0x1d, 0x24, 0x31]);
   assert.deepEqual(windowColor('#fff'), [255, 255, 255]);
   assert.equal(windowColor('var(--x)'), null);
@@ -208,7 +210,7 @@ check('8. the custom title bar keeps what a Windows title bar does (audit F2 F4 
 
 // Node strips the type annotations of these dependency-free modules.
 const { externalAddress, fragmentOf, isHistoryButton, isStrayDrop, opensLinkElsewhere } = await import(pathToFileURL(path.join(desktop, 'src/lib/browser-guards.ts')).href);
-const { imeComposing } = await import(pathToFileURL(path.join(desktop, 'src/ds/ime.ts')).href);
+const { imeComposing } = await import(pathToFileURL(path.join(desktop, 'src/lib/ime.ts')).href);
 check("9. a failed page is the app's to answer, never WebView2's error page (rule 21)", () => {
   const rust = read('src-tauri/src/native_feel.rs');
   assert.match(rust, /SetIsBuiltInErrorPageEnabled\(false\)/, 'the WebView2 error page must stay off');
@@ -361,7 +363,7 @@ check('14. every WebView locks its root against overscroll (rule 4, audit Q5)', 
       .map(([, , body]) => body);
   const locked = (css, selector, declaration, why) =>
     assert.ok(bodiesOf(css, selector).some((body) => declaration.test(body)), why);
-  const system = read('src/ds/styles/system.css');
+  const system = read('src/theme/base.css');
   const reminder = read('src/reminder/reminder.css');
   // A precision touchpad or a touchscreen must never slide the whole view and uncover the window
   // background: on html (the scroller of the viewport) and on the document, in the main window and the chip.
@@ -1229,6 +1231,32 @@ check('28. the first maximized show is cloaked by DWM only through a guard that 
   assert.ok(!/let _ = [^;]*Cloak::on\b/.test(show), 'never `let _ = Cloak::on(…)`');
   assert.ok(show.search(/Cloak::on\b/) >= 0 && show.search(/Cloak::on\b/) < show.search(/\bshow_maximized\b/), 'the window is cloaked before the Win32 maximize');
   assert.ok(!/\bset_cloak\(|DWMWA_CLOAK/.test(show), 'show_main never cloaks or uncloaks by hand');
+});
+
+// The Sigrid plan, Task 2: check 29.
+check('29. Sigrid draws no web cursor of its own: the pointer stays the arrow (rule 3)', () => {
+  // Sigrid's sources may name `cursor-not-allowed` and `cursor-progress` only where they do today (asked of Sigrid as R16),
+  // and Qamille's base keeps the arrow on them. `cursor-pointer` and every other cursor never appear.
+  const KNOWN = new Set([
+    'components/ui/checkbox.tsx',
+    'components/ui/input.tsx',
+    'components/ui/radio-group.tsx',
+    'components/ui/select.tsx',
+    'components/ui/switch.tsx',
+    'components/ui/textarea.tsx',
+    'internal/file-drop.tsx',
+  ]);
+  const home = path.join(desktop, 'vendor', 'sigrid', 'src');
+  const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => (entry.isDirectory() ? walk(path.join(dir, entry.name)) : [path.join(dir, entry.name)]));
+  for (const file of walk(home).filter((name) => /\.tsx?$/.test(name))) {
+    const cursors = [...fs.readFileSync(file, 'utf8').matchAll(/cursor-([a-z-]+)/g)].map((match) => match[1]);
+    if (!cursors.length) continue;
+    const name = path.relative(home, file).replaceAll('\\', '/');
+    for (const cursor of cursors) assert.ok(['not-allowed', 'progress', 'default'].includes(cursor), `${name} uses cursor-${cursor}: ask Sigrid to drop it`);
+    if (cursors.some((cursor) => cursor !== 'default')) assert.ok(KNOWN.has(name), `${name} is a new file with a web cursor: ask Sigrid to drop it`);
+  }
+  const system = stripComments(read('src/theme/base.css'));
+  assert.match(system, /\[class\*='cursor-not-allowed'\],\s*\[class\*='cursor-progress'\]\s*\{\s*cursor:\s*default;/, "system.css must keep the arrow on Sigrid's disabled and busy controls");
 });
 
 if (failures.length) {

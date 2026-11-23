@@ -91,7 +91,7 @@ try {
     if (i === 59) throw new Error(`Preview did not start: ${output}`);
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
-  browser = await chromium.launch({ channel: 'msedge', headless: true });
+  browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 
   for (const [width, height] of [[1440, 900], [1000, 640]]) {
     const at = `${width}`;
@@ -105,7 +105,7 @@ try {
       route.fulfill({ contentType: 'application/javascript', body: `export default ${JSON.stringify(fixture)};` }),
     );
     await page.goto(url);
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await expect(page.locator('html')).toHaveAttribute('data-scheme', 'dark');
     await expect(page.locator('.message-title')).toHaveText(subject);
     await page.evaluate(() => document.fonts.ready);
     await page.mouse.move(0, 0);

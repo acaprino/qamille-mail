@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import Tabs from '../../../src/ds/primitives/Tabs';
+import Tabs from '../../../src/ui/Tabs';
 
 const items = [
   { value: 'all', label: 'All', count: 48 },
@@ -11,7 +11,7 @@ export default function TabsGallery({ props = {} }: { props?: Record<string, any
   const [value, setValue] = useState<string>(props.value ?? 'all');
   return (
     <section aria-label="Tabs" style={{ padding: 48 }}>
-      <Tabs value={value} onChange={setValue} items={items} variant={props.variant} aria-label="Show" />
+      <Tabs value={value} onChange={setValue} items={items} aria-label="Show" />
       <output aria-label="Tab value">{value}</output>
     </section>
   );

@@ -82,7 +82,7 @@ async function launch(name, data, demo = false, options = {}) {
   await page.addInitScript(() => {
     window.__startupAlerts = [];
     new MutationObserver(() => {
-      for (const alert of document.querySelectorAll('.toast.error')) {
+      for (const alert of document.querySelectorAll('[data-scope="toast"]:has([data-slot="toast-error"])')) {
         const message = alert.textContent.trim();
         if (!window.__startupAlerts.includes(message)) window.__startupAlerts.push(message);
       }
@@ -100,7 +100,7 @@ async function launch(name, data, demo = false, options = {}) {
 async function assertNoErrors(session) {
   assert.deepEqual(session.pageErrors, [], `${session.name}: JavaScript errors`);
   assert.deepEqual(await session.page.evaluate(() => window.__startupAlerts), [], `${session.name}: app errors`);
-  await expect(session.page.locator('.toast.error')).toHaveCount(0);
+  await expect(session.page.locator('[data-scope="toast"][data-part="root"]:has([data-slot="toast-error"])')).toHaveCount(0);
 }
 
 async function assertEmpty(session) {

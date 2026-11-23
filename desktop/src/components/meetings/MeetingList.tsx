@@ -3,13 +3,11 @@
 // drawn) or, while there is something in the search field, the results in their place. It holds
 // no data of its own: the shell loads, selects and searches, this draws and reports.
 //
-// The rows of a group arrive and leave with Motion (AnimatePresence; the rows already there when a
-// group appears do not animate). The scroller is a Motion `layoutScroll` box so that a scrolled list
-// does not read as rows that moved.
-import { AnimatePresence, motion } from 'motion/react';
+// The rows of a group arrive and leave with Sigrid's motion (`Presence` and `Item` of ui/motion).
+import { Presence } from '../../ui/motion';
 import { Fragment, type ReactNode } from 'react';
-import Button from '../../ds/primitives/Button';
-import Icon from '../../ds/primitives/Icon';
+import Button from '../../ui/Button';
+import Icon from '../../ui/Icon';
 import { desktop } from '../../lib/api';
 import { tr } from '../../lib/i18n';
 import type { CaptureSnapshot, MeetingHit } from '../../lib/meetings';
@@ -18,6 +16,7 @@ import { GROUP_ORDER, clockLabel, type MeetingGroup, type MeetingRow } from '../
 import { cn } from '../../lib/utils';
 import MeetingRowItem from './MeetingRowItem';
 import './MeetingList.css';
+import { Input } from '../../ui/Input';
 
 export type MeetingListProps = {
   groups: Record<MeetingGroup, MeetingRow[]>;
@@ -172,7 +171,7 @@ export default function MeetingList({
                 {labels[name]}
               </h2>
               <ul className="items">
-                <AnimatePresence initial={false}>
+                <Presence>
                   {groups[name].map((row) => (
                     <MeetingRowItem
                       key={row.key}
@@ -190,7 +189,7 @@ export default function MeetingList({
                       ontranscribe={ontranscribe}
                     />
                   ))}
-                </AnimatePresence>
+                </Presence>
               </ul>
             </div>
           ) : null,
@@ -231,7 +230,7 @@ export default function MeetingList({
           <span className="list-search-icon">
             <Icon name="search" size={15} />
           </span>
-          <input
+          <Input
             type="search"
             value={query}
             onChange={(event) => onquery(event.currentTarget.value)}
@@ -242,9 +241,7 @@ export default function MeetingList({
         </div>
       </header>
 
-      <motion.div className="list-scroll" layoutScroll>
-        {content}
-      </motion.div>
+      <div className="list-scroll">{content}</div>
     </section>
   );
 }

@@ -3,7 +3,7 @@ import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 
 const base = process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:5187';
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const context = await browser.newContext({ locale: 'en-US' });
 const page = await context.newPage();
 const errors = [];
@@ -82,7 +82,7 @@ try {
   console.log('PASS direct installation and packages awaiting import have distinct status labels');
 
   await page.goto(`${base}/__mcp-settings-test?case=failure`);
-  await expect(page.getByRole('alert')).toContainText('Synthetic permissions unavailable');
+  await expect(page.locator('[role="alert"], [data-scope="toast"][data-part="root"]').filter({ hasText: 'Synthetic permissions unavailable' }).first()).toBeVisible();
   await expect(save()).toHaveCount(0);
   assert.equal(await page.evaluate(() => window.settingsCalls.some(call => call.command === 'save_mcp_configuration')), false);
   await page.getByRole('button', { name: 'Reload permissions', exact: true }).click();

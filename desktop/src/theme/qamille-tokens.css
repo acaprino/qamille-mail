@@ -1,0 +1,89 @@
+:root {
+  color-scheme: light;
+  --radius-full: 999px;
+  --radius-sheet: 14px;
+  --on-accent-soft: #e6ecff;
+  --on-accent-border: #ffffff3b;
+  --priority-text: #8a4a06;
+  --priority-mark: #c46a0a;
+  --avatar-text: #4c5870;
+  --sidebar-hover: #22262e;
+  /* The highlight colour of the unlumen components (NavList bar, Switch): Compatto's indigo. */
+  --badge: #d9e1f2;
+  --hover: #f4f5f8;
+  --thread-open: #f7f8fe;
+  --avatar: #e7ecf6;
+  --label-bg: #eef0f5;
+  --label-text: #4a5363;
+  --priority-bg: #fdf1df;
+  --priority-wash: #fffaf2;
+  --summary-bg: #f3f6fd;
+  --summary-border: #dbe4f7;
+  --danger-border: #ebc3c7;
+  --shadow-sm: none;
+  --scrim: #0f183055;
+  --scrim-soft: #15274a1f;
+  --recipients-max: 96px;
+  --panel-narrow: 420px;
+  --panel-wide: 760px;
+  --modal-sm: 420px;
+  --modal-md: 560px;
+  --modal-lg: 960px;
+  --z-popover: 10;
+  --z-composer: 12;
+  --z-dock: 13;
+  --z-floating: 16;
+  --z-panel: 20;
+  --z-modal: 30;
+  --z-toast: 50;
+  --z-window: 100;
+  --motion-panel: 180ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --paper: #fff;
+  --paper-text: #171717;
+  --paper-muted: #666;
+  --paper-rule: #ccc;
+  --sender-1: #e3ebfa;
+  --sender-2: #f4e8dd;
+  --sender-3: #e1eee8;
+  --sender-4: #eee5f4;
+  --label-1: #4a73d9;
+  --label-2: #8f67c4;
+  --label-3: #2e8a6c;
+  --label-4: #b27a22;
+  --label-5: #c45c74;
+  --window-close: #c42b1c;
+  --on-window-close: #fff;
+}
+:root[data-scheme='dark'] {
+  color-scheme: dark;
+  /* The Compatto look in the dark: the same structure as the light block, the indigo accent lightened.
+     Two steps of depth: the sidebar and the ground (the darker one, shared with the top bar), and the sheet
+     (--color-raised, a step lighter) that carries the work.
+     --color-primary sits at 6.6:1 on the sheet; the text on it is dark. */
+  --on-accent-soft: #26285a;
+  --on-accent-border: #0f102055;
+  --priority-text: #f0b878;
+  --priority-mark: #e8a25a;
+  --avatar-text: #2f3a50;
+  --sidebar-hover: #1c2230;
+  --badge: #2f3558;
+  --hover: #222a38;
+  --thread-open: #1e2433;
+  --avatar: #2c3350;
+  --label-bg: #232b38;
+  --label-text: #a8b3c6;
+  --priority-bg: #3d2f1e;
+  --priority-wash: #221d18;
+  --summary-bg: #1f2738;
+  --summary-border: #313d55;
+  --danger-border: #74404c;
+  --shadow-sm: none;
+  --scrim: #00000080;
+  --scrim-soft: #0000003d;
+  --label-1: #7393df;
+  --label-2: #b595d8;
+  --label-3: #56a68b;
+  --label-4: #dfad66;
+  --label-5: #d58294;
+}

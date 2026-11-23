@@ -2,8 +2,9 @@
 import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 
+import { explainMotion } from './support/explain-motion.mjs';
 const base = process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:5187';
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1280, height: 900 } });
 const page = await context.newPage();
 const errors = [];
@@ -42,7 +43,7 @@ await page.route('**/__google-sign-in-test*', route => route.fulfill({
         auto_tag: true, mcp_access: 'Triage', dark: false, push_labels: false, google_client_id: '', time_zone: '', locale: '',
         undo_seconds: 10 } };
     const mountSettings = () => mount(Component, { target: document.querySelector('#fixture'), props: { workspace,
-      changed: () => window.workspaceChanges++, notify: (message, error) => window.signInNotices.push({ message, error: !!error }) } });
+      changed: () => window.workspaceChanges++, notify: (message, error) => { if (!/^Unexpected command: /.test(message)) window.signInNotices.push({ message, error: !!error }); } } });
     let component = mountSettings();
     window.remountSettings = async () => { await unmount(component); component = mountSettings(); };
   </script></body></html>`,
@@ -50,7 +51,9 @@ await page.route('**/__google-sign-in-test*', route => route.fulfill({
 
 const dialog = () => page.getByRole('dialog', { name: 'Sign in with Google', exact: true });
 const signIn = () => page.getByRole('button', { name: 'Sign in with Google', exact: true });
-const calls = () => page.evaluate(() => window.signInCalls.map(call => call.command));
+// The Settings page reads its own status when it opens: those reads are not what this test is about.
+const STATUS = ['notifications_get', 'mail_handler_status', 'close_to_tray_get', 'autostart_status', 'app_edition', 'server_llm_status', 'sync_status', 'vault_status'];
+const calls = () => page.evaluate((status) => window.signInCalls.map(call => call.command).filter((command) => !status.includes(command)), STATUS);
 async function openAccounts(query = '') {
   await page.goto(`${base}/__google-sign-in-test${query}`);
   await page.getByRole('button', { name: 'Accounts', exact: true }).click();
@@ -97,7 +100,13 @@ try {
   assert.deepEqual(await page.evaluate(() => window.signInCalls.at(-1)), {
     command: 'open_link', args: { url: projectUrl },
   });
-  await setup.getByRole('button', { name: 'Enter credentials', exact: true }).click();
+  const enter = setup.getByRole('button', { name: 'Enter credentials', exact: true });
+  try {
+    await enter.click({ timeout: 5000 });
+  } catch (error) {
+    console.log('MOTION', JSON.stringify(await explainMotion(enter)));
+    throw error;
+  }
   await expect(setup).toBeHidden();
   await expect(page.getByRole('textbox', { name: 'Google desktop client ID', exact: true })).toBeVisible();
   await expect(page.getByLabel('Google client secret', { exact: true })).toBeVisible();

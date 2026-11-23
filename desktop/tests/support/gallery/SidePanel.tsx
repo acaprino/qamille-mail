@@ -2,8 +2,8 @@
 // The "After the pane" button sits after the pane in the DOM, so Tab can reach it only if the
 // panel does not trap the focus.
 import { useRef, useState } from 'react';
-import Button from '../../../src/ds/primitives/Button';
-import SidePanel from '../../../src/ds/primitives/SidePanel';
+import Button from '../../../src/ui/Button';
+import SidePanel from '../../../src/ui/SidePanel';
 
 export default function SidePanelSection() {
   const [open, setOpen] = useState(false);
@@ -39,7 +39,7 @@ export default function SidePanelSection() {
         <output aria-label="Close count">{closes}</output>
         <output aria-label="Open count">{opened}</output>
       </div>
-      <div style={{ position: 'relative', height: 420, border: '1px solid var(--border)' }}>
+      <div style={{ position: 'relative', height: 420, border: '1px solid var(--color-line)' }}>
         <p style={{ padding: 12 }}>The pane behind the panel.</p>
         {open && (
           <SidePanel

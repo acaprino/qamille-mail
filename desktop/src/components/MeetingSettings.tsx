@@ -3,11 +3,11 @@
 // the Settings form (handed back through `onSettingsChange`), which the Save bar of Settings saves.
 // The transcription models live on the server: the app installs nothing.
 import { useEffect, useRef } from 'react';
-import Button from '../ds/primitives/Button';
-import Field from '../ds/primitives/Field';
-import Modal from '../ds/primitives/Modal';
-import Select from '../ds/primitives/Select';
-import Switch from '../ds/primitives/Switch';
+import Button from '../ui/Button';
+import Field from '../ui/Field';
+import Modal from '../ui/Modal';
+import Select from '../ui/Select';
+import Switch from '../ui/Switch';
 import { errorText } from '../lib/api';
 import { backendText, tr } from '../lib/i18n';
 import {
@@ -22,6 +22,7 @@ import { regionalLocale } from '../lib/regional';
 import { useReactive } from '../lib/store';
 import type { Settings } from '../lib/types';
 import './MeetingSettings.css';
+import { Input } from '../ui/Input';
 
 export type MeetingSettingsProps = {
   settings: Settings;
@@ -227,7 +228,7 @@ export default function MeetingSettings({ settings, onSettingsChange, notify }: 
         <>
           <Field>
             {tr('Modello remoto', 'Remote model')}
-            <input
+            <Input
               value={settings.meeting_remote_model}
               onChange={(event) => set({ meeting_remote_model: event.currentTarget.value })}
               placeholder="whisper-1"

@@ -1,0 +1,57 @@
+# The browser tests of the preview (desktop/tests/*.mjs, run by desktop/scripts/test-browser.mjs), all of them or the ones the pull
+# request names. Nothing is built or run on the owner's machine (AGENTS.md, «Nothing is compiled on this machine»): this is where
+# they run. ci.yml runs only onboarding-professional on every pull request; this one is for the pull request that asks for the
+# rest, and runs again on every push to it while the label is there.
+#
+#   Label the pull request `browser-tests`.
+#   To run only some: put a line `browser: name1 name2` in the pull request's description (names as in desktop/tests/).
+#
+# A test that fails fails the job, and the screenshots they take are kept as an artifact either way.
+name: browser
+
+on:
+  pull_request:
+    branches: [develop]
+    types: [labeled, synchronize, reopened]
+
+jobs:
+  browser:
+    if: contains(github.event.pull_request.labels.*.name, 'browser-tests')
+    runs-on: windows-latest
+    timeout-minutes: 150
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+      - run: npm run artcraft:sync
+      - run: npm run sigrid:sync
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Browser tests
+        shell: pwsh
+        env:
+          QAMILLE_SHOTS_DIR: ${{ runner.temp }}/screens
+          # Through the environment, never into the script: the description of a pull request is text from outside.
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          $names = @()
+          foreach ($line in ($env:PR_BODY -split "`n")) {
+            if ($line -match '^\s*browser:\s*(.+?)\s*$') { $names = $Matches[1] -split '\s+' | Where-Object { $_ -match '^[a-z0-9-]+$' } }
+          }
+          if ($names.Count -gt 0) { Write-Host "Running: $($names -join ' ')"; npm run test:browser -- @names }
+          else { Write-Host 'Running all'; npm run test:browser }
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-screens
+          path: ${{ runner.temp }}/screens
+          if-no-files-found: ignore
+          retention-days: 7

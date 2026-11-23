@@ -2,10 +2,10 @@
 // item opens a Modal (the Modal stays in the section, so it outlives the Popover's own content),
 // plus a side panel and a tipped button so the layer order can be read with all four in use.
 import { useState } from 'react';
-import Button from '../../../src/ds/primitives/Button';
-import Modal from '../../../src/ds/primitives/Modal';
-import Popover from '../../../src/ds/primitives/Popover';
-import SidePanel from '../../../src/ds/primitives/SidePanel';
+import Button from '../../../src/ui/Button';
+import Modal from '../../../src/ui/Modal';
+import Popover from '../../../src/ui/Popover';
+import SidePanel from '../../../src/ui/SidePanel';
 
 export default function PopoverSection() {
   const [menu, setMenu] = useState(false);
@@ -47,7 +47,7 @@ export default function PopoverSection() {
         </Popover>
         <output aria-label="Picked">{picked}</output>
       </div>
-      <div style={{ position: 'relative', height: 300, marginTop: 12, border: '1px solid var(--border)' }}>
+      <div style={{ position: 'relative', height: 300, marginTop: 12, border: '1px solid var(--color-line)' }}>
         {panel && (
           <SidePanel narrow aria-label="Side details" onScrim={() => setPanel(false)} onClose={() => setPanel(false)}>
             <div className="side-panel-body">

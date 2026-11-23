@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import Button from '../ds/primitives/Button';
-import Icon from '../ds/primitives/Icon';
-import Modal from '../ds/primitives/Modal';
+import Button from '../ui/Button';
+import Icon from '../ui/Icon';
+import Modal from '../ui/Modal';
 import '../print.css';
 import { call, desktop, errorText } from '../lib/api';
 import { tr } from '../lib/i18n';

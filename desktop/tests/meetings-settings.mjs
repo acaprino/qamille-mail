@@ -6,7 +6,7 @@ import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 
 const url = process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:1420';
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 900 } });
 const page = await context.newPage();
 page.setDefaultTimeout(15000);
@@ -58,9 +58,14 @@ async function openMeetings() {
 }
 const combo = (name) => content.getByRole('combobox', { name, exact: true });
 const options = async (name) => {
+  await expect(page.getByRole('listbox')).toHaveCount(0);
   await combo(name).click();
-  const listed = await page.getByRole('listbox', { name }).getByRole('option').allTextContents();
+  // A list that was closed may stay in the page, hidden: the one looked at is the one that shows.
+  const popup = page.locator('[data-slot="select-content"]:visible');
+  await popup.getByRole('option').first().waitFor();
+  const listed = await popup.getByRole('option').allTextContents();
   await page.keyboard.press('Escape');
+  await expect(combo(name)).toHaveAttribute('aria-expanded', 'false');
   return listed.map((text) => text.trim());
 };
 const megabytes = (bytes) => `${(bytes / 1_048_576).toFixed(1)} MB`;

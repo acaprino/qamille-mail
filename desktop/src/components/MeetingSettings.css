@@ -11,14 +11,14 @@
     flex: 1;
     min-width: 0;
     height: 6px;
-    accent-color: var(--accent);
+    accent-color: var(--color-primary);
   }
   & span {
-    color: var(--muted);
+    color: var(--color-ink-mute);
     white-space: nowrap;
   }
 }
 .meeting-error {
-  color: var(--danger);
+  color: var(--color-destructive);
   overflow-wrap: anywhere;
 }

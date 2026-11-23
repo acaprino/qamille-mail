@@ -2,10 +2,11 @@
 // email → a code by mail (the same answer whether the email has an account or not) → code and new
 // password → back to «Sign in» with the email filled in. Every device of the account is signed out.
 import { useState } from 'react';
-import Button from '../../ds/primitives/Button';
-import Field from '../../ds/primitives/Field';
+import Button from '../../ui/Button';
+import Field from '../../ui/Field';
 import { call, errorText } from '../../lib/api';
 import { tr } from '../../lib/i18n';
+import { Input } from '../../ui/Input';
 
 export type ResetPasswordStepProps = {
   url: string;
@@ -36,7 +37,7 @@ export default function ResetPasswordStep({ url, onDone, onBack }: ResetPassword
       <h3>{tr('Password dimenticata', 'Forgot password')}</h3>
       <Field>
         {tr('Email', 'Email')}
-        <input type="email" value={email} autoComplete="email" disabled={sent} onChange={(e) => setEmail(e.currentTarget.value)} />
+        <Input type="email" value={email} autoComplete="email" disabled={sent} onChange={(e) => setEmail(e.currentTarget.value)} />
       </Field>
       {!sent ? (
         <div className="button-row step-actions">
@@ -72,11 +73,11 @@ export default function ResetPasswordStep({ url, onDone, onBack }: ResetPassword
           </p>
           <Field>
             {tr('Codice', 'Code')}
-            <input value={code} autoComplete="one-time-code" onChange={(e) => setCode(e.currentTarget.value)} />
+            <Input value={code} autoComplete="one-time-code" onChange={(e) => setCode(e.currentTarget.value)} />
           </Field>
           <Field>
             {tr('Nuova password', 'New password')}
-            <input type="password" value={password} autoComplete="new-password" onChange={(e) => setPassword(e.currentTarget.value)} />
+            <Input type="password" value={password} autoComplete="new-password" onChange={(e) => setPassword(e.currentTarget.value)} />
           </Field>
           <p className="field-help">
             {tr('Tutti i dispositivi dell’account verranno scollegati.', 'Every device of the account will be signed out.')}

@@ -1,8 +1,8 @@
 // Asked once per account when the history brought many old unread messages into the Inbox (EX-9):
 // mark the ones older than 30 days read, here and on Gmail, or leave the Inbox as it is.
 import { useRef, useState } from 'react';
-import Button from '../ds/primitives/Button';
-import Modal from '../ds/primitives/Modal';
+import Button from '../ui/Button';
+import Modal from '../ui/Modal';
 import { call, errorText } from '../lib/api';
 import { tr } from '../lib/i18n';
 

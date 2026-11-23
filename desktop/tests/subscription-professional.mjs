@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { chromium, expect } from '@playwright/test';
 
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const errors = [];
 async function start(server) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'en-US' });
@@ -57,9 +57,19 @@ try {
     await expect(dialog.getByText(/cancel it at once with the payment processor/)).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Manage subscription' })).toBeVisible();
     assert.equal(await dialog.getByLabel('Password').count(), 0);
+    // The page reloads at once (Professional): the notice of the deletion goes with it, the sign-in screen is what is seen.
+    await page.evaluate(() => (window.__beforeReload = true));
     await dialog.getByRole('button', { name: 'Confirm with Google and delete' }).click();
-    await expect(page.getByText('Account deleted')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Sign in to Qamille', exact: true })).toBeVisible();
+    await page.waitForFunction(() => !window.__beforeReload, null, { timeout: 15000 }).catch(() => {});
+    await page.waitForLoadState('load');
+    const signIn = page.getByText('Sign in to Qamille', { exact: true });
+    try {
+      await expect(signIn).toBeVisible({ timeout: 15000 });
+    } catch (error) {
+      const said = (await page.locator('body').innerText().catch(() => 'no body')).replace(/\s+/g, ' ').slice(0, 400);
+      console.log(`MOTION after the reload (${page.url()}): ${said}`);
+      throw error;
+    }
     console.log('PASS an account without password is deleted after signing in with Google again');
     await context.close();
   }

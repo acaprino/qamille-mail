@@ -5,9 +5,9 @@
 // versions shows its own summary and key points. The page does the work; this draws and reports.
 // Every top-level element carries `meeting-summary`, the class its rules are scoped under.
 import { useEffect, useRef, useState } from 'react';
-import Button from '../../ds/primitives/Button';
-import Checkbox from '../../ds/primitives/Checkbox';
-import Icon from '../../ds/primitives/Icon';
+import Button from '../../ui/Button';
+import Checkbox from '../../ui/Checkbox';
+import Icon from '../../ui/Icon';
 import { backendText, tr } from '../../lib/i18n';
 import type { MeetingAction, MeetingDetail, MeetingJob } from '../../lib/meetings';
 import type { SummaryView } from '../../lib/meetings-view';

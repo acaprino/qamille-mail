@@ -5,7 +5,7 @@
   justify-items: center;
   margin: auto;
   font-size: var(--text-sm);
-  color: var(--muted);
+  color: var(--color-ink-mute);
 
   & p {
     margin: 0;

@@ -1,11 +1,9 @@
 // The floating chip of the recording going on (or of one that was interrupted and can be
 // recovered), at the bottom of the window on every page. It is the only poller of the capture: it
 // reads the status every second and publishes it on the capture bus, which the Meetings page
-// listens to. A click opens that meeting on the Meetings page. While it records, the microphone
-// breathes (Motion), still when the system asks for reduced motion.
-import { motion, useReducedMotion } from 'motion/react';
+// listens to. A click opens that meeting on the Meetings page.
 import { useEffect, useRef, useState } from 'react';
-import Icon from '../../ds/primitives/Icon';
+import Icon from '../../ui/Icon';
 import { tr } from '../../lib/i18n';
 import {
   captureActive,
@@ -27,7 +25,6 @@ export type MeetingRecordingIndicatorProps = {
 };
 
 export default function MeetingRecordingIndicator({ onopen, notify }: MeetingRecordingIndicatorProps) {
-  const still = useReducedMotion();
   const [capture, setCapture] = useState<CaptureSnapshot>(() => emptyCapture());
   // The poll reads these between awaits and in a timer: refs keep them current.
   const captureRef = useRef(capture);
@@ -111,16 +108,11 @@ export default function MeetingRecordingIndicator({ onopen, notify }: MeetingRec
 
   const interrupted = capture.state === 'interrupted';
   if (!captureActive(capture) && !interrupted) return null;
-  const breathing = !still && capture.state === 'recording';
   return (
     <button className={cn('recording-indicator', interrupted && 'interrupted')} onClick={openCapture}>
-      <motion.span
-        className="recording-mic"
-        animate={breathing ? { opacity: [1, 0.4, 1] } : { opacity: 1 }}
-        transition={breathing ? { duration: 1.6, ease: 'easeInOut', repeat: Infinity } : { duration: 0.2 }}
-      >
+      <span className="recording-mic">
         <Icon name="mic" size={16} />
-      </motion.span>
+      </span>
       <span className="visually-hidden">
         {interrupted ? tr('Apri recupero registrazione:', 'Open recording recovery:') : tr('Apri registrazione:', 'Open recording:')}
       </span>

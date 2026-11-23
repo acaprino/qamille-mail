@@ -1,9 +1,11 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
-import Button from '../ds/primitives/Button';
-import Count from '../ds/primitives/Count';
-import Icon from '../ds/primitives/Icon';
-import { NavItem, NavList } from '../ds/primitives/NavList';
-import Tooltip from '../ds/primitives/Tooltip';
+import Avatar from '../ui/Avatar';
+import Kbd from '../ui/Kbd';
+import Button from '../ui/Button';
+import Count from '../ui/Count';
+import Icon from '../ui/Icon';
+import { NavItem, NavList } from '../ui/NavList';
+import Tooltip from '../ui/Tooltip';
 import { desktop, initials } from '../lib/api';
 import { activityCenter, toggleActivityPanel } from '../lib/activity-center';
 import type { Activity } from '../lib/activity';
@@ -11,6 +13,9 @@ import { folderLabel, tr } from '../lib/i18n';
 import { useStore } from '../lib/store';
 import type { Folder, UndoAction, Workspace } from '../lib/types';
 import ActivityCenter from './ActivityCenter';
+
+/** An account's colour, [r, g, b, …] in 0..255, as #rrggbb. */
+const hexOf = (rgb: number[]) => `#${rgb.slice(0, 3).map((n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0')).join('')}`;
 
 export type SidebarProps = {
   workspace: Workspace;
@@ -110,7 +115,7 @@ export default function Sidebar({
       >
         <Icon name="edit" size={iconSize} stroke={iconStroke} />
         <span className="sidebar-text">{tr('Nuovo messaggio', 'New message')}</span>
-        <kbd>N</kbd>
+        <Kbd>N</Kbd>
       </Button>
       <div className="sidebar-body" id="sidebar-navigation">
         <div className="sidebar-label sidebar-text">{tr('Account', 'Accounts')}</div>
@@ -121,10 +126,12 @@ export default function Sidebar({
             onClick={() => selectAccount(null)}
             aria-label={tr('Tutti gli account', 'All accounts')}
             aria-pressed={accountId === null}
+            icon={
+              <Avatar name={tr('Tutti gli account', 'All accounts')} size="xs" decorative className="bg-sidebar-selected text-sidebar-accent">
+                <Icon name="inbox" size={12} stroke={iconStroke} />
+              </Avatar>
+            }
           >
-            <span className="account-avatar all-accounts">
-              <Icon name="inbox" size={12} stroke={iconStroke} />
-            </span>
             <span className="sidebar-text">{tr('Tutti gli account', 'All accounts')}</span>
           </NavItem>
           {workspace.accounts.map((account) => (
@@ -136,13 +143,8 @@ export default function Sidebar({
               aria-label={collapsed ? tr(`Passa a ${account.name}`, `Switch to ${account.name}`) : undefined}
               title={collapsed ? undefined : `${account.name} · ${account.email}`}
               aria-pressed={accountId === account.id}
+              icon={<Avatar name={account.name} color={hexOf(account.color)} size="xs" decorative />}
             >
-              <span
-                className="account-avatar"
-                style={{ '--account-color': `rgb(${account.color.slice(0, 3).join(' ')})` } as React.CSSProperties}
-              >
-                {initials(account.name)}
-              </span>
               <span className="account-details sidebar-text">
                 <strong>{account.name}</strong>
                 <small>{account.email}</small>
@@ -158,11 +160,10 @@ export default function Sidebar({
               active={view === id}
               onClick={() => navigate(id)}
               aria-label={collapsed ? folderLabel(id) : undefined}
-              aria-current={view === id ? 'page' : undefined}
+              icon={<Icon name={icon} size={iconSize} stroke={iconStroke} />}
+              end={!!workspace.counts[id] && <Count value={workspace.counts[id]} className="nav-count" />}
             >
-              <Icon name={icon} size={iconSize} stroke={iconStroke} />
               <span className="sidebar-text">{folderLabel(id)}</span>
-              {!!workspace.counts[id] && <Count value={workspace.counts[id]} className="nav-count" />}
             </NavItem>
           ))}
         </NavList>
@@ -177,9 +178,8 @@ export default function Sidebar({
               active={view === `label:${label}`}
               onClick={() => navigate(`label:${label}`)}
               aria-label={label}
-              aria-current={view === `label:${label}` ? 'page' : undefined}
+              icon={<span className="label-dot" style={{ '--dot': `var(--label-${(i % 5) + 1})` } as React.CSSProperties} />}
             >
-              <span className="label-dot" style={{ '--dot': `var(--label-${(i % 5) + 1})` } as React.CSSProperties} />
               <span className="sidebar-text">{label}</span>
             </NavItem>
           ))}
@@ -194,11 +194,10 @@ export default function Sidebar({
               active={view === id}
               onClick={() => navigate(id)}
               aria-label={collapsed ? folderLabel(id) : undefined}
-              aria-current={view === id ? 'page' : undefined}
+              icon={<Icon name={icon} size={iconSize} stroke={iconStroke} />}
+              end={id === 'Assistant' ? <span className="ai-badge">AI</span> : undefined}
             >
-              <Icon name={icon} size={iconSize} stroke={iconStroke} />
               <span className="sidebar-text">{folderLabel(id)}</span>
-              {id === 'Assistant' && <span className="ai-badge">AI</span>}
             </NavItem>
           ))}
         </NavList>
@@ -219,7 +218,7 @@ export default function Sidebar({
               'aria-current': view === 'Settings' ? 'page' : undefined,
             },
             <>
-              <span className="avatar user-avatar">{initials(workspace.settings.user_name)}</span>
+              <Avatar name={workspace.settings.user_name} size="xs" decorative className="bg-sidebar-selected text-sidebar-selected-ink" />
               <span className="sidebar-text">
                 <strong>{workspace.settings.user_name}</strong>
                 <small>{tr('Spazio personale', 'Personal workspace')}</small>

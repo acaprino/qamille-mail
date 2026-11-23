@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
-import { chromium } from '@playwright/test';
+import { chromium, expect } from '@playwright/test';
 
+import { pickDate } from './support/dates.mjs';
 const source = fs.readFileSync(new URL('../src/lib/search.ts', import.meta.url), 'utf8');
 const compiled = ts.transpileModule(source, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
@@ -48,7 +49,7 @@ assert.deepEqual(search.markedParts('A proposal for Q4', ['proposal']), [
 console.log('PASS query builders preserve boolean groups, quoted phrases and calendar ranges');
 if (process.argv.includes('--utilities-only')) process.exit(0);
 
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const context = await browser.newContext({
   viewport: { width: 1440, height: 1000 },
   locale: 'en-US',
@@ -80,9 +81,8 @@ try {
   );
 
   await page.getByRole('button', { name: /^When/ }).click();
-  // The date field (DateField) reads what is typed on Enter or when the focus leaves it.
-  await page.getByLabel('Date', { exact: true }).fill('2026-10-15');
-  await page.getByLabel('Date', { exact: true }).press('Enter');
+  // The date field is Sigrid's: a button that opens a calendar, where the day is chosen.
+  await pickDate(page, page.getByLabel('Date', { exact: true }), '2026-10-15');
   assert.match(
     await page.locator('.search-date-preview').innerText(),
     /October 9, 2026.*October 21, 2026/s,
@@ -155,7 +155,7 @@ try {
   await page
     .locator('.mail-open', { hasText: 'Q4 proposal: can you review by Thursday?' })
     .waitFor();
-  assert.equal(await page.locator('.mail-open').count(), 1);
+  await expect(page.locator('.mail-open')).toHaveCount(1);
   await page.getByRole('button', { name: /^When/ }).click();
   await page.getByLabel('Date', { exact: true }).press('Escape');
   assert.equal(
@@ -182,9 +182,7 @@ try {
   await page.locator('.sidebar-body nav').nth(1).locator('button').first().click();
   await page.getByRole('textbox', { name: 'Cerca email', exact: true }).waitFor();
   await page.getByRole('button', { name: /^Quando/ }).click();
-  // The date field (DateField) reads what is typed on Enter or when the focus leaves it.
-  await page.getByLabel('Data', { exact: true }).fill('2026-10-15');
-  await page.getByLabel('Data', { exact: true }).press('Enter');
+  await pickDate(page, page.getByLabel('Data', { exact: true }), '2026-10-15');
   assert.match(
     await page.locator('.search-date-preview').innerText(),
     /9 ottobre 2026.*21 ottobre 2026/s,

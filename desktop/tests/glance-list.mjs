@@ -2,7 +2,7 @@
 // they hold, two weights, an amber priority row, hover-only checkboxes, a select bar that waits
 // for the first tick, and a headline that says what needs the reader. Synthetic data only.
 import { chromium, expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -77,7 +77,7 @@ try {
     if (i === 59) throw new Error(`Preview did not start: ${output}`);
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
-  browser = await chromium.launch({ channel: 'msedge', headless: true });
+  browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   const page = await open();
 
   // Minor groups start closed, and a closed group never hides that it holds something unread.
@@ -87,7 +87,7 @@ try {
   await expect(heading(page, 'Priority')).toHaveAttribute('aria-expanded', 'true');
   await expect(heading(page, 'Notifications')).toHaveClass(/has-unread/);
   await expect(heading(page, 'Seen')).not.toHaveClass(/has-unread/);
-  const blue = await token(page, '--accent-text');
+  const blue = await token(page, '--color-accent');
   assert.equal(await heading(page, 'Notifications').locator('.group-count').evaluate((el) => getComputedStyle(el).color), blue, 'the number of a closed group with unread mail is blue');
   assert.notEqual(await heading(page, 'Seen').locator('.group-count').evaluate((el) => getComputedStyle(el).color), blue);
   console.log('PASS Minor groups start closed and keep a trace');
@@ -119,9 +119,9 @@ try {
   // The message just opened keeps its Priority card until the reader moves on, so a plain read
   // row is the pinned one.
   const readRow = page.locator('.mail-row:not(.unread):not([data-section="priority"])').first();
-  assert.ok((await weight(unreadRow.locator('.mail-meta strong'))) >= 700, 'an unread sender is bold');
+  assert.ok((await weight(unreadRow.locator('.mail-meta strong'))) >= 600, 'an unread sender is bold');
   assert.equal(await weight(readRow.locator('.mail-meta strong')), 500, 'a read sender is regular');
-  const ink = await token(page, '--text');
+  const ink = await token(page, '--color-ink');
   assert.equal(await unreadRow.locator('.mail-meta strong').evaluate((el) => getComputedStyle(el).color), ink);
   // Compatto (mockup): the sender is ink in both states; the weight, the dot and the accent time tell them apart.
   assert.equal(await readRow.locator('.mail-meta strong').evaluate((el) => getComputedStyle(el).color), ink, 'a read sender is ink too');

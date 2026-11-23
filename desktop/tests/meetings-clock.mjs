@@ -44,7 +44,7 @@ for (let attempt = 0; attempt < 40; attempt++) {
   }
   await new Promise((resolve) => setTimeout(resolve, 250));
 }
-const browser = await chromium.launch({ channel: 'msedge', headless: true }).catch((error) => {
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] }).catch((error) => {
   server?.kill();
   throw error;
 });

@@ -1,10 +1,10 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { calendarWords as dateWords } from '../lib/calendar-words';
-import Button from '../ds/primitives/Button';
-import Tooltip from '../ds/primitives/Tooltip';
-import DateField from '../ds/primitives/DateField';
-import Icon from '../ds/primitives/Icon';
-import Select from '../ds/primitives/Select';
+import Button from '../ui/Button';
+import Tooltip from '../ui/Tooltip';
+import DateField from '../ui/DateField';
+import Icon from '../ui/Icon';
+import Select from '../ui/Select';
 import { call } from '../lib/api';
 import { backendText, isItalian, tr } from '../lib/i18n';
 import { regionalLocale, regionalTimeZone } from '../lib/regional';
@@ -29,7 +29,8 @@ import { useReactive } from '../lib/store';
 import { tick } from '../lib/tick';
 import { cn } from '../lib/utils';
 import type { MailPage, Workspace } from '../lib/types';
-import { imeComposing } from '../ds/ime';
+import { imeComposing } from '../lib/ime';
+import { Input } from '../ui/Input';
 
 export type SearchBarProps = {
   query: string;
@@ -234,7 +235,7 @@ export default function SearchBar({
     (
       firstControl.current ??
       document.querySelector<HTMLElement>(
-        '#search-filter-panel form [data-scope="select"][data-part="trigger"], #search-filter-panel form input',
+        '#search-filter-panel form [data-slot="select-trigger"], #search-filter-panel form input',
       )
     )?.focus();
   }
@@ -406,7 +407,7 @@ export default function SearchBar({
                 {panel === 'from'
                   ? t('Chi ha inviato l’email?', 'Who sent the email?')
                   : t('A chi era indirizzata?', 'Who was it sent to?')}{' '}
-                <input
+                <Input
                   ref={firstControl}
                   value={field}
                   onChange={(event) => (s.field = event.target.value)}
@@ -431,7 +432,7 @@ export default function SearchBar({
                 <Button type="button" variant="secondary" disabled={!field.trim()} onClick={addPerson}>
                   {t('Aggiungi un’altra persona', 'Add another person')}
                 </Button>
-                <Button variant="primary" disabled={!field.trim() && !s.people.length}>
+                <Button type="submit" variant="primary" disabled={!field.trim() && !s.people.length}>
                   {t('Applica filtro', 'Apply filter')}
                 </Button>
               </div>
@@ -462,6 +463,7 @@ export default function SearchBar({
                     <div className="search-field">
                       <span>{mode === 'between' ? t('Dal giorno', 'From date') : t('Data', 'Date')}</span>
                       <DateField
+                        clearable
                         value={day}
                         onChange={(value) => (s.day = value)}
                         aria-label={mode === 'between' ? t('Dal giorno', 'From date') : t('Data', 'Date')}
@@ -473,6 +475,7 @@ export default function SearchBar({
                       <div className="search-field">
                         <span>{t('Al giorno incluso', 'Through date, inclusive')}</span>
                         <DateField
+                          clearable
                           value={end}
                           onChange={(value) => (s.end = value)}
                           aria-label={t('Al giorno incluso', 'Through date, inclusive')}
@@ -485,7 +488,7 @@ export default function SearchBar({
                     {mode === 'around' && (
                       <label>
                         {t('Giorni prima e dopo', 'Days before and after')}
-                        <input
+                        <Input
                           type="number"
                           min="0"
                           max="365"
@@ -551,7 +554,7 @@ export default function SearchBar({
                     {t('Scegli un intervallo diverso', 'Choose a different range')}
                   </Button>
                 )}
-                <Button variant="primary" disabled={mode !== 'recent' && (!day || (mode === 'between' && !end))}>
+                <Button type="submit" variant="primary" disabled={mode !== 'recent' && (!day || (mode === 'between' && !end))}>
                   {t('Applica filtro', 'Apply filter')}
                 </Button>
               </div>
@@ -584,7 +587,7 @@ export default function SearchBar({
               ) : s.attachment === 'filename' ? (
                 <label>
                   {t('Il nome contiene', 'Name contains')}
-                  <input
+                  <Input
                     ref={firstControl}
                     value={field}
                     onChange={(event) => (s.field = event.target.value)}
@@ -594,7 +597,7 @@ export default function SearchBar({
                 </label>
               ) : null}
               <div className="search-panel-actions">
-                <Button variant="primary" disabled={s.attachment === 'type' && !field}>
+                <Button type="submit" variant="primary" disabled={s.attachment === 'type' && !field}>
                   {t('Applica filtro', 'Apply filter')}
                 </Button>
               </div>
@@ -626,7 +629,7 @@ export default function SearchBar({
               ) : (
                 <label>
                   {t('Valore', 'Value')}{' '}
-                  <input
+                  <Input
                     ref={firstControl}
                     value={field}
                     onChange={(event) => (s.field = event.target.value)}
@@ -641,7 +644,7 @@ export default function SearchBar({
                 ))}
               </datalist>
               <div className="search-panel-actions">
-                <Button variant="primary" disabled={!field.trim()}>
+                <Button type="submit" variant="primary" disabled={!field.trim()}>
                   {t('Applica filtro', 'Apply filter')}
                 </Button>
               </div>

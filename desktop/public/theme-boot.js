@@ -8,4 +8,4 @@ try {
   // Without storage the system theme decides.
 }
 const dark = saved === 'dark' || (saved !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+document.documentElement.dataset.scheme = dark ? 'dark' : 'light';

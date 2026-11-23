@@ -6,7 +6,7 @@ export default function NoticesGallery() {
   const [errors, setErrors] = useState<string[]>([]);
   return (
     <>
-      <header aria-label="Bar" style={{ display: 'flex', height: 40, background: 'var(--surface)' }}>
+      <header aria-label="Bar" style={{ display: 'flex', height: 40, background: 'var(--color-raised)' }}>
         <WindowControls onerror={(message) => setErrors((all) => [...all, message])} />
       </header>
       <output aria-label="Window errors">{errors.join('|')}</output>

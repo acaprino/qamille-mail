@@ -22,7 +22,7 @@ try {
     if (i === 59) throw new Error(`Preview did not start: ${output}`);
     await new Promise(resolve => setTimeout(resolve, 200));
   }
-  browser = await chromium.launch({ channel: 'msedge', headless: true });
+  browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   const page = await browser.newPage({ locale: 'en-US', viewport: { width: 1440, height: 1000 }, colorScheme: 'dark' });
   const errors = [];
   const remoteRequests = [];
@@ -69,7 +69,7 @@ try {
     <h2 id="part2">Part 2</h2><p><a id="back" href="#legacy">Back to the top</a></p>`;
   await page.evaluate(([id, html]) => window.__previewEdit(id, { body_html: html }),
     [8, newsletter.body_html.replace('</div></body>', `${links}</div></body>`)]);
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('html')).toHaveAttribute('data-scheme', 'dark');
 
   // A plain-text message keeps the text reader.
   await expect(page.locator('article.message-body')).toBeVisible();
@@ -103,7 +103,7 @@ try {
   const darkEmail = await page.locator('.html-body iframe').evaluate(element => {
     const doc = element.contentDocument;
     return {
-      theme: doc.documentElement.dataset.theme,
+      theme: doc.documentElement.dataset.scheme,
       filter: getComputedStyle(doc.documentElement).filter,
       imageFilter: getComputedStyle(doc.querySelector('img')).filter,
     };
@@ -113,19 +113,19 @@ try {
   assert.notEqual(darkEmail.imageFilter, 'none', 'Images are counter-transformed and keep their colors');
 
   await page.emulateMedia({ colorScheme: 'light' });
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-  await expect(frame.locator('html')).toHaveAttribute('data-theme', 'light');
+  await expect(page.locator('html')).toHaveAttribute('data-scheme', 'light');
+  await expect(frame.locator('html')).toHaveAttribute('data-scheme', 'light');
   await page.getByRole('button', { name: 'Toggle dark appearance' }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  await expect(frame.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('html')).toHaveAttribute('data-scheme', 'dark');
+  await expect(frame.locator('html')).toHaveAttribute('data-scheme', 'dark');
   assert.equal(await page.evaluate(() => localStorage.getItem('qamille:appearance')), 'dark');
 
   await page.getByRole('button', { name: 'Alex Personal workspace' }).click();
   await page.getByRole('combobox', { name: 'Appearance', exact: true }).click();
   await page.getByRole('option', { name: 'Automatic (system)', exact: true }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await expect(page.locator('html')).toHaveAttribute('data-scheme', 'light');
   await page.emulateMedia({ colorScheme: 'dark' });
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('html')).toHaveAttribute('data-scheme', 'dark');
 
   await page.getByRole('button', { name: 'Inbox', exact: false }).first().click();
   await page.getByText('This week: 5 tools for focused work').first().click();

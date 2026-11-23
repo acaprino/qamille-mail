@@ -2,14 +2,15 @@
 // code, password twice, optional username, device name. The server answers the same way whether
 // the email is free or already has an account; «Send the code again» after 60 s.
 import { useEffect, useState, type ReactNode } from 'react';
-import Button from '../../ds/primitives/Button';
-import Field from '../../ds/primitives/Field';
+import Button from '../../ui/Button';
+import Field from '../../ui/Field';
 import DeviceName from './DeviceName';
 import { call, errorText } from '../../lib/api';
 import { tr } from '../../lib/i18n';
 import type { LegalInfo } from '../../lib/server-connect';
 import { acceptedTerms, needsTermsBox, termsBlock } from '../../lib/subscription-usage';
 import TermsBox from './TermsBox';
+import { Input } from '../../ui/Input';
 
 export type SignUpStepProps = {
   url: string;
@@ -71,7 +72,7 @@ export default function SignUpStep({ url, defaultDeviceName, legal, titled = fal
       {!sent && google}
       <Field>
         {tr('Email', 'Email')}
-        <input type="email" value={email} autoComplete="email" disabled={sent} onChange={(e) => setEmail(e.currentTarget.value)} />
+        <Input type="email" value={email} autoComplete="email" disabled={sent} onChange={(e) => setEmail(e.currentTarget.value)} />
       </Field>
       {!google && needsTermsBox(legal) && <TermsBox legal={legal!} checked={terms} onChange={setTerms} onError={setError} />}
       {!sent ? (
@@ -101,19 +102,19 @@ export default function SignUpStep({ url, defaultDeviceName, legal, titled = fal
           </p>
           <Field>
             {tr('Codice', 'Code')}
-            <input value={code} autoComplete="one-time-code" onChange={(e) => setCode(e.currentTarget.value)} />
+            <Input value={code} autoComplete="one-time-code" onChange={(e) => setCode(e.currentTarget.value)} />
           </Field>
           <Field>
             {tr('Password', 'Password')}
-            <input type="password" value={password} autoComplete="new-password" onChange={(e) => setPassword(e.currentTarget.value)} />
+            <Input type="password" value={password} autoComplete="new-password" onChange={(e) => setPassword(e.currentTarget.value)} />
           </Field>
           <Field>
             {tr('Ripeti la password', 'Repeat the password')}
-            <input type="password" value={repeat} autoComplete="new-password" onChange={(e) => setRepeat(e.currentTarget.value)} />
+            <Input type="password" value={repeat} autoComplete="new-password" onChange={(e) => setRepeat(e.currentTarget.value)} />
           </Field>
           <Field>
             {tr('Username (facoltativo)', 'Username (optional)')}
-            <input value={username} autoComplete="username" onChange={(e) => setUsername(e.currentTarget.value)} />
+            <Input value={username} autoComplete="username" onChange={(e) => setUsername(e.currentTarget.value)} />
           </Field>
           <DeviceName value={deviceName} onChange={setDeviceName} />
           <div className="button-row step-actions">

@@ -5,8 +5,8 @@
 // say; the buttons call back and the page does the work. "Riprova" is a new transcription with the
 // engine Settings says now, not the failed job run again: the job would restart with the options
 // it failed with, and a fix made in Settings (the model, the language) would change nothing.
-import Button from '../../ds/primitives/Button';
-import Icon from '../../ds/primitives/Icon';
+import Button from '../../ui/Button';
+import Icon from '../../ui/Icon';
 import { backendText, tr } from '../../lib/i18n';
 import type { MeetingDetail, MeetingJob } from '../../lib/meetings';
 import MeetingNotice from './MeetingNotice';

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { openAllGroups } from './support/groups.mjs';
 // Browser preview only: it drives the mock backend in src/lib/preview.ts, which clamps
 // `list_mail` to 1..100 rows per call exactly like the Rust backend (INV-007).
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const context = await browser.newContext({
   locale: 'en-US',
   viewport: { width: 1440, height: 900 },

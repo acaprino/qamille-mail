@@ -28,7 +28,7 @@ async function waitForServer() {
 let browser;
 try {
   await waitForServer();
-  browser = await chromium.launch({ channel: 'msedge', headless: true });
+  browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   page.setDefaultTimeout(30000);

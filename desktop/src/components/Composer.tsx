@@ -1,10 +1,10 @@
-import { motion, useIsPresent, useReducedMotion, type Variants } from 'motion/react';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
-import Button from '../ds/primitives/Button';
-import Tooltip from '../ds/primitives/Tooltip';
-import DateField from '../ds/primitives/DateField';
-import Icon from '../ds/primitives/Icon';
-import Select from '../ds/primitives/Select';
+import { useLand } from '../ui/motion';
+import Button from '../ui/Button';
+import Tooltip from '../ui/Tooltip';
+import DateField from '../ui/DateField';
+import Icon from '../ui/Icon';
+import Select from '../ui/Select';
 import { call, errorText } from '../lib/api';
 import { calendarWords as dateWords } from '../lib/calendar-words';
 import { copiedDraft, type ComposerHandle, type ComposerState } from '../lib/composer';
@@ -17,8 +17,9 @@ import type { Draft, UndoAction, Workspace } from '../lib/types';
 import { cn } from '../lib/utils';
 import RecipientInput, { splitRecipients } from './contacts/RecipientInput';
 import RichEditor, { type RichEditorHandle } from './RichEditor';
-import { imeComposing } from '../ds/ime';
+import { imeComposing } from '../lib/ime';
 import './Composer.css';
+import { Input } from '../ui/Input';
 
 // The status value is a stable key: the dock compares it, so only its label is translated.
 export function saveStatusLabel(status: string): string {
@@ -53,21 +54,16 @@ const plainHtml = (text: string) =>
 const withPending = (list: string | undefined, typed: string) =>
   [(list ?? '').trim(), ...splitRecipients(typed)].filter(Boolean).join(', ');
 
-// The window opens by fading in where it stands (a slide would move its frame out of the place the
-// layout gives it while it settles) and, minimized or closed, sinks towards the dock as it fades.
-const spring = { type: 'spring', stiffness: 400, damping: 32 } as const;
-const variants: Variants = {
-  open: { opacity: 1, y: 0, transition: { opacity: spring, y: { duration: 0 } } },
-  closed: { opacity: 0, y: 24, transition: spring },
-};
+const OPEN_LAYER =
+  ':is([data-slot="sheet-content"], [data-slot="dialog-content"], [data-slot="popover-content"]):is([data-open], [data-state="open"]), [role="menu"], [role="listbox"]';
+/** Whether such a layer is on the page and shown (a closed list stays in the DOM, hidden). */
+const openLayer = () => [...document.querySelectorAll(OPEN_LAYER)].some((layer) => layer.checkVisibility?.() ?? true);
 
 export default function Composer(props: ComposerProps) {
   const { initial, workspace, active, windowClosing, minimize } = props;
   // The callbacks and flags as they are now, for timers, awaits and the handle given to the dock.
   const p = useRef(props);
   p.current = props;
-  const still = useReducedMotion();
-  const present = useIsPresent();
 
   const s = useReactive(() => ({
     draft: copy(initial),
@@ -417,32 +413,20 @@ export default function Composer(props: ComposerProps) {
     await queue('discard', null, false);
   }
 
-  // Minimized, the panel stays drawn (out of the accessibility tree) until it has sunk away, then it
-  // is hidden; opened again it shows at once. Without motion it hides at once.
-  const [gone, setGone] = useState(!active);
-  if (active && gone) setGone(false);
-  const hidden = still ? !active : !active && gone;
-  const leaving = !present || (!active && !hidden);
+  // Minimized, the panel is hidden at once; opened again it settles into place.
+  const hidden = !active;
+  useLand(panel, active, active);
   const fileName = (path: string) => path.split(/[\\/]/).pop();
 
   return (
-    <motion.div
+    <div
       ref={panel}
       id={`compose-panel-${draft.id}`}
       className={cn('composer-panel', s.dropDepth > 0 && 'mail-drop')}
       role="tabpanel"
       tabIndex={-1}
       hidden={hidden}
-      aria-hidden={leaving ? true : undefined}
       aria-labelledby={`compose-tab-${draft.id}`}
-      style={leaving ? { pointerEvents: 'none' } : undefined}
-      variants={variants}
-      initial={still ? false : 'closed'}
-      animate={still ? undefined : active ? 'open' : 'closed'}
-      exit={!still && active ? 'closed' : undefined}
-      onAnimationComplete={(definition) => {
-        if (definition === 'closed' && !p.current.active) setGone(true);
-      }}
       onFocus={(event) => {
         if (
           event.target instanceof HTMLElement &&
@@ -455,7 +439,8 @@ export default function Composer(props: ComposerProps) {
       onDragLeaveCapture={dragLeave}
       onDropCapture={(event) => void dropMail(event)}
       onKeyDownCapture={(event) => {
-        if (event.key === 'Escape' && !event.defaultPrevented && !locked && !imeComposing(event.nativeEvent)) {
+        // A layer that is open (a side panel, a dialog, a popover, a menu, a list) takes the Esc before the composer minimizes.
+        if (event.key === 'Escape' && !event.defaultPrevented && !locked && !imeComposing(event.nativeEvent) && !openLayer()) {
           event.preventDefault();
           event.stopPropagation();
           minimize();
@@ -597,7 +582,7 @@ export default function Composer(props: ComposerProps) {
         )}
         <label className="field-row">
           <span>{tr('Oggetto', 'Subject')}</span>
-          <input
+          <Input
             aria-label={tr('Oggetto', 'Subject')}
             value={draft.subject}
             onChange={(event) => {
@@ -679,7 +664,7 @@ export default function Composer(props: ComposerProps) {
             value={s.scheduleDay}
             onChange={(value) => (s.scheduleDay = value)}
           />
-          <input
+          <Input
             className="time-field"
             type="time"
             aria-label={tr('Ora di invio', 'Send time')}
@@ -751,6 +736,6 @@ export default function Composer(props: ComposerProps) {
           <Icon name="trash" size={18} />
         </Button>
       </footer>
-    </motion.div>
+    </div>
   );
 }

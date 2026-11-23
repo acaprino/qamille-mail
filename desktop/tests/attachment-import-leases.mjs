@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 
 if (process.env.QAMILLE_CDP) throw new Error('Attachment lease tests require an isolated synthetic browser.');
 const base = process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:1420';
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 900 } });
 const errors = [];
 const requests = [];

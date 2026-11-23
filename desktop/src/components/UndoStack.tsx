@@ -1,8 +1,9 @@
-import { AnimatePresence, motion, useIsPresent, useReducedMotion } from 'motion/react';
+import { Item, Presence } from '../ui/motion';
 import { useEffect, useState } from 'react';
-import Button from '../ds/primitives/Button';
-import Count from '../ds/primitives/Count';
-import Icon from '../ds/primitives/Icon';
+import Button from '../ui/Button';
+import Count from '../ui/Count';
+import Icon from '../ui/Icon';
+import Progress from '../ui/Progress';
 import { cn } from '../lib/utils';
 import { undoLabel } from '../lib/undo';
 import {
@@ -21,8 +22,6 @@ export type UndoStackProps = {
   undo: (action: UndoAction) => Promise<void>;
   dismiss: (id: number) => Promise<void>;
 };
-
-const spring = { type: 'spring', stiffness: 400, damping: 32 } as const;
 
 export default function UndoStack({ actions, undo, dismiss }: UndoStackProps) {
   const [now, setNow] = useState(() => Date.now());
@@ -58,7 +57,7 @@ export default function UndoStack({ actions, undo, dismiss }: UndoStackProps) {
       className="undo-stack"
       aria-label={tr('Azioni recenti sulle email', 'Recent email actions')}
     >
-      <AnimatePresence initial={false}>
+      <Presence>
         {[...visible].reverse().map((action) => (
           <Notice
             key={action.id}
@@ -70,7 +69,7 @@ export default function UndoStack({ actions, undo, dismiss }: UndoStackProps) {
             onDismiss={() => void dismiss(action.id)}
           />
         ))}
-      </AnimatePresence>
+      </Presence>
     </section>
   );
 }
@@ -90,25 +89,13 @@ function Notice({
   onGiveUp: () => void;
   onDismiss: () => void;
 }) {
-  const still = useReducedMotion();
-  // A notice on its way out is still drawn for a moment: it must not take a click or the focus.
-  const present = useIsPresent();
   const remaining = Math.max(0, action.expires_at_ms - now);
   const available = canUndo(action, now);
   const retrying = isRetryNotice(action, now);
   const seconds = retrySeconds(action, now);
   const subject = action.subject || tr('Messaggio senza oggetto', 'Untitled message');
   return (
-    <motion.div
-      className={cn('undo-notice', action.status === 'failed' && 'failed')}
-      data-action-id={action.id}
-      inert={!present}
-      layout={still ? false : 'position'}
-      initial={still ? false : { opacity: 0, y: 16, scale: 0.97 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={still ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, scale: 0.96 }}
-      transition={spring}
-    >
+    <Item className={cn('undo-notice', action.status === 'failed' && 'failed')} data-action-id={action.id}>
       <span className="undo-icon">
         <Icon
           name={
@@ -198,22 +185,18 @@ function Notice({
           >
             {available ? tr('Annulla', 'Undo') : tr('In corso…', 'Applying…')}
           </Button>
-          <div
-            className="undo-track"
-            role="progressbar"
-            aria-label={tr('Tempo rimasto per annullare', 'Time left to undo')}
-            aria-valuemin={0}
-            aria-valuemax={(action.expires_at_ms - action.created_at_ms) / 1000}
-            aria-valuenow={Math.ceil(remaining / 1000)}
-          >
-            <span
-              style={{
-                transform: `scaleX(${Math.min(1, remaining / (action.expires_at_ms - action.created_at_ms))})`,
-              }}
+          <div className="undo-track">
+            <Progress
+              countdown
+              size="sm"
+              aria-label={tr('Tempo rimasto per annullare', 'Time left to undo')}
+              value={remaining / 1000}
+              max={(action.expires_at_ms - action.created_at_ms) / 1000}
+              valueText={tr(`${Math.ceil(remaining / 1000)} s rimasti`, `${Math.ceil(remaining / 1000)} seconds left`)}
             />
           </div>
         </>
       )}
-    </motion.div>
+    </Item>
   );
 }

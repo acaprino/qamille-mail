@@ -1,11 +1,10 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
-import Button from '../ds/primitives/Button';
-import Checkbox from '../ds/primitives/Checkbox';
-import Field from '../ds/primitives/Field';
-import Icon from '../ds/primitives/Icon';
-import GoogleMark from '../ds/primitives/GoogleMark';
-import Select from '../ds/primitives/Select';
-import Switch from '../ds/primitives/Switch';
+import Button from '../ui/Button';
+import Checkbox from '../ui/Checkbox';
+import Field from '../ui/Field';
+import Icon from '../ui/Icon';
+import Select from '../ui/Select';
+import Switch from '../ui/Switch';
 import { call, desktop, errorText } from '../lib/api';
 import { needsReconsent, providerItems as serverProviderItems, reconsentText, type LlmStatus } from '../lib/assistant-server';
 import type { Appearance } from '../lib/appearance';
@@ -27,6 +26,7 @@ import ComputeSettings from './ComputeSettings';
 import DesktopSettings from './DesktopSettings';
 import VaultSettings from './VaultSettings';
 import './Settings.css';
+import { Input, Textarea } from '../ui/Input';
 
 export type SettingsHandle = {
   /** Opens a section by its key ('General', 'Accounts', 'Local storage', 'Search', 'Meetings'…); unknown keys are ignored. */
@@ -363,14 +363,14 @@ export default function Settings({
                 </p>
                 <Field>
                   {tr('Il tuo nome', 'Your name')}
-                  <input
+                  <Input
                     value={settings.user_name}
                     onChange={(e) => (form.settings.user_name = e.currentTarget.value)}
                   />
                 </Field>
                 <Field>
                   {tr('Cerca una località per il fuso orario', 'Find a city for the time zone')}
-                  <input
+                  <Input
                     value={form.zoneSearch}
                     onChange={(e) => (form.zoneSearch = e.currentTarget.value)}
                     placeholder={tr('Roma, Londra, Havana…', 'Rome, London, Havana…')}
@@ -512,7 +512,7 @@ export default function Settings({
                   disabled={form.busy}
                   onClick={() => void signInWithGoogle()}
                 >
-                  <GoogleMark />
+                  <img src="/brand/google.svg" alt="" width={18} height={18} />
                   {form.googlePending
                     ? tr('Mostra avanzamento accesso', 'Show sign-in progress')
                     : hasGmail
@@ -545,7 +545,7 @@ export default function Settings({
                   </p>
                   <Field>
                     {tr('ID client desktop di Google', 'Google desktop client ID')}
-                    <input
+                    <Input
                       ref={googleClientInput}
                       value={settings.google_client_id}
                       onChange={(e) => (form.settings.google_client_id = e.currentTarget.value)}
@@ -555,7 +555,7 @@ export default function Settings({
                   </Field>
                   <Field>
                     {tr('Client secret di Google', 'Google client secret')}
-                    <input
+                    <Input
                       type="password"
                       value={form.googleSecret}
                       onChange={(e) => (form.googleSecret = e.currentTarget.value)}
@@ -591,14 +591,14 @@ export default function Settings({
                   </summary>
                   <Field>
                     {tr("Nome dell'account", 'Account name')}
-                    <input
+                    <Input
                       value={form.name}
                       onChange={(e) => (form.name = e.currentTarget.value)}
                     />
                   </Field>
                   <Field>
                     Email
-                    <input
+                    <Input
                       type="email"
                       value={form.email}
                       onChange={(e) => (form.email = e.currentTarget.value)}
@@ -606,7 +606,7 @@ export default function Settings({
                   </Field>
                   <Field>
                     {tr('Password per le app', 'App password')}
-                    <input
+                    <Input
                       type="password"
                       value={form.password}
                       onChange={(e) => (form.password = e.currentTarget.value)}
@@ -684,7 +684,7 @@ export default function Settings({
                   <>
                     <Field>
                       {tr('Modello', 'Model')}
-                      <input
+                      <Input
                         value={settings.ai_model}
                         onChange={(e) => (form.settings.ai_model = e.currentTarget.value)}
                         placeholder={tr('Nome del modello', 'Model name')}
@@ -692,7 +692,7 @@ export default function Settings({
                     </Field>
                     <Field>
                       Endpoint
-                      <input
+                      <Input
                         value={settings.ai_base_url}
                         onChange={(e) => (form.settings.ai_base_url = e.currentTarget.value)}
                         placeholder="https://…"
@@ -700,7 +700,7 @@ export default function Settings({
                     </Field>
                     <Field>
                       {tr('Chiave API', 'API key')}
-                      <input
+                      <Input
                         type="password"
                         value={form.aiKey}
                         onChange={(e) => (form.aiKey = e.currentTarget.value)}
@@ -757,14 +757,14 @@ export default function Settings({
                 </div>
                 <Field>
                   {tr('Nome', 'Name')}
-                  <input
+                  <Input
                     value={signature.name}
                     onChange={(e) => (form.signature.name = e.currentTarget.value)}
                   />
                 </Field>
                 <Field>
                   {tr('Testo della firma', 'Signature text')}
-                  <textarea
+                  <Textarea
                     rows={7}
                     value={signature.body}
                     onChange={(e) => (form.signature.body = e.currentTarget.value)}

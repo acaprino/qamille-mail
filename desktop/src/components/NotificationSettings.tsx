@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import Switch from '../ds/primitives/Switch';
+import Switch from '../ui/Switch';
 import { call, errorText } from '../lib/api';
 import { tr } from '../lib/i18n';
 import { useReactive } from '../lib/store';

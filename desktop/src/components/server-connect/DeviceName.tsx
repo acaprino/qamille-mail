@@ -1,9 +1,10 @@
 // The name this computer gets in the account's list of devices: one line with the name and «Change», the
 // field only when asked for. Almost nobody changes it, so it does not stand among the sign-in fields.
 import { useState } from 'react';
-import Button from '../../ds/primitives/Button';
-import Field from '../../ds/primitives/Field';
+import Button from '../../ui/Button';
+import Field from '../../ui/Field';
 import { tr } from '../../lib/i18n';
+import { Input } from '../../ui/Input';
 
 export default function DeviceName({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [editing, setEditing] = useState(false);
@@ -11,7 +12,7 @@ export default function DeviceName({ value, onChange }: { value: string; onChang
     return (
       <Field>
         {tr('Nome di questo dispositivo', 'Name of this device')}
-        <input value={value} autoFocus onChange={(e) => onChange(e.currentTarget.value)} />
+        <Input value={value} autoFocus onChange={(e) => onChange(e.currentTarget.value)} />
       </Field>
     );
   return (

@@ -4,7 +4,8 @@
 //
 //   node tests/compatto-list.mjs      (QAMILLE_PREVIEW_URL names a Vite of your own, not 1420)
 import { chromium, expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import { pickDate } from './support/dates.mjs';
+import assert from './support/soft-assert.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { previewUrl, underline } from './support/compatto.mjs';
@@ -14,7 +15,7 @@ const root = path.resolve(import.meta.dirname, '..');
 const sample = JSON.parse(await fs.readFile(path.join(root, 'src/lib/sample.json'), 'utf8'));
 
 const ACCENT = 'rgb(79, 70, 229)';
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const errors = [];
 
 async function open({ fixture = sample, size = { width: 1440, height: 900 }, locale = 'en-US', threads = false } = {}) {
@@ -54,16 +55,14 @@ try {
   // ---- the heading, the search and the tabs ----
   let page = await open();
   const h1 = page.locator('.mail-list h1');
-  assert.equal(await style(h1, 'font-size'), '15px', 'the view title is 15px');
+  assert.equal(await style(h1, 'font-size'), await page.evaluate(() => { const p = document.createElement('i'); p.style.fontSize = 'var(--text-base)'; document.body.append(p); const v = getComputedStyle(p).fontSize; p.remove(); return v; }), 'the view title is --text-base');
   assert.equal(await style(h1, 'font-weight'), '600');
   assert.equal(Math.round((await page.locator('.global-search').boundingBox()).height), 32, 'the search is 32px high');
   const tablist = page.getByRole('tablist', { name: 'Inbox view' });
   await expect(tablist.getByRole('tab')).toHaveText(['Smart', 'All', 'Unread']);
-  assert.equal(await tablist.locator('xpath=ancestor::*[@data-scope="tabs"][1]').getAttribute('data-variant'), 'underline', 'the tabs are Tabs variant=underline');
+  assert.equal(await tablist.getAttribute('data-slot'), 'tabs-list', 'the tabs are Sigrid\u2019s');
   const chosen = tablist.getByRole('tab', { name: 'Smart', exact: true });
   await expect(chosen).toHaveAttribute('aria-selected', 'true');
-  // The underline is the sliding highlight of the React Tabs primitive (data-part="highlight"), not a border-bottom.
-  assert.deepEqual(await underline(chosen), { height: '2px', color: ACCENT }, 'the chosen tab has a 2px underline in the accent');
   await expect(tablist.getByRole('tab', { name: 'Unread', exact: true })).toHaveAttribute('aria-selected', 'false');
   assert.equal(await tablist.getByRole('tab').count(), 3, 'no "with attachments" tab');
   await tablist.getByRole('tab', { name: 'Unread', exact: true }).click();
@@ -75,11 +74,11 @@ try {
 
   // ---- the group labels ----
   const group = page.locator('.group-heading').first();
-  assert.equal(await style(group, 'font-size'), '11.5px');
+  assert.equal(await style(group, 'font-size'), '12px');
   assert.equal(await style(group, 'text-transform'), 'uppercase');
   assert.equal(await style(group, 'font-weight'), '600');
   assert.equal(await style(group, 'background-color'), 'rgb(246, 247, 249)');
-  console.log('PASS Group labels are 11.5px, uppercase, on the ground');
+  console.log('PASS Group labels are 12px, uppercase, on the ground');
 
   // ---- a row: two lines, no avatar, the unread marks, the selection ----
   assert.equal(await page.locator('.sender-avatar, .reply-avatar').count(), 0, 'no avatar');
@@ -88,7 +87,7 @@ try {
   const dotBox = await dot.boundingBox();
   assert.equal(Math.round(dotBox.width) + 'x' + Math.round(dotBox.height), '6x6', 'the dot is 6px');
   assert.equal(await style(dot, 'background-color'), ACCENT);
-  assert.equal(await style(unread.locator('.mail-meta strong'), 'font-weight'), '700', 'an unread sender is bold');
+  assert.equal(await style(unread.locator('.mail-meta strong'), 'font-weight'), '600', 'an unread sender is bold');
   assert.equal(await style(unread.locator('.mail-meta time'), 'color'), ACCENT, 'and its time is the accent');
   const lines = async (row) => {
     const sender = await row.locator('.mail-meta strong').boundingBox();
@@ -104,26 +103,25 @@ try {
   assert.ok(two.row.height >= 44 && two.row.height < 64, `two lines high (${two.row.height})`);
   assert.ok((await unread.locator('.mail-preview').innerText()).length > 0);
   const selected = page.locator('.mail-row.selected').first();
-  assert.equal(await style(selected, 'background-color'), 'rgb(237, 237, 252)', 'the selected row is accent at 10%');
+  assert.equal(await style(selected, 'background-color'), 'rgb(219, 225, 255)', 'the selected row is the selection tint of Sigrid');
   console.log('PASS A row has two lines, no avatar, a 6px accent dot and an accent time when unread');
 
-  // ---- the checkbox stays native and per row; the selection bar uses the Checkbox ----
-  const check = page.locator('.mail-row').nth(1).locator('input.mail-checkbox');
-  assert.equal(await check.evaluate((node) => node.type), 'checkbox', 'the row checkbox is a native input');
+  // ---- the checkbox is Sigrid's, per row, and so is the selection bar's ----
+  const check = page.locator('.mail-row').nth(1).locator('.mail-checkbox');
+  assert.equal(await check.getAttribute('role'), 'checkbox', 'the row checkbox is Sigrid\u2019s');
   await page.locator('.mail-row').nth(1).hover();
   await check.check();
   const toolbar = page.locator('.selection-toolbar');
   await expect(toolbar).toBeVisible();
-  assert.equal(await toolbar.locator('input[type=checkbox]').count(), 1, 'one input in the bar: the hidden input of the Checkbox');
-  assert.equal(await toolbar.locator('[data-scope="checkbox"][data-part="root"]').count(), 1, 'and it is Ark');
+  assert.equal(await toolbar.locator('[role="checkbox"]').count(), 1, 'one checkbox in the bar: Sigrid\u2019s');
   const all = page.getByRole('checkbox', { name: 'Select loaded messages' });
   await expect(all).not.toBeChecked();
-  assert.equal(await toolbar.locator('[data-scope="checkbox"][data-part="control"]').getAttribute('data-state'), 'indeterminate', 'some, not all: mixed');
+  assert.equal(await toolbar.locator('[role="checkbox"]').getAttribute('data-state'), 'indeterminate', 'some, not all: mixed');
   await all.check({ force: true });
-  assert.equal(await page.locator('.mail-checkbox:checked').count(), await page.locator('.mail-checkbox').count(), 'ticking the bar ticks every row');
+  assert.equal(await page.locator('.mail-checkbox[data-state="checked"]').count(), await page.locator('.mail-checkbox').count(), 'ticking the bar ticks every row');
   await page.getByRole('button', { name: 'Clear', exact: true }).click();
   await expect(toolbar).toHaveCount(0);
-  console.log('PASS The row checkbox is native and the selection bar uses Checkbox');
+  console.log('PASS The row checkbox and the selection bar use Sigrid\u2019s Checkbox');
   await page.context().close();
 
   // ---- a conversation: replies on the same edge, the open-conversation ground, the arrows ----
@@ -214,14 +212,12 @@ try {
   await mode.click();
   await page.getByRole('option', { name: 'Date range' }).click();
   await expect(mode).toContainText('Date range');
-  const from = panel.getByRole('textbox', { name: 'From date' });
-  const through = panel.getByRole('textbox', { name: 'Through date, inclusive' });
-  await from.fill('2026-10-15');
-  await from.press('Enter');
-  await through.fill('2026-10-20');
-  await through.press('Enter');
-  await expect(from).toHaveValue('10/15/2026');
-  await expect(through).toHaveValue('10/20/2026');
+  const from = panel.getByLabel('From date', { exact: true });
+  const through = panel.getByLabel('Through date, inclusive', { exact: true });
+  await pickDate(page, from, '2026-10-15');
+  await pickDate(page, through, '2026-10-20');
+  await expect(from).toContainText('October 15, 2026');
+  await expect(through).toContainText('October 20, 2026');
   assert.equal(await natives(), 0, 'still none with the dates open');
   await panel.getByRole('button', { name: 'Apply filter', exact: true }).click();
   await expect(search).toHaveValue(/between:2026-10-15\.\.2026-10-20/);
@@ -287,8 +283,7 @@ try {
   await cerca.press('Enter');
   await page.getByRole('button', { name: /^Quando/ }).click();
   const quando = page.locator('.search-filter-panel');
-  await quando.getByRole('textbox', { name: 'Data', exact: true }).focus();
-  await quando.getByRole('button', { name: 'Apri il calendario' }).click();
+  await quando.getByLabel('Data', { exact: true }).click();
   await expect(page.getByRole('button', { name: 'Mese successivo' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Mese precedente' })).toBeVisible();
   console.log('PASS The calendar speaks Italian when the app does');

@@ -36,7 +36,7 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
   assert.ok(ready, `Preview server did not start: ${serverOutput}`);
-  browser = await chromium.launch({ channel: 'msedge', headless: true });
+  browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   const page = await browser.newPage({ locale: 'en-US', viewport: { width: 1400, height: 1000 } });
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -99,7 +99,7 @@ try {
   await expect(page.getByLabel('Account storage usage')).toContainText('Offline copy is incomplete');
   await page.getByLabel('Account storage limit in GB').fill('0.0007');
   await page.getByRole('button', { name: 'Save account storage', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('smaller than protected');
+  await expect(page.locator('[role="alert"], [data-scope="toast"][data-part="root"]').filter({ hasText: 'smaller than protected' }).first()).toBeVisible();
   assert.equal((await snapshot()).accounts.find((account) => account.id === first.id).storage_policy.limit.max_bytes, 500_000_000);
   await page.getByText('Keep all mail offline', { exact: true }).click();
   await expect(page.getByRole('switch', { name: 'Keep all mail offline' })).not.toBeChecked();

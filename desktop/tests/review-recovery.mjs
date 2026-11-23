@@ -19,7 +19,7 @@ try {
     if (i === 59) throw new Error(`Preview did not start: ${output}`);
     await new Promise(r => setTimeout(r, 200));
   }
-  browser = await chromium.launch({ channel: 'msedge', headless: true });
+  browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   const page = await browser.newPage({ locale: 'en-US', viewport: { width: 1440, height: 1050 } });
   page.setDefaultTimeout(10000);
   const errors = [];

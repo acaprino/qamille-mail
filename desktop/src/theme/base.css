@@ -1,0 +1,284 @@
+/* The base of Qamille (ADR-0011 v4): the element rules and the few rules for Sigrid's parts. Page rules stay in styles.css.
+   The imports keep this order, and stay before every rule, as CSS asks. */
+@import './qamille-tokens.css';
+@import '../ui/parts.css';
+@import './tailwind.css';
+* {
+  box-sizing: border-box;
+}
+html {
+  background: var(--color-paper);
+}
+/* Native feel (docs/aspetto-nativo.md rule 4): the root of the WebView never scrolls and never slides past
+   its edge, so a precision touchpad or a touchscreen cannot move the whole view and uncover the window
+   background. Each screen scrolls inside its own container; the root lock is the guarantee, and only some containers
+   add `overscroll-behavior: contain`. */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: var(--color-paper);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  /* Native feel (docs/aspetto-nativo.md): labels, buttons and lists are not a
+     document, so they neither select nor show the text cursor. */
+  user-select: none;
+  cursor: default;
+}
+/* Sigrid's disabled and busy controls still carry the web page's cursors (`cursor-not-allowed`, `cursor-progress`; asked
+   of Sigrid as R16): a Windows app keeps the arrow. Unlayered, so it beats Sigrid's utilities until they are gone. */
+[class*='cursor-not-allowed'],
+[class*='cursor-progress'] {
+  cursor: default;
+}
+/* Fields and reading content opt back in: text the user types, reads or copies.
+   A new reading area adds `.selectable` (or joins this list). */
+input,
+textarea,
+[contenteditable]:not([contenteditable='false']),
+.selectable,
+.reader-scroll,
+.attached-message,
+.chat-question,
+.chat-answer,
+.contact-detail,
+.inline-error,
+.toast,
+/* Configurations, scopes and paths to paste elsewhere, errors to quote, account values. */
+pre,
+code,
+[role='alert'],
+.compute-account strong,
+[data-subscription] {
+  user-select: text;
+  cursor: auto;
+}
+/* The element rules of the buttons are in the base layer (after Sigrid's own base), so the utilities of Sigrid's parts win over
+   them (the Sigrid plan, Task 7). */
+@layer base {
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+}
+/* Windows controls keep the arrow: "don't use the pointing hand cursor for links or other
+   interactive elements. Instead, use hover effects" (Microsoft, mouse interactions;
+   docs/aspetto-nativo.md rule 3). Links inside a message keep the hand: they are document, in the
+   message's own iframe; the links of this document (setup guides) are the interface's. */
+@layer base {
+  button,
+  a {
+    cursor: default;
+  }
+}
+/* A link of the interface (a setup guide) in the app's accent, not the browser's blue and purple. */
+a:any-link {
+  color: var(--color-accent);
+  text-underline-offset: 3px;
+}
+/* Icons, avatars and links of the interface do not drag a browser ghost out of the window
+   (rule 22). Attachments and messages are dragged by the app's own handlers. */
+img,
+a {
+  -webkit-user-drag: none;
+}
+@layer base {
+  button {
+    border: 0;
+    background: none;
+    color: inherit;
+  }
+}
+@layer base {
+  button:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+@layer base {
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  summary:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
+  }
+}
+/* The bare fields (the ones that are not Sigrid's Input) and the base of the page: in the base layer, so Sigrid's own
+   classes on its fields win over them (the Sigrid plan, Task 9). */
+@layer base {
+  input,
+  textarea,
+  select {
+    color: inherit;
+    background: var(--color-raised);
+    border: 1px solid var(--color-input);
+    border-radius: var(--radius-md);
+    padding: 7px 9px;
+  }
+}
+/* A disabled field looks like every disabled control (ds/README.md, "Stati e movimento"): without this
+   rule the colours above replace the browser's own and a locked field looks ready to type in.
+   Checkboxes keep the browser's disabled look; the date and recipient fields dim as a whole. */
+@layer base {
+  input:not([type='checkbox'], [type='radio']):disabled,
+  textarea:disabled,
+  select:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+input[type='checkbox'] {
+  accent-color: var(--color-primary);
+  width: 17px;
+  height: 17px;
+}
+textarea {
+  resize: vertical;
+  line-height: 1.65;
+}
+button svg,
+span svg {
+  display: block;
+  flex-shrink: 0;
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+h1 {
+  font-family: var(--font-sans);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  letter-spacing: -1px;
+}
+h2 {
+  font-family: var(--font-sans);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: -0.4px;
+}
+h3 {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.muted {
+  color: var(--color-ink-mute);
+}
+.accent {
+  color: var(--color-accent) !important;
+}
+/* A checkbox with its label: the box and the text on one line, and a click anywhere on it toggles (ui/Checkbox.tsx). */
+.checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+}
+.checkbox-row[data-disabled] {
+  opacity: 0.5;
+}
+
+/* Task 9: field (the Sigrid plan: only Task 9 touches this section, which ends at the next blank line) */
+/* The look of a field is Sigrid's (ui/Field.tsx, ui/Input.tsx); what is left is the space under it and the weight of what
+   is typed (the label is medium). */
+.field {
+  margin-bottom: 14px;
+}
+.field input,
+.field textarea {
+  font-weight: 400;
+}
+
+/* A progress bar: a visible track filled in the accent. The bare element drew no track, so at 0% it was a
+   blank gap. A page that must signal a limit sets --progress-fill. */
+progress {
+  appearance: none;
+  height: 6px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-line);
+  overflow: hidden;
+}
+progress::-webkit-progress-bar {
+  background: var(--color-line);
+  border-radius: var(--radius-full);
+}
+progress::-webkit-progress-value {
+  background: var(--progress-fill, var(--color-primary));
+  border-radius: var(--radius-full);
+}
+/* A disclosure row (details): the app's chevron in place of the browser's triangle, turned down when open
+   (the mask reads only the alpha of the drawing). */
+summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+}
+summary::-webkit-details-marker {
+  display: none;
+}
+summary::before {
+  content: '';
+  flex: none;
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 5 7 7-7 7'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 5 7 7-7 7'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  transition: transform var(--motion-panel) var(--ease-out);
+}
+details[open] > summary::before {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  summary::before {
+    transition: none;
+  }
+}
+.field-help {
+  font-size: var(--text-2xs);
+  color: var(--color-ink-mute);
+  line-height: 1.65;
+  margin-top: -7px;
+  margin-bottom: 14px;
+}
+/* Under a heading it describes the section: the pull toward a field above would lay it over the heading. */
+:is(h2, h3, h4) + .field-help {
+  margin-top: 4px;
+}
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.popover-divider {
+  display: block;
+  height: 1px;
+  margin: 4px 2px;
+  background: var(--color-line);
+}
+
+/* Overlays (ADR-0008): the three containers (SidePanel, Modal, Popover) are styled by Sigrid; ui/parts.css holds the helpers for what goes inside them. */

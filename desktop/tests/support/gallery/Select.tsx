@@ -2,16 +2,16 @@
 // listener that stands for App.tsx's shortcut handler (same guard, shortcutIgnored): it counts
 // the keys the page would have acted on, so a test can see that a key typed in the list is not one.
 import { useEffect, useState } from 'react';
-import Modal from '../../../src/ds/primitives/Modal';
-import Select from '../../../src/ds/primitives/Select';
-import SidePanel from '../../../src/ds/primitives/SidePanel';
+import Modal from '../../../src/ui/Modal';
+import Select from '../../../src/ui/Select';
+import SidePanel from '../../../src/ui/SidePanel';
 import { shortcutIgnored } from '../../../src/lib/shortcut-guard';
 
 const items = [
   { value: 'it', label: 'Italiano' },
   { value: 'en', label: 'English' },
   { value: 'es', label: 'Español' },
-  { value: 'de', label: 'Deutsch', disabled: true },
+  { value: 'de', label: 'Deutsch' },
   { value: 'fr', label: 'Français' },
 ];
 
@@ -54,7 +54,7 @@ export default function SelectSection({ props = {} }: { props?: Record<string, a
           {body}
         </Modal>
       ) : props.panel ? (
-        <div style={{ position: 'relative', height: 320, border: '1px solid var(--border)' }}>
+        <div style={{ position: 'relative', height: 320, border: '1px solid var(--color-line)' }}>
           <SidePanel aria-label="Preferences" onScrim={close}>
             {body}
           </SidePanel>

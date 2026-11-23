@@ -9,18 +9,18 @@
   gap: 6px;
   width: min(360px, calc(100vw - 40px));
   padding: 12px 14px;
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--border);
+  color: var(--color-ink);
+  background: var(--color-raised);
+  border: 1px solid var(--color-line);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
+  box-shadow: var(--elevation-lg);
 }
 :root:has(.app-shell.has-composers) .update-notice {
   bottom: 62px;
 }
 .update-notice p {
   margin: 0;
-  color: var(--muted);
+  color: var(--color-ink-mute);
 }
 /* The release notes: at most three lines here, the rest is in the release. */
 .update-notice .update-notice-notes {

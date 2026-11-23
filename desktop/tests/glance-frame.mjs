@@ -1,7 +1,7 @@
 // The restyled frame (spec 2026-11-07 §4.1): one ground, one white sheet, IBM Plex Sans for
 // everything scanned and for titles (spec 2026-11-08 §3), one blue, no resting shadows. Synthetic data only.
 import { chromium, expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -10,11 +10,11 @@ const port = 28171;
 const url = `http://127.0.0.1:${port}`;
 const root = path.resolve(import.meta.dirname, '..');
 
-// The window colour shows before the page paints: it is the theme's --ground, the colour the page paints
+// The window colour shows before the page paints: it is the theme's --color-paper, the colour the page paints
 // first (docs/aspetto-nativo.md rule 6, kept in step by tests/native-feel.mjs).
 const tauri = JSON.parse(fs.readFileSync(path.join(root, 'src-tauri/tauri.conf.json'), 'utf8'));
-assert.equal(tauri.app.windows[0].backgroundColor.toLowerCase(), '#f6f7f9', 'window backgroundColor follows --ground');
-console.log('PASS The window background follows --ground');
+assert.equal(tauri.app.windows[0].backgroundColor.toLowerCase(), '#f6f7f9', 'window backgroundColor follows --color-paper');
+console.log('PASS The window background follows --color-paper');
 
 const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', String(port), '--strictPort'], {
   cwd: root, windowsHide: true, stdio: 'pipe',
@@ -30,7 +30,7 @@ try {
     if (i === 59) throw new Error(`Preview did not start: ${output}`);
     await new Promise(resolve => setTimeout(resolve, 200));
   }
-  browser = await chromium.launch({ channel: 'msedge', headless: true });
+  browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   const errors = [];
 
   for (const [width, height] of [[1440, 900], [1200, 800], [1100, 720], [1000, 640]]) {
@@ -57,7 +57,7 @@ try {
         sheetRight: window.innerWidth - document.querySelector('.workspace-content').getBoundingClientRect().right,
         sheetBottom: window.innerHeight - document.querySelector('.workspace-content').getBoundingClientRect().bottom,
         radiusToken: token('--radius-sheet'),
-        ground: token('--ground'),
+        ground: token('--color-paper'),
         groundPaint: style('.app-shell').backgroundColor,
         sidebarEdge: style('.sidebar').borderRightWidth,
         shadows: [...document.querySelectorAll('.primary, .compose-main, .brand-mark')].map(el => getComputedStyle(el).boxShadow),
@@ -151,9 +151,12 @@ try {
   await expect(dark.locator('.mail-row').first()).toBeVisible();
   const tokens = await dark.evaluate(() => {
     const token = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    return { ground: token('--ground'), sidebar: token('--sidebar'), surface: token('--surface'), wash: token('--priority-wash'), paint: getComputedStyle(document.querySelector('.app-shell')).backgroundColor };
+    return { ground: token('--color-paper'), sidebar: token('--color-sidebar-paper'), surface: token('--color-raised'), wash: token('--priority-wash'), paint: getComputedStyle(document.querySelector('.app-shell')).backgroundColor };
   });
-  assert.deepEqual(tokens, { ground: '#12161e', sidebar: '#12161e', surface: '#1a202c', wash: '#221d18', paint: 'rgb(18, 22, 30)' });
+  // The sidebar's own paper is Sigrid's (a dark column of its own): it is a colour, not a number this test owns.
+  const { sidebar, ...rest } = tokens;
+  assert.match(sidebar, /^#[0-9a-f]{6}$/);
+  assert.deepEqual(rest, { ground: '#12161e', surface: '#1a202c', wash: '#221d18', paint: 'rgb(18, 22, 30)' });
   console.log('PASS Dark ground, sheet and priority wash');
   await dark.close();
 

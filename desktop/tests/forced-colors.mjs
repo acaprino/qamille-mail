@@ -1,13 +1,13 @@
-// Windows Contrast themes (forced colours, audit F10, src/ds/styles/forced-colors.css): against the
+// Windows Contrast themes (forced colours, audit F10, src/theme/forced-colors.css): against the
 // browser preview with `forced-colors: active` emulated, every state that the app shows only with a
 // tint or a shadow must still be visible as a border or an outline in a system colour.
 // Run: node tests/forced-colors.mjs   (Vite preview on 127.0.0.1:1420). Synthetic sample data only.
 import { chromium, expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 
 const base = process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:1420';
 const shots = process.env.QAMILLE_SHOTS;
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1280, height: 860 } });
 const page = await context.newPage();
 const errors = [];
@@ -57,7 +57,7 @@ try {
     });
 
     await step(`${colorScheme}: the active page in the sidebar has a highlighted edge`, async () => {
-      const active = page.locator('.sidebar nav button.active').first();
+      const active = page.locator('.sidebar nav [aria-current="page"]').first();
       await expect(active).toHaveCount(1);
       const s = await style(active, 'outline-style', 'outline-width', 'outline-color');
       assert.ok(visibleLine(s['outline-width'], s['outline-style']), `active nav outline: ${JSON.stringify(s)}`);
@@ -129,28 +129,28 @@ try {
         if (name) await page.locator('.settings-nav').getByRole('button', { name, exact: true }).click().catch(() => {});
       }
       await switches.first().waitFor();
-      const states = await switches.evaluateAll((elements) =>
+      // Sigrid's switch: the drawn control (`switch-control`) is the track, its `switch-thumb` the thumb; `data-state` says whether it is on.
+      const states = await page.locator('[data-slot="switch-control"]').evaluateAll((elements) =>
         elements.slice(0, 12).map((element) => {
-          const thumb = element.querySelector("[data-part='thumb']");
-          const fill = element.querySelector("[data-part='fill']");
+          const thumb = element.querySelector("[data-slot='switch-thumb']");
           const track = getComputedStyle(element);
           return {
-            on: element.getAttribute('aria-checked') === 'true',
+            on: element.getAttribute('data-state') === 'checked',
             border: track.borderTopStyle !== 'none' && parseFloat(track.borderTopWidth) >= 1,
             thumb: thumb ? getComputedStyle(thumb).backgroundColor : null,
-            fill: fill ? getComputedStyle(fill).backgroundColor : null,
-            fillOpacity: fill ? Number(getComputedStyle(fill).opacity) : null,
+            fill: track.backgroundColor,
           };
         }),
       );
       assert.ok(states.length > 0, 'Settings has switches');
       const buttonText = await systemColor('ButtonText');
       const highlightText = await systemColor('HighlightText');
+      const buttonFace = await systemColor('ButtonFace');
       for (const s of states) {
         assert.ok(s.border, `switch track has an edge: ${JSON.stringify(s)}`);
         assert.equal(s.thumb, s.on ? highlightText : buttonText, `switch thumb: ${JSON.stringify(s)}`);
-        if (s.on) assert.ok(s.fill === highlight && s.fillOpacity === 1, `an "on" switch is filled with Highlight: ${JSON.stringify(s)}`);
-        else assert.equal(s.fillOpacity, 0, `an "off" switch has no fill: ${JSON.stringify(s)}`);
+        if (s.on) assert.equal(s.fill, highlight, `an "on" switch is filled with Highlight: ${JSON.stringify(s)}`);
+        else assert.equal(s.fill, buttonFace, `an "off" switch is the colour of a button: ${JSON.stringify(s)}`);
       }
       if (shots) await page.screenshot({ path: `${shots}/forced-colors-settings-${colorScheme}.png` });
     });

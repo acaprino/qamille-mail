@@ -2,8 +2,7 @@
 // (its address comes from the server, so Google's page opens on it), instead of an empty inbox that says nothing.
 // Another address or provider stays in Settings > Accounts.
 import { useEffect, useState } from 'react';
-import Button from '../ds/primitives/Button';
-import GoogleMark from '../ds/primitives/GoogleMark';
+import Button from '../ui/Button';
 import { call, errorText } from '../lib/api';
 import { connectGoogle } from '../lib/google-sign-in';
 import { tr } from '../lib/i18n';
@@ -56,7 +55,7 @@ export default function ConnectMailbox({ connected, otherWays }: ConnectMailboxP
             )}
       </p>
       <Button variant="secondary" className="google-button" disabled={busy} onClick={() => void connect()}>
-        <GoogleMark />
+        <img src="/brand/google.svg" alt="" width={18} height={18} />
         {busy
           ? tr('Conferma nel browser…', 'Confirm in your browser…')
           : email

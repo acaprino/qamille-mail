@@ -12,8 +12,12 @@ use std::{
 struct Scratch(PathBuf);
 impl Scratch {
     fn new() -> Self {
+        // Tests run in parallel in one process, and the clock of a Windows runner can give the same nanosecond twice:
+        // a counter keeps every folder's name its own.
+        static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let root = std::env::temp_dir().join(format!(
-            "qamille-draft-cleanup-{}-{}",
+            "qamille-draft-cleanup-{}-{}-{n}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)

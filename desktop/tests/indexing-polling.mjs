@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 // poll instead of the old 2.5 s loop (INV-005, INV-009). The same 30 s poll stays on desktop for
 // transitions the backend does not announce; the `indexing-changed` listener itself is
 // desktop-only and is exercised by the native build.
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 900 } });
 const page = await context.newPage();
 const errors = [];

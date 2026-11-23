@@ -5,14 +5,15 @@
 // one nobody recorded is grey. A recording that waits for its transcript while the engine cannot
 // run says why, with a link to Settings; one whose transcription failed says so, with "Riprova".
 //
-// The row is a Motion <li>: inside the list's AnimatePresence it fades in when it arrives, slides
-// (layout) when the rows above it change, and fades out when it leaves. While it fades out it is
+// The row is an `Item` (Sigrid's motion): inside the list's `Presence` it comes down into its place when it arrives, slides
+// when the rows above it change, and fades out when it leaves. While it fades out it is
 // only a picture: no `data-row-key`, inert and hidden from the accessibility tree, so the row that
 // took its place (the same meeting in another group) is the only one the page and its tests find.
-import { motion, useIsPresent, useReducedMotion } from 'motion/react';
+import { Item, useIsPresent } from '../../ui/motion';
 import type { ReactNode } from 'react';
-import Button from '../../ds/primitives/Button';
-import Icon from '../../ds/primitives/Icon';
+import Button from '../../ui/Button';
+import Icon from '../../ui/Icon';
+import Progress from '../../ui/Progress';
 import { backendText, tr } from '../../lib/i18n';
 import { captureActive, stateLabel, type CaptureSnapshot } from '../../lib/meetings';
 import { clockLabel, type MeetingRow } from '../../lib/meetings-view';
@@ -41,7 +42,6 @@ export type MeetingRowItemProps = {
   ontranscribe: (row: MeetingRow) => void;
 };
 
-const spring = { type: 'spring', stiffness: 400, damping: 32 } as const;
 
 function lengthOf(seconds: number | null): string | null {
   if (!seconds) return null;
@@ -88,7 +88,6 @@ export default function MeetingRowItem({
   onsettings,
   ontranscribe,
 }: MeetingRowItemProps) {
-  const still = useReducedMotion();
   const present = useIsPresent();
 
   /** The name of a meeting that has none is the same words the header of its detail uses. */
@@ -158,16 +157,12 @@ export default function MeetingRowItem({
         <span className="item-title">{title}</span>
         {sub && <span className={cn('item-sub', row.status === 'failed' && 'danger')}>{sub}</span>}
         {row.job && (
-          <span
+          <Progress
             className="item-bar"
-            role="progressbar"
+            value={row.job.progress}
             aria-label={row.job.kind === 'transcribe' ? tr('Trascrizione', 'Transcription') : tr('Sintesi', 'Summary')}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={row.job.progress}
-          >
-            <span style={{ width: `${row.job.progress}%` }}></span>
-          </span>
+            size="sm"
+          />
         )}
       </span>
       {row.status === 'recording' ? (
@@ -182,16 +177,11 @@ export default function MeetingRowItem({
   );
 
   return (
-    <motion.li
+    <Item
+      as="li"
       className={cn('item', selected && 'selected', row.status === 'unrecorded' && 'unrecorded')}
       data-row-key={present ? row.key : undefined}
-      inert={!present || undefined}
       aria-hidden={present ? undefined : 'true'}
-      layout={still ? false : 'position'}
-      initial={still ? false : { opacity: 0, y: -6 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={still ? undefined : { opacity: 0, transition: { duration: 0.12 } }}
-      transition={spring}
     >
       {row.openable ? (
         <button
@@ -241,6 +231,6 @@ export default function MeetingRowItem({
           </Button>
         </div>
       ) : null}
-    </motion.li>
+    </Item>
   );
 }

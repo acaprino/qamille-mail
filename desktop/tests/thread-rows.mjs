@@ -2,7 +2,7 @@
 // message on one edge, who each answers beside the name, a fold per reply, a count that never
 // hides what is unread. Synthetic data only.
 import { chromium, expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -59,7 +59,7 @@ try {
     if (i === 59) throw new Error(`Preview did not start: ${output}`);
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
-  browser = await chromium.launch({ channel: 'msedge', headless: true });
+  browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   const fixture = withConversation(sample);
 
   // ---- closed, then open ----
@@ -120,7 +120,7 @@ try {
   assert.deepEqual(await replies(page).evaluateAll((nodes) => nodes.map((n) => Number(n.dataset.replyId))), [IDS.root, IDS.a]);
   await expect(fold).toHaveAttribute('aria-expanded', 'false');
   assert.equal((await text(fold)).replace(/\D/g, ''), '2', 'the folded reply says how many it hides');
-  assert.equal(await fold.evaluate((el) => getComputedStyle(el).color), await colorOf(page, '--accent-text'), 'blue: one of them is unread');
+  await expect.poll(() => fold.evaluate((el) => getComputedStyle(el).color), { message: 'blue: one of them is unread' }).toBe(await colorOf(page, '--color-accent'));
   await fold.click();
   await expect(replies(page)).toHaveCount(4);
   console.log('PASS Folding a reply hides everything under it and keeps a count');
@@ -277,7 +277,7 @@ try {
   page = await open(withConversation(sample, { extraReplies: 31, read: { [IDS.many]: true, [lastBeyond]: false } }));
   await expect(toggle(page)).toHaveAttribute('aria-expanded', 'false');
   await expect(toggle(page)).toHaveClass(/has-unread/);
-  assert.equal(await toggle(page).evaluate((el) => getComputedStyle(el).color), await colorOf(page, '--accent-text'), 'the closed arrow is blue');
+  assert.equal(await toggle(page).evaluate((el) => getComputedStyle(el).color), await colorOf(page, '--color-accent'), 'the closed arrow is blue');
   await toggle(page).click();
   await expect(replies(page)).toHaveCount(30);
   await page.locator('.reply-more').click();
@@ -443,7 +443,7 @@ try {
     .locator('.field-row')
     .filter({ has: toField })
     .locator('[data-scope="tags-input"][data-part="item-preview"]')
-    .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('title')));
+    .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-value')));
   assert.ok(toChips.some((entry) => entry.includes(MARIA[1])), `the sender is in To: ${toChips}`);
   assert.ok(toChips.some((entry) => entry.includes('guest9@example.test')), `the other recipients are in To: ${toChips}`);
   assert.ok(!toChips.some((entry) => entry.includes(ME)), 'the reader is not in To');

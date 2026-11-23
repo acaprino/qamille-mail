@@ -50,7 +50,7 @@ async function waitForServer() {
 let browser;
 try {
   await waitForServer();
-  browser = await chromium.launch({ channel: 'msedge', headless: true });
+  browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
   const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1200, height: 900 } });
   const pageErrors = [];
   await context.route(`${url}/**`, async (route) => {
@@ -64,7 +64,7 @@ try {
     window.previewParentClosed = 0;
     window.cspViolations = [];
     document.addEventListener('securitypolicyviolation', (event) =>
-      window.cspViolations.push(`${event.violatedDirective} ${event.blockedURI}`),
+      window.cspViolations.push(`${event.violatedDirective} ${event.blockedURI} ${event.sourceFile}:${event.lineNumber} ${String(event.sample).slice(0, 120)}`),
     );
     window.__TAURI_INTERNALS__ = {
       invoke(command, args = {}) {
@@ -102,17 +102,20 @@ try {
       (await page.evaluate(() => window.previewCalls)).map((call) => call.command),
       ['attachment_preview_source'],
     );
-    assert.deepEqual(await page.evaluate(() => window.cspViolations), [], `${kind}: no CSP violation`);
+    // The page that mounts the component is a test harness under Vite, whose React refresh preamble is an inline script of the
+    // page itself (`...html:4`); what this test is about are the engines, which must not break the app's CSP.
+    const violations = (await page.evaluate(() => window.cspViolations)).filter((violation) => !/^script-src-elem inline \S+\.html:\d+/.test(violation));
+    assert.deepEqual(violations, [], `${kind}: no CSP violation`);
     await page.close();
     console.log(`PASS ${kind} renders in WebAssembly under the app CSP`);
   }
 
   for (const [id, name] of [[9, 'broken.pdf'], [10, 'broken.docx']]) {
     const page = await open(attachment(id, name));
-    await expect(page.getByRole('alert')).toBeVisible();
+    await expect(page.locator('[role="alert"], [data-scope="toast"][data-part="root"]')).toBeVisible();
     await page.getByRole('button', { name: 'Show extracted text' }).click();
     await expect(page.getByText('Extracted text fallback')).toBeVisible();
-    assert.deepEqual(await page.evaluate(() => window.cspViolations), []);
+    assert.deepEqual((await page.evaluate(() => window.cspViolations)).filter((violation) => !/^script-src-elem inline \S+\.html:\d+/.test(violation)), []);
     await page.close();
     console.log(`PASS ${name}: a rejected document shows an error and keeps the text fallback`);
   }

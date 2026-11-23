@@ -1,6 +1,6 @@
-import Button from '../ds/primitives/Button';
-import Icon from '../ds/primitives/Icon';
-import Modal from '../ds/primitives/Modal';
+import Button from '../ui/Button';
+import Icon from '../ui/Icon';
+import Modal from '../ui/Modal';
 import { tr } from '../lib/i18n';
 import './GoogleSignInDialog.css';
 

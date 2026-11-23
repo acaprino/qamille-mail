@@ -1,12 +1,13 @@
-import { AnimatePresence, motion, useIsPresent, useReducedMotion } from 'motion/react';
+import { Item, Presence, useIsPresent } from '../ui/motion';
 import { useEffect, useRef, type ChangeEvent, type ReactNode } from 'react';
-import Button from '../ds/primitives/Button';
-import Checkbox from '../ds/primitives/Checkbox';
-import Count from '../ds/primitives/Count';
-import Icon from '../ds/primitives/Icon';
-import Menu from '../ds/primitives/Menu';
-import Modal from '../ds/primitives/Modal';
-import Select from '../ds/primitives/Select';
+import Button from '../ui/Button';
+import Avatar from '../ui/Avatar';
+import Checkbox from '../ui/Checkbox';
+import Count from '../ui/Count';
+import Icon from '../ui/Icon';
+import Menu from '../ui/Menu';
+import Modal from '../ui/Modal';
+import Select from '../ui/Select';
 import { call, desktop, errorText, initials } from '../lib/api';
 import { bookLabel, folderLabel, isItalian, tr } from '../lib/i18n';
 import { useReactive } from '../lib/store';
@@ -26,6 +27,7 @@ import {
 import ContactForm from './contacts/ContactForm';
 import DuplicatesPanel from './contacts/DuplicatesPanel';
 import MergeDialog from './contacts/MergeDialog';
+import { Input } from '../ui/Input';
 
 export type ContactsProps = { notify: (message: string, error?: boolean) => void };
 
@@ -37,7 +39,6 @@ type FormState = {
   targets: BookView[];
 };
 
-const spring = { type: 'spring', stiffness: 400, damping: 32 } as const;
 // A plain copy (store values are proxies, which structuredClone refuses).
 const copy = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
@@ -45,18 +46,10 @@ const copy = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 // out of the accessibility tree and inert, so the list reads as its new content at once.
 function ContactListItem({ children }: { children: ReactNode }) {
   const present = useIsPresent();
-  const still = useReducedMotion();
   return (
-    <motion.li
-      aria-hidden={present ? undefined : true}
-      inert={!present}
-      initial={still ? false : { opacity: 0, y: -6 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={still ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, y: -6 }}
-      transition={spring}
-    >
+    <Item as="li" aria-hidden={present ? undefined : true}>
       {children}
-    </motion.li>
+    </Item>
   );
 }
 
@@ -419,7 +412,7 @@ export default function Contacts({ notify }: ContactsProps) {
             />
           </div>
           <div className="contacts-filters">
-            <input
+            <Input
               type="search"
               aria-label={tr('Cerca nei contatti', 'Search contacts')}
               placeholder={tr('Cerca nome, email, telefono…', 'Search name, email, phone…')}
@@ -479,7 +472,7 @@ export default function Contacts({ notify }: ContactsProps) {
             />
           )}
           <ul className="contact-list" aria-label={tr('Contatti', 'Contacts')}>
-            <AnimatePresence initial={false}>
+            <Presence>
               {s.items.map((c) => (
                 <ContactListItem key={c.id}>
                   <button
@@ -491,7 +484,7 @@ export default function Contacts({ notify }: ContactsProps) {
                     aria-current={c.id === s.selectedId ? 'true' : undefined}
                     onClick={() => (s.selectedId = c.id)}
                   >
-                    <span className="account-avatar">{initials(displayName(c))}</span>
+                    <Avatar name={displayName(c)} size="xs" decorative />
                     <span className="contact-main">
                       <span className="contact-head">
                         <strong>{displayName(c)}</strong>
@@ -512,7 +505,7 @@ export default function Contacts({ notify }: ContactsProps) {
                   </button>
                 </ContactListItem>
               ))}
-            </AnimatePresence>
+            </Presence>
           </ul>
           {s.loaded && !s.items.length && (
             <p className="muted contacts-empty">{tr('Nessun contatto.', 'No contacts.')}</p>
@@ -526,7 +519,7 @@ export default function Contacts({ notify }: ContactsProps) {
           {selected ? (
             <>
               <header>
-                <span className="account-avatar large">{initials(displayName(selected))}</span>
+                <Avatar name={displayName(selected)} size="md" decorative />
                 <h2>{displayName(selected)}</h2>
               </header>
               <div className="contact-detail-actions">

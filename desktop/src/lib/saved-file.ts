@@ -1,7 +1,7 @@
 // What a notice offers after a file was saved (an attachment, an exported message): Open and Show in
 // folder. The page never names a path: the save handed back a token, valid only for the files saved in
 // this session (src-tauri/src/saved_files.rs), and the commands take that token alone.
-import type { NoticeAction } from '../ds/primitives/Toaster';
+import type { NoticeAction } from '../ui/Toaster';
 import { call, errorText } from './api';
 import { tr } from './i18n';
 

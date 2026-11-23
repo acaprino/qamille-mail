@@ -1,4 +1,4 @@
-// Keeps the native window's background on the page's `--ground` (what html, body and
+// Keeps the native window's background on the page's `--color-paper` (what html, body and
 // .app-shell paint), so resizing or switching theme never shows a strip of another
 // colour behind the page (docs/aspetto-nativo.md). Outside Tauri (browser tests) it does nothing.
 export function windowColor(value: string): [number, number, number] | null {
@@ -10,7 +10,7 @@ export function windowColor(value: string): [number, number, number] | null {
 
 export async function paintWindowBackground(): Promise<void> {
   if (!('__TAURI_INTERNALS__' in window)) return;
-  const color = windowColor(getComputedStyle(document.documentElement).getPropertyValue('--ground'));
+  const color = windowColor(getComputedStyle(document.documentElement).getPropertyValue('--color-paper'));
   if (!color) return;
   try {
     const { getCurrentWindow } = await import('@tauri-apps/api/window');

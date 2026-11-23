@@ -1615,7 +1615,7 @@ checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
 
 [[package]]
 name = "qamille-compute"
-version = "1.1.6"
+version = "1.1.7"
 dependencies = [
  "image",
  "ort",
@@ -1632,7 +1632,7 @@ dependencies = [
 
 [[package]]
 name = "qamille-server"
-version = "1.1.6"
+version = "1.1.7"
 dependencies = [
  "argon2",
  "axum",

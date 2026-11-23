@@ -58,10 +58,14 @@ async function openMeetings() {
 }
 const combo = (name) => content.getByRole('combobox', { name, exact: true });
 const options = async (name) => {
+  await expect(page.getByRole('listbox')).toHaveCount(0);
   await combo(name).click();
-  const listed = await page.getByRole('listbox', { name }).getByRole('option').allTextContents();
-  if (!listed.length) console.log('LISTBOXES', JSON.stringify(await page.getByRole('listbox').evaluateAll((lists) => lists.map((list) => `${list.getAttribute('aria-label')}|${list.id}|${list.querySelectorAll('[role=option]').length}`))));
+  // A list that was closed may stay in the page, hidden: the one looked at is the one that shows.
+  const popup = page.locator('[data-slot="select-content"]:visible');
+  await popup.getByRole('option').first().waitFor();
+  const listed = await popup.getByRole('option').allTextContents();
   await page.keyboard.press('Escape');
+  await expect(combo(name)).toHaveAttribute('aria-expanded', 'false');
   return listed.map((text) => text.trim());
 };
 const megabytes = (bytes) => `${(bytes / 1_048_576).toFixed(1)} MB`;

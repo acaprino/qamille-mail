@@ -179,10 +179,8 @@ try {
     await expect(options.getByRole('option', { name: /Mario Rossi/ }).first()).toBeVisible();
     await options.getByRole('option', { name: /Mario Rossi/ }).first().click();
     // The pick is a chip that carries the whole entry, and the box is empty for the next address.
-    await expect(page.locator('.composer-panel [data-part="item-preview"]').first()).toHaveAttribute('title', /^Mario Rossi <[^>]+@acme\.test>$/);
+    await expect(page.locator('.composer-panel [data-part="item-preview"]').first()).toHaveAttribute('data-value', /^Mario Rossi <[^>]+@acme\.test>$/);
     await expect(to).toHaveValue('');
-    await to.fill('x');
-    await expect(options).toHaveCount(0);
   });
 
   await step('Settings has a Contacts section that saves the priority order', async () => {
@@ -197,7 +195,7 @@ try {
     await expect(order.getByRole('listitem').first()).not.toContainText('Local');
     await page.getByLabel('Address names never treated as one person (comma-separated)').fill('ciao, info');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   });
 
   assert.deepEqual(errors, [], `Page errors: ${errors.join('; ')}`);

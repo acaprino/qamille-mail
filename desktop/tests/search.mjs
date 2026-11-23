@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
-import { chromium } from '@playwright/test';
+import { chromium, expect } from '@playwright/test';
 
 import { pickDate } from './support/dates.mjs';
 const source = fs.readFileSync(new URL('../src/lib/search.ts', import.meta.url), 'utf8');
@@ -152,11 +152,10 @@ try {
   });
   await page.getByRole('button', { name: 'Apply filter', exact: true }).click();
   await settled();
-  await page.getByRole('button', { name: 'Apply filter', exact: true }).click();
   await page
     .locator('.mail-open', { hasText: 'Q4 proposal: can you review by Thursday?' })
     .waitFor();
-  assert.equal(await page.locator('.mail-open').count(), 1);
+  await expect(page.locator('.mail-open')).toHaveCount(1);
   await page.getByRole('button', { name: /^When/ }).click();
   await page.getByLabel('Date', { exact: true }).press('Escape');
   assert.equal(
@@ -183,9 +182,7 @@ try {
   await page.locator('.sidebar-body nav').nth(1).locator('button').first().click();
   await page.getByRole('textbox', { name: 'Cerca email', exact: true }).waitFor();
   await page.getByRole('button', { name: /^Quando/ }).click();
-  // The date field (DateField) reads what is typed on Enter or when the focus leaves it.
-  await page.getByLabel('Data', { exact: true }).fill('2026-10-15');
-  await page.getByLabel('Data', { exact: true }).press('Enter');
+  await pickDate(page, page.getByLabel('Data', { exact: true }), '2026-10-15');
   assert.match(
     await page.locator('.search-date-preview').innerText(),
     /9 ottobre 2026.*21 ottobre 2026/s,

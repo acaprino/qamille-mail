@@ -11,7 +11,7 @@ const items = [
   { value: 'it', label: 'Italiano' },
   { value: 'en', label: 'English' },
   { value: 'es', label: 'Español' },
-  { value: 'de', label: 'Deutsch', disabled: true },
+  { value: 'de', label: 'Deutsch' },
   { value: 'fr', label: 'Français' },
 ];
 

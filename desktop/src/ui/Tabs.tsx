@@ -23,24 +23,15 @@ export type TabsProps = {
 
 export default function Tabs({ value, onChange, items, 'aria-label': ariaLabel, ids }: TabsProps) {
   const root = useRef<HTMLDivElement>(null);
-  // Sigrid's tabs give their own ids and point the chosen tab at a panel of their own. The caller's panel has other
-  // ids, or none: the tabs take the ids the caller asked for (in the order of `items`, which is the order of the DOM),
-  // and a tab points at a panel only when the caller named it.
+  // The ids the caller asked for go to Sigrid (Ark finds the tabs by them for the arrows). A tab points at a panel only when
+  // the caller named it: without a name Ark's own panel does not exist here.
   useLayoutEffect(() => {
-    const triggers = [...(root.current?.querySelectorAll<HTMLElement>('[role="tab"]') ?? [])];
-    triggers.forEach((element, index) => {
-      const item = items[index];
-      if (!item) return;
-      const id = ids?.trigger?.(item.value);
-      if (id) element.id = id;
-      const panel = ids?.content?.(item.value);
-      if (panel && item.value === value) element.setAttribute('aria-controls', panel);
-      else element.removeAttribute('aria-controls');
-    });
+    if (ids?.content) return;
+    root.current?.querySelectorAll<HTMLElement>('[role="tab"]').forEach((element) => element.removeAttribute('aria-controls'));
   });
   return (
     <div ref={root} style={{ display: 'contents' }}>
-      <SigridTabs value={value} onValueChange={(next) => onChange?.(next)}>
+      <SigridTabs value={value} onValueChange={(next) => onChange?.(next)} {...(ids ? { ids } : {})}>
         <TabsList aria-label={ariaLabel}>
           {items.map((item) => (
             <TabsTrigger key={item.value} value={item.value}>

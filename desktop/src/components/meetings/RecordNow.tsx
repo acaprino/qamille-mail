@@ -87,7 +87,7 @@ export default function RecordNow({ settings, live, notify, onstarted }: RecordN
     <>
       <Popover
         open={open}
-        onOpenChange={setOpen}
+        onOpenChange={(next) => setOpen(next && !recording)}
         label={tr('Registra ora', 'Record now')}
         className="record-popover"
         trigger={

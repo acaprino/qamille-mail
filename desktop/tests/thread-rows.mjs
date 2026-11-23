@@ -120,7 +120,7 @@ try {
   assert.deepEqual(await replies(page).evaluateAll((nodes) => nodes.map((n) => Number(n.dataset.replyId))), [IDS.root, IDS.a]);
   await expect(fold).toHaveAttribute('aria-expanded', 'false');
   assert.equal((await text(fold)).replace(/\D/g, ''), '2', 'the folded reply says how many it hides');
-  assert.equal(await fold.evaluate((el) => getComputedStyle(el).color), await colorOf(page, '--color-accent'), 'blue: one of them is unread');
+  await expect.poll(() => fold.evaluate((el) => getComputedStyle(el).color), { message: 'blue: one of them is unread' }).toBe(await colorOf(page, '--color-accent'));
   await fold.click();
   await expect(replies(page)).toHaveCount(4);
   console.log('PASS Folding a reply hides everything under it and keeps a count');
@@ -443,7 +443,7 @@ try {
     .locator('.field-row')
     .filter({ has: toField })
     .locator('[data-scope="tags-input"][data-part="item-preview"]')
-    .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('title')));
+    .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-value')));
   assert.ok(toChips.some((entry) => entry.includes(MARIA[1])), `the sender is in To: ${toChips}`);
   assert.ok(toChips.some((entry) => entry.includes('guest9@example.test')), `the other recipients are in To: ${toChips}`);
   assert.ok(!toChips.some((entry) => entry.includes(ME)), 'the reader is not in To');

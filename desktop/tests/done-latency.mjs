@@ -342,7 +342,7 @@ try {
     await tp.evaluate(
       () => (window.__previewCommandFail = { queue_mail_action: 'Synthetic refusal' }),
     );
-    await expect(tp.getByRole('alert')).toContainText('Synthetic refusal');
+    await expect(tp.locator('[data-scope="toast"][data-part="root"]').filter({ hasText: 'Synthetic refusal' })).toBeVisible();
     await expect(tThreadPin).toBeEnabled();
     await expect(tReaderPin).toBeEnabled();
     await expect(tUndos).toHaveCount(1);

@@ -77,7 +77,7 @@ try {
     const record = page.getByRole('button', { name: 'Record now', exact: true });
     const search = page.getByRole('searchbox', { name: 'Search transcripts' });
     for (const [name, control] of [['Record now', record], ['the search field', search]]) {
-      assert.equal((await box(control)).height, 32, `${name} is 32px high`);
+      assert.equal(Math.round((await box(control)).height), 32, `${name} is 32px high`);
       assert.equal(await radius(control), '6px', `${name} has a 6px radius`);
       assert.equal(await css(control, 'box-shadow'), 'none', `${name} has no resting shadow`);
     }
@@ -164,7 +164,7 @@ try {
     // The focus stays inside while it is open.
     for (let i = 0; i < 6; i++) {
       await page.keyboard.press('Tab');
-      assert.equal(await dialog.evaluate((node) => node.contains(document.activeElement)), true, 'the focus does not leave the dialog');
+      await expect.poll(() => dialog.evaluate((node) => node.contains(document.activeElement)), { message: 'the focus does not leave the dialog' }).toBe(true);
     }
     await page.keyboard.press('Escape');
     await expect(dialog).toHaveCount(0);

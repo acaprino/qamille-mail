@@ -100,7 +100,7 @@ try {
   await sidebar.getByRole('button', { name: 'New message' }).focus();
   await page.keyboard.press('Shift+Tab');
   await expect(collapse).toBeFocused();
-  await expect(page.getByRole('tooltip')).toContainText('Collapse sidebar');
+  await expect(page.locator('[data-slot="tooltip-content"]')).toContainText('Collapse sidebar');
   await page.keyboard.press('Escape');
   console.log('PASS Collapse sidebar has a tooltip and no title attribute');
 

@@ -1,6 +1,7 @@
 // A panel from the side (looks at or edits one thing without leaving the view), drawn by Sigrid's Sheet in its non-modal
-// form: it does not trap the focus, and the rest of the page stays reachable. Esc, or a click outside, calls `onClose`
-// (or `onScrim` when there is none). The caller closes the panel by unmounting it, which gives the sheet no chance to
+// form: it does not trap the focus, and the rest of the page stays reachable. Esc calls `onClose` (or `onScrim` when there
+// is none); a click outside calls `onScrim`, so a panel with a form in it can ask before it lets the changes go. The
+// caller closes the panel by unmounting it, which gives the sheet no chance to
 // restore the focus: the panel puts it back on the element that had it when it opened (lib/focus-return.ts). `onOpen`
 // runs once it is showing, to place the focus (without it the first control gets it). The panel has its own bar with a
 // close button, so Sigrid's is off. The sheet opens at the edge of the window (it no longer fills the pane it sits in).
@@ -30,7 +31,7 @@ export default function SidePanel({ narrow = false, className, style, ref, 'aria
   );
   const width: CSSProperties = { width: narrow ? 'min(var(--panel-narrow), 100%)' : 'min(var(--panel-wide), 78%)', maxWidth: 'none', ...style };
   return (
-    <Sheet open modal={false} onOpenChange={(open) => !open && (onClose ?? onScrim)()}>
+    <Sheet open modal={false} onOpenChange={(open, reason) => !open && (reason === 'outside' ? onScrim : (onClose ?? onScrim))()}>
       <SheetContent
         ref={setContent}
         side="right"

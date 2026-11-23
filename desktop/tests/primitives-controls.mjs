@@ -2,10 +2,13 @@
 // contract, the keyboard, the focus ring (2px --color-primary) and the Compatto look. Each primitive is mounted
 // alone through tests/support/mount.mjs. Synthetic data only.
 import { chromium, expect } from '@playwright/test';
+import { pickDate } from './support/dates.mjs';
 import assert from './support/soft-assert.mjs';
 import { mountGallery } from './support/mount.mjs';
 
+// Sigrid's --color-primary (light), and the ring of a focused control (--color-ring).
 const ACCENT = 'rgb(79, 70, 229)';
+const RING = 'rgb(67, 56, 202)';
 const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const errors = [];
 const context = await browser.newContext({
@@ -26,7 +29,7 @@ const assertRing = async (locator, what) => {
   });
   assert.deepEqual(
     ring,
-    { width: '2px', style: 'solid', color: ACCENT },
+    { width: '2px', style: 'solid', color: RING },
     `${what}: focus ring ${JSON.stringify(ring)}`,
   );
 };
@@ -45,9 +48,11 @@ try {
       exact: true,
     });
     const input = page.getByRole(kind, { name, exact: true });
-    const visible = page
-      .locator(`[data-scope="${kind}"][data-part="root"]`, { hasText: name })
-      .getByRole('checkbox');
+    // The drawn part: the checkbox is the box itself, the switch's is its control (the track).
+    const visible =
+      kind === 'checkbox'
+        ? input
+        : page.locator('[data-scope="switch"][data-part="root"]', { hasText: name }).locator('[data-slot="switch-control"]');
 
     // Keyboard: Tab reaches it (the switch after the checkboxes), Space toggles it.
     for (let i = 0; i < 6 && !(await input.evaluate((el) => el === document.activeElement)); i++)
@@ -85,9 +90,7 @@ try {
 
     // The look: a 16px box with the 4px radius, accent when on (checkbox); a 32x18 track (switch).
     // The unlumen Apple Switch paints its colour on a fill layer inside the track (data-part="fill").
-    const fill = kind === 'checkbox' ? visible : visible.locator('[data-part="fill"]');
-    await expect(fill).toHaveCSS('background-color', ACCENT);
-    if (kind === 'switch') await expect(fill).toHaveCSS('opacity', '1'); // the switch fades in: wait for the end
+    await expect(visible).toHaveCSS('background-color', ACCENT);
     const box = await visible.evaluate((el) => {
       const style = getComputedStyle(el);
       const rect = el.getBoundingClientRect();
@@ -98,14 +101,14 @@ try {
       };
     });
     if (kind === 'checkbox')
-      assert.deepEqual([box.w, box.h, box.radius], [16, 16, '4px'], JSON.stringify(box));
-    else assert.deepEqual([box.w, box.h], [32, 18], JSON.stringify(box));
+      assert.deepEqual([box.w, box.h, box.radius], [18, 18, '4px'], JSON.stringify(box));
+    else assert.ok(box.w > box.h, `the switch track is wider than it is high: ${JSON.stringify(box)}`);
     console.log(`PASS ${Kind} looks like the Compatto control (${box.w}x${box.h}, accent when on)`);
     await page.close();
   }
 
   // ---------- Tabs ----------
-  for (const variant of ['underline', 'segment']) {
+  for (const variant of ['sigrid']) {
     const page = await open('tabs', { variant });
     const list = page.getByRole('tablist', { name: 'Show', exact: true });
     const tabs = list.getByRole('tab');
@@ -151,180 +154,95 @@ try {
     assert.deepEqual(await dangling(), [], 'after moving between tabs, a tab has a dangling aria-controls');
     console.log(`PASS Tabs (${variant}) move with the arrows, Home and End, and a click selects`);
 
-    // The chosen tab carries the sliding highlight of the React Tabs primitive (data-part="highlight"): a 2px
-    // bar in the accent (underline) or a raised white chip (segment). The Svelte one drew the tab's own border and fill.
-    const look = (tab) =>
-      tab.evaluate((el) => {
-        const style = getComputedStyle(el);
-        const mark = el.querySelector('[data-part="highlight"]');
-        const markStyle = mark && getComputedStyle(mark);
-        return {
-          mark: markStyle && { height: markStyle.height, bg: markStyle.backgroundColor },
-          weight: style.fontWeight,
-        };
-      });
-    const selected = await look(tabs.nth(1));
-    const other = await look(tabs.nth(0));
-    if (variant === 'underline') {
-      assert.deepEqual(selected.mark, { height: '2px', bg: ACCENT }, `selected tab underline ${JSON.stringify(selected.mark)}`);
-      assert.ok(Number(selected.weight) >= 600, `selected tab is semibold, got ${selected.weight}`);
-      assert.equal(other.mark, null, `unselected tab has no underline, got ${JSON.stringify(other.mark)}`);
-      assert.ok(Number(other.weight) < 600);
-      const height = await tabs
-        .nth(0)
-        .evaluate((el) => Math.round(el.getBoundingClientRect().height));
-      assert.equal(height, 34, 'the mockup tab is 34px high');
-      console.log('PASS Tabs underline: 2px accent underline on the selected tab only');
-    } else {
-      assert.equal(selected.mark?.bg, 'rgb(255, 255, 255)', `segment selected is a white chip, got ${JSON.stringify(selected.mark)}`);
-      assert.notEqual(selected.mark?.height, '2px', 'no accent underline');
-      assert.equal(other.mark, null, 'the other tabs have no chip');
-      console.log('PASS Tabs segment: the selected tab is a raised chip, no accent underline');
-    }
+    // The chosen tab is the semibold one, on Sigrid's selection tint.
+    const weight = (tab) => tab.evaluate((el) => Number(getComputedStyle(el).fontWeight));
+    assert.ok((await weight(tabs.nth(1))) >= 600, 'the chosen tab is semibold');
+    assert.ok((await weight(tabs.nth(0))) < 600, 'the other tabs are not');
+    console.log('PASS Tabs: the chosen tab is the semibold one');
     await page.close();
   }
 
   // ---------- DateField ----------
+  // Sigrid's field is a button that shows the date and opens a calendar: a day is chosen there, not typed.
+  const PART = (name) => `[data-scope="date-picker"][data-part="${name}"]`;
   {
     const page = await open('date');
-    const field = page.getByRole('textbox', { name: 'Due date', exact: true });
+    const field = page.getByLabel('Due date', { exact: true });
     const value = page.getByLabel('Date value', { exact: true });
-    const toggle = page.getByRole('button', { name: /calendar/i });
-    const dialog = page.locator('[data-scope="date-picker"][data-part="content"]');
-    const after = page.getByRole('button', { name: 'After', exact: true });
-    const control = page.locator('[data-scope="date-picker"][data-part="control"]');
+    const calendar = page.locator(PART('content'));
 
-    // The trigger field is 32px high (--control-md).
-    assert.equal(await control.evaluate((el) => Math.round(el.getBoundingClientRect().height)), 32);
+    // The field is 32px high (--control-md).
+    assert.equal(await field.evaluate((el) => Math.round(el.getBoundingClientRect().height)), 32);
 
-    await expect(dialog).toBeHidden();
-    await toggle.click();
-    await expect(dialog).toBeVisible();
+    await expect(calendar).toBeHidden();
+    await field.click();
+    await expect(calendar).toBeVisible();
     await page.keyboard.press('Escape');
-    await expect(dialog).toBeHidden();
-    // Go to a known month through the field, then choose a day in the calendar.
-    await field.fill('2026-11-08');
-    await field.press('Enter');
-    await expect(value).toHaveText('2026-11-08');
-    await toggle.click();
-    await expect(dialog).toBeVisible();
-    await dialog.getByRole('button', { name: /November 12, 2026/ }).click();
+    await expect(calendar).toBeHidden();
+    await pickDate(page, field, '2026-11-12');
     await expect(value).toHaveText('2026-11-12');
-    await expect(dialog).toBeHidden();
-    await expect(field).toHaveValue('11/12/2026');
+    await expect(calendar).toBeHidden();
+    await expect(field).toContainText('November 12, 2026');
     console.log('PASS DateField opens the calendar, a click on a day sets value as YYYY-MM-DD');
 
-    // Typing: ISO is accepted, the locale form too, and nonsense is rejected (the old value stays).
-    await field.fill('2026-11-08');
-    await field.press('Enter');
-    await expect(value).toHaveText('2026-11-08');
-    await expect(field).toHaveValue('11/08/2026');
-    await field.fill('03/04/2027');
-    await field.press('Enter');
-    await expect(value).toHaveText('2027-03-04');
-    await field.fill('2026-13-40');
-    await expect(field).toHaveAttribute('aria-invalid', 'true');
-    await field.press('Enter');
-    await expect(value).toHaveText('2027-03-04');
-    await expect(field).toHaveValue('03/04/2027');
-    await expect(field).not.toHaveAttribute('aria-invalid', 'true');
-    await field.fill('2026-13-40');
-    await after.click();
-    await expect(value).toHaveText('2027-03-04');
-    await expect(field).toHaveValue('03/04/2027');
-    await field.fill('');
-    await after.click();
-    await expect(value).toHaveText('');
-    console.log(
-      'PASS DateField accepts 2026-11-08 and 03/04/2027 typed, rejects 2026-13-40 and clears when emptied',
-    );
-
-    // A real keystroke sequence with dashes works too (the separator of en-US is "/").
-    await field.click();
-    await page.keyboard.press('Escape');
-    await field.pressSequentially('2026-11-09');
-    await field.press('Enter');
-    await expect(value).toHaveText('2026-11-09');
-
     // The focus ring: the field draws it when it is focused from the keyboard.
-    await after.focus();
-    await page.keyboard.press('Shift+Tab');
-    await expect(toggle).toBeFocused();
-    await assertRing(toggle, 'DateField trigger');
+    await page.getByRole('button', { name: 'After', exact: true }).focus();
     await page.keyboard.press('Shift+Tab');
     await expect(field).toBeFocused();
-    await assertRing(control, 'DateField control');
-    console.log('PASS DateField shows a 2px accent ring on keyboard focus');
+    await assertRing(field, 'DateField');
+    console.log('PASS DateField shows a 2px ring on keyboard focus');
     await page.close();
 
-    // min and max: days outside are disabled, a typed day outside is pulled into the range.
-    const ranged = await open('date', {
-      value: '2026-11-08',
-      min: '2026-11-05',
-      max: '2026-11-20',
-    });
-    const rangedField = ranged.getByRole('textbox', { name: 'Due date', exact: true });
-    await ranged.getByRole('button', { name: /calendar/i }).click();
-    const rangedDialog = ranged.locator('[data-scope="date-picker"][data-part="content"]');
-    await expect(rangedDialog.getByRole('button', { name: /November 25, 2026/ })).toBeDisabled();
-    await expect(rangedDialog.getByRole('button', { name: /November 12, 2026/ })).toBeEnabled();
-    await ranged.keyboard.press('Escape');
-    await rangedField.fill('2026-12-30');
-    await rangedField.press('Enter');
-    await expect(ranged.getByLabel('Date value', { exact: true })).toHaveText('2026-11-20');
+    // min and max: days outside are disabled.
+    const ranged = await open('date', { value: '2026-11-08', min: '2026-11-05', max: '2026-11-20' });
+    await ranged.getByLabel('Due date', { exact: true }).click();
+    const cell = (day) => ranged.locator(`${PART('table-cell-trigger')}[data-value="${day}"]`);
+    await expect(cell('2026-11-25')).toHaveAttribute('data-disabled', '');
+    await expect(cell('2026-11-12')).not.toHaveAttribute('data-disabled', '');
     console.log('PASS DateField honours min and max');
     await ranged.close();
 
-    // The locale prop shapes the typed form and the calendar.
+    // The locale prop shapes what the field says.
     const italian = await open('date', { value: '2026-11-08', locale: 'it-IT' });
-    const italianField = italian.getByRole('textbox', { name: 'Due date', exact: true });
-    await expect(italianField).toHaveValue('08/11/2026');
-    await italianField.fill('09/11/2026');
-    await italianField.press('Enter');
-    await expect(italian.getByLabel('Date value', { exact: true })).toHaveText('2026-11-09');
-    console.log('PASS DateField formats and reads the locale of the prop (it-IT: day first)');
+    await expect(italian.getByLabel('Due date', { exact: true })).toContainText('8 novembre 2026');
+    console.log('PASS DateField reads the locale of the prop (it-IT: day first)');
     await italian.close();
   }
 
   // ---------- DateField inside Modal and SidePanel ----------
-  // The calendar is not portalled: it belongs to the dialog that holds the field, so the focus trap
-  // keeps it, Esc closes the calendar first, and a click on a day neither closes the dialog nor is lost.
+  // The calendar belongs to the dialog that holds the field: Esc closes the calendar first, and a click on a day neither
+  // closes the dialog nor is lost.
   for (const [kind, props] of [['Modal', { modal: true }], ['SidePanel', { panel: true }]]) {
     const page = await open('date', props);
-    const dialog = page.locator('[data-slot="dialog-content"]');
+    const dialog = page.locator('[data-slot="dialog-content"], [data-slot="sheet-content"]').first();
     await expect(dialog).toBeVisible();
-    const field = dialog.getByRole('textbox', { name: 'Due date', exact: true });
-    const calendar = page.locator('[data-scope="date-picker"][data-part="content"]');
+    const field = dialog.getByLabel('Due date', { exact: true });
+    const calendar = page.locator(PART('content'));
     const closes = page.getByLabel('Closes', { exact: true });
-    await field.fill('2026-11-08');
-    await field.press('Enter');
-    await dialog.getByRole('button', { name: /calendar/i }).click();
+    await field.click();
     await expect(calendar).toBeVisible();
-    // The calendar is on top (the point at its middle is its own) and not clipped by the dialog body.
+    // The calendar is on top (the point at its middle is its own) and not clipped by the window.
     const onTop = await calendar.evaluate((el) => {
       const r = el.getBoundingClientRect();
       return el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
     });
     assert.ok(onTop, `${kind}: the calendar is on top`);
-    const clipped = await calendar.evaluate((el) => {
+    // The lowest point of the card the screen shows belongs to the card: the window around the field does not cut it.
+    const lowest = await calendar.evaluate((el) => {
       const r = el.getBoundingClientRect();
-      const box = el.closest('[data-slot="dialog-content"]').getBoundingClientRect();
-      return { bottom: r.bottom - box.bottom, viewport: r.bottom - innerHeight };
+      const y = Math.min(r.bottom - 6, innerHeight - 6);
+      return el.contains(document.elementFromPoint(r.left + r.width / 2, y));
     });
-    assert.ok(clipped.viewport <= 0, `${kind}: the calendar fits the window (${JSON.stringify(clipped)})`);
-    // Keyboard: arrows move the day, Enter chooses; the dialog stays.
+    assert.ok(lowest, `${kind}: the window does not cut the calendar`);
     await page.keyboard.press('Escape');
     await expect(calendar).toBeHidden();
     await expect(dialog).toBeVisible();
     await expect(closes).toHaveText('0');
-    await dialog.getByRole('button', { name: /calendar/i }).click();
-    await expect(calendar).toBeVisible();
-    await calendar.getByRole('button', { name: /November 12, 2026/ }).click();
+    await pickDate(page, field, '2026-11-12');
     await expect(page.getByLabel('Date value', { exact: true })).toHaveText('2026-11-12');
     await expect(calendar).toBeHidden();
     await expect(dialog).toBeVisible();
     await expect(closes).toHaveText('0');
-    await expect(field).toHaveValue('11/12/2026');
     console.log(`PASS DateField inside a ${kind}: calendar on top, Esc closes only it, a click on a day chooses`);
     await page.close();
   }

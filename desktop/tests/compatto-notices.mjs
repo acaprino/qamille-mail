@@ -52,8 +52,8 @@ try {
   await expect(toast).toContainText('Synthetic failure');
   await page.evaluate(() => (window.__previewCommandFail = {}));
   await sync.click();
-  await expect(toast.last()).toContainText('Your inbox is up to date');
-  await expect(toast.first()).toContainText('Synthetic failure');
+  await expect(toast.filter({ hasText: 'Your inbox is up to date' })).toHaveCount(1);
+  await expect(toast.filter({ hasText: 'Synthetic failure' })).toHaveCount(1);
   for (const dismiss of await toast.getByRole('button', { name: /^Close the notice/ }).all()) await dismiss.click();
   await expect(toast).toHaveCount(0);
   console.log('PASS an error stays; a new notice follows it');
@@ -132,7 +132,7 @@ try {
   assert.equal(await css(closeButton, 'background-color'), await token(bar, '--window-close', 'background-color'), 'close turns red');
   await bar.keyboard.press('Tab');
   await bar.keyboard.press('Tab');
-  await expect(bar.getByRole('tooltip')).toBeVisible();
+  await expect(bar.locator('[data-slot="tooltip-content"]')).toBeVisible();
   await bar.close();
   console.log('PASS window controls: 46px buttons, tokens, hint through Tooltip, no title');
 

@@ -59,23 +59,27 @@ try {
   console.log('PASS Text on Reply, Reply all, Forward; icon only on the quick actions; no title');
 
   // (b) Tips: only the real shortcuts. Archive E, Reply R; the others have none.
-  const tip = page.getByRole('tooltip');
-  const tipOf = async (name) => {
+  const tip = page.locator('[data-slot="tooltip-content"]').last();
+  // The card of the button before it may still be fading when this one opens: wait for the one that says `label`.
+  const tipOf = async (name, label) => {
     await named(name).focus();
     await page.keyboard.press('Shift+Tab');
     await page.keyboard.press('Tab');
     await expect(named(name)).toBeFocused();
     await expect(tip).toBeVisible();
-    const text = (await tip.innerText()).replace(/\s+/g, ' ').trim();
-    const keys = await tip.locator('kbd').count();
+    await expect(tip).toContainText(label);
+    // The label and the shortcut are two parts side by side: read together, with a space between.
+    const text = (await tip.evaluate((el) => [...el.childNodes].map((node) => node.textContent.trim()).filter(Boolean).join(' '))).trim();
+    const keys = await tip.locator('[data-slot="tooltip-shortcut"]').count();
+    console.log(`MOTION tip of ${name}: ${JSON.stringify({ text, keys, html: (await tip.innerHTML()).slice(0, 400) })}`);
     await page.keyboard.press('Escape');
     await expect(tip).toHaveCount(0);
     return { text, keys };
   };
-  assert.deepEqual(await tipOf('Archive message'), { text: 'Archive E', keys: 1 });
-  assert.deepEqual(await tipOf('Reply'), { text: 'Reply R', keys: 1 });
+  assert.deepEqual(await tipOf('Archive message', 'Archive'), { text: 'Archive E', keys: 1 });
+  assert.deepEqual(await tipOf('Reply', 'Reply'), { text: 'Reply R', keys: 1 });
   for (const [name, text] of [['Move message to trash', 'Move to trash'], ['Snooze until tomorrow', 'Snooze until tomorrow'], ['Done', 'Done']]) {
-    assert.deepEqual(await tipOf(name), { text, keys: 0 }, `${name} has a tip and no shortcut`);
+    assert.deepEqual(await tipOf(name, text), { text, keys: 0 }, `${name} has a tip and no shortcut`);
   }
   console.log('PASS Tips show E on Archive and R on Reply, nothing on the others');
 
@@ -146,7 +150,7 @@ try {
       .filter({ has: page.getByRole('combobox', { name: label, exact: true }) })
       .locator('[data-scope="tags-input"][data-part="item-preview"]');
   await expect(page.getByRole('combobox', { name: 'To', exact: true })).toBeVisible();
-  const toChips = await chipsOf('To').evaluateAll((nodes) => nodes.map((n) => n.getAttribute('title')));
+  const toChips = await chipsOf('To').evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-value')));
   assert.ok(toChips.some((entry) => entry.includes(first.from_addr)), 'the sender is in To');
   assert.ok(toChips.some((entry) => entry.includes('person01@example.test')) && toChips.some((entry) => entry.includes('person40@example.test')), 'the other recipients are in To');
   assert.ok(!toChips.some((entry) => entry.includes('alex@studio-example.com')), 'the reader is not in To');

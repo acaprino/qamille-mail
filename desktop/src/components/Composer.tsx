@@ -54,7 +54,8 @@ const plainHtml = (text: string) =>
 const withPending = (list: string | undefined, typed: string) =>
   [(list ?? '').trim(), ...splitRecipients(typed)].filter(Boolean).join(', ');
 
-const OPEN_LAYER = '[data-slot="sheet-content"][data-open], [data-slot="dialog-content"][data-open], [data-slot="popover-content"][data-open], [role="menu"], [role="listbox"]';
+const OPEN_LAYER =
+  ':is([data-slot="sheet-content"], [data-slot="dialog-content"], [data-slot="popover-content"]):is([data-open], [data-state="open"]), [role="menu"], [role="listbox"]';
 /** Whether such a layer is on the page and shown (a closed list stays in the DOM, hidden). */
 const openLayer = () => [...document.querySelectorAll(OPEN_LAYER)].some((layer) => layer.checkVisibility?.() ?? true);
 

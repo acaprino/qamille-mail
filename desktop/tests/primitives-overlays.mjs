@@ -3,7 +3,7 @@
 // to the opener, the measures come from the --modal-* and --panel-* tokens, the side panel is not
 // modal, and a Modal opened from a Popover closes first (Review Focus 2). Synthetic data only.
 import { chromium, expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 import { mountGallery } from './support/mount.mjs';
 
 const base = process.env.QAMILLE_PREVIEW_URL ?? 'http://127.0.0.1:1420';
@@ -32,8 +32,8 @@ try {
     await expect(dialog).toBeVisible();
     await ready(dialog);
     assert.equal(await dialog.getAttribute('aria-modal'), 'true');
-    // Svelte moved a [data-ds-portal] wrapper to <body>; React's Ark Portal renders the layer there itself.
-    assert.equal(await page.locator('body > [data-scope="dialog"][data-part="positioner"]').count(), 1, 'an open Modal is one layer in <body>');
+    // Sigrid's Dialog renders its layer (a portal) on <body> itself.
+    assert.equal(await page.locator('body > [data-slot="dialog-portal"]').count(), 1, 'an open Modal is one layer in <body>');
     await page.keyboard.press('Escape');
     await expect(dialog).toHaveCount(0);
     await page.waitForTimeout(200);
@@ -57,7 +57,7 @@ try {
     // The veil is the --scrim color, and a click on it calls onclose.
     await small.click();
     await expect(dialog).toBeVisible();
-    const backdrop = page.locator('[data-scope="dialog"][data-part="backdrop"]');
+    const backdrop = page.locator('[data-slot="dialog-overlay"]');
     const [veil, scrim] = await backdrop.evaluate((el) => {
       const probe = document.createElement('i');
       probe.style.background = 'var(--scrim)';

@@ -92,7 +92,10 @@ try {
     console.log(`${passed ? 'ok  ' : 'FAIL'} ${name} (${seconds}s)${timedOut ? ' TIMED OUT after 300 s' : ''}`);
     if (!passed) {
       failures.push(name);
-      console.log(text.split('\n').filter((line) => line.trim()).slice(-90).join('\n'));
+      const lines = text.split('\n').filter((line) => line.trim());
+      // The failures a test tells and goes on from (SOFT FAIL, FAIL STEP) are all printed; of the rest, the last of it.
+      const told = lines.filter((line) => /^(SOFT FAIL|FAIL STEP|MOTION)/.test(line));
+      console.log([...told.slice(0, 160), ...lines.slice(-40)].join('\n'));
     }
   }
 } finally {

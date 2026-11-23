@@ -179,7 +179,7 @@ try {
     await expect(options.getByRole('option', { name: /Mario Rossi/ }).first()).toBeVisible();
     await options.getByRole('option', { name: /Mario Rossi/ }).first().click();
     // The pick is a chip that carries the whole entry, and the box is empty for the next address.
-    await expect(page.locator('.composer-panel [data-part="item-preview"]')).toHaveAttribute('title', /^Mario Rossi <[^>]+@acme\.test>$/);
+    await expect(page.locator('.composer-panel [data-part="item-preview"]').first()).toHaveAttribute('title', /^Mario Rossi <[^>]+@acme\.test>$/);
     await expect(to).toHaveValue('');
     await to.fill('x');
     await expect(options).toHaveCount(0);

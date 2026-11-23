@@ -248,7 +248,7 @@ try {
       await page.getByLabel(t.newPassphrase).fill('a passphrase for the move');
       await page.getByLabel(t.repeat).fill('a passphrase for the mvoe');
       await save.click();
-      await expect(page.getByRole('alert').filter({ hasText: t.differ })).toBeVisible();
+      await expect(page.locator('[role="alert"], [data-scope="toast"][data-part="root"]').filter({ hasText: t.differ })).toBeVisible();
       assert.equal((await vault(page)).transfer, undefined, 'two different passphrases save nothing');
       await page.getByLabel(t.repeat).fill('a passphrase for the move');
       await page.getByLabel(t.repeat).press('Enter');

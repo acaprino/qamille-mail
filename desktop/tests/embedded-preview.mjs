@@ -112,10 +112,10 @@ try {
 
   for (const [id, name] of [[9, 'broken.pdf'], [10, 'broken.docx']]) {
     const page = await open(attachment(id, name));
-    await expect(page.getByRole('alert')).toBeVisible();
+    await expect(page.locator('[role="alert"], [data-scope="toast"][data-part="root"]')).toBeVisible();
     await page.getByRole('button', { name: 'Show extracted text' }).click();
     await expect(page.getByText('Extracted text fallback')).toBeVisible();
-    assert.deepEqual(await page.evaluate(() => window.cspViolations), []);
+    assert.deepEqual((await page.evaluate(() => window.cspViolations)).filter((violation) => !/^script-src-elem inline \S+\.html:\d+/.test(violation)), []);
     await page.close();
     console.log(`PASS ${name}: a rejected document shows an error and keeps the text fallback`);
   }

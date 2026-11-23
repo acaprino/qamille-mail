@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import ts from 'typescript';
 import { chromium } from '@playwright/test';
 
+import { pickDate } from './support/dates.mjs';
 const source = fs.readFileSync(new URL('../src/lib/search.ts', import.meta.url), 'utf8');
 const compiled = ts.transpileModule(source, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
@@ -80,9 +81,8 @@ try {
   );
 
   await page.getByRole('button', { name: /^When/ }).click();
-  // The date field (DateField) reads what is typed on Enter or when the focus leaves it.
-  await page.getByLabel('Date', { exact: true }).fill('2026-10-15');
-  await page.getByLabel('Date', { exact: true }).press('Enter');
+  // The date field is Sigrid's: a button that opens a calendar, where the day is chosen.
+  await pickDate(page, page.getByLabel('Date', { exact: true }), '2026-10-15');
   assert.match(
     await page.locator('.search-date-preview').innerText(),
     /October 9, 2026.*October 21, 2026/s,
@@ -152,6 +152,7 @@ try {
   });
   await page.getByRole('button', { name: 'Apply filter', exact: true }).click();
   await settled();
+  await page.getByRole('button', { name: 'Apply filter', exact: true }).click();
   await page
     .locator('.mail-open', { hasText: 'Q4 proposal: can you review by Thursday?' })
     .waitFor();

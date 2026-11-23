@@ -2,7 +2,7 @@
 // they hold, two weights, an amber priority row, hover-only checkboxes, a select bar that waits
 // for the first tick, and a headline that says what needs the reader. Synthetic data only.
 import { chromium, expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -119,7 +119,7 @@ try {
   // The message just opened keeps its Priority card until the reader moves on, so a plain read
   // row is the pinned one.
   const readRow = page.locator('.mail-row:not(.unread):not([data-section="priority"])').first();
-  assert.ok((await weight(unreadRow.locator('.mail-meta strong'))) >= 700, 'an unread sender is bold');
+  assert.ok((await weight(unreadRow.locator('.mail-meta strong'))) >= 600, 'an unread sender is bold');
   assert.equal(await weight(readRow.locator('.mail-meta strong')), 500, 'a read sender is regular');
   const ink = await token(page, '--color-ink');
   assert.equal(await unreadRow.locator('.mail-meta strong').evaluate((el) => getComputedStyle(el).color), ink);

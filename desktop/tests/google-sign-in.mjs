@@ -2,6 +2,7 @@
 import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 
+import { explainMotion } from './support/explain-motion.mjs';
 const base = process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:5187';
 const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1280, height: 900 } });
@@ -99,7 +100,13 @@ try {
   assert.deepEqual(await page.evaluate(() => window.signInCalls.at(-1)), {
     command: 'open_link', args: { url: projectUrl },
   });
-  await setup.getByRole('button', { name: 'Enter credentials', exact: true }).click();
+  const enter = setup.getByRole('button', { name: 'Enter credentials', exact: true });
+  try {
+    await enter.click({ timeout: 5000 });
+  } catch (error) {
+    console.log('MOTION', JSON.stringify(await explainMotion(enter)));
+    throw error;
+  }
   await expect(setup).toBeHidden();
   await expect(page.getByRole('textbox', { name: 'Google desktop client ID', exact: true })).toBeVisible();
   await expect(page.getByLabel('Google client secret', { exact: true })).toBeVisible();

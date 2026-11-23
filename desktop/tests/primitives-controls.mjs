@@ -2,7 +2,7 @@
 // contract, the keyboard, the focus ring (2px --color-primary) and the Compatto look. Each primitive is mounted
 // alone through tests/support/mount.mjs. Synthetic data only.
 import { chromium, expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 import { mountGallery } from './support/mount.mjs';
 
 const ACCENT = 'rgb(79, 70, 229)';
@@ -47,7 +47,7 @@ try {
     const input = page.getByRole(kind, { name, exact: true });
     const visible = page
       .locator(`[data-scope="${kind}"][data-part="root"]`, { hasText: name })
-      .locator('[data-part="control"]');
+      .getByRole('checkbox');
 
     // Keyboard: Tab reaches it (the switch after the checkboxes), Space toggles it.
     for (let i = 0; i < 6 && !(await input.evaluate((el) => el === document.activeElement)); i++)

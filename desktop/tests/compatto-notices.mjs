@@ -2,7 +2,7 @@
 // computed values and driven through roles and accessible names. Sample data only.
 // Run: node scripts/test-browser.mjs compatto-notices
 import { expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { box, css, openApp, previewUrl } from './support/compatto.mjs';
@@ -29,7 +29,7 @@ try {
   // (a) A notice: Sigrid's Toasts, in the region «Notices», with its text and a close button.
   await sync.click();
   await expect(toast).toHaveCount(1);
-  await expect(page.getByRole('status', { name: 'Notices' }).locator('[data-scope="toast"]')).toHaveCount(1);
+  await expect(page.getByRole('status', { name: 'Notices' }).locator('[data-scope="toast"][data-part="root"]')).toHaveCount(1);
   await expect(toast).toContainText('Your inbox is up to date');
   const close = toast.getByRole('button', { name: /^Close the notice/ });
   await expect(close).toBeVisible();

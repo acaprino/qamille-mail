@@ -44,7 +44,7 @@ try {
   }
   {
     const { page, context } = await connected({ unlinked: true });
-    await expect(page.getByRole('alert').filter({ hasText: 'This device is no longer connected to the server' })).toBeVisible();
+    await expect(page.locator('[role="alert"], [data-scope="toast"][data-part="root"]').filter({ hasText: 'This device is no longer connected to the server' })).toBeVisible();
     await expect(page.getByRole('list', { name: 'Server models' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Sign in again', exact: true }).click();
     const form = page.getByRole('region', { name: 'Server connection' });
@@ -60,7 +60,7 @@ try {
   }
   {
     const { page, context } = await connected({ mismatch: true });
-    const alert = page.getByRole('alert').filter({ hasText: 'The server uses a different model from the index' });
+    const alert = page.locator('[role="alert"], [data-scope="toast"][data-part="root"]').filter({ hasText: 'The server uses a different model from the index' });
     await expect(alert).toContainText('nomic-embed-text, 768 dimensions');
     await expect(alert).toContainText('EmbeddingGemma 2, 256 dimensions');
     await alert.getByRole('button', { name: 'Reindex', exact: true }).click();

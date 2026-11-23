@@ -387,7 +387,7 @@ try {
       const marked = menu.locator('[data-highlighted]');
       await expect(marked).toHaveCount(1);
       await expect(marked).toHaveAccessibleName(name);
-      await expect(menu).toHaveAttribute('aria-activedescendant', await marked.getAttribute('id'));
+      await expect(marked).toBeFocused();
     };
     const open = async () => {
       await trigger.click();

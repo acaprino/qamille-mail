@@ -175,7 +175,7 @@ try {
   );
   console.log('PASS boolean query chips preserve grouping and clear safely');
 
-  await page.getByRole('button', { name: 'Alex Personal workspace' }).click();
+  await page.getByRole('button', { name: /^Settings/ }).click();
   await page.getByRole('combobox', { name: 'Regional format', exact: true }).click();
   await page.getByRole('option', { name: 'it-IT', exact: true }).click();
   await page.getByRole('button', { name: 'Save changes', exact: true }).click();

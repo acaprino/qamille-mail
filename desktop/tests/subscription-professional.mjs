@@ -24,7 +24,7 @@ async function signInWithGoogle(page) {
 }
 async function openCompute(page) {
   await page.getByRole('button', { name: /^New message/ }).waitFor();
-  await page.getByRole('complementary', { name: 'Sidebar' }).getByRole('button', { name: 'Alex Personal workspace' }).click();
+  await page.getByRole('navigation', { name: 'Sidebar' }).getByRole('button', { name: /^Settings/ }).click();
   await page.locator('.settings-nav').getByRole('button', { name: 'Compute', exact: true }).click();
   await expect(page.getByText('User:')).toBeVisible();
 }

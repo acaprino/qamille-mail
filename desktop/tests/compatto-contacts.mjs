@@ -137,7 +137,7 @@ try {
   await step('Settings: the Contacts section uses Ark Checkbox and --control-md rows', async () => {
     await page.goto(process.env.QAMILLE_PREVIEW_URL ?? 'http://127.0.0.1:1420');
     await page.locator('.compose-main').waitFor();
-    await page.getByRole('button', { name: 'Alex Personal workspace' }).click();
+    await page.getByRole('button', { name: /^Settings/ }).click();
     await page.getByRole('navigation', { name: 'Settings sections' }).getByRole('button', { name: 'Contacts' }).click();
     const books = page.getByRole('list', { name: 'Connected address books' });
     await expect(books.locator('[data-slot="checkbox"]').first()).toBeVisible();

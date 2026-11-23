@@ -53,7 +53,7 @@ try {
     await page.getByLabel('Password', { exact: true }).fill('una password lunga');
     await page.locator('.server-connect').getByRole('button', { name: 'Sign in', exact: true }).click();
     await page.getByRole('button', { name: /^New message/ }).waitFor();
-    await page.getByRole('complementary', { name: 'Sidebar' }).getByRole('button', { name: 'Alex Personal workspace' }).click();
+    await page.getByRole('navigation', { name: 'Sidebar' }).getByRole('button', { name: /^Settings/ }).click();
     await page.locator('.settings-nav').getByRole('button', { name: 'Compute', exact: true }).click();
     await expect(page.getByText('User:')).toBeVisible();
     assert.equal(await page.getByText('https://qamille.example').count(), 0, 'the address is not shown');

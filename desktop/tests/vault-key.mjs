@@ -40,7 +40,7 @@ const { vaultText } = await import(pathToFileURL(path.join(desktop, 'src/lib/vau
 
 const TEXT = {
   'en-US': {
-    sidebar: 'Sidebar', workspace: 'Alex Personal workspace', accounts: 'Accounts', credentials: 'Credentials',
+    sidebar: 'Sidebar', workspace: /^Settings/, accounts: 'Accounts', credentials: 'Credentials',
     fromAnother: 'Credentials from another computer', doNotOpen: 'The credentials do not open',
     chosenThere: 'the account credentials open with the transfer passphrase chosen there',
     passphrase: 'Transfer passphrase', open: 'Open the credentials', wrong: 'The transfer passphrase is not correct.',
@@ -62,7 +62,7 @@ const TEXT = {
     storage: 'Portable credentials storage failed: Access is denied. (os error 5)',
   },
   'it-IT': {
-    sidebar: 'Barra laterale', workspace: 'Alex Spazio personale', accounts: 'Account', credentials: 'Credenziali',
+    sidebar: 'Barra laterale', workspace: /^Impostazioni/, accounts: 'Account', credentials: 'Credenziali',
     fromAnother: 'Credenziali di un altro computer', doNotOpen: 'Le credenziali non si aprono',
     chosenThere: 'le credenziali degli account si aprono con la frase di trasferimento scelta là',
     passphrase: 'Frase di trasferimento', open: 'Apri le credenziali', wrong: 'La frase di trasferimento non è corretta.',
@@ -104,7 +104,7 @@ async function open(vault, locale, server) {
 const vault = (page) => page.evaluate(() => window.__previewVault);
 const toast = (page, text) => page.locator('[data-scope="toast"][data-part="root"]').filter({ hasText: text });
 async function credentials(page, t) {
-  await page.getByRole('complementary', { name: t.sidebar }).getByRole('button', { name: t.workspace }).click();
+  await page.getByRole('navigation', { name: t.sidebar }).getByRole('button', { name: t.workspace }).click();
   await page.locator('.settings-nav').getByRole('button', { name: t.accounts, exact: true }).click();
   await expect(page.getByRole('heading', { name: t.credentials, exact: true })).toBeVisible();
 }

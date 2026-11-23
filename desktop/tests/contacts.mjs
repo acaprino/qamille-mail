@@ -186,7 +186,7 @@ try {
   await step('Settings has a Contacts section that saves the priority order', async () => {
     await page.goto(base);
     await page.locator('.compose-main').waitFor();
-    await page.getByRole('button', { name: 'Alex Personal workspace' }).click();
+    await page.getByRole('button', { name: /^Settings/ }).click();
     await page.getByRole('navigation', { name: 'Settings sections' }).getByRole('button', { name: 'Contacts' }).click();
     await expect(page.getByRole('heading', { level: 2, name: 'Contacts' })).toBeVisible();
     const order = page.getByRole('list', { name: 'Order of address books' });

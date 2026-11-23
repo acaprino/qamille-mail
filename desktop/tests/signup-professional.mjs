@@ -34,7 +34,7 @@ try {
     await form.getByLabel('Code').fill('12345678');
     await form.getByRole('button', { name: 'Create account and sign in', exact: true }).click();
     await page.getByRole('button', { name: /^New message/ }).waitFor();
-    await page.getByRole('complementary', { name: 'Sidebar' }).getByRole('button', { name: 'Alex Personal workspace' }).click();
+    await page.getByRole('navigation', { name: 'Sidebar' }).getByRole('button', { name: /^Settings/ }).click();
     await page.locator('.settings-nav').getByRole('button', { name: 'Compute', exact: true }).click();
     await expect(page.getByText('User:')).toBeVisible();
     await expect(page.getByText('anna', { exact: true })).toBeVisible();
@@ -81,7 +81,7 @@ try {
   {
     const { page, context } = await start({ signup: true, password_reset: true });
     await page.getByRole('button', { name: /^New message/ }).waitFor();
-    await page.getByRole('complementary', { name: 'Sidebar' }).getByRole('button', { name: 'Alex Personal workspace' }).click();
+    await page.getByRole('navigation', { name: 'Sidebar' }).getByRole('button', { name: /^Settings/ }).click();
     await page.locator('.settings-nav').getByRole('button', { name: 'Compute', exact: true }).click();
     await page.getByRole('button', { name: 'Connect to a server', exact: true }).click();
     const form = page.getByRole('region', { name: 'Server connection' });

@@ -70,6 +70,16 @@ code,
     font: inherit;
   }
 }
+/* Tailwind's preflight clears every list. The lists the app writes itself keep the browser's markers and indent, as they had
+   before it; Sigrid's say role="list" and stay clear. */
+@layer base {
+  ul:not([role='list']),
+  ol:not([role='list']) {
+    list-style: revert;
+    margin: revert;
+    padding: revert;
+  }
+}
 /* Windows controls keep the arrow: "don't use the pointing hand cursor for links or other
    interactive elements. Instead, use hover effects" (Microsoft, mouse interactions;
    docs/aspetto-nativo.md rule 3). Links inside a message keep the hand: they are document, in the

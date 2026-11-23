@@ -25,11 +25,13 @@ export type NavItemProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'type'>
   icon?: ReactNode;
   /** What follows the name, at the end of the row (a `Count`). */
   end?: ReactNode;
+  /** A second line under the name, in the muted ink (not on the rail). */
+  description?: ReactNode;
 };
 
-export function NavItem({ active = false, hint, icon, end, children, ...rest }: NavItemProps) {
+export function NavItem({ active = false, hint, icon, end, description, children, ...rest }: NavItemProps) {
   const row = (
-    <SigridNavItem current={active} icon={icon} end={end} {...rest}>
+    <SigridNavItem current={active} icon={icon} end={end} description={description} {...rest}>
       {children}
     </SigridNavItem>
   );

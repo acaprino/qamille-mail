@@ -178,7 +178,7 @@ try {
     await expect(message).toBeVisible();
   });
   await step('Configured duration and dark-mode progress', async () => {
-    await page.getByRole('button', { name: /Alex Personal workspace/ }).click();
+    await page.getByRole('button', { name: /^Settings/ }).click();
     await choose(page.getByRole('combobox', { name: /^Undo time/ }), '10 seconds');
     await choose(page.getByRole('combobox', { name: 'Appearance', exact: true }), 'Dark');
     await page.getByRole('button', { name: 'Save changes' }).click();
@@ -192,7 +192,7 @@ try {
     await page.screenshot({ path: '../checks/undo-dark.png' });
     await undo().click();
     await expect(notices).toHaveCount(0);
-    await page.getByRole('button', { name: /Alex Personal workspace/ }).click();
+    await page.getByRole('button', { name: /^Settings/ }).click();
     await expect(page.getByRole('combobox', { name: /^Undo time/ })).toContainText('10 seconds');
     await choose(page.getByRole('combobox', { name: /^Undo time/ }), '5 seconds');
     await choose(page.getByRole('combobox', { name: 'Appearance', exact: true }), 'Light');

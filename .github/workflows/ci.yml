@@ -24,6 +24,13 @@ jobs:
           workspaces: |
             server
             compute
+      # The build writes the locks, nobody does by hand (the machines here compile nothing): `cargo fetch` without --locked
+      # brings a lock to what its Cargo.toml says (a crate's version, a dependency added) and changes nothing else.
+      # --locked below then stops only what it is for: a change in the lock that nobody asked for.
+      - name: The locks follow the manifests
+        run: |
+          cargo fetch --manifest-path server/Cargo.toml
+          cargo fetch --manifest-path compute/Cargo.toml
       - name: Server tests
         run: cargo test --manifest-path server/Cargo.toml --jobs 2 --locked --no-fail-fast
       - name: Compute tests
@@ -51,6 +58,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: app
+      # The build writes the locks, nobody does by hand (the machines here compile nothing): `cargo fetch` without --locked
+      # brings a lock to what its Cargo.toml says (a crate's version, a dependency added) and changes nothing else.
+      # --locked below then stops only what it is for: a change in the lock that nobody asked for.
+      - name: The lock follows the manifest
+        run: cargo fetch --manifest-path app/Cargo.toml
       - name: App tests
         # Every test file runs even after one fails: a failure must not hide the ones after it.
         run: cargo test --manifest-path app/Cargo.toml --no-default-features --features test-support --jobs 2 --locked --no-fail-fast

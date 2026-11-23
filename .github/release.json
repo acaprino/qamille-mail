@@ -29,5 +29,7 @@
     "qamille-compute",
     "qamille"
   ],
-  "prepare": []
+  "prepare": [
+    "cargo fetch --manifest-path desktop/src-tauri/Cargo.toml"
+  ]
 }

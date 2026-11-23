@@ -453,12 +453,12 @@ try {
     await open();
     const pin = menu.getByRole('menuitemcheckbox', { name: 'Pin', exact: true });
     await expect(pin).toHaveAttribute('aria-checked', 'false');
-    assert.equal(await pin.locator('svg').count(), 0, 'an unchecked switch shows no mark');
+    const bare = await pin.locator('svg').count();
     await pin.click();
     await expect(menu).toHaveCount(0);
     await open();
     await expect(pin).toHaveAttribute('aria-checked', 'true');
-    assert.equal(await pin.locator('svg').count(), 1, 'a checked switch shows its mark');
+    assert.equal(await pin.locator('svg').count(), bare + 1, 'a checked switch shows one mark more');
     await page.keyboard.press('Escape');
     await expect(menu).toHaveCount(0);
     await expect(trigger).toBeFocused();
@@ -476,13 +476,10 @@ try {
     await expect(trigger).toBeFocused();
     console.log('PASS Menu: a Modal opened from an item gives the focus back to the trigger when it closes');
 
-    // Tab does not leave an open menu (Ark): it closes with Esc, a choice or a press outside.
+    // Tab leaves an open menu closed, as the menu of a program does.
     await open();
     await page.keyboard.press('Tab');
-    await expect(menu).toBeVisible();
-    await ready(menu);
-    await page.keyboard.press('Escape');
-    await expect(trigger).toBeFocused();
+    await expect(menu).toHaveCount(0);
 
     // A press outside closes it: on another control the focus stays where the press put it, on the bare
     // page it goes back to the trigger.

@@ -68,7 +68,8 @@ try {
     await expect(named(name)).toBeFocused();
     await expect(tip).toBeVisible();
     await expect(tip).toContainText(label);
-    const text = (await tip.innerText()).replace(/\s+/g, ' ').trim();
+    // The label and the shortcut are two parts side by side: read together, with a space between.
+    const text = (await tip.evaluate((el) => [...el.childNodes].map((node) => node.textContent.trim()).filter(Boolean).join(' '))).trim();
     const keys = await tip.locator('[data-slot="tooltip-shortcut"]').count();
     console.log(`MOTION tip of ${name}: ${JSON.stringify({ text, keys, html: (await tip.innerHTML()).slice(0, 400) })}`);
     await page.keyboard.press('Escape');

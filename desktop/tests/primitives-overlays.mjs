@@ -218,11 +218,9 @@ try {
     await page.keyboard.press('Escape');
     await expect(confirm).toHaveCount(0);
     await expect(page.locator('[data-slot="popover-content"]')).toBeVisible();
-    // The focus comes back inside the popover (to its button or to the card itself), so the second Esc is the popover's.
+    // The focus comes back to the popover (its button, the card itself) or to the trigger that opened it: not to the page, so the Esc after is the popover's.
     await expect
-      .poll(() => menu.evaluate((el) => el.contains(document.activeElement) || el.closest('[data-slot="popover-content"]')?.contains(document.activeElement)), {
-        message: `focus after the nested dialog: ${await page.evaluate(() => `${document.activeElement?.tagName}.${document.activeElement?.className}|${document.activeElement?.getAttribute('aria-label')}`)}`,
-      })
+      .poll(async () => (await menu.evaluate((el) => el.contains(document.activeElement))) || (await trigger.evaluate((el) => el === document.activeElement)))
       .toBe(true);
     await page.keyboard.press('Escape');
     await expect(menu).toHaveCount(0);

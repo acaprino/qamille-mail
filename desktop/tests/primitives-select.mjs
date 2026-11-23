@@ -76,7 +76,7 @@ try {
     const host = await context.newPage();
     host.on('pageerror', (error) => errors.push(error.message));
     await mountGallery(host, 'select', props);
-    const dialog = host.locator('[data-slot="dialog-content"]');
+    const dialog = host.locator('[data-slot="dialog-content"], [data-slot="sheet-content"]');
     await expect(dialog).toBeVisible();
     const field = dialog.getByRole('combobox', { name: 'Language' });
     const options = host.getByRole('listbox');

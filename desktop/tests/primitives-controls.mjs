@@ -47,7 +47,7 @@ try {
     const input = page.getByRole(kind, { name, exact: true });
     const visible = page
       .locator(`[data-scope="${kind}"][data-part="root"]`, { hasText: name })
-      .locator('[data-part="control"]');
+      .getByRole('checkbox');
 
     // Keyboard: Tab reaches it (the switch after the checkboxes), Space toggles it.
     for (let i = 0; i < 6 && !(await input.evaluate((el) => el === document.activeElement)); i++)

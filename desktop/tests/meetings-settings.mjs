@@ -60,6 +60,7 @@ const combo = (name) => content.getByRole('combobox', { name, exact: true });
 const options = async (name) => {
   await combo(name).click();
   const listed = await page.getByRole('listbox', { name }).getByRole('option').allTextContents();
+  if (!listed.length) console.log('LISTBOXES', JSON.stringify(await page.getByRole('listbox').evaluateAll((lists) => lists.map((list) => `${list.getAttribute('aria-label')}|${list.id}|${list.querySelectorAll('[role=option]').length}`))));
   await page.keyboard.press('Escape');
   return listed.map((text) => text.trim());
 };

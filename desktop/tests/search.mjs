@@ -152,6 +152,7 @@ try {
   });
   await page.getByRole('button', { name: 'Apply filter', exact: true }).click();
   await settled();
+  await page.getByRole('button', { name: 'Apply filter', exact: true }).click();
   await page
     .locator('.mail-open', { hasText: 'Q4 proposal: can you review by Thursday?' })
     .waitFor();

@@ -29,7 +29,7 @@ try {
   // (a) A notice: Sigrid's Toasts, in the region «Notices», with its text and a close button.
   await sync.click();
   await expect(toast).toHaveCount(1);
-  await expect(page.getByRole('status', { name: 'Notices' }).locator('[data-scope="toast"]')).toHaveCount(1);
+  await expect(page.getByRole('status', { name: 'Notices' }).locator('[data-scope="toast"][data-part="root"]')).toHaveCount(1);
   await expect(toast).toContainText('Your inbox is up to date');
   const close = toast.getByRole('button', { name: /^Close the notice/ });
   await expect(close).toBeVisible();

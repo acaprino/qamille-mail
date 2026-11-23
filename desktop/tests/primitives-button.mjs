@@ -16,7 +16,7 @@ try {
   await mountGallery(page, 'button');
 
   const archive = page.getByRole('button', { name: 'Archive', exact: true });
-  const tooltip = page.getByRole('tooltip');
+  const tooltip = page.locator('[data-slot="tooltip-content"]');
   const send = page.getByRole('button', { name: 'Send', exact: true });
 
   // (a) A tip is a hint, not the name: no title attribute, the aria-label stays the accessible name.
@@ -104,7 +104,7 @@ try {
   await mountGallery(touchPage, 'button');
   await touchPage.getByRole('button', { name: 'Archive', exact: true }).tap();
   await touchPage.waitForTimeout(800);
-  await expect(touchPage.getByRole('tooltip')).toHaveCount(0);
+  await expect(touchPage.locator('[data-slot="tooltip-content"]')).toHaveCount(0);
   assert.equal(await touchPage.locator('#archived').textContent(), '1', 'the tap still presses the button');
   console.log('PASS A touch tap opens no tooltip');
 

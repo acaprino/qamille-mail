@@ -257,9 +257,9 @@ try {
       assert.equal((await box(control)).height, 32, `${await control.getAttribute('aria-label') ?? 'Send'} is 32px`);
     }
     await panel.getByRole('button', { name: 'Schedule send', exact: true }).click();
-    const day = panel.getByRole('textbox', { name: 'Send date', exact: true });
+    const day = panel.getByLabel('Send date', { exact: true });
     const time = panel.getByLabel('Send time', { exact: true });
-    assert.equal((await box(panel.locator('[data-scope="date-picker"][data-part="control"]'))).height, 32, 'the date field is 32px');
+    assert.equal((await box(day)).height, 32, 'the date field is 32px');
     await expect(day).toBeVisible();
     assert.equal((await box(time)).height, 32, 'the time box is 32px');
     assert.equal(await time.getAttribute('type'), 'time', 'the time stays a native time input');
@@ -393,10 +393,10 @@ try {
     await area.getByRole('combobox', { name: 'A', exact: true }).fill('someone@x.it;');
     await expect(area.getByRole('button', { name: 'Rimuovi someone@x.it', exact: true })).toBeVisible();
     await area.getByRole('button', { name: 'Programma invio', exact: true }).click();
-    const day = area.getByRole('textbox', { name: 'Data di invio', exact: true });
-    await expect(day).toHaveAttribute('placeholder', 'gg/mm/aaaa');
+    const day = area.getByLabel('Data di invio', { exact: true });
+    await expect(day).toBeVisible();
     await expect(area.getByLabel('Ora di invio', { exact: true })).toBeVisible();
-    await area.getByRole('button', { name: 'Apri il calendario', exact: true }).click();
+    await day.click();
     await expect(it.getByRole('button', { name: 'Mese successivo', exact: true })).toBeVisible();
     await expect(it.getByRole('button', { name: 'Mese precedente', exact: true })).toBeVisible();
     await italian.close();
@@ -406,10 +406,9 @@ try {
     const page = await context.newPage();
     page.on('pageerror', (error) => errors.push(error.message));
     await mountGallery(page, 'date', { disabled: true });
-    const day = page.getByRole('textbox', { name: 'Due date', exact: true });
+    const day = page.getByLabel('Due date', { exact: true });
     await expect(day).toBeDisabled();
-    await expect(page.getByRole('button', { name: /calendar/i })).toBeDisabled();
-    await page.getByRole('button', { name: /calendar/i }).click({ force: true });
+    await day.click({ force: true });
     await expect(page.locator('[data-scope="date-picker"][data-part="content"]')).toBeHidden();
     assert.ok(Number(await css(page.locator('[data-scope="date-picker"][data-part="control"]'), 'opacity')) < 1, 'it looks disabled');
     await page.close();

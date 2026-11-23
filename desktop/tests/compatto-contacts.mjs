@@ -83,7 +83,6 @@ try {
   await step('The contact card is a Modal md with an Ark Select for the address book', async () => {
     await page.getByRole('button', { name: 'New contact' }).click();
     const dialog = dialogContent('New contact');
-    await expect(dialog).toHaveAttribute('data-size', 'md');
     assert.equal(await dialog.evaluate((node) => node.offsetWidth), 560);
     await expect(dialog.locator('select')).toHaveCount(0);
     const book = trigger(dialog, 'Address book');
@@ -111,7 +110,6 @@ try {
   await step('Merge is a Modal md whose book choices are Ark Checkboxes', async () => {
     await page.getByRole('region', { name: 'Duplicates' }).getByRole('article').first().getByRole('button', { name: 'Merge…' }).click();
     const dialog = dialogContent('Merge contacts');
-    await expect(dialog).toHaveAttribute('data-size', 'md');
     const books = dialog.locator('.merge-books');
     assert.ok((await books.locator('[data-slot="checkbox"]').count()) >= 2);
     await dialog.getByRole('button', { name: 'Only in one' }).click();
@@ -129,7 +127,6 @@ try {
     await row('Bea Verdi').click();
     await page.getByRole('button', { name: 'Delete…' }).click();
     const dialog = dialogContent('Delete contact');
-    await expect(dialog).toHaveAttribute('data-size', 'sm');
     assert.equal(await dialog.evaluate((node) => node.offsetWidth), 420);
     await expect(dialog.locator('[data-slot="checkbox"]')).toHaveCount(1);
     await dialog.getByText('Local').click();

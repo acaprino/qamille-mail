@@ -25,10 +25,14 @@ impl Workspace {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
+        // Tests run in parallel in one process, and the clock of a Windows runner can give the same nanosecond twice:
+        // a counter keeps every workspace's name its own.
+        static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let root = base
             .canonicalize()
             .unwrap()
-            .join(format!("workspace-{}-{stamp}", std::process::id()));
+            .join(format!("workspace-{}-{stamp}-{n}", std::process::id()));
         fs::create_dir(&root).unwrap();
         let repository = Arc::new(JsonStoreRepository::new(root.join("data/store.json")));
         repository

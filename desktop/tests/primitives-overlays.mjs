@@ -405,22 +405,28 @@ try {
     assert.deepEqual(shape, ['menuitem', 'menuitem', 'menuitem', 'separator', 'menuitemcheckbox', 'menuitem', 'separator', 'menuitem']);
     console.log('PASS Menu: a separator between groups, and the destructive item last, after its own separator');
 
-    // A disabled item says so and why, the arrows skip it, and a click on it does nothing.
+    // A disabled item says so and why, the arrows stop on it (it stays reachable for a screen reader: Sigrid's menu), and neither
+    // Enter nor a click on it does anything.
     const download = menu.getByRole('menuitem', { name: 'Download', exact: true });
     await expect(download).toHaveAttribute('aria-disabled', 'true');
     await expect(download).toHaveAttribute('title', 'Not while printing');
     await page.keyboard.press('ArrowDown');
     await on('Print');
     await page.keyboard.press('ArrowDown');
+    await on('Download');
+    await page.keyboard.press('Enter');
+    await expect(menu).toBeVisible();
+    await expect(picked).toHaveText('none');
+    await page.keyboard.press('ArrowDown');
     await on('Archive');
     await download.click({ force: true });
     await expect(menu).toBeVisible();
     await expect(picked).toHaveText('none');
-    console.log('PASS Menu: a disabled item is marked, skipped by the arrows and does nothing on a click');
+    console.log('PASS Menu: a disabled item is marked and does nothing on Enter or a click');
 
     // A shortcut is shown at the end of the item and is not part of its name.
     const print = menu.getByRole('menuitem', { name: 'Print', exact: true });
-    await expect(print.locator('kbd')).toHaveText('Ctrl+P');
+    await expect(print.locator('[data-slot="dropdown-menu-shortcut"]')).toHaveText('Ctrl+P');
     await expect(print).toHaveAttribute('aria-keyshortcuts', 'Ctrl+P');
     console.log('PASS Menu: a shortcut shows in a <kbd> and is announced as aria-keyshortcuts, not as the name');
 

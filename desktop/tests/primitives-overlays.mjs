@@ -312,15 +312,15 @@ try {
     // the menu's: E does not archive the message behind it.
     await page.keyboard.press('d');
     await on('Download .eml');
-    await page.waitForTimeout(500); // the typeahead forgets the letters typed after 350 ms
+    await page.waitForTimeout(900); // the typeahead forgets the letters typed after 750 ms
     await page.keyboard.press('s');
     await on('Set aside');
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(900);
     await page.keyboard.press('p');
     await on('Print email');
     await page.keyboard.press('p');
     await on('Print thread');
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(900);
     await page.keyboard.press('e');
     await page.waitForTimeout(300);
     await expect(menu).toBeVisible();

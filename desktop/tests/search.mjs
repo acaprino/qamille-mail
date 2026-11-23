@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
-import { chromium } from '@playwright/test';
+import { chromium, expect } from '@playwright/test';
 
 import { pickDate } from './support/dates.mjs';
 const source = fs.readFileSync(new URL('../src/lib/search.ts', import.meta.url), 'utf8');

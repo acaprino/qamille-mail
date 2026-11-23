@@ -283,8 +283,7 @@ try {
   await cerca.press('Enter');
   await page.getByRole('button', { name: /^Quando/ }).click();
   const quando = page.locator('.search-filter-panel');
-  await quando.getByRole('textbox', { name: 'Data', exact: true }).focus();
-  await quando.getByRole('button', { name: 'Apri il calendario' }).click();
+  await quando.getByLabel('Data', { exact: true }).click();
   await expect(page.getByRole('button', { name: 'Mese successivo' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Mese precedente' })).toBeVisible();
   console.log('PASS The calendar speaks Italian when the app does');

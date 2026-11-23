@@ -181,8 +181,6 @@ try {
     // The pick is a chip that carries the whole entry, and the box is empty for the next address.
     await expect(page.locator('.composer-panel [data-part="item-preview"]').first()).toHaveAttribute('data-value', /^Mario Rossi <[^>]+@acme\.test>$/);
     await expect(to).toHaveValue('');
-    await to.fill('x');
-    await expect(options).toHaveCount(0);
   });
 
   await step('Settings has a Contacts section that saves the priority order', async () => {

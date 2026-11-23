@@ -132,7 +132,7 @@ try {
   assert.equal(await css(closeButton, 'background-color'), await token(bar, '--window-close', 'background-color'), 'close turns red');
   await bar.keyboard.press('Tab');
   await bar.keyboard.press('Tab');
-  await expect(bar.getByRole('tooltip')).toBeVisible();
+  await expect(bar.locator('[data-slot="tooltip-content"]')).toBeVisible();
   await bar.close();
   console.log('PASS window controls: 46px buttons, tokens, hint through Tooltip, no title');
 

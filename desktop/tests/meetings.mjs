@@ -961,7 +961,7 @@ try {
     await expect(pane).toContainText('La trascrizione è stata annullata.');
     await previewApi('meeting_preview_readiness', { transcription_blocker: NO_ENGINE });
     await pane.getByRole('button', { name: 'Riprova', exact: true }).click();
-    await expect(page.getByRole('region', { name: 'Notifiche' }).getByText(NO_ENGINE)).toBeVisible();
+    await expect(page.locator('[data-scope="toast"][data-part="root"]').getByText(NO_ENGINE)).toBeVisible();
     assert.equal((await transcriptions()).length, 2, 'nothing was started');
     await expect(pane).toContainText('La trascrizione è stata annullata.');
   });
@@ -1000,7 +1000,7 @@ try {
     // The engine is blocked: the reason is told, nothing starts, the row stays as it was.
     await previewApi('meeting_preview_readiness', { transcription_blocker: NO_ENGINE });
     await retry.click();
-    await expect(page.getByRole('region', { name: 'Notifiche' }).getByText(NO_ENGINE)).toBeVisible();
+    await expect(page.locator('[data-scope="toast"][data-part="root"]').getByText(NO_ENGINE)).toBeVisible();
     assert.equal((await readMeeting(id)).jobs.length, 1);
     await expect(failed.locator('.item-sub')).toHaveText('Trascrizione non riuscita');
     // Fixed: "Riprova" is a new transcription with the settings of now, and the row moves along
@@ -1043,7 +1043,7 @@ try {
     const retry = pane.getByRole('button', { name: 'Riprova', exact: true });
     await retry.focus();
     await page.keyboard.press('Enter');
-    await expect(page.getByRole('region', { name: 'Notifiche' }).getByText(NO_ENGINE)).toBeVisible();
+    await expect(page.locator('[data-scope="toast"][data-part="root"]').getByText(NO_ENGINE)).toBeVisible();
     await expect(retry).toBeFocused();
   });
 
@@ -2095,7 +2095,7 @@ try {
     await openMeetings(); // nothing is open: only the timer reads the meeting
     await previewApi('meeting_preview_read_error', { id });
     const mark = await callMark();
-    const notice = page.getByRole('region', { name: 'Notifiche' }).getByText('File meeting non leggibile (simulazione).');
+    const notice = page.locator('[data-scope="toast"][data-part="root"]').getByText('File meeting non leggibile (simulazione).');
     await expect(notice).toHaveCount(1, { timeout: 10000 });
     const reads = () => page.evaluate(
       ({ from, id }) =>

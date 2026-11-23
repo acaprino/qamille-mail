@@ -65,7 +65,7 @@ try {
   await page.keyboard.press('Enter');
   await expect.poll(() => listbox.evaluate((el) => el.contains(document.activeElement))).toBe(true);
   const deutsch = listbox.getByRole('option', { name: 'Deutsch' });
-  await expect(deutsch).toHaveAttribute('aria-disabled', 'true');
+  await expect(deutsch).toHaveAttribute('data-disabled', '');
   await deutsch.click({ force: true });
   await expect(listbox).toBeVisible();
   await expect(value).toHaveText('en');

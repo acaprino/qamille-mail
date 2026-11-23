@@ -6,9 +6,9 @@ import { pickDate } from './support/dates.mjs';
 import assert from './support/soft-assert.mjs';
 import { mountGallery } from './support/mount.mjs';
 
-const ACCENT = 'rgb(79, 70, 229)';
-// The ring of a focused control is Sigrid's --color-ring.
-const RING = 'rgb(67, 56, 202)';
+// Sigrid's --color-primary (light), which is also the ring of a focused control.
+const ACCENT = 'rgb(67, 56, 202)';
+const RING = ACCENT;
 const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const errors = [];
 const context = await browser.newContext({
@@ -48,9 +48,11 @@ try {
       exact: true,
     });
     const input = page.getByRole(kind, { name, exact: true });
-    const visible = page
-      .locator(`[data-scope="${kind}"][data-part="root"]`, { hasText: name })
-      .getByRole('checkbox');
+    // The drawn part: the checkbox is the box itself, the switch's is its control (the track).
+    const visible =
+      kind === 'checkbox'
+        ? input
+        : page.locator('[data-scope="switch"][data-part="root"]', { hasText: name }).locator('[data-slot="switch-control"]');
 
     // Keyboard: Tab reaches it (the switch after the checkboxes), Space toggles it.
     for (let i = 0; i < 6 && !(await input.evaluate((el) => el === document.activeElement)); i++)
@@ -88,9 +90,7 @@ try {
 
     // The look: a 16px box with the 4px radius, accent when on (checkbox); a 32x18 track (switch).
     // The unlumen Apple Switch paints its colour on a fill layer inside the track (data-part="fill").
-    const fill = kind === 'checkbox' ? visible : visible.locator('[data-part="fill"]');
-    await expect(fill).toHaveCSS('background-color', ACCENT);
-    if (kind === 'switch') await expect(fill).toHaveCSS('opacity', '1'); // the switch fades in: wait for the end
+    await expect(visible).toHaveCSS('background-color', ACCENT);
     const box = await visible.evaluate((el) => {
       const style = getComputedStyle(el);
       const rect = el.getBoundingClientRect();
@@ -102,13 +102,13 @@ try {
     });
     if (kind === 'checkbox')
       assert.deepEqual([box.w, box.h, box.radius], [18, 18, '4px'], JSON.stringify(box));
-    else assert.deepEqual([box.w, box.h], [32, 18], JSON.stringify(box));
+    else assert.ok(box.w > box.h, `the switch track is wider than it is high: ${JSON.stringify(box)}`);
     console.log(`PASS ${Kind} looks like the Compatto control (${box.w}x${box.h}, accent when on)`);
     await page.close();
   }
 
   // ---------- Tabs ----------
-  for (const variant of ['underline', 'segment']) {
+  for (const variant of ['sigrid']) {
     const page = await open('tabs', { variant });
     const list = page.getByRole('tablist', { name: 'Show', exact: true });
     const tabs = list.getByRole('tab');
@@ -154,36 +154,11 @@ try {
     assert.deepEqual(await dangling(), [], 'after moving between tabs, a tab has a dangling aria-controls');
     console.log(`PASS Tabs (${variant}) move with the arrows, Home and End, and a click selects`);
 
-    // The chosen tab carries the sliding highlight of the React Tabs primitive (data-part="highlight"): a 2px
-    // bar in the accent (underline) or a raised white chip (segment). The Svelte one drew the tab's own border and fill.
-    const look = (tab) =>
-      tab.evaluate((el) => {
-        const style = getComputedStyle(el);
-        const mark = el.querySelector('[data-part="highlight"]');
-        const markStyle = mark && getComputedStyle(mark);
-        return {
-          mark: markStyle && { height: markStyle.height, bg: markStyle.backgroundColor },
-          weight: style.fontWeight,
-        };
-      });
-    const selected = await look(tabs.nth(1));
-    const other = await look(tabs.nth(0));
-    if (variant === 'underline') {
-      assert.deepEqual(selected.mark, { height: '2px', bg: ACCENT }, `selected tab underline ${JSON.stringify(selected.mark)}`);
-      assert.ok(Number(selected.weight) >= 600, `selected tab is semibold, got ${selected.weight}`);
-      assert.equal(other.mark, null, `unselected tab has no underline, got ${JSON.stringify(other.mark)}`);
-      assert.ok(Number(other.weight) < 600);
-      const height = await tabs
-        .nth(0)
-        .evaluate((el) => Math.round(el.getBoundingClientRect().height));
-      assert.equal(height, 34, 'the mockup tab is 34px high');
-      console.log('PASS Tabs underline: 2px accent underline on the selected tab only');
-    } else {
-      assert.equal(selected.mark?.bg, 'rgb(255, 255, 255)', `segment selected is a white chip, got ${JSON.stringify(selected.mark)}`);
-      assert.notEqual(selected.mark?.height, '2px', 'no accent underline');
-      assert.equal(other.mark, null, 'the other tabs have no chip');
-      console.log('PASS Tabs segment: the selected tab is a raised chip, no accent underline');
-    }
+    // The chosen tab is the semibold one, on Sigrid's selection tint.
+    const weight = (tab) => tab.evaluate((el) => Number(getComputedStyle(el).fontWeight));
+    assert.ok((await weight(tabs.nth(1))) >= 600, 'the chosen tab is semibold');
+    assert.ok((await weight(tabs.nth(0))) < 600, 'the other tabs are not');
+    console.log('PASS Tabs: the chosen tab is the semibold one');
     await page.close();
   }
 

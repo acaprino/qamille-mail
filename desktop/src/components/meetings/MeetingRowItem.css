@@ -9,6 +9,10 @@
     background: var(--color-selected);
     box-shadow: inset 3px 0 0 var(--color-primary);
   }
+  /* The ink Sigrid pairs with its selection tint (plain ink on it reads at 4.19:1 in the dark theme). */
+  &.selected .item-title {
+    color: var(--color-selected-ink);
+  }
   & .item-main {
     display: grid;
     grid-template-columns: 48px minmax(0, 1fr) auto;

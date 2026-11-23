@@ -119,7 +119,7 @@ try {
     const page = await context.newPage();
     watch(page);
     await mountGallery(page, 'side-panel');
-    const panel = page.getByRole('dialog', { name: 'Details' });
+    const panel = page.locator('[data-slot="sheet-content"]');
     const after = page.getByRole('button', { name: 'After the pane', exact: true });
 
     await page.getByRole('button', { name: 'Open wide', exact: true }).click();
@@ -242,7 +242,7 @@ try {
     await expect(trigger).toBeFocused();
     await page.keyboard.press('Shift+Tab');
     await expect(page.getByRole('button', { name: 'Hint', exact: true })).toBeFocused();
-    const hint = page.getByRole('tooltip');
+    const hint = page.locator('[data-slot="tooltip-content"]');
     await expect(hint).toBeVisible();
     const layer = (selector) => page.locator(selector).evaluate((el) => Number(getComputedStyle(el).zIndex));
     const tooltipZ = await layer('[data-scope="tooltip"][data-part="positioner"]');

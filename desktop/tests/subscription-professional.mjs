@@ -59,7 +59,9 @@ try {
     assert.equal(await dialog.getByLabel('Password').count(), 0);
     await dialog.getByRole('button', { name: 'Confirm with Google and delete' }).click();
     // (The page reloads at once: the notice of the deletion goes with it, the sign-in screen is what is seen.)
-    await expect(page.getByRole('button', { name: 'Sign in to Qamille', exact: true })).toBeVisible();
+    await page.waitForLoadState('load');
+    const said = (await page.locator('body').innerText()).replace(/\s+/g, ' ').slice(0, 300);
+    await expect(page.getByRole('button', { name: 'Sign in to Qamille', exact: true }), said).toBeVisible();
     console.log('PASS an account without password is deleted after signing in with Google again');
     await context.close();
   }

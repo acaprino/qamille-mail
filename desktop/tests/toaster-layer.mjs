@@ -75,15 +75,14 @@ try {
   await expect(saved).toHaveCount(1);
   const actions = saved.locator('[data-slot="toast-actions"] button');
   assert.deepEqual((await actions.allTextContents()).map((text) => text.trim()), ['Open', 'Show in folder'], 'two actions, before the close button');
-  // From the first action, Tab walks the other one and then the close button.
-  await actions.first().focus();
+  // From the close button (the first of the notice), Tab walks the actions.
+  await saved.getByRole('button', { name: /^Close the notice/ }).focus();
   const walked = [];
   for (let step = 0; step < 2; step += 1) {
     await page.keyboard.press('Tab');
     walked.push(await focused());
   }
-  assert.deepEqual(walked[0], 'Show in folder', 'the second action is reachable with Tab');
-  assert.match(String(walked[1]), /close/i, `then the close button (${JSON.stringify(walked)})`);
+  assert.deepEqual(walked, ['Open', 'Show in folder'], 'both actions are reachable with Tab');
   // Nothing takes them out of the tab order: not hidden, not inert, no tabindex of -1.
   assert.deepEqual(
     await actions.evaluateAll((buttons) => buttons.map((b) => ({ tab: b.tabIndex, disabled: b.disabled, hidden: !!b.closest('[inert], [aria-hidden="true"]') }))),

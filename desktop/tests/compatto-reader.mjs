@@ -59,7 +59,7 @@ try {
   console.log('PASS Text on Reply, Reply all, Forward; icon only on the quick actions; no title');
 
   // (b) Tips: only the real shortcuts. Archive E, Reply R; the others have none.
-  const tip = page.getByRole('tooltip');
+  const tip = page.locator('[data-slot="tooltip-content"]');
   const tipOf = async (name) => {
     await named(name).focus();
     await page.keyboard.press('Shift+Tab');

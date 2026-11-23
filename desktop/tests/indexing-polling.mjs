@@ -15,7 +15,7 @@ await page.clock.install();
 await page.goto(process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:1420');
 await page.getByRole('button', { name: /^New message/ }).waitFor();
 try {
-  await page.getByRole('complementary', { name: 'Sidebar' }).getByRole('button', { name: 'Alex Personal workspace' }).click();
+  await page.getByRole('navigation', { name: 'Sidebar' }).getByRole('button', { name: /^Settings/ }).click();
   await page.locator('.settings-nav').getByRole('button', { name: 'Search', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Full mail index' })).toBeVisible();
   const statusCalls = () =>

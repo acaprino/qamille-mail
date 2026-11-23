@@ -13,7 +13,7 @@ async function open(server) {
   await page.addInitScript((value) => (window.__previewServer = value), server);
   await page.goto(process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:1420');
   await page.getByRole('button', { name: /^New message/ }).waitFor();
-  await page.getByRole('complementary', { name: 'Sidebar' }).getByRole('button', { name: 'Alex Personal workspace' }).click();
+  await page.getByRole('navigation', { name: 'Sidebar' }).getByRole('button', { name: /^Settings/ }).click();
   return { page, context };
 }
 async function connect(page) {

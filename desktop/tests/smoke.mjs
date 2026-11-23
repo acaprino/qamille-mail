@@ -96,7 +96,7 @@ try {
     await page.getByRole('textbox', { name: 'Search mail' }).fill('');
   });
   await step('Settings and dark appearance', async () => {
-    await page.getByRole('button', { name: 'Alex Personal workspace' }).click();
+    await page.getByRole('button', { name: /^Settings/ }).click();
     await page.getByRole('heading', { name: 'Settings', exact: true }).waitFor();
     await page.getByRole('combobox', { name: 'Appearance', exact: true }).click();
     await page.getByRole('option', { name: 'Dark', exact: true }).click();

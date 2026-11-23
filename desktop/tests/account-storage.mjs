@@ -66,7 +66,7 @@ try {
     await page.getByRole('option', { name: label, exact: typeof label === 'string' }).click();
   };
   async function openStorage() {
-    await page.getByRole('complementary', { name: 'Sidebar' }).getByRole('button', { name: 'Alex Personal workspace' }).click();
+    await page.getByRole('navigation', { name: 'Sidebar' }).getByRole('button', { name: /^Settings/ }).click();
     await page.getByRole('button', { name: 'Local storage', exact: true }).click();
     // ADR-0005: the account storage section is the only offline-mail control.
     assert.equal(await page.getByRole('button', { name: 'Offline mail', exact: true }).count(), 0);

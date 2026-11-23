@@ -13,7 +13,7 @@ async function signInStep(server) {
   await page.addInitScript((value) => (window.__previewServer = value), server);
   await page.goto(process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:1420');
   await page.getByRole('button', { name: /^New message/ }).waitFor();
-  await page.getByRole('complementary', { name: 'Sidebar' }).getByRole('button', { name: 'Alex Personal workspace' }).click();
+  await page.getByRole('navigation', { name: 'Sidebar' }).getByRole('button', { name: /^Settings/ }).click();
   await page.locator('.settings-nav').getByRole('button', { name: 'Compute', exact: true }).click();
   await page.getByRole('button', { name: 'Connect to a server', exact: true }).click();
   const form = page.getByRole('region', { name: 'Server connection' });

@@ -40,7 +40,7 @@ try {
   assert.ok(await page.evaluate(() => window.__previewCalls.includes('mark_old_unread_read')));
   console.log('PASS the unread notice offers its two choices and marks the old ones read');
 
-  await page.getByRole('complementary', { name: 'Sidebar' }).getByRole('button', { name: 'Alex Personal workspace' }).click();
+  await page.getByRole('navigation', { name: 'Sidebar' }).getByRole('button', { name: /^Settings/ }).click();
   await page.locator('.settings-nav').getByRole('button', { name: 'Search', exact: true }).click();
   const coverage = page.getByTestId('history-coverage').first();
   await expect(coverage).toContainText(/Listed: \d+ of 48300 · Indexed by content: 0/);

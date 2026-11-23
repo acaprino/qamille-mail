@@ -27,7 +27,7 @@ try {
   await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   console.log('PASS Local calendar and event editor load in synthetic preview');
-  await page.getByRole('button', { name: /Alex Personal workspace/ }).click();
+  await page.getByRole('button', { name: /^Settings/ }).click();
   await page.getByRole('button', { name: 'Agent access', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'MCP connection', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Save assistant permissions' })).toBeDisabled();

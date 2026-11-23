@@ -120,7 +120,7 @@ try {
   await expect(frame.locator('html')).toHaveAttribute('data-scheme', 'dark');
   assert.equal(await page.evaluate(() => localStorage.getItem('qamille:appearance')), 'dark');
 
-  await page.getByRole('button', { name: 'Alex Personal workspace' }).click();
+  await page.getByRole('button', { name: /^Settings/ }).click();
   await page.getByRole('combobox', { name: 'Appearance', exact: true }).click();
   await page.getByRole('option', { name: 'Automatic (system)', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('data-scheme', 'light');

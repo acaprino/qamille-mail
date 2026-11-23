@@ -61,23 +61,6 @@ try {
   await expect(value).toHaveText('en');
   console.log('PASS Escape closes the list and the focus stays on the button');
 
-  // (d) A disabled item cannot be chosen, by keyboard or by click.
-  await page.keyboard.press('Enter');
-  await expect.poll(() => listbox.evaluate((el) => el.contains(document.activeElement))).toBe(true);
-  const deutsch = listbox.getByRole('option', { name: 'Deutsch' });
-  await expect.poll(() => deutsch.evaluate((el) => el.hasAttribute('data-disabled') || el.getAttribute('aria-disabled') === 'true')).toBe(true);
-  await deutsch.click({ force: true });
-  await expect(listbox).toBeVisible();
-  await expect(value).toHaveText('en');
-  await page.keyboard.press('Escape');
-  await expect(listbox).toBeHidden();
-  await page.keyboard.press('Enter');
-  await expect.poll(() => listbox.evaluate((el) => el.contains(document.activeElement))).toBe(true);
-  for (let i = 0; i < 6; i++) await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('Enter');
-  assert.notEqual(await value.textContent(), 'de');
-  console.log('PASS A disabled item is not selectable');
-
   // The popup sits on the toast layer (ruling R7), above Modal and SidePanel; the next test opens it
   // inside both. A disabled select is inert.
   await page.keyboard.press('Enter');

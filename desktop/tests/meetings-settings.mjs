@@ -59,7 +59,8 @@ async function openMeetings() {
 const combo = (name) => content.getByRole('combobox', { name, exact: true });
 const options = async (name) => {
   await combo(name).click();
-  const popup = page.locator('[data-slot="select-content"]');
+  // A list that was closed may stay in the page, hidden: the one looked at is the one that shows.
+  const popup = page.locator('[data-slot="select-content"]:visible');
   await popup.getByRole('option').first().waitFor();
   const listed = await popup.getByRole('option').allTextContents();
   await page.keyboard.press('Escape');

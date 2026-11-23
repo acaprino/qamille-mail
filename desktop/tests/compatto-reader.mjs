@@ -67,7 +67,7 @@ try {
     await expect(named(name)).toBeFocused();
     await expect(tip).toBeVisible();
     const text = (await tip.innerText()).replace(/\s+/g, ' ').trim();
-    const keys = await tip.locator('kbd').count();
+    const keys = await tip.locator('[data-slot="tooltip-shortcut"]').count();
     await page.keyboard.press('Escape');
     await expect(tip).toHaveCount(0);
     return { text, keys };
@@ -146,7 +146,7 @@ try {
       .filter({ has: page.getByRole('combobox', { name: label, exact: true }) })
       .locator('[data-scope="tags-input"][data-part="item-preview"]');
   await expect(page.getByRole('combobox', { name: 'To', exact: true })).toBeVisible();
-  const toChips = await chipsOf('To').evaluateAll((nodes) => nodes.map((n) => n.getAttribute('title')));
+  const toChips = await chipsOf('To').evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-value')));
   assert.ok(toChips.some((entry) => entry.includes(first.from_addr)), 'the sender is in To');
   assert.ok(toChips.some((entry) => entry.includes('person01@example.test')) && toChips.some((entry) => entry.includes('person40@example.test')), 'the other recipients are in To');
   assert.ok(!toChips.some((entry) => entry.includes('alex@studio-example.com')), 'the reader is not in To');

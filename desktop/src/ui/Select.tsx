@@ -2,13 +2,13 @@
 // chosen item's label, and a list that opens under it. Keyboard: Enter, Space or the arrows open it; arrows move, Enter
 // chooses, Escape closes and the focus stays on the button; typing a letter jumps to the item that starts with it.
 // `label` is the visible label and the button's name, and the open list carries it too; without it pass `aria-label`. `onChange` is told the new value
-// ('' = nothing chosen). `className` goes on the button. Sigrid's Select has no disabled item and no `aria-required`
-// (asked of Sigrid as R18): an item written `disabled` is shown as any other.
+// ('' = nothing chosen). `className` goes on the button. Sigrid's Select has no `aria-required` (asked of Sigrid as R18)
+// and no disabled item (the app has none).
 import { useId } from 'react';
 import { Select as SigridSelect } from '@acaprino/sigrid';
 import { cn } from './cn';
 
-export type SelectItem = { value: string; label: string; disabled?: boolean };
+export type SelectItem = { value: string; label: string };
 
 export type SelectProps = {
   value: string;

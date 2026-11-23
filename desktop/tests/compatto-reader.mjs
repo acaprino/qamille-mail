@@ -2,7 +2,7 @@
 // (spec 2026-11-08 section 6, "Lettore") and driven through roles and accessible names.
 // Sample data only. Run: node scripts/test-browser.mjs compatto-reader
 import { chromium, expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { box, css, previewUrl } from './support/compatto.mjs';

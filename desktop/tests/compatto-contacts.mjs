@@ -2,7 +2,7 @@
 // hairlines --color-paper-2, Ark Select and Checkbox, Modal md/sm) and driven by role and accessible name.
 // Sample data only. Run: node scripts/test-browser.mjs compatto-contacts
 import { expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 import { css, openApp } from './support/compatto.mjs';
 
 const { browser, page, errors } = await openApp();

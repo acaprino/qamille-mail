@@ -1,7 +1,7 @@
 // The restyled frame (spec 2026-11-07 §4.1): one ground, one white sheet, IBM Plex Sans for
 // everything scanned and for titles (spec 2026-11-08 §3), one blue, no resting shadows. Synthetic data only.
 import { chromium, expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';

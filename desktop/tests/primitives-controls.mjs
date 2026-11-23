@@ -2,7 +2,7 @@
 // contract, the keyboard, the focus ring (2px --color-primary) and the Compatto look. Each primitive is mounted
 // alone through tests/support/mount.mjs. Synthetic data only.
 import { chromium, expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 import { mountGallery } from './support/mount.mjs';
 
 const ACCENT = 'rgb(79, 70, 229)';

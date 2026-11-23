@@ -2,7 +2,7 @@
 // message on one edge, who each answers beside the name, a fold per reply, a count that never
 // hides what is unread. Synthetic data only.
 import { chromium, expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';

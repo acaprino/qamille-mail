@@ -3,7 +3,7 @@
 // radius from --radius-md). The primitive is mounted alone through tests/support/mount.mjs.
 // Synthetic data only.
 import { chromium, expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 import { mountGallery } from './support/mount.mjs';
 
 const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });

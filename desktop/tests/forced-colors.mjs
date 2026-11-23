@@ -3,7 +3,7 @@
 // tint or a shadow must still be visible as a border or an outline in a system colour.
 // Run: node tests/forced-colors.mjs   (Vite preview on 127.0.0.1:1420). Synthetic sample data only.
 import { chromium, expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 
 const base = process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:1420';
 const shots = process.env.QAMILLE_SHOTS;

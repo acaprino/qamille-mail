@@ -2,7 +2,7 @@
 // computed values and driven through roles and accessible names. Sample data only.
 // Run: node scripts/test-browser.mjs compatto-notices
 import { expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { box, css, openApp, previewUrl } from './support/compatto.mjs';

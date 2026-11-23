@@ -3,7 +3,7 @@
 // tests/support/mount.mjs; the gallery listens to window keydown like App.tsx does, through the
 // same guard, so a key typed in the list is seen not to reach the page shortcuts. Synthetic data only.
 import { chromium, expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 import { mountGallery } from './support/mount.mjs';
 
 const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });

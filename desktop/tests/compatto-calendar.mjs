@@ -2,7 +2,7 @@
 // Select/Checkbox/DateField in the event editor (time stays native), the editor as a 420px SidePanel, calendar
 // colours kept. Fake desktop backend, synthetic data only.
 import { chromium, expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 
 import { pickDate } from './support/dates.mjs';
 const base = process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:5187';

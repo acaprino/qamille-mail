@@ -7,7 +7,7 @@
 //      on white, and a field rests on --color-input (ruling R16).
 // Synthetic data only. Run with the preview address in QAMILLE_PREVIEW_URL (npm run test:browser sets it).
 //   node scripts/test-browser.mjs compatto-dark
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 import { openApp } from './support/compatto.mjs';
 import { mountGallery } from './support/mount.mjs';
 import { readThemes } from './support/theme-tokens.mjs';

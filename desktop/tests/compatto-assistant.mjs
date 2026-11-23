@@ -4,7 +4,7 @@
 // and the two Google dialogs (Modal sm / md). Every component is mounted alone with synthetic IPC; no
 // real account, client file or network is touched.
 import { chromium, expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 
 const base = process.env.QAMILLE_PREVIEW_URL ?? 'http://127.0.0.1:1420';
 const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });

@@ -3,7 +3,7 @@
 // to the opener, the measures come from the --modal-* and --panel-* tokens, the side panel is not
 // modal, and a Modal opened from a Popover closes first (Review Focus 2). Synthetic data only.
 import { chromium, expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 import { mountGallery } from './support/mount.mjs';
 
 const base = process.env.QAMILLE_PREVIEW_URL ?? 'http://127.0.0.1:1420';

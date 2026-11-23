@@ -2,7 +2,7 @@
 // of the mockup read as computed values at 1440x900 in en-US, and behaviour through role and name.
 // Synthetic data only (the preview's sample workspace).
 import { expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 import { openApp, css, box } from './support/compatto.mjs';
 
 const WHITE = 'rgb(255, 255, 255)';

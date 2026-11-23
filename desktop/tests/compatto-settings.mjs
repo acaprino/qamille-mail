@@ -2,7 +2,7 @@
 // (spec 2026-11-08 sections 6 and 7.2) and driven through roles and accessible names.
 // Sample data only. Run: node scripts/test-browser.mjs compatto-settings
 import { expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 import { box, css, openApp } from './support/compatto.mjs';
 
 const { browser, page, errors } = await openApp();

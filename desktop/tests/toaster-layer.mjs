@@ -4,7 +4,7 @@
 // dialog (a failed save, an error) is announced and its close button works.
 // Run: node tests/toaster-layer.mjs (Vite preview on 127.0.0.1:1420). Synthetic sample data only.
 import { chromium, expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 
 const base = process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:1420';
 const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });

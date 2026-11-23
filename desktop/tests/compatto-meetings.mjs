@@ -5,7 +5,7 @@
 // dialogs are Ark, and the dark theme reads at 4.5:1. Synthetic preview data only; no audio device.
 // Run: node scripts/test-browser.mjs compatto-meetings
 import { expect } from '@playwright/test';
-import assert from 'node:assert/strict';
+import assert from './support/soft-assert.mjs';
 import { openApp, css, box, underline } from './support/compatto.mjs';
 
 const results = [];

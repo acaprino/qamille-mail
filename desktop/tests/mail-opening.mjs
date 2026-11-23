@@ -201,7 +201,7 @@ try {
   await row(subjects.b).locator('.mail-open').click();
   await expect(row(subjects.b)).not.toHaveClass(/unread/, { timeout: 100 });
   await expect.poll(inboxCount, { timeout: 100 }).toBe(intact - 1);
-  await expect(page.getByRole('alert')).toContainText('Synthetic markAsSeen failure');
+  await expect(page.locator('[role="alert"], [data-scope="toast"]')).toContainText('Synthetic markAsSeen failure');
   await expect(row(subjects.b)).toHaveClass(/unread/);
   await expect.poll(inboxCount).toBe(intact);
   await expect(heading(subjects.b)).toBeVisible();

@@ -112,7 +112,7 @@ try {
 
   for (const [id, name] of [[9, 'broken.pdf'], [10, 'broken.docx']]) {
     const page = await open(attachment(id, name));
-    await expect(page.getByRole('alert')).toBeVisible();
+    await expect(page.locator('[role="alert"], [data-scope="toast"]')).toBeVisible();
     await page.getByRole('button', { name: 'Show extracted text' }).click();
     await expect(page.getByText('Extracted text fallback')).toBeVisible();
     assert.deepEqual(await page.evaluate(() => window.cspViolations), []);

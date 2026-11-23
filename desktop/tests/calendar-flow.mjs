@@ -2,6 +2,7 @@
 import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 
+import { dateText } from './support/dates.mjs';
 const base = process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:5187';
 const shots = process.env.QAMILLE_SHOTS || '';
 const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
@@ -121,8 +122,8 @@ try {
   // The checkbox is Ark's: its box covers the input, so the row (its label) takes the click.
   await sheet.getByText('All day', { exact: true }).click();
   await expect(sheet.getByRole('checkbox', { name: 'All day' })).toBeChecked();
-  const startDate = await sheet.getByLabel('Start date').inputValue();
-  await expect(sheet.getByLabel('End date')).toHaveValue(startDate);
+  const startDate = await dateText(sheet.getByLabel('Start date'));
+  await expect(sheet.getByLabel('End date')).toHaveText(startDate);
   await expect(sheet).toContainText('1 day');
   await sheet.getByText('All day', { exact: true }).click();
   await expect(sheet.getByRole('checkbox', { name: 'All day' })).not.toBeChecked();

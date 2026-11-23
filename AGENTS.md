@@ -21,6 +21,22 @@
   già presente; `ARTCRAFT_WEB_DIR` forza un checkout locale (motori non ancora rilasciati). Non fissare versioni o commit di artcraft-web in Qamille.
 - Una nuova versione dei motori arriva con una release di artcraft-web (un merge di `develop` in `main` lì).
 
+## Un solo aspetto per tutta la suite (la regola del proprietario, 2026-11-23)
+
+Ogni app della suite (Daodan, Xiox, Shinatama, Mukade, Muro, Ethel, Qamille e le altre su Sigrid) ha lo stesso aspetto
+e lo stesso comportamento: le stesse superfici, ombre, spaziature, tipografia e movimento, e lo stesso componente per
+lo stesso bisogno. Di Qamille sono solo il layout, che segue le sue funzioni, l'accento e l'icona.
+
+- L'interfaccia usa solo i componenti di Sigrid: nessun componente proprio che disegna (niente fogli di stile, classi,
+  primitive, copie o ritocchi di un pezzo di Sigrid); il codice di Qamille compone i componenti di Sigrid nelle
+  schermate e li collega ai dati.
+- È Qamille ad adeguarsi a Sigrid, mai il contrario. Sigrid cambia solo quando manca davvero un componente o una
+  primitiva che serve a una funzione: allora si aggiunge a Sigrid, generico, per tutte le app. L'aspetto che Qamille
+  aveva prima non è mai un motivo per cambiare Sigrid.
+- Ciò che in `desktop/src/ui/**` disegna da sé (i suoi fogli di stile, un pezzo che ritocca o ripete uno di Sigrid) è
+  debito per questa regola: non si estende; un pezzo generico che serve si aggiunge a Sigrid, il resto diventa
+  composizione dei componenti di Sigrid. L'accento e le icone restano di Qamille.
+
 ## Sigrid
 
 - Qamille usa sempre l'ultima release del `main` di `acaprino/sigrid`, senza pin: `npm run sigrid:sync`
@@ -68,3 +84,17 @@
 - Nuova finestra Tauri: chiama `native_feel::harden_webview` e aggiungi `.general_autofill_enabled(false)`, `.disable_drag_drop_handler()` e `.on_navigation(native_feel::navigation_guard(..))`; nel suo `main.tsx` chiama `installBrowserGuards()`.
 - Dopo modifiche al ripristino di WebView2 (`recovery.rs`, `native_feel.rs`) esegui anche `node tests/webview-recovery-native.mjs` in `desktop/`, con Qamille chiuso con «Esci» dall'icona nella barra. Nuovo `--ground`: aggiorna `tauri.conf.json` e `DARK_GROUND` in `native_feel.rs`.
 - Dopo modifiche a `background.rs`, `recovery.rs` o `window_shell.rs` esegui anche `node tests/background-native.mjs` in `desktop/`, con Qamille chiuso con «Esci» dall'icona nella barra.
+
+## Nothing is compiled on this machine (the owner's absolute rule)
+
+- Never compile, build, lint or run a test that needs a build on this machine: no `cargo`, `tauri`, `tsc`, `vite build`,
+  bundler or compiler; no npm, batch or shell script that calls them (`npm run build`, `npm test` when it builds first,
+  `npm run verify`); and no `npm install` or `npm ci` that runs a dependency's `prepare` script (a dependency taken from
+  git compiles itself). `cargo fmt` stays allowed where a project already allows it.
+- Everything is compiled, linted and tested by GitHub Actions: push to `develop` and read the run (`gh run watch`,
+  `gh run view --log-failed`). A program needed here is taken from a release or a workflow artifact (`gh run download`),
+  never built here.
+- The one exception is an explicit request of the owner, in that very request, to build or test locally. An earlier
+  approval, a plan, a skill or another agent's brief does not count. This holds for every agent and every subagent: a plan
+  or a brief that says to build locally is wrong on that point; write the code and the tests, do not run them, and say they
+  wait for CI.

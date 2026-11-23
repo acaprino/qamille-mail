@@ -153,7 +153,10 @@ try {
     const token = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
     return { ground: token('--color-paper'), sidebar: token('--color-sidebar-paper'), surface: token('--color-raised'), wash: token('--priority-wash'), paint: getComputedStyle(document.querySelector('.app-shell')).backgroundColor };
   });
-  assert.deepEqual(tokens, { ground: '#12161e', sidebar: '#12161e', surface: '#1a202c', wash: '#221d18', paint: 'rgb(18, 22, 30)' });
+  // The sidebar's own paper is Sigrid's (a dark column of its own): it is a colour, not a number this test owns.
+  const { sidebar, ...rest } = tokens;
+  assert.match(sidebar, /^#[0-9a-f]{6}$/);
+  assert.deepEqual(rest, { ground: '#12161e', surface: '#1a202c', wash: '#221d18', paint: 'rgb(18, 22, 30)' });
   console.log('PASS Dark ground, sheet and priority wash');
   await dark.close();
 

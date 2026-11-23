@@ -54,6 +54,10 @@ const plainHtml = (text: string) =>
 const withPending = (list: string | undefined, typed: string) =>
   [(list ?? '').trim(), ...splitRecipients(typed)].filter(Boolean).join(', ');
 
+const OPEN_LAYER = '[data-slot="sheet-content"][data-open], [data-slot="dialog-content"][data-open], [data-slot="popover-content"][data-open], [role="menu"], [role="listbox"]';
+/** Whether such a layer is on the page and shown (a closed list stays in the DOM, hidden). */
+const openLayer = () => [...document.querySelectorAll(OPEN_LAYER)].some((layer) => layer.checkVisibility?.() ?? true);
+
 export default function Composer(props: ComposerProps) {
   const { initial, workspace, active, windowClosing, minimize } = props;
   // The callbacks and flags as they are now, for timers, awaits and the handle given to the dock.
@@ -434,7 +438,8 @@ export default function Composer(props: ComposerProps) {
       onDragLeaveCapture={dragLeave}
       onDropCapture={(event) => void dropMail(event)}
       onKeyDownCapture={(event) => {
-        if (event.key === 'Escape' && !event.defaultPrevented && !locked && !imeComposing(event.nativeEvent)) {
+        // A layer that is open (a side panel, a dialog, a popover, a menu, a list) takes the Esc before the composer minimizes.
+        if (event.key === 'Escape' && !event.defaultPrevented && !locked && !imeComposing(event.nativeEvent) && !openLayer()) {
           event.preventDefault();
           event.stopPropagation();
           minimize();

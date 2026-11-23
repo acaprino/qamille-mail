@@ -139,7 +139,7 @@ try {
   await fresh.keyboard.press('Enter');
   await expect.poll(() => fresh.getByRole('listbox').evaluate((el) => el.contains(document.activeElement))).toBe(true);
   await fresh.keyboard.press('e');
-  const inside = await fresh.evaluate(() => !!document.activeElement?.closest('[data-scope="select"]'));
+  const inside = await fresh.evaluate(() => !!document.activeElement?.closest('[data-slot="select-content"]'));
   assert.ok(inside, 'the focus is still inside the Select after typing');
   await expect(fresh.getByRole('option', { name: 'English' })).toHaveAttribute('data-highlighted', '');
   await fresh.keyboard.press('Enter');

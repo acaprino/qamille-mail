@@ -49,6 +49,8 @@ const SAMPLES = {
   'graph.closed': [['Lavoro', 3]],
   'graph.add': [['Lavoro']],
   'graph.addAfter': [['Lavoro']],
+  'graph.hides': [['Ordini', 1], ['Ordini', 12]],
+  'graph.chosenToo': [['Registro']],
   'graph.leadsTo': [[['Lavoro']], [['Lavoro', 'Casa', 'Posta']]],
   'graph.comesFrom': [[['Lavoro']], [['Lavoro', 'Casa', 'Posta']]],
   'graph.onPath': [['Copia', [2]], ['Copia', [1, 2, 3]]],

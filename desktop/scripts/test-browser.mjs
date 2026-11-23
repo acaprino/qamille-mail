@@ -95,7 +95,12 @@ try {
       const lines = text.split('\n').filter((line) => line.trim());
       // The failures a test tells and goes on from (SOFT FAIL, FAIL STEP) are all printed; of the rest, the last of it.
       const told = lines.filter((line) => /^(SOFT FAIL|FAIL STEP|MOTION)/.test(line));
-      console.log([...told.slice(0, 160), ...lines.slice(-40)].join('\n'));
+      // What went wrong first (the error, its locator, the line of the test) comes before the tail, which is often a page snapshot.
+      const first = lines
+        .filter((line) => /^\s*(\w*Error\b|Locator:|Expected|Received|.*waiting for|.*tests[\\/][\w-]+\.mjs:\d+)/.test(line))
+        .slice(0, 14)
+        .map((line) => line.slice(0, 240));
+      console.log([...told.slice(0, 160), ...first, ...lines.slice(-40)].join('\n'));
     }
   }
 } finally {

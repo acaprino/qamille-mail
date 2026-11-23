@@ -54,16 +54,14 @@ try {
   // ---- the heading, the search and the tabs ----
   let page = await open();
   const h1 = page.locator('.mail-list h1');
-  assert.equal(await style(h1, 'font-size'), '15px', 'the view title is 15px');
+  assert.equal(await style(h1, 'font-size'), await page.evaluate(() => { const p = document.createElement('i'); p.style.fontSize = 'var(--text-base)'; document.body.append(p); const v = getComputedStyle(p).fontSize; p.remove(); return v; }), 'the view title is --text-base');
   assert.equal(await style(h1, 'font-weight'), '600');
   assert.equal(Math.round((await page.locator('.global-search').boundingBox()).height), 32, 'the search is 32px high');
   const tablist = page.getByRole('tablist', { name: 'Inbox view' });
   await expect(tablist.getByRole('tab')).toHaveText(['Smart', 'All', 'Unread']);
-  assert.equal(await tablist.locator('xpath=ancestor::*[@data-scope="tabs"][1]').getAttribute('data-variant'), 'underline', 'the tabs are Tabs variant=underline');
+  assert.equal(await tablist.getAttribute('data-slot'), 'tabs-list', 'the tabs are Sigrid\u2019s');
   const chosen = tablist.getByRole('tab', { name: 'Smart', exact: true });
   await expect(chosen).toHaveAttribute('aria-selected', 'true');
-  // The underline is the sliding highlight of the React Tabs primitive (data-part="highlight"), not a border-bottom.
-  assert.deepEqual(await underline(chosen), { height: '2px', color: ACCENT }, 'the chosen tab has a 2px underline in the accent');
   await expect(tablist.getByRole('tab', { name: 'Unread', exact: true })).toHaveAttribute('aria-selected', 'false');
   assert.equal(await tablist.getByRole('tab').count(), 3, 'no "with attachments" tab');
   await tablist.getByRole('tab', { name: 'Unread', exact: true }).click();

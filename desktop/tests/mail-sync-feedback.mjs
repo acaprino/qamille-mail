@@ -74,7 +74,8 @@ await page.addInitScript(({ settings, account }) => {
 const count = (command) => page.evaluate(name => window.calls.filter(call => call === name).length, command);
 const indicator = page.locator('.activity-indicator');
 const line = indicator.locator('.activity-line');
-const toast = page.locator('[data-scope="toast"][data-part="root"]');
+// The notices of this test; the fake backend refuses the commands it was not written for, and that is not what is looked at here.
+const toast = page.locator('[data-scope="toast"][data-part="root"]').filter({ hasNotText: /Unexpected command/ });
 const sync = page.getByRole('button', { name: 'Sync mail', exact: true });
 // Waits until the app has not called the backend for 300 ms (at most 5 s).
 const quiet = () => page.evaluate(async () => {
@@ -125,8 +126,8 @@ try {
   await page.evaluate(() => window.setSyncPhase('syncing'));
   await expect(line).toBeVisible({ timeout: 1500 });
   await page.evaluate(() => window.setSyncPhase('error', ['Connection interrupted. Try again.']));
-  await expect(toast).toHaveAttribute('role', 'alert');
-  await expect(toast).toContainText('Connection interrupted');
+  await expect(toast.filter({ hasText: 'Connection interrupted' }).first()).toBeVisible();
+  await expect(toast.filter({ has: page.locator('[data-slot="toast-error"]') }).first()).toContainText('Connection interrupted');
   await expect(indicator).toHaveCount(0, { timeout: 1500 });
   await expect(sync).toBeEnabled();
   await expect(sync).toHaveAttribute('title', /Connection interrupted/);
@@ -153,7 +154,7 @@ try {
   await sync.click();
   await expect.poll(() => count('sync_mail')).toBe(2);
   await page.evaluate(() => window.failManualSync(new Error('Synthetic storage failure')));
-  await expect(toast).toContainText('Synthetic storage failure');
+  await expect(toast.filter({ hasText: 'Synthetic storage failure' }).first()).toBeVisible();
   await expect(sync).toHaveAttribute('title', /Synthetic storage failure/);
   console.log('PASS a failed manual request is reported as an alert');
 

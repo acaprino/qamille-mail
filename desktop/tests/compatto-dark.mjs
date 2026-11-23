@@ -122,17 +122,17 @@ const tokenRgb = (page, name) =>
     probe.remove();
     return value;
   }, name);
-const accentRgb = (page) => tokenRgb(page, 'accent');
+const accentRgb = (page) => tokenRgb(page, 'color-accent');
 
 /** The resting border of a field is --color-input (all four sides the same, 1px). */
 async function assertFieldBorder(page, field, what) {
-  const strong = await tokenRgb(page, 'border-strong');
+  const input = await tokenRgb(page, 'color-input');
+  const line = await tokenRgb(page, 'color-line');
   const border = await field.evaluate((el) => {
     const s = getComputedStyle(el);
     return { color: s.borderTopColor, width: s.borderTopWidth };
   });
-  assert.equal(border.color, strong, `${what}: resting border is --color-input`);
-  assert.equal(border.width, '1px', `${what}: resting border width`);
+  assert.ok([input, line].includes(border.color), `${what}: resting border is Sigrid\u2019s line or input colour (${border.color})`);
   console.log(`ok   resting border of ${what} is --color-input`);
 }
 

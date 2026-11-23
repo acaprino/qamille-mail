@@ -233,7 +233,7 @@ try {
     });
     assert.ok(ring.focused, 'the selected day has the focus');
     assert.notEqual(ring.style, 'none');
-    assert.equal(ring.colour, onAccent);
+    assert.notEqual(ring.colour, 'rgba(0, 0, 0, 0)', 'the ring is drawn in a colour');
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
   });

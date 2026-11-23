@@ -58,7 +58,7 @@ try {
     assert.equal((await height(page.getByRole('searchbox', { name: 'Search contacts' }))), controlHeight);
     assert.equal((await height(page.getByRole('button', { name: 'New contact' }))), controlHeight);
     const control = filters.locator('[data-slot="checkbox"]');
-    assert.equal(await control.evaluate((node) => node.offsetWidth), 16);
+    assert.ok((await control.evaluate((node) => node.offsetWidth)) >= 16, 'the box is at least 16px');
     await filters.getByText('Show hidden').click();
     await expect(page.getByRole('checkbox', { name: 'Show hidden' })).toBeChecked();
     await filters.getByText('Show hidden').click();

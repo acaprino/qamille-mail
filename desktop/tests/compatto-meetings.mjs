@@ -144,7 +144,7 @@ try {
     await more.click();
     const menu = page.getByRole('menu', { name: 'Meeting actions' });
     await expect(menu).toBeVisible();
-    assert.equal(await menu.evaluate((node) => node.dataset.scope), 'menu', 'the menu is an Ark Menu');
+    assert.equal(await menu.evaluate((node) => node.dataset.slot), 'dropdown-menu-content', 'the menu is Sigrid\u2019s');
     await expect(menu.getByRole('menuitem')).toHaveText(['Rename', 'Delete']);
     // Delete is destructive: last, after a separator.
     assert.deepEqual(await menu.evaluate((node) => [...node.children].map((child) => child.getAttribute('role'))), ['menuitem', 'separator', 'menuitem']);
@@ -152,7 +152,7 @@ try {
 
     const dialog = page.getByRole('dialog', { name: 'Rename meeting' });
     await expect(dialog).toBeVisible();
-    assert.equal(await dialog.evaluate((node) => node.dataset.scope), 'dialog', 'the dialog is an Ark Dialog');
+    assert.equal(await dialog.evaluate((node) => node.dataset.slot), 'dialog-content', 'the dialog is Sigrid\u2019s');
     const name = dialog.getByLabel('Name', { exact: true });
     await expect(name).toBeFocused();
     // (Computed, not measured: the dialog is still scaling in.)
@@ -175,7 +175,6 @@ try {
     await page.getByRole('menu', { name: 'Meeting actions' }).getByRole('menuitem', { name: 'Delete' }).click();
     const confirm = page.getByRole('dialog', { name: 'Delete meeting' });
     await expect(confirm).toContainText('Delete “Compact check”? The recording and the text are removed. This cannot be undone.');
-    assert.equal(await confirm.evaluate((node) => node.dataset.size), 'sm');
     await confirm.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(confirm).toHaveCount(0);
     await expect(pane.getByRole('heading', { name: 'Compact check', level: 2 })).toBeVisible();

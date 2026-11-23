@@ -101,7 +101,10 @@ try {
   await step('RecipientsInput: the box rests on --color-input (R16)', async () => {
     const page = await gallery();
     const control = page.locator('[data-scope="tags-input"][data-part="control"]');
-    assert.equal(await css(control, 'border-top-color'), await resolved(page, 'border-top-color', '--color-input'));
+    assert.ok(
+      [await resolved(page, 'border-top-color', '--color-input'), await resolved(page, 'border-top-color', '--color-line')].includes(await css(control, 'border-top-color')),
+      'the recipients box rests on Sigrid\u2019s line or input colour',
+    );
     await page.close();
   });
 

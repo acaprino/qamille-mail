@@ -272,12 +272,12 @@ try {
     const subject = await page.locator('.message-title').textContent();
     const trigger = page.getByRole('button', { name: 'More message actions', exact: true });
     const menu = page.getByRole('menu', { name: 'Message actions' });
-    // The item the keys are on: the only one marked, and the one the menu names as its active descendant.
+    // The item the keys are on: the only one marked, and the one that has the focus (Sigrid's menu moves the focus along the items).
     const on = async (name) => {
       const marked = menu.locator('[data-highlighted]');
       await expect(marked).toHaveCount(1);
       await expect(marked).toHaveAccessibleName(name);
-      await expect(menu).toHaveAttribute('aria-activedescendant', await marked.getAttribute('id'));
+      await expect(marked).toBeFocused();
     };
 
     // (a) role menu, items role menuitem; the trigger says it opens a menu.

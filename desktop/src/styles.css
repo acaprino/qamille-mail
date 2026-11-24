@@ -416,7 +416,7 @@
   white-space: nowrap;
 }
 .unread .mail-meta time {
-  color: var(--color-primary);
+  color: var(--color-accent);
   font-weight: 600;
 }
 /* The arrow of a conversation takes the place left of the time. */
@@ -699,7 +699,7 @@
   font-weight: 600;
 }
 .reply-row.unread .reply-head time {
-  color: var(--color-primary);
+  color: var(--color-accent);
   font-weight: 600;
 }
 .reply-row.unread .reply-snippet {

@@ -30,7 +30,7 @@ try {
     const api = await import('/src/lib/api.ts');
     await api.call('mail_action', { id: 7, action: 'archive' });
   });
-  const folders = page.getByRole('navigation', { name: 'Mail folders' });
+  const folders = page.getByRole('list', { name: 'Folders' });
   await page.getByRole('tab', { name: 'Unread', exact: true }).click();
   await folders.getByRole('button', { name: /^Archive\s*\d*$/ }).click();
   await expect(page.locator('.mail-list')).toHaveAttribute('aria-busy', 'false');

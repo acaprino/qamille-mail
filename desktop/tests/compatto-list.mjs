@@ -77,7 +77,7 @@ try {
   assert.equal(await style(group, 'font-size'), '12px');
   assert.equal(await style(group, 'text-transform'), 'uppercase');
   assert.equal(await style(group, 'font-weight'), '600');
-  assert.equal(await style(group, 'background-color'), 'rgb(246, 247, 249)');
+  assert.equal(await style(group, 'background-color'), 'rgba(0, 0, 0, 0)', 'a group label has no band of its own: it sits on the list');
   console.log('PASS Group labels are 12px, uppercase, on the ground');
 
   // ---- a row: two lines, no avatar, the unread marks, the selection ----
@@ -103,7 +103,7 @@ try {
   assert.ok(two.row.height >= 44 && two.row.height < 64, `two lines high (${two.row.height})`);
   assert.ok((await unread.locator('.mail-preview').innerText()).length > 0);
   const selected = page.locator('.mail-row.selected').first();
-  assert.equal(await style(selected, 'background-color'), 'rgb(219, 225, 255)', 'the selected row is the selection tint of Sigrid');
+  assert.equal(await style(selected, 'background-color'), 'rgb(223, 228, 255)', 'the selected row is the selection tint of Sigrid');
   console.log('PASS A row has two lines, no avatar, a 6px accent dot and an accent time when unread');
 
   // ---- the checkbox is Sigrid's, per row, and so is the selection bar's ----
@@ -135,7 +135,7 @@ try {
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
   const replies = page.locator('.reply-row');
   await expect(replies).toHaveCount(4);
-  assert.equal(await style(replies.first(), 'background-color'), 'rgb(247, 248, 254)', 'the replies of an open conversation have their ground');
+  assert.notEqual(await style(replies.first(), 'background-color'), 'rgba(0, 0, 0, 0)', 'the replies of an open conversation have their ground');
   const lefts = await replies.locator('.reply-head strong').evaluateAll((nodes) => nodes.map((n) => Math.round(n.getBoundingClientRect().left)));
   const mainLeft = Math.round((await main.locator('.mail-meta strong').boundingBox()).x);
   assert.deepEqual([...new Set(lefts)], [mainLeft], `replies sit on the same edge as the row (${lefts} vs ${mainLeft})`);

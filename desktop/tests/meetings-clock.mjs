@@ -100,7 +100,7 @@ try {
   // A fake clock that still runs in real time, so only the jumps below move it by minutes.
   await page.clock.install({ time: new Date(T0 * 1000) });
   await page.goto(previewUrl);
-  const nav = page.getByRole('navigation', { name: 'Spazio di lavoro' });
+  const nav = page.getByRole('list', { name: 'Spazio di lavoro' });
   await nav.getByRole('button', { name: 'Meeting', exact: true }).waitFor();
   for (const event of await appCall('list_events')) await appCall('delete_event', { id: event.id });
   // "Standup" begins in 5 minutes and ends at 10:15; "Pranzo" is for later and must not move.

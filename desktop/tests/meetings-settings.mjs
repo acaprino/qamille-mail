@@ -51,7 +51,7 @@ const nav = page.locator('.settings-nav');
 async function openMeetings() {
   await page.goto(url);
   await page.locator('.compose-main').waitFor();
-  await page.locator('.sidebar .profile').click();
+  await page.getByRole('list', { name: /^(Workspace|Spazio di lavoro)$/ }).getByRole('button', { name: /^(Settings|Impostazioni)/ }).click();
   await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
   await nav.getByRole('button', { name: 'Meetings', exact: true }).click();
   await expect(content.getByRole('heading', { name: 'Meetings', exact: true })).toBeVisible();
@@ -175,7 +175,7 @@ try {
     await connected.addInitScript(() => (window.__previewServer = { connected: true }));
     await connected.goto(url);
     await connected.locator('.compose-main').waitFor();
-    await connected.locator('.sidebar .profile').click();
+    await connected.getByRole('list', { name: /^(Workspace|Spazio di lavoro)$/ }).getByRole('button', { name: /^(Settings|Impostazioni)/ }).click();
     await connected.locator('.settings-nav').getByRole('button', { name: 'Meetings', exact: true }).click();
     const panel = connected.locator('.settings-content');
     await expect(panel).toContainText('The server set in Settings → Compute transcribes: the meeting audio is sent to that server.');

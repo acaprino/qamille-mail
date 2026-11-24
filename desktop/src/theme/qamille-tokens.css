@@ -8,7 +8,7 @@
   /* The highlight colour of the unlumen components (NavList bar, Switch): Compatto's indigo. */
   --badge: #d9e1f2;
   --hover: #f4f5f8;
-  --thread-open: #f7f8fe;
+  --thread-open: color-mix(in oklab, var(--color-selected) 35%, var(--color-paper));
   --avatar: #e7ecf6;
   --label-bg: #eef0f5;
   --label-text: #4a5363;
@@ -63,7 +63,7 @@
   --avatar-text: #2f3a50;
   --badge: #2f3558;
   --hover: #222a38;
-  --thread-open: #1e2433;
+  --thread-open: color-mix(in oklab, var(--color-selected) 35%, var(--color-paper));
   --avatar: #2c3350;
   --label-bg: #232b38;
   --label-text: #a8b3c6;

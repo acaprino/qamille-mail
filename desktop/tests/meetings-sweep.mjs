@@ -24,7 +24,7 @@ const step = async (name, work) => {
 };
 
 const { browser, page, errors } = await openApp();
-const workspace = page.getByRole('navigation', { name: 'Workspace' });
+const workspace = page.getByRole('list', { name: 'Workspace' });
 const root = page.locator('.meetings-page');
 const pane = page.locator('.meetings-page .detail-pane');
 const api = (command, args = {}) =>
@@ -61,7 +61,7 @@ async function makeReady(title, { keepAudio = false } = {}) {
 }
 /** Away and back: the page reads the meetings once, when it opens. */
 async function openPage() {
-  await page.getByRole('navigation', { name: 'Mail folders' }).getByRole('button', { name: /^Inbox\s*\d*$/ }).click();
+  await page.getByRole('list', { name: 'Folders' }).getByRole('button', { name: /^Inbox\s*\d*$/ }).click();
   await workspace.getByRole('button', { name: 'Meetings', exact: true }).click();
   await expect(root.locator('[data-list-ready]')).toBeAttached();
 }

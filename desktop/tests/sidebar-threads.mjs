@@ -110,15 +110,12 @@ try {
   await page.getByRole('button', { name: 'Print selected', exact: true }).click();
   await expect(page.locator('.print-message')).toHaveCount(2);
   await page.getByRole('button', { name: 'Close print preview' }).click();
-  await page.getByRole('button', { name: 'Collapse sidebar', exact: true }).click();
-  await expect(page.locator('.sidebar')).toHaveClass(/collapsed/);
-  assert.ok((await page.locator('.sidebar').boundingBox()).width <= 76);
-  await page
-    .getByRole('button', { name: `Switch to ${fixture.accounts[0].name}`, exact: true })
-    .click();
-  await expect(page.locator('.workspace-name')).toContainText(fixture.accounts[0].name);
+  await page.getByRole('button', { name: 'Collapse the sidebar', exact: true }).click();
+  await expect(page.locator('[data-slot="sidebar"]')).toHaveAttribute('data-collapsed');
+  assert.ok((await page.locator('[data-slot="sidebar"]').boundingBox()).width <= 76);
+  // The rail is Sigrid's: it has no account switcher (the header goes), the Select is in the column.
   await page.reload();
-  await expect(page.locator('.sidebar')).toHaveClass(/collapsed/);
+  await expect(page.locator('[data-slot="sidebar"]')).toHaveAttribute('data-collapsed');
   await expect(page.getByRole('button', { name: 'Threads', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
@@ -126,38 +123,42 @@ try {
   await page.getByRole('button', { name: 'Emails', exact: true }).click();
   await expect(page.locator('.thread-toggle')).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Conversation messages' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Expand sidebar', exact: true }).click();
-  await expect(page.locator('.sidebar')).not.toHaveClass(/collapsed/);
-  if (!native) await page.setViewportSize({ width: 850, height: 650 });
-  await page.getByRole('button', { name: 'Collapse sidebar', exact: true }).click();
-  assert.ok((await page.locator('.sidebar').boundingBox()).width <= 76);
-  const folders = page.getByRole('navigation', { name: 'Mail folders' });
+  await page.getByRole('button', { name: 'Expand the sidebar', exact: true }).click();
+  await expect(page.locator('[data-slot="sidebar"]')).not.toHaveAttribute('data-collapsed');
+  // (Under about 620 px Sigrid's sidebar is a drawer, not a rail: the narrow layout is tested by Sigrid itself.)
+  await page.getByRole('button', { name: 'Collapse the sidebar', exact: true }).click();
+  assert.ok((await page.locator('[data-slot="sidebar"]').boundingBox()).width <= 76);
+  const folders = page.getByRole('list', { name: 'Folders' });
   await folders.getByRole('button', { name: 'Sent', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Sent', exact: true })).toBeVisible();
+  // The account Select is in the column: widen the sidebar for the account steps.
+  await page.getByRole('button', { name: 'Expand the sidebar', exact: true }).click();
+  const account = page.getByRole('combobox', { name: 'Account' });
+  const chooseAccount = async (name) => {
+    await account.click();
+    await page.getByRole('option', { name, exact: true }).click();
+  };
   // Account buttons filter mail, so pages without mail must hand over to the inbox.
   const leaveDialog = page.getByRole('dialog', { name: 'Save your changes?' });
   const other = fixture.accounts[1];
-  await page.getByRole('complementary', { name: 'Sidebar' }).getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Sidebar' }).getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: `Switch to ${other.name}`, exact: true }).click();
+  await chooseAccount(other.name);
   // Synthetic sample settings may include optional legacy keys; discard any form-only defaults.
   if (await leaveDialog.isVisible()) await leaveDialog.getByRole('button', { name: 'Discard', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Inbox', exact: true })).toBeVisible();
-  await expect(page.locator('.workspace-name')).toContainText(other.name);
-  await page.getByRole('complementary', { name: 'Sidebar' }).getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(account).toContainText(other.name);
+  await page.getByRole('navigation', { name: 'Sidebar' }).getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('textbox', { name: 'Your name', exact: true }).fill('Unsaved account switch');
-  await page.getByRole('button', { name: 'All accounts', exact: true }).click();
+  await chooseAccount('All accounts');
   await expect(leaveDialog).toBeVisible();
   await leaveDialog.getByRole('button', { name: 'Keep editing', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: `Switch to ${other.name}`, exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-  await page.getByRole('button', { name: 'All accounts', exact: true }).click();
+  await expect(account).toContainText(other.name);
+  await chooseAccount('All accounts');
   await leaveDialog.getByRole('button', { name: 'Discard', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Inbox', exact: true })).toBeVisible();
-  await expect(page.locator('.workspace-name')).toContainText('All accounts');
+  await expect(account).toContainText('All accounts');
   assert.deepEqual(errors, []);
   await page.screenshot({
     path: native ? '../checks/sidebar-collapsed-native.png' : '../checks/sidebar-collapsed.png',

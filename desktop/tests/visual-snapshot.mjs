@@ -179,7 +179,7 @@ try {
     await page.getByText('Budget is with Maria').first().waitFor();
   });
   await state('search-filters', {}, async (page) => {
-    await page.locator('.search-filter-button').first().click();
+    await page.locator('.global-search input').click();
     await page.waitForTimeout(200);
   });
   await state('search-results', {}, async (page) => {

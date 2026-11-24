@@ -137,6 +137,19 @@ a {
     padding: 7px 9px;
   }
 }
+/* The browser's own marks inside a field are not Sigrid's: the arrow that opens the list of a field with suggestions, and the spin
+   buttons of a number field. The list still opens as the person types; the number is typed or moved with the arrow keys. */
+input[list]::-webkit-calendar-picker-indicator {
+  display: none !important;
+}
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  appearance: textfield;
+}
 /* A disabled field looks like every disabled control (ds/README.md, "Stati e movimento"): without this
    rule the colours above replace the browser's own and a locked field looks ready to type in.
    Checkboxes keep the browser's disabled look; the date and recipient fields dim as a whole. */

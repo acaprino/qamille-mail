@@ -277,8 +277,9 @@
   color: var(--color-ink-mute);
   border-bottom: 1px solid var(--color-line);
 }
+/* The tabs keep room under them: the chosen one does not sit on the line, nor the first group on the tabs. */
 .mail-tabs {
-  padding: 0 14px;
+  padding: 0 14px 8px;
   border-bottom: 1px solid var(--color-line);
 }
 .mail-scroll {
@@ -1452,7 +1453,7 @@
   flex: 1;
   min-width: 0;
   padding: 7px 0;
-  border-radius: 0;
+  border-radius: var(--radius-md);
   background: none;
   font-size: var(--text-xs);
 }
@@ -1493,7 +1494,14 @@
 /* The same ring as every field (theme/base.css); the body is a contenteditable, so it shows it on click too. */
 .rich-content:focus-visible {
   outline: 2px solid var(--color-primary);
-  outline-offset: 3px;
+  outline-offset: -2px;
+  border-radius: var(--radius-md);
+}
+/* The recipients sit on the row: the bare field inside them has no box (the base rule boxes every bare input). */
+.field-row .recipients-box input {
+  border: 0;
+  background: transparent;
+  padding: 0;
 }
 .rich-content p {
   margin: 0 0 10px;
@@ -2152,10 +2160,14 @@
 .search-workbench {
   position: relative;
   z-index: var(--z-popover);
-  padding: 0 6px 6px;
+  padding: 10px 14px;
   flex-shrink: 0;
   background: transparent;
   font-size: var(--text-xs);
+}
+/* With nothing but the panel inside (it floats over the page) the strip takes no room: opening the search moves nothing. */
+.search-workbench:not(:has(> :not(.search-filter-popover))) {
+  padding: 0;
 }
 .search-applied-filters, .search-recovery-actions {
   display: flex;
@@ -2163,7 +2175,7 @@
   gap: 7px;
   flex-wrap: wrap;
 }
-.search-applied-filters { margin-top: 8px; }
+.search-applied-filters { margin-top: 0; }
 .search-chip { display: inline-flex; max-width: 100%; align-items: center; border-radius: var(--radius-md); border: 1px solid var(--color-line); background: var(--color-paper); color: var(--color-ink); }
 .search-chip > button:first-child { padding: 4px 7px; text-overflow: ellipsis; overflow: hidden; max-width: 420px; white-space: nowrap; text-align: left; }
 .search-chip-remove { display: inline-flex; align-items: center; justify-content: center; align-self: stretch; min-width: 26px; min-height: 24px; padding: 0; border-left: 1px solid var(--color-line); }
@@ -2171,15 +2183,17 @@
 .search-query-code code { overflow-wrap: anywhere; font-size: var(--text-2xs); }
 .search-query-code button { white-space: nowrap; }
 /* The search header's text starts on one edge, 8px in, where the text of its buttons starts. */
-.search-scope { margin: 7px 0 0; padding-left: 8px; font-size: var(--text-2xs); color: var(--color-ink-mute); overflow-wrap: anywhere; }
+.search-scope { margin: 8px 0 0; padding-left: 0; font-size: var(--text-2xs); color: var(--color-ink-mute); overflow-wrap: anywhere; }
 .search-scope > span { display: block; margin-top: 3px; color: var(--color-ink); }
 .search-error { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 9px; padding: 10px; border: 1px solid var(--priority-mark); border-radius: var(--radius-md); background: var(--color-paper); }
 .search-error small { flex-basis: 100%; color: var(--color-ink-mute); }
 .search-progress { margin: 7px 0; color: var(--color-ink-mute); }
-.search-recovery { margin-top: 7px; }
+.search-recovery { margin-top: 8px; }
 .search-recovery-actions { gap: 12px; }
-.search-coverage { margin: 0 0 6px; padding-left: 8px; font-size: var(--text-2xs); color: var(--color-ink-mute); }
+.search-coverage { margin: 0 0 6px; padding-left: 0; font-size: var(--text-2xs); color: var(--color-ink-mute); }
 .search-recovery-actions .text-button { padding-inline: 8px; }
+/* The words of the first text button start on the strip's left edge, as the chip and the scope line above it. */
+.search-recovery-actions > .text-button:first-child { margin-left: -8px; }
 .search-recovery-options { padding: 10px 0 4px; display: flex; flex-wrap: wrap; gap: 8px; }
 .search-recovery-options p { width: 100%; margin: 0 0 2px; color: var(--color-ink-mute); }
 .search-recovery-options button { padding: 7px 10px; font-size: var(--text-xs); }
@@ -2287,8 +2301,8 @@
   container: reader / inline-size;
 }
 @container reader (max-width: 800px) {
-  .reader-forward span,
-  .reader-reply-all span {
+  .reader-forward > span:not([data-icon]),
+  .reader-reply-all > span:not([data-icon]) {
     display: none;
   }
 }

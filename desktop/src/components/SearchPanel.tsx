@@ -96,7 +96,7 @@ export default function SearchPanel({ query, locale, zone, accountId, accounts, 
     },
   ];
   // The caption of a block, as the sidebar's group labels: 12px, semibold, spaced. A paragraph, not an h3, so the base titles' size does not reach it.
-  const heading = 'text-xs font-semibold uppercase tracking-wider text-ink-mute';
+  const heading = 'text-2xs font-semibold uppercase tracking-wider text-ink-mute';
   const idle = !query.trim();
   const frequent = people.slice(0, 6);
 
@@ -136,15 +136,10 @@ export default function SearchPanel({ query, locale, zone, accountId, accounts, 
           <p className={heading}>{t('Persone', 'People')}</p>
           <div className="flex flex-wrap gap-1.5">
             {frequent.map((person) => (
-              <button
-                key={person.address}
-                type="button"
-                onClick={() => onapply(withSearchFilter(query, 'from', person.address))}
-                className="flex h-(--control-sm) items-center gap-2 rounded-md border border-line px-2 text-sm text-ink-soft hover:bg-selected/60 hover:text-ink"
-              >
+              <Button key={person.address} type="button" variant="secondary" onClick={() => onapply(withSearchFilter(query, 'from', person.address))}>
                 <Avatar name={person.name || person.address} size="xs" decorative />
                 <span className="max-w-40 truncate">{person.name || person.address}</span>
-              </button>
+              </Button>
             ))}
           </div>
         </section>

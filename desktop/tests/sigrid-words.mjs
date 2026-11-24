@@ -20,6 +20,10 @@ const ITALIAN = qamilleWords(true);
 // entry here and fails «every function word has a sample», so nobody forgets to look at it.
 const SAMPLES = {
   'common.closeNotice': [['Salvato']],
+  'graph.holds': [['Ordini', 3]],
+  'graph.inGroup': [['Ordini']],
+  'graph.moved': [['Ordini', 120, 40]],
+  'graph.moreSteps': [[2]],
   'common.keysTogether': [[['Ctrl', 'K']]],
   'common.keysInSequence': [[['G', 'I']]],
   'colors.numbered': [[1], [18]],
@@ -65,6 +69,7 @@ const SAMPLES = {
 
 // Words that are the same in both languages, by path. A word is listed here on purpose, with the reason.
 const SAME = new Set([
+  'graph.moreSteps', // a sign and a number: «+2»
   'common.keysTogether', // «Ctrl + K»: a key combination reads the same
   'progress.value', // «45%»: a percentage reads the same
   'duration.short', // «1h 30m»: the same abbreviations

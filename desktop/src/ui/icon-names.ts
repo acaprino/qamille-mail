@@ -41,6 +41,7 @@ export const ICON_MAP = {
   reply: 'reply',
   replyAll: 'replyAll',
   arrow: 'moveRight',
+  back: 'back',
   close: 'close',
   minimize: 'windowMinimize',
   'window-maximize': 'windowMaximize',

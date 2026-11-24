@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import Badge from '../../ui/Badge';
 import Button from '../../ui/Button';
 import Checkbox from '../../ui/Checkbox';
 import Modal from '../../ui/Modal';
@@ -152,7 +153,7 @@ export default function MergeDialog({
         {group.members.map((member) => (
           <li key={member.key}>
             <strong>{member.fields.name || '—'}</strong>
-            <span className="origin-chip">{bookLabel(member.label)}</span>
+            <Badge variant="secondary">{bookLabel(member.label)}</Badge>
             <small className="muted">{member.fields.emails.map((e) => e.value).join(', ')}</small>
           </li>
         ))}

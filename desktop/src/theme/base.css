@@ -162,27 +162,31 @@ span svg {
   display: block;
   flex-shrink: 0;
 }
-h1,
-h2,
-h3,
-p {
-  margin: 0;
-}
-h1 {
-  font-family: var(--font-sans);
-  font-size: var(--text-2xl);
-  font-weight: 600;
-  letter-spacing: -1px;
-}
-h2 {
-  font-family: var(--font-sans);
-  font-size: var(--text-xl);
-  font-weight: 600;
-  letter-spacing: -0.4px;
-}
-h3 {
-  font-size: var(--text-sm);
-  font-weight: 600;
+/* The titles and paragraphs of the page: in the base layer, so a heading a Sigrid part draws (a Panel's title, a dialog's) keeps
+   its own size and weight, and the classes of the app still win over these. */
+@layer base {
+  h1,
+  h2,
+  h3,
+  p {
+    margin: 0;
+  }
+  h1 {
+    font-family: var(--font-sans);
+    font-size: var(--text-2xl);
+    font-weight: 600;
+    letter-spacing: -1px;
+  }
+  h2 {
+    font-family: var(--font-sans);
+    font-size: var(--text-xl);
+    font-weight: 600;
+    letter-spacing: -0.4px;
+  }
+  h3 {
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
 }
 .muted {
   color: var(--color-ink-mute);

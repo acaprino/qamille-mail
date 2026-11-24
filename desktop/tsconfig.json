@@ -29,6 +29,9 @@
       ],
       "@acaprino/sigrid": [
         "./vendor/sigrid/dist/index.d.ts"
+      ],
+      "@acaprino/sigrid/*": [
+        "./vendor/sigrid/dist/*.d.ts"
       ]
     }
   },

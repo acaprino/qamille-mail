@@ -2,7 +2,7 @@
 // that apply at once; `checked` is controlled and `onChange` is told the new value. Drawn by Sigrid's Switch (Ark's
 // switch: a hidden `role="switch"` checkbox in a label); without a visible label the name is the `aria-label`.
 import type { ReactNode } from 'react';
-import { Switch as SigridSwitch } from '@acaprino/sigrid';
+import { Switch as SigridSwitch } from '@acaprino/sigrid/primitives';
 
 export type SwitchProps = {
   checked: boolean;

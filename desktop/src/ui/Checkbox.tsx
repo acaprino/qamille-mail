@@ -4,7 +4,7 @@
 // only the box (a button with role="checkbox"): the row and its label are a <label> around it, as Sigrid's own notes
 // ask of an app. The row keeps Ark's anatomy attributes (`data-scope="checkbox"`) that the pages' own rules place it by.
 import type { ReactNode } from 'react';
-import { Checkbox as SigridCheckbox } from '@acaprino/sigrid';
+import { Checkbox as SigridCheckbox } from '@acaprino/sigrid/primitives';
 
 export type CheckboxProps = {
   checked: boolean;

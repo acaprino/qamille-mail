@@ -4,7 +4,7 @@
 // that had it when it closes. `size` is `sm`, `md` (default) or `lg`: the widths are Qamille's tokens, given to Sigrid's
 // window. Sigrid's window has a close button of its own (its words name it).
 import { useRef, type CSSProperties, type HTMLAttributes } from 'react';
-import { DialogContent, DialogRoot } from '@acaprino/sigrid';
+import { DialogContent, DialogRoot } from '@acaprino/sigrid/primitives';
 import { imeComposing } from '../lib/ime';
 import { useReturnFocus } from '../lib/focus-return';
 

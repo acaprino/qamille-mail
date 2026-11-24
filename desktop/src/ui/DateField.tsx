@@ -5,7 +5,8 @@
 // label the field is tied to. The calendar's words are Sigrid's (ui/words.ts): `translations` is kept so the callers
 // need not change, and is not read.
 import { useId } from 'react';
-import { Button, DateField as SigridDateField } from '@acaprino/sigrid';
+import { Button } from '@acaprino/sigrid/primitives';
+import { DateField as SigridDateField } from '@acaprino/sigrid/components';
 import Icon from '../ui/Icon';
 import { tr } from '../lib/i18n';
 

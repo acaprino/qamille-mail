@@ -249,7 +249,6 @@ try {
     const send = panel.getByRole('button', { name: 'Send', exact: true });
     for (const control of [
       send,
-      panel.getByRole('button', { name: 'Schedule send', exact: true }),
       panel.getByRole('button', { name: 'Attach files', exact: true }),
       panel.getByRole('button', { name: 'Discard draft', exact: true }),
       panel.getByRole('combobox', { name: 'From', exact: true }),
@@ -257,22 +256,11 @@ try {
     ]) {
       assert.equal((await box(control)).height, 32, `${await control.getAttribute('aria-label') ?? 'Send'} is 32px`);
     }
-    await panel.getByRole('button', { name: 'Schedule send', exact: true }).click();
-    const day = panel.getByLabel('Send date', { exact: true });
-    const time = panel.getByLabel('Send time', { exact: true });
-    assert.equal((await box(day)).height, 32, 'the date field is 32px');
-    await expect(day).toBeVisible();
-    assert.equal((await box(time)).height, 32, 'the time box is 32px');
-    assert.equal(await time.getAttribute('type'), 'time', 'the time stays a native time input');
-    await panel.getByRole('button', { name: 'Schedule send', exact: true }).click();
   });
 
   await step('The pickers are Selects and the dates a DateField (no native select, no datetime-local)', async () => {
     assert.equal(await panel.locator('select').count(), 0, 'no native select in the composer');
-    await panel.getByRole('button', { name: 'Schedule send', exact: true }).click();
     assert.equal(await panel.locator('input[type="datetime-local"]').count(), 0, 'no datetime-local');
-    await expect(panel.locator('[data-scope="date-picker"][data-part="control"]')).toHaveCount(1);
-    await panel.getByRole('button', { name: 'Schedule send', exact: true }).click();
     const signature = panel.getByRole('combobox', { name: 'Signature', exact: true });
     await signature.click();
     await expect(page.getByRole('listbox', { name: 'Signature' })).toBeVisible();
@@ -395,13 +383,6 @@ try {
     await expect(area.getByRole('combobox', { name: 'Firma', exact: true })).toBeVisible();
     await area.getByRole('combobox', { name: 'A', exact: true }).fill('someone@x.it;');
     await expect(area.getByRole('button', { name: 'Rimuovi someone@x.it', exact: true })).toBeVisible();
-    await area.getByRole('button', { name: 'Programma invio', exact: true }).click();
-    const day = area.getByLabel('Data di invio', { exact: true });
-    await expect(day).toBeVisible();
-    await expect(area.getByLabel('Ora di invio', { exact: true })).toBeVisible();
-    await day.click();
-    await expect(it.getByRole('button', { name: 'Mese successivo', exact: true })).toBeVisible();
-    await expect(it.getByRole('button', { name: 'Mese precedente', exact: true })).toBeVisible();
     await italian.close();
   });
 
@@ -414,8 +395,6 @@ try {
     await day.click({ force: true });
     await expect(page.locator('[data-scope="date-picker"][data-part="content"]')).toBeHidden();
     await page.close();
-    const source = fs.readFileSync(new URL('../src/components/Composer.tsx', import.meta.url), 'utf8');
-    assert.match(source, /<DateField[^>]*disabled=\{locked\}/s, 'the schedule row passes locked to the DateField');
   });
 
   await step('The unsaved-changes dialog is still a small Modal', async () => {

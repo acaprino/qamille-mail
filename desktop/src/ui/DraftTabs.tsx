@@ -4,7 +4,7 @@
 // and Enter or Space picks. `onPick` hears a pick of another tab (a click, or Enter or Space on it) and every click or Enter on
 // the chosen one, which the composer uses to minimize it. The caller says which tab is the Tab stop (`props.tabIndex`).
 import { useLayoutEffect, useRef, type KeyboardEvent, type ReactNode } from 'react';
-import { Tabs as SigridTabs, TabsList, TabsTrigger } from '@acaprino/sigrid';
+import { Tabs as SigridTabs, TabsList, TabsTrigger } from '@acaprino/sigrid/primitives';
 import { imeComposing } from '../lib/ime';
 import type { TabItem } from './Tabs';
 

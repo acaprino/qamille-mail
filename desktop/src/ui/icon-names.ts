@@ -1,7 +1,7 @@
 // The icon names Qamille has always used, each on the meaning Sigrid draws (its `ICON_NAMES`). The drawing is Sigrid's, in
 // the pack in context (Lucide by default); Qamille keeps no path of its own. A name that is not here draws `mail`, as the old
 // primitive did. `tests/sigrid-preconditions.mjs` (P5) checks that every target is in the synced copy's `ICON_NAMES`.
-import type { IconName } from '@acaprino/sigrid';
+import type { IconName } from '@acaprino/sigrid/primitives';
 
 export const ICON_MAP = {
   threads: 'threads',

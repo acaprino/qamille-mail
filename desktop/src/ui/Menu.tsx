@@ -6,15 +6,7 @@
 // `onOpenChange` tells the caller when it opens and closes, and `open={false}` closes it. A filter, a picker or a small
 // form is not a menu: that stays a Popover.
 import { Fragment, cloneElement, useEffect, useId, useState, type ReactElement } from 'react';
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuTrigger,
-} from '@acaprino/sigrid';
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger } from '@acaprino/sigrid/primitives';
 import Icon from '../ui/Icon';
 import Tooltip from './Tooltip';
 

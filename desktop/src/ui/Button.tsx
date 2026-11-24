@@ -6,7 +6,7 @@
 // own rules place buttons by them. Sigrid's Button is `type="button"` unless told otherwise, so a button that sends
 // a form says `type="submit"`.
 import type { ButtonHTMLAttributes, Ref } from 'react';
-import { Button as SigridButton } from '@acaprino/sigrid';
+import { Button as SigridButton } from '@acaprino/sigrid/primitives';
 import { cn } from './cn';
 import Tooltip from '../ui/Tooltip';
 

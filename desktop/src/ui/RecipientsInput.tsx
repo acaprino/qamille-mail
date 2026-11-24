@@ -9,7 +9,8 @@
 // the same address twice, and the tallest the box grows before it scrolls. The words of the chips are the app's own, in a
 // WordsProvider of their own. The repeated name in a suggestion is Sigrid's to fix (R11 of the plan's asks).
 import { useEffect, useId, useMemo, type Ref } from 'react';
-import { ChipsInput, WordsProvider } from '@acaprino/sigrid';
+import { WordsProvider } from '@acaprino/sigrid';
+import { ChipsInput } from '@acaprino/sigrid/components';
 import { useLanguage } from '../lib/i18n';
 import { recipientWords } from './words';
 

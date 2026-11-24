@@ -1,7 +1,7 @@
 // Qamille's icon, drawn by Sigrid's `Icon` in the pack in context. The call sites keep asking for a size in pixels: it is
 // snapped to the nearest step Sigrid's scale has (12, 14, 16, 20, 28, 32, 36). The stroke is Sigrid's (`--icon-stroke`), so
 // `stroke` is accepted and ignored: every visible difference from the old drawing is accepted (the owner's ruling).
-import { Icon as SigridIcon } from '@acaprino/sigrid';
+import { Icon as SigridIcon } from '@acaprino/sigrid/primitives';
 import { sigridIcon } from './icon-names';
 
 function sizeClass(size: number): string {

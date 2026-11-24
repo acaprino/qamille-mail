@@ -6,7 +6,7 @@
 // runs once it is showing, to place the focus (without it the first control gets it). The panel has its own bar with a
 // close button, so Sigrid's is off. The sheet opens at the edge of the window (it no longer fills the pane it sits in).
 import { useCallback, useRef, type CSSProperties, type HTMLAttributes, type Ref } from 'react';
-import { Sheet, SheetContent } from '@acaprino/sigrid';
+import { Sheet, SheetContent } from '@acaprino/sigrid/primitives';
 import { useReturnFocus } from '../lib/focus-return';
 
 export type SidePanelProps = HTMLAttributes<HTMLDivElement> & {

@@ -16,7 +16,7 @@ use tauri::{AppHandle, Manager, Url, WebviewWindow, Wry, window::Color};
 /// `html`, `body` and `.app-shell` paint, so a resize never shows a strip of
 /// another colour. The light value is `app.windows[0].backgroundColor` in
 /// `tauri.conf.json`. The test keeps both in sync with the stylesheet.
-pub const DARK_GROUND: Color = Color(0x12, 0x16, 0x1e, 0xff);
+pub const DARK_GROUND: Color = Color(0x1e, 0x1e, 0x1e, 0xff);
 
 /// The main window is built hidden: paint it in the appearance chosen in
 /// Settings (or the system theme) first, so the first frame is never the other

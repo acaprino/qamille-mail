@@ -28,12 +28,11 @@ const PAIRS = [
   // Content on the filled accent
   ['color-primary-foreground', 'color-primary'],
   ['color-primary-foreground', 'color-accent'],
-  ['on-accent-soft', 'color-primary'],
   // Dark sidebar
   ['color-sidebar-ink', 'color-sidebar-paper'],
   ['color-sidebar-mute', 'color-sidebar-paper'],
   ['color-sidebar-accent', 'color-sidebar-paper'],
-  ['color-sidebar-ink', 'sidebar-hover'],
+  ['color-sidebar-ink', 'color-raised'], // the activity center's button and panel in the sidebar
   ['color-sidebar-selected-ink', 'color-sidebar-selected'],
   ['color-sidebar-mute', 'color-sidebar-selected'],
   ['color-sidebar-accent', 'color-sidebar-selected'],

@@ -1,6 +1,7 @@
 // «Compatto» as Sigrid's parameters (src/theme/compatto.ts) and the stylesheet generated from them
-// (src/theme/compatto.css, scripts/theme-css.mjs): the engine keeps Compatto's page, sheet, ink, lines and indigo exactly
-// and corrects nothing, the density is Qamille's, and the committed file is what the script writes now.
+// (src/theme/compatto.css, scripts/theme-css.mjs): Qamille hands Sigrid one colour, the accent, and the engine gives the
+// grays, the sidebar, the surfaces and the corners; the density is Qamille's; and the committed file is what the script
+// writes now.
 //   node --test tests/theme-css.mjs        (needs `npm run sigrid:sync`)
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -9,25 +10,31 @@ import { OUTPUT, RETIRED_NAMES, compattoCss, loadParameters, loadSigrid } from '
 
 const sigrid = await loadSigrid();
 const parameters = await loadParameters();
-const { COMPATTO, COMPATTO_TONE, QAMILLE_DENSITY } = parameters;
+const { COMPATTO_PICK, COMPATTO_TONE, QAMILLE_DENSITY } = parameters;
+const COMPATTO = sigrid.colorTheme(COMPATTO_PICK);
 
-// What Compatto is today (theme/qamille-tokens.css), by Sigrid's token names.
-const KEPT = {
-  light: { paper: '#f6f7f9', raised: '#ffffff', ink: '#111827', line: '#e3e6ea', accent: '#4338ca', primary: '#4f46e5' },
-  dark: { paper: '#12161e', raised: '#1a202c', ink: '#e8ecf3', line: '#2a3240', accent: '#aeb0fa', primary: '#9a9cf8' },
-};
+test('Qamille picks only the accent: the grays, the sidebar and the surfaces are Sigrid’s', () => {
+  assert.deepEqual(Object.keys(COMPATTO_PICK).sort(), ['color', 'id', 'label']);
+  assert.equal(COMPATTO_PICK.color, '#4f46e5');
+});
 
 for (const scheme of ['light', 'dark']) {
-  test(`the engine keeps Compatto's ${scheme} page, sheet, ink, lines and indigo, and corrects nothing`, () => {
+  test(`in ${scheme} the engine keeps the text where it was designed and the sidebar a step below the page`, () => {
     const tokens = sigrid.themeTokens(COMPATTO, scheme, null, COMPATTO_TONE);
-    assert.deepEqual(tokens.corrected, []);
-    for (const [name, value] of Object.entries(KEPT[scheme])) assert.equal(tokens.colors[name], value, `${scheme} ${name}`);
+    for (const role of ['ink', 'inkSoft', 'inkMute']) assert.ok(!tokens.corrected.includes(role), `${scheme}: the engine moved ${role}`);
+    assert.ok(sigrid.luminance(tokens.colors['sidebar-paper']) < sigrid.luminance(tokens.colors.paper), `${scheme}: the sidebar is not below the page`);
   });
 }
 
+test('in light the engine keeps the accent as picked, and corrects nothing', () => {
+  const tokens = sigrid.themeTokens(COMPATTO, 'light', null, COMPATTO_TONE);
+  assert.deepEqual(tokens.corrected, []);
+  assert.equal(tokens.colors.primary, COMPATTO_PICK.color);
+});
+
 test('without the tone «as designed» the indigo would move: the tone is part of the parameters', () => {
   const vivid = sigrid.themeTokens(COMPATTO, 'light', null, null);
-  assert.notEqual(vivid.colors.primary, KEPT.light.primary);
+  assert.notEqual(vivid.colors.primary, COMPATTO_PICK.color);
   assert.deepEqual(COMPATTO_TONE, { intensity: 'theme', light: 'theme' });
 });
 
@@ -38,25 +45,21 @@ test('the density is Sigrid’s compact with every control 32 px high', () => {
   assert.equal(density.id, 'compatto');
 });
 
-test('the sidebar is the engine’s dark column, and the light lane of the surfaces is light', () => {
-  assert.equal(COMPATTO.sidebar, 'scura');
-  const lane = COMPATTO.surfaces.light.sidebar;
-  assert.ok(sigrid.luminance(lane) > 0.5, `${lane} is not a light lane: it would push ink and red to black and white`);
-});
-
 test('compatto.css is what scripts/theme-css.mjs writes now', () => {
   const committed = readFileSync(OUTPUT, 'utf8');
   assert.equal(committed, compattoCss(sigrid, parameters), 'compatto.css is out of date: run `npm run theme:css` and read the diff');
 });
 
-test('compatto.css writes the colours for both schemes, the density and COMPATTO’s radii', () => {
+test('compatto.css writes the colours for both schemes, the density and the corners, the same in both', () => {
   const css = readFileSync(OUTPUT, 'utf8');
   assert.match(css, /:root:not\(\[data-scheme\]\),\n:root\[data-scheme='light'\] \{/);
   assert.match(css, /:root\[data-scheme='dark'\] \{/);
   assert.match(css, /--density-control-md: 32px;/);
-  // The corners are a parameter of the theme (`radii` of COMPATTO, Sigrid 3.2.1): 4, 6, 8 and 12 px in both schemes.
-  for (const [name, px] of [['sm', 4], ['md', 6], ['lg', 8], ['xl', 12]]) {
-    assert.equal(css.split(`  --radius-${name}: ${px}px;`).length - 1, 2, `--radius-${name} is ${px}px in both blocks`);
+  // The corners are Sigrid's (the theme's shape): written once in each block, with one value.
+  for (const name of ['sm', 'md', 'lg', 'xl']) {
+    const values = [...css.matchAll(new RegExp(`^ {2}--radius-${name}: ([^;]+);`, 'gm'))].map((match) => match[1]);
+    assert.equal(values.length, 2, `--radius-${name} is written in both blocks`);
+    assert.equal(values[0], values[1], `--radius-${name} is the same in light and in dark`);
   }
   assert.doesNotMatch(css, /\bcursor:/);
 });

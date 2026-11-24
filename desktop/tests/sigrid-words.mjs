@@ -19,6 +19,7 @@ const ITALIAN = qamilleWords(true);
 // What each function word is called with, by path: a list of argument lists. A new function word of Sigrid has no
 // entry here and fails «every function word has a sample», so nobody forgets to look at it.
 const SAMPLES = {
+  'common.closeNotice': [['Salvato']],
   'common.keysTogether': [[['Ctrl', 'K']]],
   'common.keysInSequence': [[['G', 'I']]],
   'colors.numbered': [[1], [18]],

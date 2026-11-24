@@ -75,12 +75,13 @@
 .reader-reply kbd {
   display: none;
 }
+/* The dot of a label sits in the 16px icon slot of a sidebar row: it keeps its 8px round shape (no margin that would squeeze it). */
 .label-dot {
   width: 8px;
   height: 8px;
+  flex: none;
   border-radius: 50%;
   background: var(--dot);
-  margin: 0 5px;
 }
 .main-shell {
   position: relative;

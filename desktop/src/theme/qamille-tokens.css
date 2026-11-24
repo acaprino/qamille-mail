@@ -2,12 +2,9 @@
   color-scheme: light;
   --radius-full: 999px;
   --radius-sheet: 14px;
-  --on-accent-soft: #e6ecff;
-  --on-accent-border: #ffffff3b;
   --priority-text: #8a4a06;
   --priority-mark: #c46a0a;
   --avatar-text: #4c5870;
-  --sidebar-hover: #22262e;
   /* The highlight colour of the unlumen components (NavList bar, Switch): Compatto's indigo. */
   --badge: #d9e1f2;
   --hover: #f4f5f8;
@@ -61,12 +58,9 @@
      Two steps of depth: the sidebar and the ground (the darker one, shared with the top bar), and the sheet
      (--color-raised, a step lighter) that carries the work.
      --color-primary sits at 6.6:1 on the sheet; the text on it is dark. */
-  --on-accent-soft: #26285a;
-  --on-accent-border: #0f102055;
   --priority-text: #f0b878;
   --priority-mark: #e8a25a;
   --avatar-text: #2f3a50;
-  --sidebar-hover: #1c2230;
   --badge: #2f3558;
   --hover: #222a38;
   --thread-open: #1e2433;

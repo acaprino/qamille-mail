@@ -1239,12 +1239,14 @@ check('29. Sigrid draws no web cursor of its own: the pointer stays the arrow (r
   // and Qamille's base keeps the arrow on them. `cursor-pointer` and every other cursor never appear.
   const KNOWN = new Set([
     'components/ui/checkbox.tsx',
+    'components/ui/input-group.tsx',
     'components/ui/input.tsx',
     'components/ui/radio-group.tsx',
     'components/ui/select.tsx',
     'components/ui/switch.tsx',
     'components/ui/textarea.tsx',
     'internal/file-drop.tsx',
+    'lib/field.ts',
   ]);
   const home = path.join(desktop, 'vendor', 'sigrid', 'src');
   const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => (entry.isDirectory() ? walk(path.join(dir, entry.name)) : [path.join(dir, entry.name)]));

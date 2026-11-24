@@ -1,6 +1,6 @@
 // Writes src/theme/compatto.css: the «Compatto» look computed by Sigrid's theme engine from src/theme/compatto.ts, and the
 // density of the controls. The file is generated and committed (the first paint needs it as a plain stylesheet);
-// tests/tokens-compatto.mjs keeps it equal to what this script writes.
+// tests/theme-css.mjs keeps it equal to what this script writes.
 //   npm run theme:css        (needs `npm run sigrid:sync`; run it again, and read the diff, after a Sigrid release)
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -56,10 +56,11 @@ const block = (selector, variables) =>
     .join('\n')}\n}\n`;
 
 /** The text of compatto.css for the Sigrid exports `sigrid` (its dist/index.js) and Qamille's parameters. */
-export function compattoCss(sigrid, { COMPATTO, COMPATTO_TONE, QAMILLE_DENSITY }) {
+export function compattoCss(sigrid, { COMPATTO_PICK, COMPATTO_TONE, QAMILLE_DENSITY }) {
+  const COMPATTO = sigrid.colorTheme(COMPATTO_PICK);
   const density = sigrid.densityWith('compact', QAMILLE_DENSITY);
   const pick = (scheme) => ({ theme: COMPATTO, scheme, tone: COMPATTO_TONE });
-  // Everything the engine owns comes with themeVariables: the colours, the shape (`--radius-*` from COMPATTO's `radii`) and
+  // Everything the engine owns comes with themeVariables: the colours, the shape (`--radius-*`) and
   // the elevations.
   const colours = (scheme) => sigrid.themeVariables(pick(scheme));
   return [

@@ -19,7 +19,7 @@ dirette su nessuna libreria che Sigrid porta (`desktop/tests/only-sigrid.mjs`, A
 - `src/ui/motion.tsx` — **provvisorio**: finché ogni posto non usa `ListItem`, `Presence` e `Leaving` di Sigrid, le
   animazioni di Qamille sono disegnate ferme.
 - `src/ui/parts.css` — gli aiuti per ciò che sta dentro un dialogo o un pannello.
-- `src/theme/compatto.ts` — il look di Qamille come parametri di Sigrid (`COMPATTO`, `COMPATTO_TONE`, `QAMILLE_DENSITY`).
+- `src/theme/compatto.ts` — il look di Qamille come parametri di Sigrid (`COMPATTO_PICK`, `COMPATTO_TONE`, `QAMILLE_DENSITY`).
   `compatto.css` è generato da `npm run theme:css` e `tests/tokens-compatto.mjs` lo tiene uguale all'uscita del motore.
 - `src/theme/qamille-tokens.css` — i soli token di Qamille (priorità, etichette, avatar, scrim, livelli `--z-*`).
   Non ridefinisce nulla di ciò che Sigrid possiede: colori, raggi, scala del testo, densità.

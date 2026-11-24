@@ -1237,16 +1237,17 @@ check('28. the first maximized show is cloaked by DWM only through a guard that 
 check('29. Sigrid draws no web cursor of its own: the pointer stays the arrow (rule 3)', () => {
   // Sigrid's sources may name `cursor-not-allowed` and `cursor-progress` only where they do today (asked of Sigrid as R16),
   // and Qamille's base keeps the arrow on them. `cursor-pointer` and every other cursor never appear.
+  // The paths are those of Sigrid 6, whose sources are laid out by level (primitives, components, layout, assemblies).
   const KNOWN = new Set([
-    'components/ui/checkbox.tsx',
-    'components/ui/input-group.tsx',
-    'components/ui/input.tsx',
-    'components/ui/radio-group.tsx',
-    'components/ui/select.tsx',
-    'components/ui/switch.tsx',
-    'components/ui/textarea.tsx',
-    'internal/file-drop.tsx',
+    'assemblies/prompt-input.tsx',
+    'assemblies/swipe-deck.tsx',
+    'components/file-drop.tsx',
+    'components/input-group.tsx',
     'lib/field.ts',
+    'primitives/checkbox.tsx',
+    'primitives/radio-group.tsx',
+    'primitives/switch.tsx',
+    'primitives/textarea.tsx',
   ]);
   const home = path.join(desktop, 'vendor', 'sigrid', 'src');
   const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => (entry.isDirectory() ? walk(path.join(dir, entry.name)) : [path.join(dir, entry.name)]));
@@ -1254,7 +1255,9 @@ check('29. Sigrid draws no web cursor of its own: the pointer stays the arrow (r
     const cursors = [...fs.readFileSync(file, 'utf8').matchAll(/cursor-([a-z-]+)/g)].map((match) => match[1]);
     if (!cursors.length) continue;
     const name = path.relative(home, file).replaceAll('\\', '/');
-    for (const cursor of cursors) assert.ok(['not-allowed', 'progress', 'default'].includes(cursor), `${name} uses cursor-${cursor}: ask Sigrid to drop it`);
+    // The deck of cards one drags (Sigrid 6) shows the grabbing hand while a card is held: Qamille does not use it.
+    const dragged = name === 'assemblies/swipe-deck.tsx';
+    for (const cursor of cursors) assert.ok(['not-allowed', 'progress', 'default'].includes(cursor) || (dragged && cursor.startsWith('grab')), `${name} uses cursor-${cursor}: ask Sigrid to drop it`);
     if (cursors.some((cursor) => cursor !== 'default')) assert.ok(KNOWN.has(name), `${name} is a new file with a web cursor: ask Sigrid to drop it`);
   }
   const system = stripComments(read('src/theme/base.css'));

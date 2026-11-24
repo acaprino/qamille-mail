@@ -187,7 +187,7 @@ async function record(title, { eventId = null, stop = true } = {}) {
 }
 
 // ─── The page ─────────────────────────────────────────────────────────────────────────────────
-const workspaceNav = () => page.getByRole('navigation', { name: 'Spazio di lavoro' });
+const workspaceNav = () => page.getByRole('list', { name: 'Spazio di lavoro' });
 const openMeetings = async () => {
   await workspaceNav().getByRole('button', { name: 'Meeting', exact: true }).click();
   await expect(page.locator('section.meetings-page')).toBeVisible();

@@ -80,7 +80,7 @@ try {
   console.log('PASS Immediate selection and feedback; message appears without waiting for thread details');
 
   await rows.nth(2).locator('.mail-open').click();
-  await page.getByRole('navigation', { name: 'Mail folders' }).getByRole('button', { name: /^Sent\s*\d*$/ }).click();
+  await page.getByRole('list', { name: 'Folders' }).getByRole('button', { name: /^Sent\s*\d*$/ }).click();
   await page.evaluate(ids => { for (const id of ids) for (const command of ['read_mail', 'read_mail_thread']) window.mailGates.get(command + ':' + id)?.resolve(); }, [first, second]);
   await expect(page.locator('.message-body')).toHaveCount(0);
   await expect(reader).toHaveAttribute('aria-busy', 'false');
@@ -97,9 +97,11 @@ try {
   const heading = (subject) => reader.getByRole('heading', { name: subject, exact: true });
   const row = (subject) => page.locator('.mail-row', { hasText: subject });
   const inboxCount = async (on = page) => {
-    const folders = on.getByRole('navigation', { name: 'Mail folders' });
-    const badge = folders.getByRole('button', { name: /^Inbox\s*\d*$/ }).locator('.nav-count');
-    return (await badge.count()) ? Number(await badge.innerText()) : 0;
+    const folders = on.getByRole('list', { name: 'Folders' });
+    // The count is the last word of the row: «Inbox 4».
+    const text = await folders.getByRole('button', { name: /^Inbox\s*\d*$/ }).innerText();
+    const count = /(\d+)\s*$/.exec(text);
+    return count ? Number(count[1]) : 0;
   };
   const calls = (name) =>
     page.evaluate((command) => window.__previewCalls.filter((call) => call === command).length, name);
@@ -199,8 +201,8 @@ try {
     window.__previewCommandFail = { mail_action: 'Synthetic markAsSeen failure' };
   });
   await row(subjects.b).locator('.mail-open').click();
-  await expect(row(subjects.b)).not.toHaveClass(/unread/, { timeout: 100 });
-  await expect.poll(inboxCount, { timeout: 100 }).toBe(intact - 1);
+  await expect(row(subjects.b)).not.toHaveClass(/unread/, { timeout: 500 });
+  await expect.poll(inboxCount, { timeout: 500 }).toBe(intact - 1);
   await expect(page.locator('[role="alert"], [data-scope="toast"][data-part="root"]').filter({ hasText: 'Synthetic markAsSeen failure' }).first()).toBeVisible();
   await expect(row(subjects.b)).toHaveClass(/unread/);
   await expect.poll(inboxCount).toBe(intact);

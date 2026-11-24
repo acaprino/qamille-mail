@@ -24,6 +24,11 @@ assert.equal(
   search.withSearchFilter('from:a OR from:b', 'subject', 'contract'),
   '(from:a OR from:b) subject:contract',
 );
+assert.deepEqual(search.filterValues('(from:a OR from:"b c") has:attachment', 'from'), ['a', 'b c']);
+assert.deepEqual(search.filterValues('from:a to:b', 'to'), ['b']);
+assert.equal(search.withPeople('has:attachment', 'from', ['a', ' b ']), 'has:attachment (from:a OR from:b)');
+assert.equal(search.withPeople('from:a has:attachment', 'from', []), 'has:attachment');
+assert.equal(search.withPeople('has:attachment', 'from', ['x']), 'has:attachment from:x');
 assert.equal(search.removeSearchChip('(from:a OR from:b) subject:contract', 0), '');
 assert.deepEqual(search.aroundRange('around:2026-10-15'), {
   day: '2026-10-15',
@@ -70,6 +75,12 @@ async function query(text) {
   await input.press('Enter');
   await settled();
 }
+// What narrows a search is one panel that opens from the search field; the form of every filter is behind «Advanced filters».
+const panel = page.locator('#search-filters-popover');
+async function openForm(name = 'Search mail', advanced = 'Advanced filters') {
+  await page.getByRole('textbox', { name, exact: true }).click();
+  await panel.getByRole('button', { name: new RegExp(`^${advanced}`) }).click();
+}
 
 try {
   await page.goto(process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:1420');
@@ -80,27 +91,29 @@ try {
     'Search UI tests must use the isolated browser preview',
   );
 
-  await page.getByRole('button', { name: /^When/ }).click();
+  await openForm();
+  await panel.getByRole('combobox', { name: 'When' }).click();
+  await page.getByRole('option', { name: 'Around a date', exact: true }).click();
   // The date field is Sigrid's: a button that opens a calendar, where the day is chosen.
-  await pickDate(page, page.getByLabel('Date', { exact: true }), '2026-10-15');
+  await pickDate(page, panel.getByLabel('Date', { exact: true }), '2026-10-15');
   assert.match(
-    await page.locator('.search-date-preview').innerText(),
+    await panel.getByTestId('search-date-preview').innerText(),
     /October 9, 2026.*October 21, 2026/s,
   );
-  assert.match(await page.locator('.search-date-preview').innerText(), /13 days included/);
+  assert.match(await panel.getByTestId('search-date-preview').innerText(), /13 days included/);
   await page.screenshot({
     path: new URL('around-desktop.png', screenshots).pathname.replace(/^\/([A-Z]:)/, '$1'),
   });
   await page.setViewportSize({ width: 900, height: 900 });
-  const panel = await page.locator('.search-filter-panel').boundingBox();
+  const box = await panel.boundingBox();
   assert.ok(
-    panel && panel.x >= 0 && panel.x + panel.width <= 900,
+    box && box.x >= 0 && box.x + box.width <= 900,
     'Date filter remains in the viewport at 900px',
   );
   await page.screenshot({
     path: new URL('around-900.png', screenshots).pathname.replace(/^\/([A-Z]:)/, '$1'),
   });
-  await page.getByRole('button', { name: 'Apply filter', exact: true }).click();
+  await panel.getByRole('button', { name: 'Apply', exact: true }).click();
   assert.equal(
     await page.getByRole('textbox', { name: 'Search mail', exact: true }).inputValue(),
     'around:2026-10-15/6d',
@@ -145,19 +158,21 @@ try {
   );
 
   await query('');
-  await page.getByRole('button', { name: /^From/ }).click();
-  await page.getByPlaceholder('Name or email address').fill('maria@client-example.com');
+  await openForm();
+  await panel.getByPlaceholder('Name or email, several allowed').first().fill('maria@client-example.com');
   await page.screenshot({
     path: new URL('person-desktop.png', screenshots).pathname.replace(/^\/([A-Z]:)/, '$1'),
   });
-  await page.getByRole('button', { name: 'Apply filter', exact: true }).click();
+  await panel.getByRole('button', { name: 'Apply', exact: true }).click();
   await settled();
   await page
     .locator('.mail-open', { hasText: 'Q4 proposal: can you review by Thursday?' })
     .waitFor();
   await expect(page.locator('.mail-open')).toHaveCount(1);
-  await page.getByRole('button', { name: /^When/ }).click();
-  await page.getByLabel('Date', { exact: true }).press('Escape');
+  await openForm();
+  await panel.getByRole('combobox', { name: 'When' }).click();
+  await page.getByRole('option', { name: 'Exact day', exact: true }).click();
+  await panel.getByLabel('Date', { exact: true }).press('Escape');
   assert.equal(
     await page
       .getByRole('textbox', { name: 'Search mail', exact: true })
@@ -179,12 +194,15 @@ try {
   await page.getByRole('combobox', { name: 'Regional format', exact: true }).click();
   await page.getByRole('option', { name: 'it-IT', exact: true }).click();
   await page.getByRole('button', { name: 'Save changes', exact: true }).click();
-  await page.locator('.sidebar-body nav').nth(1).locator('button').first().click();
+  // Back to the first folder of the sidebar (Sigrid's), whose name follows the language the settings just changed.
+  await page.locator('[data-slot="sidebar"]').getByRole('button', { name: /^(Inbox|Posta in arrivo)/ }).first().click();
   await page.getByRole('textbox', { name: 'Cerca email', exact: true }).waitFor();
-  await page.getByRole('button', { name: /^Quando/ }).click();
-  await pickDate(page, page.getByLabel('Data', { exact: true }), '2026-10-15');
+  await openForm('Cerca email', 'Filtri avanzati');
+  await panel.getByRole('combobox', { name: 'Quando' }).click();
+  await page.getByRole('option', { name: 'Intorno a una data', exact: true }).click();
+  await pickDate(page, panel.getByLabel('Data', { exact: true }), '2026-10-15');
   assert.match(
-    await page.locator('.search-date-preview').innerText(),
+    await panel.getByTestId('search-date-preview').innerText(),
     /9 ottobre 2026.*21 ottobre 2026/s,
   );
   await page.screenshot({

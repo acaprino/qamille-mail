@@ -114,7 +114,7 @@ try {
   if (!/^https?:\/\/tauri\.localhost\//.test(page.url())) throw new Error(`The page is not served by the executable (custom-protocol): ${page.url()}`);
   await page.screenshot({ path: path.join(root, 'checks/release-theme-probe-start.png') }).catch(() => {});
   await page.emulateMedia({ colorScheme: 'dark' });
-  const settingsButton = page.locator('button.profile');
+  const settingsButton = page.getByRole('list', { name: /^(Workspace|Spazio di lavoro)$/ }).getByRole('button', { name: /^(Settings|Impostazioni)/ });
   await settingsButton.click();
   await page.screenshot({ path: path.join(root, 'checks/release-theme-probe-settings.png') }).catch(() => {});
   const combo = page.getByRole('combobox', { name: /Appearance|Aspetto/, exact: true });
@@ -180,7 +180,7 @@ try {
   };
 
   // Select: the Appearance list in Settings (Ark select content, in the portal).
-  await page.locator('button.profile').click();
+  await page.getByRole('list', { name: /^(Workspace|Spazio di lavoro)$/ }).getByRole('button', { name: /^(Settings|Impostazioni)/ }).click();
   const appearance = page.getByRole('combobox', { name: /Appearance|Aspetto/, exact: true });
   await appearance.click();
   await shown(page.locator('[data-slot="select-content"]'), 'The Select list');
@@ -188,7 +188,7 @@ try {
   console.log('PASS Select opens its list');
 
   // Modal: the new-contact dialog.
-  await page.locator('aside.sidebar button').filter({ hasText: either('Contacts', 'Rubrica') }).first().click();
+  await page.locator('[data-slot="sidebar"] button').filter({ hasText: either('Contacts', 'Rubrica') }).first().click();
   await page.locator('.contacts-page button').filter({ hasText: either('New contact', 'Nuovo contatto') }).first().click();
   await shown(page.locator('[data-slot="dialog-content"], dialog[open]'), 'The Modal');
   await page.keyboard.press('Escape');

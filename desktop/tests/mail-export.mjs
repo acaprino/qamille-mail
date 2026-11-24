@@ -67,7 +67,7 @@ try {
     await page.locator('.print-controls').evaluate((e) => getComputedStyle(e).display),
     'none',
   );
-  assert.equal(await page.locator('.sidebar').evaluate((e) => e.getBoundingClientRect().height), 0);
+  assert.equal(await page.locator('[data-slot="sidebar"]').evaluate((e) => e.getBoundingClientRect().height), 0);
   assert.ok(
     (await page
       .locator('.print-message')

@@ -97,7 +97,7 @@ try {
 
   // (i) Activity card in the sidebar footer: it shows the line, and a click opens the panel with its rows.
   await page.evaluate(() => window.__previewAnnounce({ kind: 'sync-progress', account_id: 2, phase: 'syncing', added: 0 }));
-  const line = page.locator('.sidebar .activity-indicator .activity-line');
+  const line = page.locator('[data-slot="sidebar"] .activity-indicator .activity-line');
   await expect(line).toBeVisible();
   await line.click();
   const row = page.locator('.activity-panel .activity-row').first();
@@ -153,7 +153,7 @@ try {
   const chip = chipPage.getByRole('region', { name: 'Reminder: Design review' });
   await expect(chip).toBeVisible();
   assert.equal(Math.round((await box(chip)).height), 52, 'the chip keeps the 52px the window sizing relies on');
-  assert.equal(await css(chip, 'border-top-left-radius'), '12px', 'radius-xl');
+  assert.equal(await css(chip, 'border-top-left-radius'), '10px', 'radius-xl');
   assert.match(await css(chip, 'font-family'), /IBM Plex Sans/);
   for (const name of ['Join', 'Join and record', 'Close']) {
     const button = chip.getByRole('button', { name, exact: true });

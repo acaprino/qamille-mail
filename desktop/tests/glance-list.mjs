@@ -95,9 +95,9 @@ try {
   // What the reader opened stays open when they leave the mail and come back.
   await heading(page, 'Notifications').click();
   await expect(heading(page, 'Notifications')).toHaveAttribute('aria-expanded', 'true');
-  await page.locator('.sidebar nav button', { hasText: 'Calendar' }).click();
+  await page.locator('[data-slot="sidebar"] button', { hasText: 'Calendar' }).click();
   await expect(page.locator('.mail-list')).toHaveCount(0);
-  await page.locator('.sidebar nav button', { hasText: 'Inbox' }).click();
+  await page.locator('[data-slot="sidebar"] button', { hasText: 'Inbox' }).click();
   await expect(heading(page, 'Notifications')).toHaveAttribute('aria-expanded', 'true');
   await heading(page, 'Notifications').click();
   await expect(heading(page, 'Notifications')).toHaveAttribute('aria-expanded', 'false');
@@ -106,10 +106,10 @@ try {
   // The headline says what needs the reader, not how much mail there is.
   await expect.poll(() => headline(page)).toBe(sentence(needs(fixture, page.opened)));
   const total = await page.evaluate(async () => (await (await import('/src/lib/api.ts')).call('list_mail', { query: { folder: 'Sent', search: '', offset: 0, limit: 60, threads: false } })).total);
-  await page.locator('.sidebar nav button', { hasText: /^Sent/ }).click();
+  await page.locator('[data-slot="sidebar"] button', { hasText: /^Sent/ }).click();
   await expect(page.locator('.list-heading h1')).toHaveText('Sent');
   assert.equal(await headline(page), `${total} ${total === 1 ? 'message' : 'messages'}`, 'other folders keep their total');
-  await page.locator('.sidebar nav button', { hasText: 'Inbox' }).click();
+  await page.locator('[data-slot="sidebar"] button', { hasText: 'Inbox' }).click();
   await expect(page.locator('.mail-row').first()).toBeVisible();
   console.log('PASS The Inbox headline counts what needs the reader');
 

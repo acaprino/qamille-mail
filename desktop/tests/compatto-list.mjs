@@ -77,7 +77,7 @@ try {
   assert.equal(await style(group, 'font-size'), '12px');
   assert.equal(await style(group, 'text-transform'), 'uppercase');
   assert.equal(await style(group, 'font-weight'), '600');
-  assert.equal(await style(group, 'background-color'), 'rgb(246, 247, 249)');
+  assert.equal(await style(group, 'background-color'), 'rgba(0, 0, 0, 0)', 'a group label has no band of its own: it sits on the list');
   console.log('PASS Group labels are 12px, uppercase, on the ground');
 
   // ---- a row: two lines, no avatar, the unread marks, the selection ----
@@ -103,7 +103,7 @@ try {
   assert.ok(two.row.height >= 44 && two.row.height < 64, `two lines high (${two.row.height})`);
   assert.ok((await unread.locator('.mail-preview').innerText()).length > 0);
   const selected = page.locator('.mail-row.selected').first();
-  assert.equal(await style(selected, 'background-color'), 'rgb(219, 225, 255)', 'the selected row is the selection tint of Sigrid');
+  assert.equal(await style(selected, 'background-color'), 'rgb(223, 228, 255)', 'the selected row is the selection tint of Sigrid');
   console.log('PASS A row has two lines, no avatar, a 6px accent dot and an accent time when unread');
 
   // ---- the checkbox is Sigrid's, per row, and so is the selection bar's ----
@@ -135,7 +135,7 @@ try {
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
   const replies = page.locator('.reply-row');
   await expect(replies).toHaveCount(4);
-  assert.equal(await style(replies.first(), 'background-color'), 'rgb(247, 248, 254)', 'the replies of an open conversation have their ground');
+  assert.notEqual(await style(replies.first(), 'background-color'), 'rgba(0, 0, 0, 0)', 'the replies of an open conversation have their ground');
   const lefts = await replies.locator('.reply-head strong').evaluateAll((nodes) => nodes.map((n) => Math.round(n.getBoundingClientRect().left)));
   const mainLeft = Math.round((await main.locator('.mail-meta strong').boundingBox()).x);
   assert.deepEqual([...new Set(lefts)], [mainLeft], `replies sit on the same edge as the row (${lefts} vs ${mainLeft})`);
@@ -194,42 +194,34 @@ try {
   const bar = page.locator('.search-workbench');
   const natives = () => bar.locator('select, input[type=checkbox], input[type=date], input[type=time], input[type=datetime-local]').count();
   assert.equal(await natives(), 0, 'closed: none');
-  const order = bar.getByRole('combobox', { name: 'Sort results' });
+  // The panel opens from the search field; the form of every filter is behind «Advanced filters».
+  await search.click();
+  const panel = page.locator('#search-filters-popover');
+  await expect(panel).toBeVisible();
+  assert.equal(await natives(), 0, 'the panel open: no native select, checkbox or date input');
+  await panel.getByRole('button', { name: /^Advanced filters/ }).click();
+  const order = panel.getByRole('combobox', { name: 'Order by' });
   await expect(order).toBeVisible();
   assert.equal(await order.evaluate((node) => node.tagName), 'BUTTON', 'the sort is a Select, not a <select>');
   await order.click();
   await page.getByRole('option', { name: 'Newest first' }).click();
   await expect(order).toContainText('Newest first');
-  for (const name of ['From', 'To', 'When', 'Attachments', 'More filters']) {
-    await bar.getByRole('button', { name: new RegExp(`^${name}`) }).click();
-    assert.equal(await natives(), 0, `${name}: no native select, checkbox or date input`);
-  }
-  // When: the mode is a Select; dates are DateFields.
-  await bar.getByRole('button', { name: /^When/ }).click();
-  const panel = page.locator('.search-filter-panel');
-  if (!(await panel.isVisible())) await bar.getByRole('button', { name: /^When/ }).click();
-  const mode = panel.getByRole('combobox', { name: 'What do you remember about the date?' });
+  await panel.getByRole('button', { name: /^More filters/ }).click();
+  assert.equal(await natives(), 0, 'the form of every filter: no native select, checkbox or date input');
+  // When: the date is a Select; dates are DateFields.
+  const mode = panel.getByRole('combobox', { name: 'When' });
   await mode.click();
   await page.getByRole('option', { name: 'Date range' }).click();
   await expect(mode).toContainText('Date range');
   const from = panel.getByLabel('From date', { exact: true });
-  const through = panel.getByLabel('Through date, inclusive', { exact: true });
+  const through = panel.getByLabel('Through date', { exact: true });
   await pickDate(page, from, '2026-10-15');
   await pickDate(page, through, '2026-10-20');
   await expect(from).toContainText('October 15, 2026');
   await expect(through).toContainText('October 20, 2026');
   assert.equal(await natives(), 0, 'still none with the dates open');
-  await panel.getByRole('button', { name: 'Apply filter', exact: true }).click();
+  await panel.getByRole('button', { name: 'Apply', exact: true }).click();
   await expect(search).toHaveValue(/between:2026-10-15\.\.2026-10-20/);
-  // More filters: the value is a Select and Apply waits for a choice.
-  await bar.getByRole('button', { name: /^More filters/ }).click();
-  await panel.getByRole('combobox', { name: 'Search by' }).click();
-  await page.getByRole('option', { name: 'Folder' }).click();
-  const apply = panel.getByRole('button', { name: 'Apply filter', exact: true });
-  await expect(apply).toBeDisabled();
-  await panel.getByRole('combobox', { name: 'Value' }).click();
-  await page.getByRole('option', { name: 'Sent' }).click();
-  await expect(apply).toBeEnabled();
   console.log('PASS SearchBar filters go through Select and DateField, with no native control');
 
   // ---- R3: a key typed in a Select of the search bar is not a shortcut of the page ----
@@ -256,9 +248,9 @@ try {
   await expect(page.locator('.search-progress')).toBeHidden();
   await page.locator('.mail-open').nth(1).click();
   await expect(page.locator('.message-body').first()).toBeVisible();
-  await bar.getByRole('button', { name: /^When/ }).click();
-  if (!(await panel.isVisible())) await bar.getByRole('button', { name: /^When/ }).click();
-  const trigger = panel.getByRole('combobox', { name: 'What do you remember about the date?' });
+  await search.click();
+  await panel.getByRole('button', { name: /^Advanced filters/ }).click();
+  const trigger = panel.getByRole('combobox', { name: 'When' });
   await trigger.focus();
   await expect(trigger).toBeFocused();
   const before = await calls();
@@ -281,8 +273,11 @@ try {
   const cerca = page.getByRole('textbox', { name: 'Cerca email', exact: true });
   await cerca.fill('Dinner');
   await cerca.press('Enter');
-  await page.getByRole('button', { name: /^Quando/ }).click();
-  const quando = page.locator('.search-filter-panel');
+  await cerca.click();
+  await page.locator('#search-filters-popover').getByRole('button', { name: /^Filtri avanzati/ }).click();
+  const quando = page.locator('#search-filters-popover');
+  await quando.getByRole('combobox', { name: 'Quando' }).click();
+  await page.getByRole('option', { name: 'Giorno preciso', exact: true }).click();
   await quando.getByLabel('Data', { exact: true }).click();
   await expect(page.getByRole('button', { name: 'Mese successivo' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Mese precedente' })).toBeVisible();

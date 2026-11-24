@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import Kbd from './ui/Kbd';
+import { rememberSearch } from './lib/search';
 import { useLand } from './ui/motion';
 import Button from './ui/Button';
 import Toaster, { notify as showNotice, type NoticeAction } from './ui/Toaster';
@@ -120,6 +121,8 @@ interface AppState {
   activeComposerId: number | null;
   closingWindow: boolean;
   searchInput: string;
+  /** The filters panel under the search field is open. */
+  filtersOpen: boolean;
   search: string;
   displayedQuery: string;
   searchError: string;
@@ -209,6 +212,7 @@ export default function App() {
     activeComposerId: null,
     closingWindow: false,
     searchInput: '',
+    filtersOpen: false,
     search: '',
     displayedQuery: '',
     searchError: '',
@@ -1442,7 +1446,10 @@ export default function App() {
     if (chord && e.key.toLowerCase() === 'k') {
       e.preventDefault();
       if (!isMailView()) navigate('Inbox');
-      void tick().then(() => searchElement.current?.focus());
+      void tick().then(() => {
+        searchElement.current?.focus();
+        s.filtersOpen = true;
+      });
       return;
     }
     if (
@@ -1784,16 +1791,25 @@ export default function App() {
                       s.searchInput = event.target.value;
                       find();
                     }}
+                    onClick={() => (s.filtersOpen = true)}
                     onKeyDown={(event) => {
                       // The Enter that picks an IME candidate is not a search, and the Escape that drops
                       // one is not a clear (aspetto-nativo.md, rule 24).
                       if (event.key === 'Enter' && !imeComposing(event.nativeEvent)) {
                         event.preventDefault();
+                        rememberSearch(s.searchInput);
+                        s.filtersOpen = false;
                         find(true);
+                      } else if (event.key === 'ArrowDown' && !s.filtersOpen) {
+                        event.preventDefault();
+                        s.filtersOpen = true;
                       } else if (event.key === 'Escape' && !imeComposing(event.nativeEvent)) {
-                        // Esc empties a field that has text, and the list goes back to the whole view;
-                        // on an empty field it does what it did before: nothing.
-                        if (s.searchInput) {
+                        // The first Esc closes the panel under the field; the next empties a field that has text, and
+                        // the list goes back to the whole view; on an empty field it does what it did before: nothing.
+                        if (s.filtersOpen) {
+                          event.preventDefault();
+                          s.filtersOpen = false;
+                        } else if (s.searchInput) {
                           event.preventDefault();
                           applySearch('');
                         }
@@ -1801,6 +1817,8 @@ export default function App() {
                     }}
                     aria-label={tr('Cerca email', 'Search mail')}
                     aria-keyshortcuts="Control+K"
+                    aria-controls="search-filters-popover"
+                    aria-expanded={s.filtersOpen}
                     placeholder={tr('Cerca una persona, una parola o una data', 'Search a person, a word or a date')}
                   />
                   <Kbd>Ctrl K</Kbd>
@@ -1845,6 +1863,9 @@ export default function App() {
             <LegacyLocalNotice onerror={(message) => notify(message, true)} />
             {mailView && (
               <SearchBar
+                filtersOpen={s.filtersOpen}
+                onclosefilters={() => (s.filtersOpen = false)}
+                onopenfilters={() => (s.filtersOpen = true)}
                 query={s.searchInput}
                 workspace={workspace}
                 accountId={s.accountId}

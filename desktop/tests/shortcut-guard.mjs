@@ -181,7 +181,7 @@ test('App keyboard(): arrows only from the page, the list or the reader; AltGr i
     for (const [where, locator] of [
       ['top-bar sync button', page.getByRole('button', { name: 'Sync mail', exact: true })],
       ['sidebar new-message button', page.locator('.compose-main')],
-      ['sidebar navigation', page.locator('.sidebar-body button, .sidebar-body a').first()],
+      ['sidebar navigation', page.locator('[data-slot="sidebar"] button, [data-slot="sidebar"] a').first()],
     ]) {
       await locator.focus();
       await page.keyboard.press('ArrowDown');

@@ -1,12 +1,20 @@
-import { Item, Presence, useIsPresent } from '../ui/motion';
-import { useEffect, useRef, type ChangeEvent, type ReactNode } from 'react';
+import { useEffect, useRef, type ChangeEvent } from 'react';
 import Button from '../ui/Button';
 import Avatar from '../ui/Avatar';
+import Badge from '../ui/Badge';
 import Checkbox from '../ui/Checkbox';
+import ContentSplit from '../ui/ContentSplit';
 import Count from '../ui/Count';
+import CopyButton from '../ui/CopyButton';
+import Empty from '../ui/Empty';
 import Icon from '../ui/Icon';
+import { ItemList, ItemRow } from '../ui/ItemList';
+import { Column } from '../ui/Layout';
 import Menu from '../ui/Menu';
 import Modal from '../ui/Modal';
+import Note from '../ui/Note';
+import Panel from '../ui/Panel';
+import SearchField from '../ui/SearchField';
 import Select from '../ui/Select';
 import { call, desktop, errorText, initials } from '../lib/api';
 import { bookLabel, folderLabel, isItalian, tr } from '../lib/i18n';
@@ -27,7 +35,6 @@ import {
 import ContactForm from './contacts/ContactForm';
 import DuplicatesPanel from './contacts/DuplicatesPanel';
 import MergeDialog from './contacts/MergeDialog';
-import { Input } from '../ui/Input';
 
 export type ContactsProps = { notify: (message: string, error?: boolean) => void };
 
@@ -41,17 +48,6 @@ type FormState = {
 
 // A plain copy (store values are proxies, which structuredClone refuses).
 const copy = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
-
-// A row of the list that slides in when it appears and fades out when it goes. While it leaves it is
-// out of the accessibility tree and inert, so the list reads as its new content at once.
-function ContactListItem({ children }: { children: ReactNode }) {
-  const present = useIsPresent();
-  return (
-    <Item as="li" aria-hidden={present ? undefined : true}>
-      {children}
-    </Item>
-  );
-}
 
 export default function Contacts({ notify }: ContactsProps) {
   // Read after awaits, in the listener and in timers: a deep store, always current.
@@ -76,6 +72,8 @@ export default function Contacts({ notify }: ContactsProps) {
     deleteBooks: [] as string[],
     consent: [] as string[],
     undoId: null as number | null,
+    // The split shows two panes side by side or one at a time (a narrow window): with one, the detail has a way back.
+    panes: 2 as 1 | 2,
   }));
   const fileInput = useRef<HTMLInputElement>(null);
   const sequence = useRef(0);
@@ -355,52 +353,92 @@ export default function Contacts({ notify }: ContactsProps) {
       <h1 id="contacts-title" className="sr-only">
         {folderLabel('Contacts')}
       </h1>
-      <div className="contacts-layout">
-        <div className="contacts-side">
-          <div className="contacts-toolbar">
-            <Button variant="primary" onClick={() => newContact()}>
-              <Icon name="plus" size={15} />
-              {tr('Nuovo contatto', 'New contact')}
-            </Button>
-            <Button variant="secondary" disabled={s.syncing} onClick={() => void sync(true)}>
-              {s.syncing ? tr('Aggiorno…', 'Updating…') : tr('Aggiorna ora', 'Refresh now')}
-            </Button>
-            {s.duplicates.length > 0 && (
-              <Button
-                variant="secondary"
-                aria-expanded={s.panel}
-                onClick={() => (s.panel = !s.panel)}
-              >
-                {tr('Duplicati', 'Duplicates')}{' '}
-                <Count value={s.duplicates.length} className="nav-count" />
-              </Button>
-            )}
-            {/* The file actions in a menu: the toolbar stays on one row in the side column. */}
-            <div className="more-actions">
-              <Menu
-                label={tr('Azioni sulla rubrica', 'Address book actions')}
-                tip={tr('Altre azioni', 'More actions')}
-                trigger={
-                  <Button variant="icon" aria-label={tr('Altre azioni sulla rubrica', 'More address book actions')}>
-                    <Icon name="more" size={18} />
+      <ContentSplit
+        asideLabel={tr('Elenco dei contatti', 'Contact list')}
+        width="lg"
+        show={selected ? 'main' : 'aside'}
+        onPanesChange={(panes) => (s.panes = panes)}
+        aside={
+          <Panel
+            title={tr('Contatti', 'Contacts')}
+            subtitle={`${s.total} ${tr('contatti', 'contacts')}`}
+            actions={
+              <>
+                {s.duplicates.length > 0 && (
+                  <Button variant="secondary" aria-expanded={s.panel} onClick={() => (s.panel = !s.panel)}>
+                    {tr('Duplicati', 'Duplicates')} <Count value={s.duplicates.length} />
                   </Button>
-                }
-                items={[
-                  {
-                    value: 'import',
-                    label: tr('Importa .vcf', 'Import .vcf'),
-                    icon: 'upload',
-                    onSelect: () => fileInput.current?.click(),
-                  },
-                  {
-                    value: 'export',
-                    label: tr('Esporta .vcf', 'Export .vcf'),
-                    icon: 'download',
-                    onSelect: () => void exportLocal(),
-                  },
-                ]}
-              />
-            </div>
+                )}
+                <Button
+                  variant="icon"
+                  aria-label={tr('Nuovo contatto', 'New contact')}
+                  tip={tr('Nuovo contatto', 'New contact')}
+                  onClick={() => newContact()}
+                >
+                  <Icon name="plus" size={18} />
+                </Button>
+                <Menu
+                  label={tr('Azioni sulla rubrica', 'Address book actions')}
+                  tip={tr('Altre azioni', 'More actions')}
+                  trigger={
+                    <Button variant="icon" aria-label={tr('Altre azioni sulla rubrica', 'More address book actions')}>
+                      <Icon name="more" size={18} />
+                    </Button>
+                  }
+                  items={[
+                    {
+                      value: 'sync',
+                      label: s.syncing ? tr('Aggiorno…', 'Updating…') : tr('Aggiorna ora', 'Refresh now'),
+                      icon: 'refresh',
+                      disabled: s.syncing,
+                      group: 'sync',
+                      onSelect: () => void sync(true),
+                    },
+                    {
+                      value: 'hidden',
+                      label: tr('Mostra nascosti', 'Show hidden'),
+                      checked: s.showHidden,
+                      group: 'view',
+                      onSelect: () => (s.showHidden = !s.showHidden),
+                    },
+                    {
+                      value: 'import',
+                      label: tr('Importa .vcf', 'Import .vcf'),
+                      icon: 'upload',
+                      group: 'file',
+                      onSelect: () => fileInput.current?.click(),
+                    },
+                    {
+                      value: 'export',
+                      label: tr('Esporta .vcf', 'Export .vcf'),
+                      icon: 'download',
+                      group: 'file',
+                      onSelect: () => void exportLocal(),
+                    },
+                  ]}
+                />
+              </>
+            }
+            tools={
+              <>
+                <SearchField
+                  aria-label={tr('Cerca nei contatti', 'Search contacts')}
+                  placeholder={tr('Cerca nome, email, telefono…', 'Search name, email, phone…')}
+                  value={s.text}
+                  onValueChange={(value) => (s.text = value)}
+                />
+                <Select
+                  aria-label={tr('Filtra per rubrica', 'Filter by address book')}
+                  value={s.bookFilter}
+                  onChange={(value) => (s.bookFilter = value)}
+                  items={[
+                    { value: 'all', label: tr('Tutte le rubriche', 'All address books') },
+                    ...s.books.map((b) => ({ value: b.id, label: bookLabel(b.label) })),
+                  ]}
+                />
+              </>
+            }
+          >
             <input
               ref={fileInput}
               className="sr-only"
@@ -410,115 +448,93 @@ export default function Contacts({ notify }: ContactsProps) {
               aria-hidden="true"
               onChange={(event) => void importFile(event)}
             />
-          </div>
-          <div className="contacts-filters">
-            <Input
-              type="search"
-              aria-label={tr('Cerca nei contatti', 'Search contacts')}
-              placeholder={tr('Cerca nome, email, telefono…', 'Search name, email, phone…')}
-              value={s.text}
-              onChange={(event) => (s.text = event.currentTarget.value)}
-            />
-            <Select
-              aria-label={tr('Filtra per rubrica', 'Filter by address book')}
-              value={s.bookFilter}
-              onChange={(value) => (s.bookFilter = value)}
-              items={[
-                { value: 'all', label: tr('Tutte le rubriche', 'All address books') },
-                ...s.books.map((b) => ({ value: b.id, label: bookLabel(b.label) })),
-              ]}
-            />
-            <Checkbox checked={s.showHidden} onChange={(on) => (s.showHidden = on)}>
-              {tr('Mostra nascosti', 'Show hidden')}
-            </Checkbox>
-          </div>
-          {s.consent.map((book) => (
-            <div className="contacts-consent" role="status" key={book}>
-              <span>
-                {tr(
-                  `Per leggere i contatti di ${bookName(book)} serve il tuo permesso.`,
-                  `Reading the contacts of ${bookName(book)} needs your permission.`,
-                )}
-              </span>
-              <Button variant="secondary" disabled={s.busy} onClick={() => void allowRead(book)}>
-                {tr('Consenti la lettura', 'Allow reading')}
-              </Button>
-            </div>
-          ))}
-          {s.undoId !== null && (
-            <div className="contacts-undo" role="status">
-              <span>{tr('Contatti uniti.', 'Contacts merged.')}</span>
-              <Button variant="text" disabled={s.busy} onClick={() => void undoLastMerge()}>
-                {tr('Annulla unione', 'Undo merge')}
-              </Button>
-              <Button
-                variant="icon"
-                aria-label={tr('Chiudi', 'Dismiss')}
-                tip={tr('Chiudi', 'Dismiss')}
-                onClick={() => (s.undoId = null)}
-              >
-                <Icon name="close" size={14} />
-              </Button>
-            </div>
-          )}
-          {s.panel && (
-            <DuplicatesPanel
-              groups={s.duplicates}
-              busy={s.busy}
-              same={(g) => void same(g)}
-              different={(g) => void different(g)}
-              merge={(g) => (s.merging = g)}
-              close={() => (s.panel = false)}
-            />
-          )}
-          <ul className="contact-list" aria-label={tr('Contatti', 'Contacts')}>
-            <Presence>
-              {s.items.map((c) => (
-                <ContactListItem key={c.id}>
-                  <button
-                    className={cn(
-                      'contact-row',
-                      c.id === s.selectedId && 'active',
-                      c.hidden && 'contact-hidden',
-                    )}
-                    aria-current={c.id === s.selectedId ? 'true' : undefined}
-                    onClick={() => (s.selectedId = c.id)}
-                  >
-                    <Avatar name={displayName(c)} size="xs" decorative />
-                    <span className="contact-main">
-                      <span className="contact-head">
-                        <strong>{displayName(c)}</strong>
-                        <span className="contact-origins">
-                          {c.origins.map((origin) => (
-                            <span
-                              key={origin.key}
-                              className={cn('origin-chip', !origin.writable && 'origin-readonly')}
-                              title={bookLabel(origin.label)}
-                            >
-                              {bookLabel(origin.label)}
-                            </span>
-                          ))}
-                        </span>
-                      </span>
-                      {detailLine(c) && <small className="muted">{detailLine(c)}</small>}
-                    </span>
-                  </button>
-                </ContactListItem>
+            <Column pad="sm">
+              {s.consent.map((book) => (
+                <Note
+                  key={book}
+                  title={tr('Serve il tuo permesso', 'Permission needed')}
+                  actions={
+                    <Button variant="secondary" disabled={s.busy} onClick={() => void allowRead(book)}>
+                      {tr('Consenti la lettura', 'Allow reading')}
+                    </Button>
+                  }
+                >
+                  {tr(
+                    `Per leggere i contatti di ${bookName(book)} serve il tuo permesso.`,
+                    `Reading the contacts of ${bookName(book)} needs your permission.`,
+                  )}
+                </Note>
               ))}
-            </Presence>
-          </ul>
-          {s.loaded && !s.items.length && (
-            <p className="muted contacts-empty">{tr('Nessun contatto.', 'No contacts.')}</p>
-          )}
-          <p className="muted contacts-count">
-            <Count value={s.total} /> {tr('contatti', 'contacts')}
-          </p>
-        </div>
-
+              {s.undoId !== null && (
+                <Note
+                  tone="success"
+                  title={tr('Contatti uniti', 'Contacts merged')}
+                  actions={
+                    <>
+                      <Button variant="text" disabled={s.busy} onClick={() => void undoLastMerge()}>
+                        {tr('Annulla unione', 'Undo merge')}
+                      </Button>
+                      <Button
+                        variant="icon"
+                        aria-label={tr('Chiudi', 'Dismiss')}
+                        tip={tr('Chiudi', 'Dismiss')}
+                        onClick={() => (s.undoId = null)}
+                      >
+                        <Icon name="close" size={14} />
+                      </Button>
+                    </>
+                  }
+                />
+              )}
+              {s.panel && (
+                <DuplicatesPanel
+                  groups={s.duplicates}
+                  busy={s.busy}
+                  same={(g) => void same(g)}
+                  different={(g) => void different(g)}
+                  merge={(g) => (s.merging = g)}
+                  close={() => (s.panel = false)}
+                />
+              )}
+              {s.items.length > 0 && (
+                <ItemList aria-label={tr('Contatti', 'Contacts')}>
+                  {s.items.map((c) => (
+                    <ItemRow
+                      key={c.id}
+                      leading={<Avatar name={displayName(c)} size="xs" decorative />}
+                      title={displayName(c)}
+                      description={detailLine(c) || undefined}
+                      facts={c.origins.map((origin) => ({ text: bookLabel(origin.label) }))}
+                      current={c.id === s.selectedId}
+                      onClick={() => (s.selectedId = c.id)}
+                    />
+                  ))}
+                </ItemList>
+              )}
+              {s.loaded && !s.items.length && (
+                <Empty
+                  title={tr('Nessun contatto', 'No contacts')}
+                  description={tr('Cambia la ricerca o la rubrica.', 'Change the search or the address book.')}
+                />
+              )}
+            </Column>
+          </Panel>
+        }
+      >
         <article className="contact-detail" aria-live="polite">
           {selected ? (
             <>
               <header>
+                {s.panes === 1 && (
+                  <Button
+                    variant="icon"
+                    aria-label={tr('Torna ai contatti', 'Back to contacts')}
+                    tip={tr('Torna ai contatti', 'Back to contacts')}
+                    onClick={() => (s.selectedId = null)}
+                  >
+                    <Icon name="back" size={18} />
+                  </Button>
+                )}
                 <Avatar name={displayName(selected)} size="md" decorative />
                 <h2>{displayName(selected)}</h2>
               </header>
@@ -610,9 +626,7 @@ export default function Contacts({ notify }: ContactsProps) {
               <ul className="contact-sources" aria-label={tr('Origini', 'Sources')}>
                 {selected.origins.map((origin) => (
                   <li key={origin.key}>
-                    <span className={cn('origin-chip', !origin.writable && 'origin-readonly')}>
-                      {bookLabel(origin.label)}
-                    </span>
+                    <Badge variant={origin.writable ? 'secondary' : 'outline'}>{bookLabel(origin.label)}</Badge>
                     <small className="muted">
                       {origin.writable ? syncLabel(origin.sync) : tr('Sola lettura', 'Read-only')}
                     </small>
@@ -631,15 +645,20 @@ export default function Contacts({ notify }: ContactsProps) {
               </ul>
             </>
           ) : (
-            <p className="muted contact-detail-empty">
-              {tr(
-                'Scegli un contatto per vederne i dettagli.',
-                'Choose a contact to see its details.',
-              )}
-            </p>
+            <Empty
+              fill
+              title={tr('Scegli un contatto', 'Choose a contact')}
+              description={tr('Qui vedrai i suoi dettagli.', 'Its details show here.')}
+              action={
+                <Button variant="primary" onClick={() => newContact()}>
+                  <Icon name="plus" size={15} />
+                  {tr('Aggiungi un contatto', 'Add a contact')}
+                </Button>
+              }
+            />
           )}
         </article>
-      </div>
+      </ContentSplit>
 
       {form && (
         <ContactForm
@@ -721,7 +740,10 @@ function Fact({ term, value }: { term: string; value: string }) {
   return (
     <>
       <dt>{term}</dt>
-      <dd>{value}</dd>
+      <dd>
+        <span>{value}</span>
+        <CopyButton className="ms-1" value={value} label={`${tr('Copia', 'Copy')} ${value}`} size="icon-sm" />
+      </dd>
     </>
   );
 }

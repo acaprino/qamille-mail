@@ -1,3 +1,4 @@
+import Badge from '../../ui/Badge';
 import Button from '../../ui/Button';
 import Icon from '../../ui/Icon';
 import { bookLabel, tr } from '../../lib/i18n';
@@ -42,7 +43,7 @@ export default function DuplicatesPanel({
             {group.members.map((member) => (
               <li key={member.key}>
                 <strong>{member.fields.name || member.fields.emails[0]?.value || '—'}</strong>
-                <span className="origin-chip">{bookLabel(member.label)}</span>
+                <Badge variant="secondary">{bookLabel(member.label)}</Badge>
                 <small className="muted">
                   {member.fields.emails.map((e) => e.value).join(', ')}
                 </small>

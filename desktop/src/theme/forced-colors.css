@@ -27,13 +27,11 @@
   /* The selected row, the active page and the current tab: a highlighted edge. */
   .mail-row.selected,
   .reply-row.selected,
-  .contact-row.active,
   [data-slot='sidebar'] [aria-current='page'],
   .settings-nav button.active,
   .composer-tab.active,
   .attachment.active,
-  .mail-display button.active,
-  .search-filter-button.active {
+  .mail-display button.active {
     outline: 2px solid Highlight;
     outline-offset: -2px;
   }
@@ -52,7 +50,6 @@
 
   /* Chips, tags and counts are tinted pills: a border keeps their shape. */
   .tag,
-  .origin-chip,
   .nav-count {
     border: 1px solid CanvasText;
   }

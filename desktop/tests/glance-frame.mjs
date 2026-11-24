@@ -13,7 +13,7 @@ const root = path.resolve(import.meta.dirname, '..');
 // The window colour shows before the page paints: it is the theme's --color-paper, the colour the page paints
 // first (docs/aspetto-nativo.md rule 6, kept in step by tests/native-feel.mjs).
 const tauri = JSON.parse(fs.readFileSync(path.join(root, 'src-tauri/tauri.conf.json'), 'utf8'));
-assert.equal(tauri.app.windows[0].backgroundColor.toLowerCase(), '#f6f7f9', 'window backgroundColor follows --color-paper');
+assert.equal(tauri.app.windows[0].backgroundColor.toLowerCase(), '#fbfbfb', 'window backgroundColor follows --color-paper');
 console.log('PASS The window background follows --color-paper');
 
 const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1', '--port', String(port), '--strictPort'], {
@@ -59,10 +59,9 @@ try {
         radiusToken: token('--radius-sheet'),
         ground: token('--color-paper'),
         groundPaint: style('.app-shell').backgroundColor,
-        sidebarEdge: style('.sidebar').borderRightWidth,
+        sidebarEdge: style('[data-slot="sidebar"]').borderRightWidth,
         shadows: [...document.querySelectorAll('.primary, .compose-main, .brand-mark')].map(el => getComputedStyle(el).boxShadow),
         path: hidden('.workspace-name'),
-        accountMail: hidden('.account-details small'),
         shortcutHints: hidden('.reader-reply kbd'),
         composeHint: hidden('.compose-main kbd'),
         scrollWidth: document.documentElement.scrollWidth,
@@ -77,12 +76,11 @@ try {
     assert.equal(frame.sheetBorder, '1px', `${at}: the sheet keeps only its top hairline`);
     assert.equal(Math.round(frame.sheetRight), 0, `${at}: the sheet reaches the right edge`);
     assert.equal(Math.round(frame.sheetBottom), 0, `${at}: the sheet reaches the bottom edge`);
-    assert.equal(frame.ground, '#f6f7f9');
-    assert.equal(frame.groundPaint, 'rgb(246, 247, 249)', `${at}: the shell is painted with the ground`);
-    assert.equal(frame.sidebarEdge, '0px', `${at}: no line between the sidebar and the work`);
+    assert.equal(frame.ground, '#fbfbfb');
+    assert.equal(frame.groundPaint, 'rgb(251, 251, 251)', `${at}: the shell is painted with the ground`);
+    assert.equal(frame.sidebarEdge, '1px', `${at}: the sidebar has its line against the work`);
     assert.ok(frame.shadows.length > 0 && frame.shadows.every(s => s === 'none'), `${at}: no resting shadow on blue buttons: ${frame.shadows}`);
     assert.ok(frame.path.length > 0 && frame.path.every(d => d === 'none'), `${at}: the path in the top bar is hidden`);
-    assert.ok(frame.accountMail.length > 0 && frame.accountMail.every(d => d === 'none'), `${at}: the address under the account is hidden`);
     assert.ok(frame.shortcutHints.every(d => d === 'none'), `${at}: no shortcut hint inside the reader buttons`);
     assert.ok(width < 1000 || frame.composeHint.every(d => d !== 'none'), `${at}: New message shows its N (Compatto sidebar)`);
     assert.ok(frame.scrollWidth <= frame.innerWidth, `${at}: the page does not scroll sideways (${frame.scrollWidth} > ${frame.innerWidth})`);
@@ -156,7 +154,7 @@ try {
   // The sidebar's own paper is Sigrid's (a dark column of its own): it is a colour, not a number this test owns.
   const { sidebar, ...rest } = tokens;
   assert.match(sidebar, /^#[0-9a-f]{6}$/);
-  assert.deepEqual(rest, { ground: '#12161e', surface: '#1a202c', wash: '#221d18', paint: 'rgb(18, 22, 30)' });
+  assert.deepEqual(rest, { ground: '#1e1e1e', surface: '#2a2a2a', wash: '#221d18', paint: 'rgb(30, 30, 30)' });
   console.log('PASS Dark ground, sheet and priority wash');
   await dark.close();
 

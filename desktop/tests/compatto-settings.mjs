@@ -21,7 +21,7 @@ const section = (name) => page.locator('.settings-nav').getByRole('button', { na
 const content = page.locator('.settings-content');
 
 try {
-  await page.locator('.sidebar .profile').click();
+  await page.getByRole('list', { name: /^(Workspace|Spazio di lavoro)$/ }).getByRole('button', { name: /^(Settings|Impostazioni)/ }).click();
   await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
 
   // (a) General: the old selects are Ark Selects (role combobox, 32px, 6px radius, field border), none native.

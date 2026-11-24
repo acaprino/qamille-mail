@@ -35,7 +35,8 @@ if (native) {
   await page.getByRole('button', { name: /^New message/ }).waitFor();
 }
 // Native windows retain navigation preferences between runs.
-await page.getByRole('button', { name: 'All accounts', exact: true }).click();
+await page.getByRole('combobox', { name: 'Account' }).click();
+await page.getByRole('option', { name: 'All accounts', exact: true }).click();
 await page.getByRole('button', { name: 'Emails', exact: true }).click();
 await page.getByRole('button', { name: /^Inbox\s*\d*$/ }).click();
 // The quiet groups start closed, and the message opened at startup moves into one of them.

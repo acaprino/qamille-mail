@@ -12,7 +12,7 @@ try {
   const page = await browser.newPage({ locale: 'en-US', viewport: { width: 1280, height: 860 } });
   await page.goto(base);
   await page.locator('.mail-row').first().waitFor();
-  await page.getByRole('navigation', { name: 'Workspace' }).getByRole('button', { name: 'Contacts' }).click();
+  await page.getByRole('list', { name: 'Workspace' }).getByRole('button', { name: 'Contacts' }).click();
   await page.getByRole('button', { name: 'New contact' }).click();
   await expect(page.getByRole('dialog', { name: 'New contact' })).toBeVisible();
   const layers = await page.evaluate(() => {
@@ -37,7 +37,7 @@ try {
   // Outside #app the group cannot follow `.app-shell.has-composers` as a sibling: the dock reports its height (`--bottom-bar-room`,
   // lib/bottom-room.ts) and Sigrid's notices keep that clear.
   await page.keyboard.press('Escape');
-  await page.locator('.sidebar nav button', { hasText: 'Inbox' }).first().click();
+  await page.locator('[data-slot="sidebar"] button', { hasText: 'Inbox' }).first().click();
   await page.locator('.mail-row').first().waitFor();
   const room = () => page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bottom-bar-room')) || 0);
   assert.equal(await room(), 0, 'no room kept without a composer');

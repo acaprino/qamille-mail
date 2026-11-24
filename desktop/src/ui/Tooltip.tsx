@@ -3,7 +3,7 @@
 // hint's handlers. Opens on keyboard focus at once and on hover after Sigrid's delay; closes on Escape, on blur and when
 // the pointer leaves. Drawn by Sigrid's Tooltip (Base UI's tooltip).
 import type { ReactElement } from 'react';
-import { Tooltip as SigridTooltip } from '@acaprino/sigrid';
+import { Tooltip as SigridTooltip } from '@acaprino/sigrid/primitives';
 
 export type TooltipProps = {
   text: string;

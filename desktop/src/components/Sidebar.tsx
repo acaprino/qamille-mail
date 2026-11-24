@@ -107,7 +107,7 @@ export default function Sidebar({
   return (
     <ShellSidebar
       aria-label={tr('Barra laterale', 'Sidebar')}
-      className="border-e border-line"
+      className="border-e border-line data-collapsed:w-16"
       collapsed={collapsed}
       onCollapsedChange={collapsed ? () => toggleCollapsed() : undefined}
       header={header}

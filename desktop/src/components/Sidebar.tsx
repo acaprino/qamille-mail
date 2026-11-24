@@ -1,7 +1,7 @@
 // The sidebar, drawn by Sigrid's Sidebar: the column when it is wide, the rail of icons when it is shrunk (its own button at the
 // foot shrinks and widens it). Above the groups, the app's name and the account in use (a Select: «All accounts» or one);
 // then the groups of rows: write, the folders, the labels, the places of the workspace with the history and the settings.
-// At the foot, the user (an avatar and the name, Sigrid's SidebarRow) with the user menu at its end, and the activity center.
+// At the very foot, the user (an avatar and the name, Sigrid's SidebarRow) with the user menu and the button that shrinks the column at its end, and the activity center above it; on the rail, Sigrid's own button widens it again.
 // A row is a NavItem with a plain name, so the rail shows it as an icon with its name
 // as a hint.
 import type { CSSProperties } from 'react';
@@ -105,7 +105,7 @@ export default function Sidebar({
       aria-label={tr('Barra laterale', 'Sidebar')}
       className="border-e border-line"
       collapsed={collapsed}
-      onCollapsedChange={() => toggleCollapsed()}
+      onCollapsedChange={collapsed ? () => toggleCollapsed() : undefined}
       header={header}
       footer={
         <>
@@ -119,19 +119,30 @@ export default function Sidebar({
           <SidebarRow
             leading={<Avatar name={userName} size="xs" decorative />}
             end={
-              <Menu
-                label={tr('Menu utente', 'User menu')}
-                tip={tr('Menu utente', 'User menu')}
-                trigger={
-                  <Button variant="icon" aria-label={tr('Menu utente', 'User menu')}>
-                    <Icon name="more" size={16} />
-                  </Button>
-                }
-                items={[
-                  { value: 'settings', label: folderLabel('Settings'), icon: 'settings', onSelect: () => navigate('Settings') },
-                  { value: 'history', label: tr('Cronologia delle attività', 'Activity history'), icon: 'history', onSelect: toggleActivityPanel },
-                ]}
-              />
+              <>
+                <Menu
+                  label={tr('Menu utente', 'User menu')}
+                  tip={tr('Menu utente', 'User menu')}
+                  trigger={
+                    <Button variant="icon" aria-label={tr('Menu utente', 'User menu')}>
+                      <Icon name="more" size={16} />
+                    </Button>
+                  }
+                  items={[
+                    { value: 'settings', label: folderLabel('Settings'), icon: 'settings', onSelect: () => navigate('Settings') },
+                    { value: 'history', label: tr('Cronologia delle attività', 'Activity history'), icon: 'history', onSelect: toggleActivityPanel },
+                  ]}
+                />
+                <Button
+                  variant="icon"
+                  aria-label={tr('Comprimi la barra laterale', 'Collapse the sidebar')}
+                  tip={tr('Comprimi la barra laterale', 'Collapse the sidebar')}
+                  aria-expanded={!collapsed}
+                  onClick={() => toggleCollapsed()}
+                >
+                  <Icon name="sidebar-close" size={16} />
+                </Button>
+              </>
             }
           >
             {userName}

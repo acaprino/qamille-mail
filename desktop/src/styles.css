@@ -1575,15 +1575,6 @@
   background: none;
   font-size: var(--text-2xs);
 }
-.schedule-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 9px 18px;
-  border-top: 1px solid var(--color-line);
-  flex-wrap: wrap;
-  flex-shrink: 0;
-}
 .composer-dock {
   display: flex;
   align-items: center;
@@ -1687,24 +1678,6 @@
 }
 .app-shell.has-composers ~ .undo-stack {
   bottom: 62px;
-}
-.schedule-label {
-  font-size: var(--text-xs);
-}
-.schedule-row .date-field-row {
-  flex: 0 0 auto;
-}
-.time-field {
-  box-sizing: border-box;
-  width: 110px;
-  height: var(--control-md);
-  padding: 0 9px;
-  font: inherit;
-  font-size: var(--text-sm);
-}
-.schedule-row small {
-  font-size: var(--text-2xs);
-  color: var(--color-ink-mute);
 }
 .assistant-page {
   display: flex;

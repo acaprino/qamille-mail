@@ -2,15 +2,12 @@ import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { useLand } from '../ui/motion';
 import Button from '../ui/Button';
 import Tooltip from '../ui/Tooltip';
-import DateField from '../ui/DateField';
 import Icon from '../ui/Icon';
 import Select from '../ui/Select';
 import { call, errorText } from '../lib/api';
-import { calendarWords as dateWords } from '../lib/calendar-words';
 import { copiedDraft, type ComposerHandle, type ComposerState } from '../lib/composer';
 import { isItalian, tr } from '../lib/i18n';
 import { carriesMail, droppedMailIds } from '../lib/mail-drag';
-import { parseLocalDateTime, regionalTimeZone } from '../lib/regional';
 import { useReactive } from '../lib/store';
 import { tick } from '../lib/tick';
 import type { Draft, UndoAction, Workspace } from '../lib/types';
@@ -76,9 +73,6 @@ export default function Composer(props: ComposerProps) {
     ready: false,
     cc: !!initial.cc,
     bcc: !!initial.bcc,
-    schedule: false,
-    scheduleDay: '',
-    scheduleTime: '',
     revision: 0,
     savedRevision: 0,
     status: 'Saved to drafts',
@@ -111,8 +105,6 @@ export default function Composer(props: ComposerProps) {
     bcc: withPending(s.draft.bcc, s.bcc ? s.bccPending : ''),
   });
   const fullTo = withPending(draft.to, s.toPending);
-  // The day (DateField, 'YYYY-MM-DD') and the time (native, 'HH:mm') make the local date-time the backend reads.
-  const scheduleDate = s.scheduleDay && s.scheduleTime ? `${s.scheduleDay}T${s.scheduleTime}` : '';
   const accountItems = workspace.accounts.map((account) => ({
     value: String(account.id),
     label: `${account.name} <${account.email}>`,
@@ -124,9 +116,6 @@ export default function Composer(props: ComposerProps) {
       label: signature.name,
     })),
   ];
-  const dateLocale = isItalian() ? 'it-IT' : 'en-US';
-  // The calendar's own words (Ark writes English); the field's placeholder and month names follow the locale.
-  const calendarWords = dateWords();
   const locked = s.sending || s.closing || s.attaching || windowClosing;
   const isLocked = () => s.sending || s.closing || s.attaching || p.current.windowClosing;
 
@@ -292,7 +281,7 @@ export default function Composer(props: ComposerProps) {
     }
   }
   async function queue(
-    action: 'send' | 'schedule' | 'discard',
+    action: 'send' | 'discard',
     sendAt: number | null,
     commit: boolean,
   ) {
@@ -318,24 +307,6 @@ export default function Composer(props: ComposerProps) {
   async function send() {
     if (isLocked()) return;
     await queue('send', null, true);
-  }
-  async function later() {
-    if (isLocked()) return;
-    let time: number;
-    try {
-      time = parseLocalDateTime(scheduleDate);
-    } catch (error) {
-      p.current.notify(errorText(error), true);
-      return;
-    }
-    if (!Number.isFinite(time) || time <= Date.now() / 1000) {
-      p.current.notify(
-        tr('Scegli una data e un’ora future', 'Choose a future date and time'),
-        true,
-      );
-      return;
-    }
-    await queue('schedule', time, true);
   }
   /** Takes staged files into the draft; a reply after the composer closed only releases them. */
   function adoptImport(imported: Imported): boolean {
@@ -651,35 +622,6 @@ export default function Composer(props: ComposerProps) {
           </div>
         )}
       </div>
-      {s.schedule && (
-        <div className="schedule-row">
-          <span className="schedule-label">
-            {tr('Data e ora di invio', 'Send at')} ({regionalTimeZone()})
-          </span>
-          <DateField
-            aria-label={tr('Data di invio', 'Send date')}
-            locale={dateLocale}
-            translations={calendarWords}
-            disabled={locked}
-            value={s.scheduleDay}
-            onChange={(value) => (s.scheduleDay = value)}
-          />
-          <Input
-            className="time-field"
-            type="time"
-            aria-label={tr('Ora di invio', 'Send time')}
-            value={s.scheduleTime}
-            onChange={(event) => (s.scheduleTime = event.currentTarget.value)}
-            disabled={locked}
-          />
-          <Button variant="primary" disabled={locked} onClick={() => void later()}>
-            {tr('Programma', 'Schedule')}
-          </Button>
-          <small>
-            {tr('Per inviare, Qamille deve restare aperto.', 'Qamille must be open to send.')}
-          </small>
-        </div>
-      )}
       <footer>
         <div className="send-group">
           <Button
@@ -690,18 +632,7 @@ export default function Composer(props: ComposerProps) {
             <Icon name="send" size={16} />
             {s.sending ? tr('Invio…', 'Sending…') : tr('Invia', 'Send')}
           </Button>
-          {/* Beside Send, the two tools look alike and weigh less than it; scheduling says when it is on. */}
-          <Button
-            variant="icon"
-            className={cn(s.schedule && 'active')}
-            tip={tr('Programma invio', 'Schedule send')}
-            aria-label={tr('Programma invio', 'Schedule send')}
-            aria-pressed={s.schedule}
-            disabled={locked}
-            onClick={() => (s.schedule = !s.schedule)}
-          >
-            <Icon name="clock" size={18} />
-          </Button>
+          {/* Beside Send, the tools look alike and weigh less than it. */}
           <Button
             variant="icon"
             aria-label={tr('Allega file', 'Attach files')}

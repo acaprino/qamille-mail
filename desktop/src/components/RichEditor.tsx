@@ -1,9 +1,9 @@
-import { Fragment, useEffect, useImperativeHandle, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react';
+import { Fragment, useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from 'react';
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import DOMPurify from 'dompurify';
 import Icon from '../ui/Icon';
-import Tooltip from '../ui/Tooltip';
+import { Toolbar, ToolbarButton, ToolbarSeparator } from '../ui/Toolbar';
 import { tr } from '../lib/i18n';
 
 export type RichEditorHandle = {
@@ -30,8 +30,6 @@ export default function RichEditor({ html, onchange, disabled = false, ref }: Ri
     () => ({ focus: () => void instance.current?.commands.focus('end', { scrollIntoView: false }) }),
     [],
   );
-  // The one button of the toolbar that is in the Tab order: the one that last had the focus.
-  const [lastStop, setLastStop] = useState(0);
   const [, setRevision] = useState(0);
   // The editor is created once, with the html of the first render; later changes come from it.
   const initialHtml = useRef(html);
@@ -95,53 +93,17 @@ export default function RichEditor({ html, onchange, disabled = false, ref }: Ri
     { group: 2, label: tr('Ripeti', 'Redo'), icon: <Icon name="redo" size={16} />, run: () => run()?.redo().run(), can: editor?.can().redo() ?? false },
   ];
   const works = tools.map((item) => !disabled && item.can !== false);
-  // One Tab stop for the whole toolbar (roving tabindex): the button that last had the focus, or the first
-  // that works when that one is off. Tab goes on to the text, the arrow keys move inside the toolbar.
-  const stop = works[lastStop] ? lastStop : works.indexOf(true);
-  function moveInToolbar(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-    const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
-    const at = buttons.indexOf(event.target as HTMLButtonElement);
-    if (at < 0) return;
-    const to =
-      event.key === 'Home' ? 0
-      : event.key === 'End' ? buttons.length - 1
-      : event.key === 'ArrowRight' ? (at + 1) % buttons.length
-      : event.key === 'ArrowLeft' ? (at - 1 + buttons.length) % buttons.length
-      : -1;
-    if (to < 0) return;
-    event.preventDefault();
-    buttons[to].focus();
-  }
-
   return (
     <div className="rich-editor">
-      <div
-        className="format-toolbar"
-        role="toolbar"
-        aria-label={tr('Formattazione del testo', 'Text formatting')}
-        onKeyDown={moveInToolbar}
-      >
+      {/* Sigrid's toolbar: one Tab stop for the whole bar, the arrows move between the tools; 28 px tall in the dense size. */}
+      <Toolbar size="sm" className="format-toolbar" aria-label={tr('Formattazione del testo', 'Text formatting')}>
         {tools.map((item, at) => (
           <Fragment key={item.label}>
-            {at > 0 && item.group !== tools[at - 1].group && <span className="toolbar-divider"></span>}
-            <Tooltip text={item.label}>
-              <button
-                type="button"
-                className={item.pressed ? 'active' : undefined}
-                disabled={!works[at]}
-                tabIndex={at === stop ? 0 : -1}
-                aria-label={item.label}
-                aria-pressed={item.pressed}
-                onFocus={() => setLastStop(at)}
-                onClick={item.run}
-              >
-                {item.icon}
-              </button>
-            </Tooltip>
+            {at > 0 && item.group !== tools[at - 1].group && <ToolbarSeparator />}
+            <ToolbarButton label={item.label} icon={item.icon} pressed={item.pressed} disabled={!works[at]} onClick={item.run} />
           </Fragment>
         ))}
-      </div>
+      </Toolbar>
       <div ref={element}></div>
     </div>
   );

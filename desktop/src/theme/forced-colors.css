@@ -31,8 +31,7 @@
   .settings-nav button.active,
   .composer-tab.active,
   .attachment.active,
-  .mail-display button.active,
-  .format-toolbar button.active {
+  .mail-display button.active {
     outline: 2px solid Highlight;
     outline-offset: -2px;
   }

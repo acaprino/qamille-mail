@@ -784,8 +784,8 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 0;
-  min-height: 48px;
-  padding: 8px var(--reader-pad);
+  min-height: 40px;
+  padding: 4px var(--reader-pad);
   border-bottom: 1px solid var(--color-line);
   flex-shrink: 0;
 }
@@ -1478,31 +1478,10 @@
   flex: 1;
   min-height: 80px;
 }
+/* The formatting bar is Sigrid's Toolbar; this is only the line under it and the room around it. */
 .format-toolbar {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-  padding: 5px 0 7px;
-  color: var(--color-ink-mute);
-  border-bottom: 1px solid var(--color-paper-2);
-}
-.format-toolbar button {
-  height: var(--control-md);
-  min-width: var(--control-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm);
-}
-/* Hover is the neutral tint of every icon button; the indigo fill means the format is on. */
-.format-toolbar button:hover:where(:not(:disabled)) {
-  background: var(--hover);
-  color: var(--color-ink);
-}
-.format-toolbar button.active {
-  background: var(--color-selected);
-  color: var(--color-accent);
+  padding: 3px 0 5px;
+  border-bottom: 1px solid var(--color-line);
 }
 .rich-content {
   min-height: 160px;

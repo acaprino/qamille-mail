@@ -5,7 +5,7 @@
 // ('' = nothing chosen). `className` goes on the button. Sigrid's Select has no `aria-required` (asked of Sigrid as R18)
 // and no disabled item (the app has none).
 import { useId, type ReactNode } from 'react';
-import { Select as SigridSelect } from '@acaprino/sigrid';
+import { Select as SigridSelect } from '@acaprino/sigrid/primitives';
 import { cn } from './cn';
 
 /** `mark` is drawn before the item's name in the open list (a coloured shape, for example). */

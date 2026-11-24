@@ -120,12 +120,41 @@ export function withSearchFilter(query: string, operator: string, value: string)
   return parts.join(' ');
 }
 
-export function filterValue(query: string, operator: string): string {
-  const token = queryParts(query).find((part) => part.toLowerCase().startsWith(`${operator}:`));
-  const value = token?.slice(operator.length + 1) || '';
+function unquoted(value: string): string {
   return value.startsWith('"') && value.endsWith('"')
     ? value.slice(1, -1).replace(/\\(["\\])/g, '$1')
     : value;
+}
+
+export function filterValue(query: string, operator: string): string {
+  const token = queryParts(query).find((part) => part.toLowerCase().startsWith(`${operator}:`));
+  return unquoted(token?.slice(operator.length + 1) || '');
+}
+
+/** Every value an operator has in the query, an OR group of it included: «(from:a OR from:b)» gives a and b. */
+export function filterValues(query: string, operator: string): string[] {
+  const prefix = `${operator}:`;
+  const values: string[] = [];
+  const collect = (parts: string[]) => {
+    for (const part of parts) {
+      if (part.startsWith('(') && part.endsWith(')')) collect(queryParts(part.slice(1, -1)));
+      else if (part.toLowerCase().startsWith(prefix)) values.push(unquoted(part.slice(prefix.length)));
+    }
+  };
+  collect(queryParts(query));
+  return values;
+}
+
+/**
+ * The query with the people of an operator set to `values`: none takes the operator out, one is a filter, several are one
+ * OR group («from:a OR from:b»), as the form of the filters writes them.
+ */
+export function withPeople(query: string, operator: string, values: string[]): string {
+  const list = values.map((value) => value.trim()).filter(Boolean);
+  if (list.length <= 1) return withSearchFilter(query, operator, list[0] ?? '');
+  const rest = withSearchFilter(query, operator, '');
+  const group = `(${list.map((value) => `${operator}:${quoteSearch(value)}`).join(' OR ')})`;
+  return `${hasBooleanGroup(rest) ? `(${rest})` : rest} ${group}`.trim();
 }
 
 export function removeSearchChip(query: string, index: number): string {
@@ -340,4 +369,28 @@ export function markedParts(text: string, terms: string[]): { text: string; matc
   if (!escaped.length) return [{ text, match: false }];
   const expression = new RegExp(`(${escaped.join('|')})`, 'giu');
   return text.split(expression).map((part, index) => ({ text: part, match: index % 2 === 1 }));
+}
+
+const RECENT_KEY = 'qamille:recent-searches';
+const RECENT_MAX = 6;
+
+/** The searches the user ran last, newest first (kept in this window's storage; empty when there is none). */
+export function recentSearches(): string[] {
+  try {
+    const stored = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]');
+    return Array.isArray(stored) ? stored.filter((item): item is string => typeof item === 'string').slice(0, RECENT_MAX) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Remembers a search that was run: at the top of the list, once, and at most six. */
+export function rememberSearch(query: string): void {
+  const value = query.trim();
+  if (!value) return;
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify([value, ...recentSearches().filter((item) => item !== value)].slice(0, RECENT_MAX)));
+  } catch {
+    // Storage may be off (a private window): the list is a convenience.
+  }
 }

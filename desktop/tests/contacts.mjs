@@ -14,6 +14,18 @@ await page.locator('.compose-main').waitFor();
 const row = (name) => page.getByRole('list', { name: 'Contacts' }).getByRole('button', { name: new RegExp(name) });
 // The Ark Checkbox draws its own box and hides the input: a click goes to the visible row.
 const tick = (scope, name) => scope.locator('[data-scope="checkbox"][data-part="root"]').filter({ hasText: name });
+// The notes of the contacts column (the consent, the merge undone) are Sigrid's Note: a region of its own, no role.
+const note = (text) => page.locator('[data-slot="note"]').filter({ hasText: text });
+// «Show hidden» is an item of the address book actions menu, a menu item that is checked or not.
+async function showHidden(on) {
+  await page.getByRole('button', { name: 'More address book actions' }).click();
+  const item = page.getByRole('menuitemcheckbox', { name: 'Show hidden' });
+  if (((await item.getAttribute('aria-checked')) === 'true') !== on) await item.click();
+  else await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'More address book actions' }).click();
+  await expect(page.getByRole('menuitemcheckbox', { name: 'Show hidden' })).toHaveAttribute('aria-checked', String(on));
+  await page.keyboard.press('Escape');
+}
 const duplicatesButton = () => page.getByRole('button', { name: /^Duplicates/ });
 const results = [];
 async function step(name, work) {
@@ -30,10 +42,10 @@ try {
   });
 
   await step('A Google book without read consent shows a bar that asks for it', async () => {
-    const bar = page.getByRole('status').filter({ hasText: 'needs your permission' });
+    const bar = note('needs your permission');
     await expect(bar).toContainText('alex@studio-example.com');
     await bar.getByRole('button', { name: 'Allow reading' }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'needs your permission' })).toHaveCount(0);
+    await expect(note('needs your permission')).toHaveCount(0);
   });
 
   await step('A person in two books is one row that shows both origins', async () => {
@@ -137,10 +149,10 @@ try {
   });
 
   await step('Undo merge brings the removed copy back and the duplicate signal returns', async () => {
-    const banner = page.getByRole('status').filter({ hasText: 'Contacts merged' });
+    const banner = note('Contacts merged');
     await expect(banner).toBeVisible();
     await banner.getByRole('button', { name: 'Undo merge' }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'Contacts merged' })).toHaveCount(0);
+    await expect(note('Contacts merged')).toHaveCount(0);
     await expect(row('Mario Rossi')).toHaveCount(2);
     await expect(page.getByRole('list', { name: 'Contacts' }).getByRole('button', { name: /Mario Rossi.*Google/s })).toHaveCount(1);
     await expect(duplicatesButton()).toHaveCount(1);
@@ -160,14 +172,12 @@ try {
   });
 
   await step('Show hidden lists a hidden contact and Show again restores it for good', async () => {
-    await tick(page, 'Show hidden').click();
-    await expect(page.getByRole('checkbox', { name: 'Show hidden' })).toBeChecked();
+    await showHidden(true);
     await expect(row('Sofia')).toHaveCount(1);
     await row('Sofia').click();
     await expect(page.getByRole('button', { name: 'Hide' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Show again' }).click();
-    await tick(page, 'Show hidden').click();
-    await expect(page.getByRole('checkbox', { name: 'Show hidden' })).not.toBeChecked();
+    await showHidden(false);
     await expect(row('Sofia')).toHaveCount(1);
   });
 

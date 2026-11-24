@@ -41,28 +41,25 @@ try {
   const soft = await token('--color-paper-2');
   const controlHeight = 32;
 
-  await step('List rows are one --control-md tall and separated by --color-paper-2 hairlines', async () => {
+  await step('The list is Sigrid\'s ItemList: two-line rows, the chosen one marked, none cut to a chip', async () => {
     const rows = await list().getByRole('button').all();
     assert.ok(rows.length > 3, 'sample data has several contacts');
-    for (const one of rows) assert.equal((await height(one)), controlHeight);
-    assert.equal(await css(list().getByRole('listitem').nth(1), 'border-top-color'), soft);
-    assert.equal(await css(list().getByRole('listitem').nth(1), 'border-top-width'), '1px');
+    for (const one of rows) assert.ok((await height(one)) >= controlHeight, 'a row is at least one control tall');
+    await expect(page.locator('[data-slot="item-row"]').first()).toBeVisible();
+    await row('Ada Lovelace').click();
+    await expect(row('Ada Lovelace')).toHaveAttribute('aria-current', 'true');
+    await expect(row('Ada Lovelace')).toContainText('Google');
   });
 
-  await step('Toolbar controls are --control-md and the filters are Ark Select and Checkbox', async () => {
+  await step('The column header holds New contact as an icon, the search is a SearchField and the filter an Ark Select', async () => {
     await expect(page.locator('.contacts-page select')).toHaveCount(0);
-    const filters = page.locator('.contacts-filters');
-    const book = trigger(filters, 'Filter by address book');
+    const panel = page.getByRole('region', { name: 'Contacts' });
+    const book = trigger(panel, 'Filter by address book');
     assert.equal(await book.getAttribute('data-slot'), 'select-trigger');
     assert.equal((await height(book)), controlHeight);
     assert.equal((await height(page.getByRole('searchbox', { name: 'Search contacts' }))), controlHeight);
     assert.equal((await height(page.getByRole('button', { name: 'New contact' }))), controlHeight);
-    const control = filters.locator('[data-slot="checkbox"]');
-    assert.ok((await control.evaluate((node) => node.offsetWidth)) >= 16, 'the box is at least 16px');
-    await filters.getByText('Show hidden').click();
-    await expect(page.getByRole('checkbox', { name: 'Show hidden' })).toBeChecked();
-    await filters.getByText('Show hidden').click();
-    await expect(page.getByRole('checkbox', { name: 'Show hidden' })).not.toBeChecked();
+    assert.equal(await page.getByRole('button', { name: 'New contact' }).first().evaluate((node) => node.textContent.trim()), '', 'New contact is an icon with its name as the hint');
     await book.click();
     await page.getByRole('option', { name: 'All address books' }).waitFor();
     assert.ok((await page.getByRole('option').count()) >= 2);

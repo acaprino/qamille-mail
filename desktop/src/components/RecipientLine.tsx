@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import Button from '../ui/Button';
+import CopyButton from '../ui/CopyButton';
 import { tr } from '../lib/i18n';
 import { recipientView, type PersonIndex } from '../lib/people';
 import { tick } from '../lib/tick';
@@ -25,6 +26,8 @@ export default function RecipientLine({ label, kind, addresses, index, self }: R
   }
 
   if (!view.all.length) return null;
+  // What is copied is the addresses (what a mail program needs), not the names that stand for them on the screen.
+  const copy = <CopyButton className="ms-1 size-6 min-w-0 align-middle" value={addresses.join(', ')} label={`${tr('Copia gli indirizzi', 'Copy the addresses')}: ${label}`} size="icon-xs" />;
   return (
     <div className="recipient-line" data-kind={kind}>
       {open ? (
@@ -34,6 +37,7 @@ export default function RecipientLine({ label, kind, addresses, index, self }: R
             <Button ref={showLess} variant="text" className="recipient-toggle" onClick={() => void toggle(false)}>
               {tr('Mostra meno', 'Show less')}
             </Button>
+            {copy}
           </div>
           {/* A scrolling box has to take the focus, or the keyboard cannot reach the names below the fold. */}
           <div className="recipient-full" role="group" tabIndex={0} aria-label={tr('Tutti i destinatari', 'All recipients')}>
@@ -58,6 +62,7 @@ export default function RecipientLine({ label, kind, addresses, index, self }: R
               </Button>
             </>
           )}
+          {copy}
         </>
       )}
     </div>

@@ -339,9 +339,6 @@
   border-radius: 50%;
   background: var(--priority-mark);
 }
-.group-heading .collapsed {
-  transform: rotate(-90deg);
-}
 /* A closed group never hides that it holds something unread: the heading stays ink with a dot and a
    number in the accent. */
 .group-heading.has-unread[aria-expanded='false'] {
@@ -603,10 +600,6 @@
 .reply-fold:hover {
   background: var(--color-selected);
   color: var(--color-ink);
-}
-.thread-toggle[aria-expanded='false'] svg,
-.reply-fold[aria-expanded='false'] svg {
-  transform: rotate(-90deg);
 }
 /* Closed, the arrow turns blue when one of the replies it hides is unread. */
 .thread-toggle.has-unread,

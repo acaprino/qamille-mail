@@ -5,6 +5,7 @@ import Button from '../ui/Button';
 import CopyButton from '../ui/CopyButton';
 import Icon from '../ui/Icon';
 import Menu, { type MenuItem } from '../ui/Menu';
+import { useLand } from '../ui/motion';
 import MessageHtml from './MessageHtml';
 import AttachmentPanel from './AttachmentPanel';
 import AddFromMail from './contacts/AddFromMail';
@@ -141,6 +142,8 @@ export default function Reader({
   useLayoutEffect(() => {
     if (scroller.current) scroller.current.scrollTop = 0;
   }, [email?.id]);
+  // Another message under the reader's hand settles into place.
+  useLand(scroller, email?.id, !!email);
   // The commands behind "More actions": the message's output, then what can change for it. Only what
   // can change is offered: nothing to move back from the Inbox, no snooze to remove on a message that
   // is not snoozed. Set aside is a switch and shows its state.

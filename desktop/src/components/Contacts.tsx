@@ -4,6 +4,7 @@ import Avatar from '../ui/Avatar';
 import Badge from '../ui/Badge';
 import Checkbox from '../ui/Checkbox';
 import ContentSplit from '../ui/ContentSplit';
+import { useLand } from '../ui/motion';
 import Count from '../ui/Count';
 import CopyButton from '../ui/CopyButton';
 import Empty from '../ui/Empty';
@@ -82,6 +83,9 @@ export default function Contacts({ notify }: ContactsProps) {
   const say = (message: string, error?: boolean) => notifyRef.current(message, error);
 
   const selected = s.items.find((c) => c.id === s.selectedId) ?? null;
+  // Another contact under the reader's hand settles into place.
+  const detail = useRef<HTMLElement>(null);
+  useLand(detail, s.selectedId, !!selected);
   const writableOrigins = (c: ContactView) => c.origins.filter((o) => o.writable);
 
   async function load() {
@@ -521,7 +525,7 @@ export default function Contacts({ notify }: ContactsProps) {
           </Panel>
         }
       >
-        <article className="contact-detail" aria-live="polite">
+        <article className="contact-detail" aria-live="polite" ref={detail}>
           {selected ? (
             <>
               <header>

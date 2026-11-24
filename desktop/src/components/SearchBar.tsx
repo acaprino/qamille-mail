@@ -5,6 +5,7 @@ import { useEffect, type KeyboardEvent } from 'react';
 import Button from '../ui/Button';
 import Tooltip from '../ui/Tooltip';
 import Icon from '../ui/Icon';
+import { usePopup } from '../ui/motion';
 import { backendText, isItalian, tr } from '../lib/i18n';
 import { regionalLocale, regionalTimeZone } from '../lib/regional';
 import {
@@ -95,6 +96,8 @@ export default function SearchBar({
   const scope = filterValue(query, 'in');
   const account = workspace.accounts.find((item) => item.id === accountId);
   const coverageIncomplete = !!page.search && page.search.coverage !== 'complete';
+  // The panel opens from the search field: it comes in from the side of it.
+  const popup = usePopup(() => document.querySelector('.global-search'));
 
   useEffect(() => {
     if (!filtersOpen) s.advancedFirst = false;
@@ -139,6 +142,7 @@ export default function SearchBar({
     <section className="search-workbench" aria-label={t('Filtri di ricerca', 'Search filters')}>
       {filtersOpen && (
         <div
+          ref={popup}
           id="search-filters-popover"
           className="search-filter-popover"
           role="group"

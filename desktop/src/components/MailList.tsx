@@ -1,4 +1,4 @@
-import { Item, Presence, useIsPresent } from '../ui/motion';
+import { Item, Presence, Turn, useIsPresent } from '../ui/motion';
 import { useEffect, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react';
 import Button from '../ui/Button';
 import Checkbox from '../ui/Checkbox';
@@ -119,9 +119,9 @@ function GroupHeading({
         {sectionLabel(title)}
       </span>
       <Count value={count} className="group-count" />
-      <span className={cn(collapsed && 'collapsed')}>
-        <Icon name="down" size={14} />
-      </span>
+      <Turn open={!collapsed}>
+        <Icon name="chevron" size={14} />
+      </Turn>
     </>
   );
   return (
@@ -333,7 +333,9 @@ function MailRow({
           title={`${1 + email.replies.length + (email.replies_more ?? 0)} ${t('messaggi nella conversazione', 'messages in this thread')}${!isThreadOpen(email) && hasUnreadReplies(email) ? t(', con messaggi non letti', ', with unread messages') : ''}`}
           onClick={toggleThread}
         >
-          <Icon name="down" size={14} />
+          <Turn open={isThreadOpen(email)}>
+            <Icon name="chevron" size={14} />
+          </Turn>
           <span className="thread-total">{1 + email.replies.length + (email.replies_more ?? 0)}</span>
         </button>
       )}

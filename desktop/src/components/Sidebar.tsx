@@ -78,6 +78,10 @@ export default function Sidebar({
 }: SidebarProps) {
   const center = useStore(activityCenter);
   const userName = workspace.settings.user_name || tr('Utente', 'User');
+  const userMenu = [
+    { value: 'settings', label: folderLabel('Settings'), icon: 'settings', onSelect: () => navigate('Settings') },
+    { value: 'history', label: tr('Cronologia delle attività', 'Activity history'), icon: 'history', onSelect: toggleActivityPanel },
+  ];
   const icon = (name: string) => <Icon name={name} size={iconSize} stroke={iconStroke} />;
   const header = (
     <div className="flex flex-col gap-3">
@@ -128,10 +132,7 @@ export default function Sidebar({
                       <Icon name="more" size={16} />
                     </Button>
                   }
-                  items={[
-                    { value: 'settings', label: folderLabel('Settings'), icon: 'settings', onSelect: () => navigate('Settings') },
-                    { value: 'history', label: tr('Cronologia delle attività', 'Activity history'), icon: 'history', onSelect: toggleActivityPanel },
-                  ]}
+                  items={userMenu}
                 />
                 <Button
                   variant="icon"
@@ -201,6 +202,20 @@ export default function Sidebar({
           {folderLabel('Settings')}
         </NavItem>
       </SidebarGroup>
+      {collapsed && (
+        <div className="mt-auto flex justify-center">
+          <Menu
+            label={tr('Menu utente', 'User menu')}
+            tip={userName}
+            trigger={
+              <Button variant="icon" aria-label={tr('Menu utente', 'User menu')}>
+                <Avatar name={userName} size="xs" decorative />
+              </Button>
+            }
+            items={userMenu}
+          />
+        </div>
+      )}
     </ShellSidebar>
   );
 }

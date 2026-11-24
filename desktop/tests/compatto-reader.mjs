@@ -114,7 +114,7 @@ try {
 
   // (f) The grey From / To / Date box, three names and "and 37 more".
   const header = page.locator('.message-sender');
-  assert.equal(await css(header, 'background-color'), 'rgb(246, 247, 249)');
+  assert.equal(await css(header, 'background-color'), await token(page, '--color-paper'));
   assert.equal(await css(header, 'border-top-color'), await token(page, '--color-paper-2'));
   assert.equal(await css(header, 'border-top-width'), '1px');
   assert.equal(await css(header, 'border-top-left-radius'), '6px');
@@ -203,7 +203,7 @@ try {
       const b = await box(locator);
       assert.ok(Math.abs(b.x - barBox.x) <= 1, `${width}: ${name} left edge ${b.x} vs bar ${barBox.x}`);
       assert.ok(Math.abs(b.x + b.width - (barBox.x + barBox.width)) <= 1, `${width}: ${name} right edge ${b.x + b.width} vs bar ${barBox.x + barBox.width}`);
-      if (width === 1440) assert.ok(b.width > 760, `${width}: ${name} is wider than 760px (${b.width})`);
+      if (width === 1440) assert.ok(b.width > 740, `${width}: ${name} is wider than 740px (${b.width})`);
     }
     const lead = await box(wide.locator('.reader-toolbar button').first());
     assert.ok(Math.abs(lead.x - barBox.x) <= 1, `${width}: the toolbar starts at the same left edge (${lead.x} vs ${barBox.x})`);

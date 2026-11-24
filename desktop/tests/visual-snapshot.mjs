@@ -90,9 +90,9 @@ async function shot(page, name, keepPointer = false) {
   fs.writeFileSync(path.join(out, `${name}.json.gz`), zlib.gzipSync(JSON.stringify(rows)));
   reached.push(`${name} (${rows.length})`);
 }
-const nav = (page, name) => page.locator('.sidebar nav button', { hasText: name }).first().click();
+const nav = (page, name) => page.locator('[data-slot="sidebar"] button', { hasText: name }).first().click();
 const settings = async (page, section) => {
-  await page.locator('button.profile').click();
+  await page.getByRole('list', { name: /^(Workspace|Spazio di lavoro)$/ }).getByRole('button', { name: /^(Settings|Impostazioni)/ }).click();
   await page.locator('.settings-nav').getByRole('button', { name: section, exact: true }).click();
   await page.waitForTimeout(200);
 };
@@ -254,7 +254,7 @@ try {
   // Settings: every section, then the dialogs that hang from it
   const sections = await (async () => {
     const page = await fresh();
-    await page.locator('button.profile').click();
+    await page.getByRole('list', { name: /^(Workspace|Spazio di lavoro)$/ }).getByRole('button', { name: /^(Settings|Impostazioni)/ }).click();
     await page.locator('.settings-nav').waitFor();
     const names = await page.locator('.settings-nav button').allInnerTexts();
     await page.context().close();
@@ -276,7 +276,7 @@ try {
     await page.locator('.google-setup-guide').waitFor({ timeout: 2500 });
   });
   await state('unsaved', {}, async (page) => {
-    await page.locator('button.profile').click();
+    await page.getByRole('list', { name: /^(Workspace|Spazio di lavoro)$/ }).getByRole('button', { name: /^(Settings|Impostazioni)/ }).click();
     await page.locator('.settings-nav').waitFor();
     const field = page.locator('.settings-layout input[type="text"], .settings-layout input:not([type])').first();
     await field.fill('Changed for the snapshot');

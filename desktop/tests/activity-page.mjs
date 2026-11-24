@@ -34,10 +34,10 @@ async function openPage(page) {
 
 test('preview: the panel leads to the page, which closes the panel and clears the dot', skip, async () =>
   withPage(async (page) => {
-    await expect(page.locator('.activity-toggle')).toHaveClass(/has-unseen/);
+    await expect(page.locator('.activity-toggle')).toHaveAccessibleName(/errors to see/);
     await openPage(page);
     await expect(page.locator('.activity-panel')).toHaveCount(0);
-    await expect(page.locator('.activity-toggle')).not.toHaveClass(/has-unseen/);
+    await expect(page.locator('.activity-toggle')).not.toHaveAccessibleName(/errors to see/);
     // The topbar names the page like any other.
     await expect(page.locator('.workspace-name')).toContainText('Activity');
   }));

@@ -36,7 +36,7 @@ const dialogContent = (name) => page.getByRole('dialog', { name });
 const trigger = (scope, name) => scope.getByRole('combobox', { name, exact: true });
 
 try {
-  await page.getByRole('navigation', { name: 'Workspace' }).getByRole('button', { name: 'Contacts' }).click();
+  await page.getByRole('list', { name: 'Workspace' }).getByRole('button', { name: 'Contacts' }).click();
   await expect(row('Ada Lovelace')).toHaveCount(1);
   const soft = await token('--color-paper-2');
   const controlHeight = 32;

@@ -417,7 +417,7 @@ test(
       const line = indicator(page).locator('.activity-line');
       await pw(line).toBeVisible({ timeout: 1500 });
       assert.equal(
-        await page.locator('.sidebar .activity-indicator').count(),
+        await page.locator('[data-slot="sidebar"] .activity-indicator').count(),
         1,
         'the card is part of the sidebar footer',
       );
@@ -461,7 +461,7 @@ test('preview: nothing fixed sits over the mail but the undo notices and the toa
       `no activity element is fixed over the page: ${fixed}`,
     );
     // The panel of an expanded sidebar lives inside it, in its flow, not over the list.
-    assert.equal(await page.locator('.sidebar .activity-panel').count(), 1);
+    assert.equal(await page.locator('[data-slot="sidebar"] .activity-panel').count(), 1);
     await announce(page, syncDone(2));
   }));
 

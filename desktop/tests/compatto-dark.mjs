@@ -183,7 +183,7 @@ async function section(name, run) {
       const [r, g, b] = rgb.match(/\d+(\.\d+)?/g).map(Number);
       return 0.2126 * r + 0.7152 * g + 0.0722 * b;
     };
-    const sidebar = await page.locator('.sidebar').first().evaluate((el) => getComputedStyle(el).backgroundColor);
+    const sidebar = await page.locator('[data-slot="sidebar"]').first().evaluate((el) => getComputedStyle(el).backgroundColor);
     const surface = await page.evaluate(() => {
       const probe = document.createElement('i');
       probe.style.backgroundColor = 'var(--color-raised)';
@@ -204,7 +204,7 @@ async function section(name, run) {
     console.log(`ok   message body reads at ${body.ratio.toFixed(2)}:1`);
 
     // The row subject and the sidebar items read too.
-    for (const [selector, what] of [['.mail-row .mail-row-content', 'mail row'], ['.sidebar button', 'sidebar button']]) {
+    for (const [selector, what] of [['.mail-row .mail-row-content', 'mail row'], ['[data-slot="sidebar"] button', 'sidebar button']]) {
       const p = await page.locator(selector).first().evaluate((el) => window.__paint(el));
       assert.ok(p.ratio >= 4.5, `${what} ${p.ratio.toFixed(2)}:1`);
       console.log(`ok   ${what} reads at ${p.ratio.toFixed(2)}:1`);

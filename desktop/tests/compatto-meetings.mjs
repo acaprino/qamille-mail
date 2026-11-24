@@ -23,7 +23,7 @@ const step = async (name, work) => {
 };
 
 const { browser, page, errors } = await openApp();
-const workspace = page.getByRole('navigation', { name: 'Workspace' });
+const workspace = page.getByRole('list', { name: 'Workspace' });
 const root = page.locator('.meetings-page');
 const pane = page.locator('.meetings-page .detail-pane');
 const tab = (name) => pane.getByRole('tab', { name, exact: true });
@@ -69,7 +69,7 @@ try {
     throw new Error('The preview chain did not finish');
   });
   assert.ok(recorded);
-  await page.getByRole('navigation', { name: 'Mail folders' }).getByRole('button', { name: /^Inbox\s*\d*$/ }).click();
+  await page.getByRole('list', { name: 'Folders' }).getByRole('button', { name: /^Inbox\s*\d*$/ }).click();
   await workspace.getByRole('button', { name: 'Meetings', exact: true }).click();
   await expect(root.locator('[data-list-ready]')).toBeAttached();
 

@@ -24,7 +24,7 @@ async function step(name, work) {
 
 try {
   await step('Contacts opens from the sidebar with a heading and the unified list', async () => {
-    await page.getByRole('navigation', { name: 'Workspace' }).getByRole('button', { name: 'Contacts' }).click();
+    await page.getByRole('list', { name: 'Workspace' }).getByRole('button', { name: 'Contacts' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Contacts' })).toHaveCount(1);
     await expect(row('Ada Lovelace')).toHaveCount(1);
   });

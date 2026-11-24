@@ -136,7 +136,7 @@ try {
     await page.keyboard.press('Tab');
     const where = await page.evaluate(() => {
       const el = document.activeElement;
-      return { sidebar: !!el.closest('.sidebar'), list: !!el.closest('.mail-list'), tag: el.tagName };
+      return { sidebar: !!el.closest('[data-slot="sidebar"]'), list: !!el.closest('.mail-list'), tag: el.tagName };
     });
     if (where.sidebar) {
       sidebarStops++;

@@ -12,7 +12,7 @@ try {
     const page = await browser.newPage({ locale: 'en-US', viewport: { width: 1280, height: 860 }, reducedMotion });
     await page.goto(base);
     await page.locator('.mail-row').first().waitFor();
-    await page.getByRole('navigation', { name: 'Workspace' }).getByRole('button', { name: 'Contacts' }).click();
+    await page.getByRole('list', { name: 'Workspace' }).getByRole('button', { name: 'Contacts' }).click();
     await page.getByRole('button', { name: 'New contact' }).click();
     const dialog = page.getByRole('dialog', { name: 'New contact' });
     await expect(dialog).toBeVisible();

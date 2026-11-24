@@ -62,7 +62,7 @@ try {
     console.log('PASS the root of the mail screen stays put at 1000x640, 200 %');
 
     await page.setViewportSize(roomy);
-    await page.locator('.sidebar .profile').click();
+    await page.getByRole('list', { name: /^(Workspace|Spazio di lavoro)$/ }).getByRole('button', { name: /^(Settings|Impostazioni)/ }).click();
     await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
     await page.setViewportSize(ZOOMED);
     await assertRootFixed(page, 'settings, 1000x640 at 200 %');

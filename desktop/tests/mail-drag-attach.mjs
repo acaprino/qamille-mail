@@ -36,7 +36,8 @@ try {
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(url);
   await page.locator('.compose-main').waitFor();
-  await page.getByRole('button', { name: 'All accounts', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Account' }).click();
+  await page.getByRole('option', { name: 'All accounts', exact: true }).click();
   await page.getByRole('button', { name: 'Emails', exact: true }).click();
   await page.getByRole('button', { name: /^Inbox\s*\d*$/ }).click();
 

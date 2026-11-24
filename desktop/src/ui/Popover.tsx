@@ -4,7 +4,7 @@
 // make it controlled: an action that has done its job calls onOpenChange(false). `tip` gives an icon-only trigger its
 // hint: the Tooltip wraps the trigger.
 import { useState, type ReactElement, type ReactNode } from 'react';
-import { Popover as SigridPopover, PopoverContent, PopoverTrigger } from '@acaprino/sigrid';
+import { Popover as SigridPopover, PopoverContent, PopoverTrigger } from '@acaprino/sigrid/primitives';
 import Tooltip from './Tooltip';
 
 export type PopoverProps = {

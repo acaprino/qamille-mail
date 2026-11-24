@@ -4,7 +4,7 @@
 // the newest at the bottom; more push the oldest out. The region's name and the words come from Sigrid's words
 // (ui/words.ts), so `Toaster` takes no labels. Drawn by Sigrid's Toasts (Ark's toast).
 import { useSyncExternalStore } from 'react';
-import { Toasts, type ToastItem } from '@acaprino/sigrid';
+import { Toasts, type ToastItem } from '@acaprino/sigrid/components';
 import { tr } from '../lib/i18n';
 
 /** A button in a notice, such as Open after a file was saved. Whatever it does is a convenience. */

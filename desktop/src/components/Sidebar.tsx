@@ -1,15 +1,19 @@
 // The sidebar, drawn by Sigrid's Sidebar: the column when it is wide, the rail of icons when it is shrunk (its own button at the
 // foot shrinks and widens it). Above the groups, the app's name and the account in use (a Select: «All accounts» or one);
 // then the groups of rows: write, the folders, the labels, the places of the workspace with the history and the settings.
-// The activity center sits at the foot. A row is a NavItem with a plain name, so the rail shows it as an icon with its name
+// At the foot, the user (an avatar and the name, Sigrid's SidebarRow) with the user menu at its end, and the activity center.
+// A row is a NavItem with a plain name, so the rail shows it as an icon with its name
 // as a hint.
 import type { CSSProperties } from 'react';
+import Avatar from '../ui/Avatar';
+import Button from '../ui/Button';
 import Count from '../ui/Count';
 import Icon from '../ui/Icon';
 import Kbd from '../ui/Kbd';
+import Menu from '../ui/Menu';
 import { NavItem } from '../ui/NavList';
 import Select from '../ui/Select';
-import { Sidebar as ShellSidebar, SidebarGroup } from '../ui/Sidebar';
+import { Sidebar as ShellSidebar, SidebarGroup, SidebarRow } from '../ui/Sidebar';
 import { desktop } from '../lib/api';
 import { activityCenter, toggleActivityPanel } from '../lib/activity-center';
 import type { Activity } from '../lib/activity';
@@ -73,6 +77,7 @@ export default function Sidebar({
   showAllActivity,
 }: SidebarProps) {
   const center = useStore(activityCenter);
+  const userName = workspace.settings.user_name || tr('Utente', 'User');
   const icon = (name: string) => <Icon name={name} size={iconSize} stroke={iconStroke} />;
   const header = (
     <div className="flex flex-col gap-3">
@@ -103,13 +108,35 @@ export default function Sidebar({
       onCollapsedChange={() => toggleCollapsed()}
       header={header}
       footer={
-        <ActivityCenter
-          activities={activities}
-          undoActions={undoActions}
-          accounts={workspace.accounts}
-          openActivity={openActivity}
-          showAll={showAllActivity}
-        />
+        <>
+          <ActivityCenter
+            activities={activities}
+            undoActions={undoActions}
+            accounts={workspace.accounts}
+            openActivity={openActivity}
+            showAll={showAllActivity}
+          />
+          <SidebarRow
+            leading={<Avatar name={userName} size="xs" decorative />}
+            end={
+              <Menu
+                label={tr('Menu utente', 'User menu')}
+                tip={tr('Menu utente', 'User menu')}
+                trigger={
+                  <Button variant="icon" aria-label={tr('Menu utente', 'User menu')}>
+                    <Icon name="more" size={16} />
+                  </Button>
+                }
+                items={[
+                  { value: 'settings', label: folderLabel('Settings'), icon: 'settings', onSelect: () => navigate('Settings') },
+                  { value: 'history', label: tr('Cronologia delle attività', 'Activity history'), icon: 'history', onSelect: toggleActivityPanel },
+                ]}
+              />
+            }
+          >
+            {userName}
+          </SidebarRow>
+        </>
       }
     >
       <SidebarGroup>
@@ -159,7 +186,7 @@ export default function Sidebar({
         >
           {tr('Cronologia delle attività', 'Activity history')}
         </NavItem>
-        <NavItem active={view === 'Settings'} icon={icon('settings')} description={workspace.settings.user_name} onClick={() => navigate('Settings')}>
+        <NavItem active={view === 'Settings'} icon={icon('settings')} onClick={() => navigate('Settings')}>
           {folderLabel('Settings')}
         </NavItem>
       </SidebarGroup>

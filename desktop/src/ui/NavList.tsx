@@ -4,7 +4,7 @@
 // a row takes a lighter share of the tint. `hint` turns a row into a Tooltip trigger (the collapsed sidebar, where a row is
 // only an icon). The highlight that followed the pointer and the sliding bar of the old list are gone.
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
-import { NavItem as SigridNavItem, NavList as SigridNavList } from '@acaprino/sigrid';
+import { NavItem as SigridNavItem, NavList as SigridNavList } from '@acaprino/sigrid/layout';
 import Tooltip from './Tooltip';
 
 export function NavList({ className, children, ...rest }: { 'aria-label': string; className?: string; children?: ReactNode; group?: string }) {

@@ -194,7 +194,8 @@ try {
   await page.getByRole('combobox', { name: 'Regional format', exact: true }).click();
   await page.getByRole('option', { name: 'it-IT', exact: true }).click();
   await page.getByRole('button', { name: 'Save changes', exact: true }).click();
-  await page.locator('.sidebar-body nav').nth(1).locator('button').first().click();
+  // Back to the first folder of the sidebar (Sigrid's), whose name follows the language the settings just changed.
+  await page.locator('[data-slot="sidebar"]').getByRole('button', { name: /^(Inbox|Posta in arrivo)/ }).first().click();
   await page.getByRole('textbox', { name: 'Cerca email', exact: true }).waitFor();
   await openForm('Cerca email', 'Filtri avanzati');
   await panel.getByRole('combobox', { name: 'Quando' }).click();

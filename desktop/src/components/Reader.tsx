@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'r
 import Kbd from '../ui/Kbd';
 import ConnectMailbox from './ConnectMailbox';
 import Button from '../ui/Button';
+import CopyButton from '../ui/CopyButton';
 import Icon from '../ui/Icon';
 import Menu, { type MenuItem } from '../ui/Menu';
 import MessageHtml from './MessageHtml';
@@ -404,6 +405,9 @@ export default function Reader({
             </div>
             <div className="message-heading">
               <h2 className="message-title">{email.subject || tr('(Senza oggetto)', '(No subject)')}</h2>{' '}
+              {!!email.subject && (
+                <CopyButton className="ms-1 size-6 min-w-0 align-middle" value={email.subject} label={tr('Copia l’oggetto', 'Copy the subject')} size="icon-xs" />
+              )}
               {opening && (
                 // The next message is being read; this one stays until it arrives.
                 <span className="opening-mark" role="status" aria-label={tr('Apertura del messaggio…', 'Opening message…')}>
@@ -419,6 +423,12 @@ export default function Reader({
                 <span className="header-value">
                   <strong>{email.from_name || email.from_addr}</strong>
                   <span className="sender-address">&lt;{email.from_addr}&gt;</span>
+                  <CopyButton
+                    className="ms-1 size-6 min-w-0 align-middle"
+                    value={email.from_addr}
+                    label={`${tr('Copia', 'Copy')} ${email.from_addr}`}
+                    size="icon-xs"
+                  />
                   {!senderKnown && (
                     <Button variant="text" className="add-sender" onClick={() => setAddingSender(true)}>
                       {tr('Aggiungi ai contatti', 'Add to contacts')}

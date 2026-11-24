@@ -3,6 +3,7 @@ import Button from '../ui/Button';
 import Checkbox from '../ui/Checkbox';
 import Field from '../ui/Field';
 import Icon from '../ui/Icon';
+import SearchField from '../ui/SearchField';
 import Select from '../ui/Select';
 import Switch from '../ui/Switch';
 import { call, desktop, errorText } from '../lib/api';
@@ -370,11 +371,10 @@ export default function Settings({
                 </Field>
                 <Field>
                   {tr('Cerca una località per il fuso orario', 'Find a city for the time zone')}
-                  <Input
+                  <SearchField
                     value={form.zoneSearch}
-                    onChange={(e) => (form.zoneSearch = e.currentTarget.value)}
+                    onValueChange={(value) => (form.zoneSearch = value)}
                     placeholder={tr('Roma, Londra, Havana…', 'Rome, London, Havana…')}
-                    type="search"
                   />
                 </Field>
                 <Select

@@ -117,7 +117,7 @@ try {
   assert.equal(await css(header, 'background-color'), await token(page, '--color-paper'));
   assert.equal(await css(header, 'border-top-color'), await token(page, '--color-paper-2'));
   assert.equal(await css(header, 'border-top-width'), '1px');
-  assert.equal(await css(header, 'border-top-left-radius'), '6px');
+  assert.equal(await css(header, 'border-top-left-radius'), '4px');
   const text = (await header.innerText()).replace(/\s+/g, ' ');
   assert.match(text, /From .*Maria/, 'the From row');
   assert.match(text, /To you, person01@example.test, person02@example.test, and 37 more/, 'three names and the rest counted');
@@ -134,7 +134,7 @@ try {
   // (h) Attachments are 32px chips and still open the panel.
   const chip = page.locator('.attachments .attachment').first();
   assert.equal((await box(chip)).height, 32);
-  assert.equal(await css(chip, 'border-top-left-radius'), '6px');
+  assert.equal(await css(chip, 'border-top-left-radius'), '4px');
   await chip.click();
   await expect(page.locator('.attachment-panel')).toBeVisible();
   await page.locator('.attachment-panel').getByRole('button', { name: 'Close attachment' }).click();

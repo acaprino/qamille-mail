@@ -20,6 +20,8 @@ export default defineConfig({
     alias: [
       { find: '@', replacement: fileURLToPath(new URL('./src', import.meta.url)) },
       { find: /^@acaprino\/sigrid$/, replacement: sigrid('dist/index.js') },
+      // Sigrid 6 has an entry for each level (primitives, components, layout, assemblies) and for the heavier assemblies.
+      { find: /^@acaprino\/sigrid\/([a-z-]+)$/, replacement: sigrid('dist/$1.js') },
     ],
     dedupe: ['react', 'react-dom'],
   },

@@ -3,7 +3,7 @@
 // and choose. `ids` names the tab and its panel by value for a panel the caller draws itself; without `ids` no tab
 // carries aria-controls. A count is Sigrid's Count after the label.
 import { useLayoutEffect, useRef } from 'react';
-import { Count, Tabs as SigridTabs, TabsList, TabsTrigger } from '@acaprino/sigrid';
+import { Count, Tabs as SigridTabs, TabsList, TabsTrigger } from '@acaprino/sigrid/primitives';
 
 export type TabItem = {
   value: string;

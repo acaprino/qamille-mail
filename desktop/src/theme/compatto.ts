@@ -14,7 +14,7 @@ export const COMPATTO_PICK: ColorThemePick = { id: 'compatto', label: 'Compatto'
 export const COMPATTO_TONE: ThemeTone = { intensity: 'theme', light: 'theme' };
 
 /**
- * Qamille's density: Sigrid's `compact` (32/28/24 px controls) with the two smaller heights at 32, because every
- * control of Qamille is 32 px high today.
+ * Qamille's density: Sigrid's `compact` as it is (32/28/24 px controls: the dense bars, such as a toolbar, are 28 px), under the
+ * app's own id.
  */
-export const QAMILLE_DENSITY: DensityOverride = { id: 'compatto', label: 'Compatto', control: { sm: 32, xs: 32 } };
+export const QAMILLE_DENSITY: DensityOverride = { id: 'compatto', label: 'Compatto' };

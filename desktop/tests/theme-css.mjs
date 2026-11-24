@@ -38,10 +38,10 @@ test('without the tone «as designed» the indigo would move: the tone is part o
   assert.deepEqual(COMPATTO_TONE, { intensity: 'theme', light: 'theme' });
 });
 
-test('the density is Sigrid’s compact with every control 32 px high', () => {
+test('the density is Sigrid’s compact as it is: 32, 28 and 24 px controls, under the app’s id', () => {
   const density = sigrid.densityWith('compact', QAMILLE_DENSITY);
-  assert.deepEqual(density.control, { md: 32, sm: 32, xs: 32 });
-  assert.equal(density.row.height, 32);
+  assert.deepEqual(density.control, sigrid.densityWith('compact', {}).control);
+  assert.deepEqual(density.control, { md: 32, sm: 28, xs: 24 });
   assert.equal(density.id, 'compatto');
 });
 

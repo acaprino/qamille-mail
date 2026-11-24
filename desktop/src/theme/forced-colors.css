@@ -33,7 +33,6 @@
   .composer-tab.active,
   .attachment.active,
   .mail-display button.active,
-  .format-toolbar button.active,
   .search-filter-button.active {
     outline: 2px solid Highlight;
     outline-offset: -2px;

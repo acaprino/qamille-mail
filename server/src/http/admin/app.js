@@ -397,17 +397,19 @@
       });
     });
 
-    const toggle = el('button', {
-      type: 'button',
-      className: 'secondary',
-      text: user.disabled_at ? 'Riattiva' : 'Disattiva',
+    const toggle = user.disabled_at
+      ? el('button', { type: 'button', className: 'secondary', text: 'Riattiva' })
+      : guardedButton('Disattiva', 'Sì, disattiva', 'danger');
+    const disconnects = 'Disattivando «' + user.username + '» disconnetti tutti i suoi dispositivi. Dopo la riattivazione servirà un nuovo accesso su ciascuno.';
+    toggle.addEventListener('click', () => {
+      if (!user.disabled_at && !secondClick(toggle, disconnects)) return;
+      run(toggle, async () => {
+        const action = user.disabled_at ? 'enable' : 'disable';
+        await api('POST', '/users/' + encodeURIComponent(user.id) + '/' + action);
+        await reloadUsers(user);
+        setStatus(user.disabled_at ? '«' + user.username + '» riattivato.' : '«' + user.username + '» disattivato.');
+      });
     });
-    toggle.addEventListener('click', () => run(toggle, async () => {
-      const action = user.disabled_at ? 'enable' : 'disable';
-      await api('POST', '/users/' + encodeURIComponent(user.id) + '/' + action);
-      await reloadUsers(user);
-      setStatus(user.disabled_at ? '«' + user.username + '» riattivato.' : '«' + user.username + '» disattivato.');
-    }));
 
     const max = el('button', { type: 'button', className: 'secondary', text: 'Massimo di dispositivi…' });
     max.addEventListener('click', () => {
@@ -427,6 +429,7 @@
     });
 
     box.append(reset, max, toggle, remove);
+    if (!user.disabled_at) box.append(el('p', { className: 'hint', text: disconnects }));
     return box;
   }
 

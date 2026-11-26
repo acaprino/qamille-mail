@@ -42,6 +42,9 @@ impl AppError {
     pub fn missing(kind: &str) -> Self {
         Self::new("not_found", format!("{kind} not found"))
     }
+    pub fn delivery_not_started(message: impl Into<String>) -> Self {
+        Self::new("delivery_not_started", message)
+    }
     pub fn external(message: impl Into<String>) -> Self {
         Self::new("external", message)
     }

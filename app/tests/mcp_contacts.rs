@@ -6,17 +6,24 @@ use std::{
     io::Write,
     path::PathBuf,
     process::{Command, Stdio},
+    sync::atomic::{AtomicU64, Ordering},
 };
 
 struct Fixture(PathBuf);
 impl Fixture {
     fn new(access: qamille::model::Access) -> Self {
-        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../checks").join(format!(
-            "qamille-mcp-contacts-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
-        ));
-        std::fs::create_dir_all(&root).unwrap();
+        static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
+        let checks = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../checks");
+        std::fs::create_dir_all(&checks).unwrap();
+        let root = loop {
+            let sequence = NEXT_FIXTURE.fetch_add(1, Ordering::Relaxed);
+            let path = checks.join(format!("qamille-mcp-contacts-{}-{sequence}", std::process::id()));
+            match std::fs::create_dir(&path) {
+                Ok(()) => break path,
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(e) => panic!("failed to create contacts fixture {path:?}: {e}"),
+            }
+        };
         let mut store = qamille::model::sample_store();
         store.settings.mcp_access = access;
         store.drafts.clear();

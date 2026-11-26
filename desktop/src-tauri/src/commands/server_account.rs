@@ -10,7 +10,7 @@ use qamille::{
     },
     domain::{
         model::ComputeMode,
-        server_account::{AccountInfo, BillingPage, CheckoutStatus, DeviceInfo},
+        server_account::{AccountInfo, BillingPage, CheckoutStatus, DeviceInfo, ServerInfo},
     },
     edition::Edition,
 };
@@ -53,19 +53,9 @@ pub async fn server_probe(state: State<'_, DesktopState>, url: String) -> AppRes
     blocking(move || server.probe(&url)).await
 }
 #[tauri::command]
-pub async fn server_record_consent(state: State<'_, DesktopState>, url: String) -> AppResult<()> {
+pub async fn server_record_consent(state: State<'_, DesktopState>, url: String, shown: ServerInfo) -> AppResult<Option<ServerInfo>> {
     let server = state.server.clone();
-    // The consent to the address, and with it the one to the provider the server declares for its
-    // assistant (INV-34). A server without an assistant is not an error.
-    let sync = state.sync.clone();
-    blocking(move || {
-        server.record_consent(&url)?;
-        let _ = server.record_llm_consent(&url);
-        // The consent to keep the mailboxes on the server counts only if it declares it (S6).
-        let _ = sync.record_consent(&url);
-        Ok(())
-    })
-    .await
+    blocking(move || server.confirm_connection(&url, &shown)).await
 }
 /// The person confirmed the provider the server declares now (after `409 llm_consent_required`).
 #[tauri::command]

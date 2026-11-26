@@ -88,6 +88,28 @@ fn recreate(state: &mut ContactsState, at: usize) {
     state.queue.push(QueuedWrite { key, op: WriteOp::Create });
 }
 
+/// Accept only the operation that was actually sent. A concurrent deletion replaces
+/// its queued update with a tombstone even when all contact fields are unchanged.
+fn acknowledge_update(state: &mut ContactsState, sent: &SourceContact, fields: &ContactFields, remote: &RemoteContact) {
+    if !state.queue.iter().any(|q| q.key == sent.key && q.op == WriteOp::Update) {
+        return;
+    }
+    let Some(card) = state.sources.iter_mut().find(|c| c.key == sent.key && !c.deleted) else { return };
+    let unchanged = card.fields == sent.fields;
+    card.etag = Some(remote.etag.clone());
+    card.base = Some(remote.fields.clone());
+    if !remote.unmanaged.is_null() {
+        card.unmanaged = remote.unmanaged.clone();
+    }
+    if unchanged {
+        card.fields = fields.clone();
+        card.sync = SyncState::Synced;
+        state.queue.retain(|q| q.key != sent.key || q.op != WriteOp::Update);
+    } else {
+        card.sync = SyncState::Pending;
+    }
+}
+
 impl ContactService {
     fn fetch_all(&self, account: &crate::domain::model::Account, other: bool, token: Option<&str>) -> AppResult<(Vec<RemoteContact>, Option<String>)> {
         let (mut items, mut next_token, mut page) = (Vec::new(), None, None::<String>);
@@ -126,6 +148,9 @@ impl ContactService {
             BookKind::GoogleOther => true,
             _ => return Err(AppError::validation("This address book is not synchronized with Google")),
         };
+        // A page fetched before a successful write must not be applied after that write.
+        let _process = self.flush_lock.lock().map_err(|_| AppError::storage("Contacts write lock failed"))?;
+        let _shared = self.store.lock_flush()?;
         let state = self.store.read()?;
         if state.settings.sync_off.iter().any(|b| b == book) {
             return Ok(BookSync { book: book.into(), skipped: true, ..Default::default() });
@@ -150,6 +175,11 @@ impl ContactService {
             for item in &items {
                 seen.insert(item.remote_id.clone());
                 let position = state.sources.iter().position(|s| s.book == id && s.remote_id.as_deref() == Some(item.remote_id.as_str()));
+                // The sender will attach Google's identity or remove this card after an interrupted create.
+                if position.is_none() && item.create_request().is_some_and(|request| state.sources.iter().any(|source|
+                    source.book == id && source.create_request.as_deref() == Some(request))) {
+                    continue;
+                }
                 match (position, item.deleted) {
                     (Some(at), true) => {
                         if has_local_edits(state, &state.sources[at]) {
@@ -344,6 +374,9 @@ impl ContactService {
                 continue;
             }
             let state = self.store.read()?;
+            if !state.queue.contains(&entry) {
+                continue;
+            }
             let Some(card) = state.sources.iter().find(|s| s.key == entry.key).cloned() else {
                 self.update_state(|s| {
                     s.queue.retain(|q| q.key != entry.key);
@@ -367,6 +400,9 @@ impl ContactService {
                     let consent = e.code == "consent_required";
                     note(&card.book.0, false, Some(message.clone()));
                     self.update_state(|s| {
+                        if !s.queue.contains(&entry) {
+                            return Ok(());
+                        }
                         if consent {
                             // Permission is missing or was revoked: forget the grant so the next edit asks again,
                             // and keep the card waiting in the queue instead of marking it broken.
@@ -382,34 +418,101 @@ impl ContactService {
         Ok(results.into_iter().map(|(book, (ok, error))| BookOutcome { book, ok, error }).collect())
     }
 
+    fn find_created(&self, account: &crate::domain::model::Account, request_id: &str) -> AppResult<Vec<RemoteContact>> {
+        let (items, _) = self.fetch_all(account, false, None)?;
+        Ok(items.into_iter().filter(|item| !item.deleted && item.create_request() == Some(request_id)).collect())
+    }
+
     fn flush_one(&self, account: &crate::domain::model::Account, card: &SourceContact, op: WriteOp) -> AppResult<Step> {
         let key = card.key.clone();
         match (op, card.remote_id.clone()) {
             (WriteOp::Create, _) | (WriteOp::Update, None) => {
-                let remote = self.gateway.create(account, &card.fields)?;
-                self.update_state(|s| {
-                    let Some(at) = s.sources.iter().position(|c| c.key == key) else { return Ok(()) };
-                    let unchanged = s.sources[at].fields == card.fields;
-                    let c = &mut s.sources[at];
-                    c.remote_id = Some(remote.remote_id.clone());
-                    c.etag = Some(remote.etag.clone());
-                    c.base = Some(remote.fields.clone());
-                    c.unmanaged = remote.unmanaged.clone();
-                    s.queue.retain(|q| q.key != key);
-                    if unchanged {
-                        s.sources[at].sync = SyncState::Synced;
+                let Some((request_id, retry)) = self.update_state(|state| {
+                    let Some(current) = state.sources.iter_mut().find(|c| c.key == key && !c.deleted && c.remote_id.is_none()) else {
+                        return Ok(None);
+                    };
+                    if let Some(id) = &current.create_request {
+                        return Ok(Some((id.clone(), true)));
+                    }
+                    let mut bytes = [0; 16];
+                    getrandom::fill(&mut bytes).map_err(|_| AppError::storage("Cannot identify the Google contact creation"))?;
+                    let id = format!("{:032x}", u128::from_be_bytes(bytes));
+                    current.create_request = Some(id.clone());
+                    Ok(Some((id, false)))
+                })? else { return Ok(Step::Done) };
+                let recovered = if retry {
+                    self.find_created(account, &request_id)?.into_iter().next()
+                } else { None };
+                if retry && recovered.is_none() && !self.store.read()?.sources.iter().any(|c| c.key == key && !c.deleted) {
+                    return Ok(Step::Done);
+                }
+                let sent_fields = recovered.as_ref().map_or(&card.fields, |c| &c.fields).clone();
+                let remote = match recovered {
+                    Some(found) => found,
+                    None => match self.gateway.create(account, &card.fields, &request_id) {
+                        Ok(created) => created,
+                        Err(error) => {
+                            // A refusal on the first attempt cannot have created a contact at Google.
+                            if !retry && matches!(error.code, "unsupported_capability" | "consent_required" | "contacts_permission_denied" | "rate_limited") {
+                                self.update_state(|state| {
+                                    if let Some(current) = state.sources.iter_mut().find(|c| c.key == key) {
+                                        current.create_request = None;
+                                        if current.deleted { drop_source(state, &key); }
+                                    }
+                                    Ok(())
+                                })?;
+                            }
+                            return Err(error);
+                        }
+                    },
+                };
+                self.update_state(|state| {
+                    let Some(current) = state.sources.iter_mut().find(|c| c.key == key) else { return Ok(()) };
+                    current.remote_id = Some(remote.remote_id.clone());
+                    current.etag = Some(remote.etag.clone());
+                    current.base = Some(remote.fields.clone());
+                    current.unmanaged = remote.unmanaged.clone();
+                    current.create_request = None;
+                    if current.deleted {
+                        // The Delete and its newly known remote id now survive a restart together.
+                        return Ok(());
+                    }
+                    state.queue.retain(|q| q.key != key);
+                    if current.fields == sent_fields {
+                        current.sync = SyncState::Synced;
                     } else {
-                        // Edited while the request was in flight: it exists now, so the rest is an update.
-                        s.sources[at].sync = SyncState::Pending;
-                        s.queue.push(QueuedWrite { key: key.clone(), op: WriteOp::Update });
+                        current.sync = SyncState::Pending;
+                        state.queue.push(QueuedWrite { key: key.clone(), op: WriteOp::Update });
                     }
                     Ok(())
                 })?;
                 Ok(Step::Done)
             }
             (WriteOp::Delete, remote_id) => {
-                if let Some(remote_id) = remote_id {
-                    match self.gateway.delete(account, &remote_id) {
+                let ids = match (remote_id, &card.create_request) {
+                    (Some(id), _) => vec![id],
+                    (None, Some(request_id)) => {
+                        let matches = self.find_created(account, request_id)?;
+                        if matches.is_empty() {
+                            // Google may not expose a just-created contact yet. Keep the tombstone.
+                            return Err(AppError::new("create_unconfirmed", "Waiting for Google to confirm the contact creation"));
+                        }
+                        matches.into_iter().map(|c| c.remote_id).collect()
+                    }
+                    (None, None) => Vec::new(),
+                };
+                for (index, remote_id) in ids.iter().enumerate() {
+                    if card.remote_id.is_none() && index + 1 == ids.len() {
+                        // Persist the last resource before deleting it. A retry can now accept its 404.
+                        self.update_state(|state| {
+                            if let Some(current) = state.sources.iter_mut().find(|c| c.key == key) {
+                                current.remote_id = Some(remote_id.clone());
+                                current.create_request = None;
+                            }
+                            Ok(())
+                        })?;
+                    }
+                    match self.gateway.delete(account, remote_id) {
                         Ok(()) => {}
                         Err(e) if e.code == "not_found" => {}
                         Err(e) => return Err(e),
@@ -428,22 +531,7 @@ impl ContactService {
                     match self.gateway.update(account, &remote_id, &etag, &fields, &card.unmanaged) {
                         Ok(remote) => {
                             self.update_state(|s| {
-                                let Some(at) = s.sources.iter().position(|c| c.key == key) else { return Ok(()) };
-                                let unchanged = s.sources[at].fields == card.fields;
-                                let c = &mut s.sources[at];
-                                c.etag = Some(remote.etag.clone());
-                                c.base = Some(remote.fields.clone());
-                                if !remote.unmanaged.is_null() {
-                                    c.unmanaged = remote.unmanaged.clone();
-                                }
-                                if unchanged {
-                                    c.fields = fields.clone();
-                                    c.sync = SyncState::Synced;
-                                    s.queue.retain(|q| q.key != key);
-                                } else {
-                                    // Edited while the request was in flight: keep the newer text and send it next.
-                                    c.sync = SyncState::Pending;
-                                }
+                                acknowledge_update(s, card, &fields, &remote);
                                 Ok(())
                             })?;
                             return Ok(Step::Done);
@@ -458,16 +546,17 @@ impl ContactService {
                                     base = Some(remote.fields.clone());
                                 }
                                 Merge3::Conflict(_) => {
-                                    self.update_state(|s| {
-                                        if let Some(c) = s.sources.iter_mut().find(|c| c.key == key) {
+                                    let conflicted = self.update_state(|s| {
+                                        if let Some(c) = s.sources.iter_mut().find(|c| c.key == key && !c.deleted) {
                                             c.sync = SyncState::Conflict;
                                             c.theirs = Some(remote.fields.clone());
                                             c.etag = Some(remote.etag.clone());
                                             c.unmanaged = remote.unmanaged.clone();
+                                            return Ok(true);
                                         }
-                                        Ok(())
+                                        Ok(false)
                                     })?;
-                                    return Ok(Step::Conflict);
+                                    return Ok(if conflicted { Step::Conflict } else { Step::Done });
                                 }
                             }
                         }
@@ -570,6 +659,26 @@ fn contacts_activity(report: &SyncReport) -> Option<(NewActivity, bool)> {
 mod activity_tests {
     use super::*;
     use crate::domain::activity::{ActivityKind, code};
+
+    #[test]
+    fn a_late_success_for_an_update_preserves_a_queued_deletion() {
+        let sent = SourceContact {
+            key: "c1".into(), book: BookId::google(1), remote_id: Some("people/1".into()),
+            sync: SyncState::Pending, ..Default::default()
+        };
+        let mut state = ContactsState::default();
+        state.sources.push(sent.clone());
+        queue_write(&mut state, &sent.key, WriteOp::Update);
+        drop_source(&mut state, &sent.key);
+        let remote = RemoteContact {
+            remote_id: "people/1".into(), etag: "next".into(), fields: sent.fields.clone(),
+            unmanaged: serde_json::Value::Null, deleted: false,
+        };
+        acknowledge_update(&mut state, &sent, &sent.fields, &remote);
+        assert!(state.sources[0].deleted);
+        assert_eq!(state.sources[0].sync, SyncState::Pending);
+        assert_eq!(state.queue, vec![QueuedWrite { key: sent.key, op: WriteOp::Delete }]);
+    }
 
     fn book(added: usize, updated: usize, removed: usize) -> BookSync {
         BookSync { book: "google:1".into(), added, updated, removed, ..Default::default() }

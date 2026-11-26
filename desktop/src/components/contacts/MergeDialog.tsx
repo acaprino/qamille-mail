@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Badge from '../../ui/Badge';
 import Button from '../../ui/Button';
 import Checkbox from '../../ui/Checkbox';
-import Modal from '../../ui/Modal';
+import Modal, { ModalFooter } from '../../ui/Modal';
 import { errorText } from '../../lib/api';
 import { bookLabel, tr } from '../../lib/i18n';
 import { useReactive } from '../../lib/store';
@@ -216,7 +216,7 @@ export default function MergeDialog({
           {s.failures.join('; ')}
         </p>
       )}
-      <div className="contact-actions">
+      <ModalFooter>
         {finished ? (
           <>
             <p className="muted">
@@ -246,7 +246,7 @@ export default function MergeDialog({
             </Button>
           </>
         )}
-      </div>
+      </ModalFooter>
     </Modal>
   );
 }

@@ -153,6 +153,7 @@ fn next_deadline_is_the_earliest_across_snooze_reminder_send_and_outbox() {
                 send_at: now + 600,
                 requested_send_at: None,
                 error: None,
+                receipt_message_id: None,
                 owner_pid: None,
                 requires_mcp_send: false,
                 source_profile: None,

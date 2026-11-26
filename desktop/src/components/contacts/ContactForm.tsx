@@ -1,6 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react';
 import Button from '../../ui/Button';
-import Modal from '../../ui/Modal';
+import Modal, { ModalFooter } from '../../ui/Modal';
 import Select from '../../ui/Select';
 import { errorText } from '../../lib/api';
 import { tr } from '../../lib/i18n';
@@ -160,14 +160,14 @@ export default function ContactForm({
             {error}
           </p>
         )}
-        <div className="contact-actions">
+        <ModalFooter>
           <Button type="button" variant="secondary" onClick={cancel}>
             {tr('Annulla', 'Cancel')}
           </Button>
           <Button type="submit" variant="primary" disabled={busy}>
             {tr('Salva', 'Save')}
           </Button>
-        </div>
+        </ModalFooter>
       </form>
     </Modal>
   );

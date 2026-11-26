@@ -25,6 +25,15 @@ pub struct RemoteContact {
     pub deleted: bool,
 }
 
+pub const CREATE_REQUEST_KEY: &str = "qamille.contact.create";
+
+impl RemoteContact {
+    pub fn create_request(&self) -> Option<&str> {
+        self.unmanaged["clientData"].as_array()?.iter()
+            .find(|item| item["key"].as_str() == Some(CREATE_REQUEST_KEY))?["value"].as_str()
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct RemotePage {
     pub items: Vec<RemoteContact>,
@@ -35,7 +44,7 @@ pub struct RemotePage {
 pub trait ContactGateway: Send + Sync {
     /// `etag_conflict` marks a stale etag on update; `sync_token_expired` marks an expired token on list.
     fn list(&self, account: &Account, other: bool, page: Option<&str>, sync_token: Option<&str>) -> AppResult<RemotePage>;
-    fn create(&self, account: &Account, fields: &ContactFields) -> AppResult<RemoteContact>;
+    fn create(&self, account: &Account, fields: &ContactFields, request_id: &str) -> AppResult<RemoteContact>;
     fn update(&self, account: &Account, remote_id: &str, etag: &str, fields: &ContactFields, unmanaged: &serde_json::Value) -> AppResult<RemoteContact>;
     fn delete(&self, account: &Account, remote_id: &str) -> AppResult<()>;
     /// One card as the server has it now; used to resolve a stale etag.
@@ -54,7 +63,7 @@ impl ContactGateway for NullContactGateway {
     fn list(&self, _: &Account, _: bool, _: Option<&str>, _: Option<&str>) -> AppResult<RemotePage> {
         unsupported()
     }
-    fn create(&self, _: &Account, _: &ContactFields) -> AppResult<RemoteContact> {
+    fn create(&self, _: &Account, _: &ContactFields, _: &str) -> AppResult<RemoteContact> {
         unsupported()
     }
     fn update(&self, _: &Account, _: &str, _: &str, _: &ContactFields, _: &serde_json::Value) -> AppResult<RemoteContact> {

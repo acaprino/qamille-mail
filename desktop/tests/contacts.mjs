@@ -18,13 +18,13 @@ const tick = (scope, name) => scope.locator('[data-scope="checkbox"][data-part="
 const note = (text) => page.locator('[data-slot="note"]').filter({ hasText: text });
 // «Show hidden» is an item of the address book actions menu, a menu item that is checked or not.
 async function showHidden(on) {
-  await page.getByRole('button', { name: 'More address book actions' }).click();
+  const trigger = page.getByRole('button', { name: 'More address book actions' });
+  await trigger.click();
   const item = page.getByRole('menuitemcheckbox', { name: 'Show hidden' });
-  if (((await item.getAttribute('aria-checked')) === 'true') !== on) await item.click();
-  else await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'More address book actions' }).click();
-  await expect(page.getByRole('menuitemcheckbox', { name: 'Show hidden' })).toHaveAttribute('aria-checked', String(on));
-  await page.keyboard.press('Escape');
+  if ((await item.getAttribute('aria-checked') === 'true') !== on) await item.click();
+  else await item.press('Escape');
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByRole('menu', { name: 'Address book actions' })).toBeHidden();
 }
 const duplicatesButton = () => page.getByRole('button', { name: /^Duplicates/ });
 const results = [];
@@ -179,6 +179,32 @@ try {
     await page.getByRole('button', { name: 'Show again' }).click();
     await showHidden(false);
     await expect(row('Sofia')).toHaveCount(1);
+  });
+
+  await step('Later contact pages can be opened and a new search returns to the first page', async () => {
+    await page.evaluate(async () => {
+      const { previewCommand } = await import('/src/lib/preview.ts');
+      const { emptyContact } = await import('/src/lib/types.ts');
+      for (let i = 0; i <= 500; i++) {
+        const name = 'Page fixture ' + String(i).padStart(3, '0');
+        await previewCommand('contacts_create', { book: 'local', fields: { ...emptyContact(), name } });
+      }
+    });
+    const search = page.getByRole('searchbox', { name: 'Search contacts' });
+    await search.fill('Page fixture');
+    const more = page.getByRole('button', { name: 'Load more contacts' });
+    await expect(row('Page fixture 500')).toHaveCount(0);
+    await row('Page fixture 499').click();
+    await more.click();
+    await expect(row('Page fixture 500')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Page fixture 499' })).toBeVisible();
+    await row('Page fixture 500').click();
+    await expect(page.getByRole('heading', { name: 'Page fixture 500' })).toBeVisible();
+    await search.fill('Page fixture 000');
+    await expect(row('Page fixture 000')).toBeVisible();
+    await expect(row('Page fixture 500')).toHaveCount(0);
+    await expect(more).toHaveCount(0);
+    await search.fill('');
   });
 
   await step('The composer completes recipients from the unified book', async () => {

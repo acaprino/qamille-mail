@@ -36,6 +36,15 @@ pub struct Config {
     pub profiles: BTreeMap<String, Profile>,
     pub worker_autostart: bool,
 }
+/// Authorization reads the same engine as desktop and the standalone worker.
+/// The JSON backup remains in place after SQLite activation.
+pub(crate) fn active_workspace(root: &std::path::Path) -> AppResult<Store> {
+    let lock = OpenOptions::new().read(true).write(true).create(true).truncate(false)
+        .open(root.join("store.lock"))?;
+    lock.lock_shared()?;
+    super::store_migration::read_active_store(root)
+}
+
 pub fn rank(access: Access) -> u8 {
     match access {
         Access::ReadOnly => 0,
@@ -110,8 +119,27 @@ pub fn save_with_autostart(config: &Config) -> AppResult<()> {
     save(config)
 }
 
+pub(super) fn revoke_mailbox(root: &std::path::Path, id: u32) -> AppResult<()> {
+    let _lock = config_lock(root)?;
+    let mut config = load_at(root)?;
+    let mut changed = false;
+    for profile in config.profiles.values_mut() {
+        if let Some(ids) = &mut profile.account_ids {
+            let count = ids.len();
+            ids.retain(|granted| *granted != id);
+            changed |= count != ids.len();
+        }
+    }
+    if changed { publish(&config, root)?; }
+    Ok(())
+}
+
 fn save_at(config: &Config, root: &std::path::Path) -> AppResult<()> {
     validate(config)?;
+    let _lock = config_lock(root)?;
+    publish(config, root)
+}
+fn config_lock(root: &std::path::Path) -> AppResult<File> {
     std::fs::create_dir_all(&root)?;
     let lock = OpenOptions::new()
         .read(true)
@@ -120,6 +148,9 @@ fn save_at(config: &Config, root: &std::path::Path) -> AppResult<()> {
         .truncate(false)
         .open(root.join("mcp-config.lock"))?;
     lock.lock()?;
+    Ok(lock)
+}
+fn publish(config: &Config, root: &std::path::Path) -> AppResult<()> {
     let temp = root.join(format!("mcp-config.{}.tmp", std::process::id()));
     let result = (|| -> AppResult<()> {
         let mut file = File::create(&temp)?;
@@ -198,6 +229,29 @@ mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[test]
+    fn authorization_reads_current_accounts_and_access_after_sqlite_activation() {
+        use crate::application::ports::StoreRepository;
+        use crate::model::Account;
+
+        let f = Fixture::new();
+        let mut backup = Store::default();
+        backup.settings.mcp_access = Access::Send;
+        std::fs::write(f.0.join("store.json"), serde_json::to_vec(&backup).unwrap()).unwrap();
+        crate::infrastructure::store_migration::activate_sqlite(&f.0).unwrap();
+        let sqlite = crate::infrastructure::sqlite_store::SqliteStoreRepository::open(
+            crate::infrastructure::store_migration::sqlite_path(&f.0)
+        ).unwrap();
+        sqlite.transaction(&mut |store| {
+            store.settings.mcp_access = Access::ReadOnly;
+            store.accounts.push(Account { id: 4, ..Default::default() });
+            Ok(())
+        }).unwrap();
+        let current = active_workspace(&f.0).unwrap();
+        assert!(current.settings.mcp_access == Access::ReadOnly);
+        assert!(current.account(4).is_some());
     }
 
     #[test]

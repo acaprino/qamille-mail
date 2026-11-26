@@ -261,6 +261,7 @@ La risposta contiene `device_key` (`spk_dev_` + 64 cifre esadecimali), da mandar
 | `model remove <id> --yes` | Cancella i file di un modello `llm-*`. |
 | `sync keygen` | Stampa una chiave casuale per `QAMILLE_SYNC_KEY` (non apre né configurazione né database). |
 | `sync rekey` | Ricifra tutte le caselle con `QAMILLE_SYNC_KEY` aprendole con `QAMILLE_SYNC_KEY_OLD`; a server fermo, tutto o niente. |
+| `sync after-restore` | Dopo il ripristino del backup, assegna una nuova epoca di sincronizzazione a ciascun utente. Conserva tutti gli elementi e le loro versioni. |
 | `sync reset --yes` | Cancella tutte le caselle salvate sul server (rimedio a una chiave persa); non vuole la chiave. |
 
 `--config <file>` vale per tutti i comandi. Codici d'uscita: 0 riuscito, 1 errore, 2 uso sbagliato.
@@ -362,4 +363,4 @@ docker compose start server
 
 La chiave `QAMILLE_SYNC_KEY` **non** è in questo backup (sta nel `.env`): conservala a parte, e dalla copia di `server.db` da sola le caselle non si leggono.
 
-Per ripristinare, a server fermo, svuota il volume e decomprimi l'archivio con lo stesso comando al contrario (`tar -C /data -xzf …`, senza `:ro`). Il backup contiene email e hash delle password: conservalo cifrato e fuori dal server.
+Per ripristinare, a server fermo, svuota il volume e decomprimi l'archivio con lo stesso comando al contrario (`tar -C /data -xzf …`, senza `:ro`). Prima di riaprire il servizio esegui `docker compose run --rm server sync after-restore`. I desktop rileggeranno tutte le caselle anche se il backup contiene numeri di versione già visti. Il backup contiene email e hash delle password: conservalo cifrato e fuori dal server.

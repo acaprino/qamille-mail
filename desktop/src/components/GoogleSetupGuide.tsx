@@ -1,7 +1,7 @@
 import { useState, type MouseEvent } from 'react';
 import Button from '../ui/Button';
 import Icon from '../ui/Icon';
-import Modal from '../ui/Modal';
+import Modal, { ModalFooter } from '../ui/Modal';
 import { openExternal } from '../lib/external-link';
 import { tr } from '../lib/i18n';
 import './GoogleSetupGuide.css';
@@ -190,14 +190,14 @@ export default function GoogleSetupGuide({ close, configure }: GoogleSetupGuideP
           {linkError}
         </p>
       )}
-      <div className="google-setup-actions">
+      <ModalFooter>
         <Button variant="secondary" onClick={close}>
           {tr('Chiudi', 'Close')}
         </Button>
         <Button variant="primary" onClick={configure}>
           {tr('Inserisci credenziali', 'Enter credentials')}
         </Button>
-      </div>
+      </ModalFooter>
     </Modal>
   );
 }

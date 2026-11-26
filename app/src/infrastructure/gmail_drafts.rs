@@ -347,44 +347,47 @@ pub fn send_snapshot(
     id: &str,
     revision: &str,
 ) -> AppResult<()> {
-    let auth = token(account)?;
-    let url = path(id)?;
-    let current = get(&format!("{url}?format=minimal"), &auth)?;
-    if current["message"]["id"].as_str() != Some(revision) {
-        return Err(AppError::new(
-            "revision_conflict",
-            "The cloud draft changed after it was queued; review it before sending",
-        ));
-    }
-    let bcc = message.bcc.join(", ");
-    let outgoing = super::mail::Outgoing {
-        message_id: message.message_id,
-        to: message.to,
-        cc: message.cc,
-        bcc: message.bcc,
-        subject: message.subject,
-        body: message.plain,
-        html: message.html,
-        in_reply_to: message.in_reply_to,
-        attachments: message.attachments,
-    };
-    let mut bytes = super::mail::build_message(account, name, &outgoing)
-        .map_err(AppError::validation)?
-        .formatted();
-    if !bcc.is_empty() {
-        let mut header = format!("Bcc: {bcc}\r\n").into_bytes();
-        header.extend(bytes);
-        bytes = header;
-    }
-    agent()
-        .put(&url)
-        .header("Authorization", format!("Bearer {auth}"))
-        .send_json(json!({"message":{"raw":encode(&bytes)}}))
-        .map_err(|e| {
-            AppError::external(format!(
-                "Cloud draft preparation failed; synchronize before retrying: {e}"
-            ))
-        })?;
+    let auth = (|| -> AppResult<String> {
+        let auth = token(account)?;
+        let url = path(id)?;
+        let current = get(&format!("{url}?format=minimal"), &auth)?;
+        if current["message"]["id"].as_str() != Some(revision) {
+            return Err(AppError::new(
+                "revision_conflict",
+                "The cloud draft changed after it was queued; review it before sending",
+            ));
+        }
+        let bcc = message.bcc.join(", ");
+        let outgoing = super::mail::Outgoing {
+            message_id: message.message_id,
+            to: message.to,
+            cc: message.cc,
+            bcc: message.bcc,
+            subject: message.subject,
+            body: message.plain,
+            html: message.html,
+            in_reply_to: message.in_reply_to,
+            attachments: message.attachments,
+        };
+        let mut bytes = super::mail::build_message(account, name, &outgoing)
+            .map_err(AppError::validation)?
+            .formatted();
+        if !bcc.is_empty() {
+            let mut header = format!("Bcc: {bcc}\r\n").into_bytes();
+            header.extend(bytes);
+            bytes = header;
+        }
+        agent()
+            .put(&url)
+            .header("Authorization", format!("Bearer {auth}"))
+            .send_json(json!({"message":{"raw":encode(&bytes)}}))
+            .map_err(|e| {
+                AppError::external(format!(
+                    "Cloud draft preparation failed; synchronize before retrying: {e}"
+                ))
+            })?;
+        Ok(auth)
+    })().map_err(|error| AppError::delivery_not_started(error.message))?;
     agent()
         .post(format!("{BASE}/send"))
         .header("Authorization", format!("Bearer {auth}"))

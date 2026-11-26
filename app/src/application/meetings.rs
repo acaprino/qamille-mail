@@ -23,6 +23,7 @@ pub struct MeetingService {
     audio: Arc<dyn AudioCapture>,
     processor: Arc<dyn MeetingProcessor>,
     controls: Controls,
+    interrupted: Arc<Mutex<std::collections::BTreeMap<(i64, u64), CaptureSnapshot>>>,
     pending_results: Arc<Mutex<HashMap<(u64, String), MeetingJobCheckpoint>>>,
     job_gate: Arc<Mutex<()>>,
     capture_gate: Arc<Mutex<()>>,
@@ -47,6 +48,7 @@ impl MeetingService {
             repository,
             audio,
             processor,
+            interrupted: Arc::default(),
             controls: Arc::new(Mutex::new(HashMap::new())),
             pending_results: Arc::new(Mutex::new(HashMap::new())),
             job_gate: Arc::new(Mutex::new(())),
@@ -207,6 +209,32 @@ impl MeetingService {
         }
         Ok(())
     }
+    /// The indicator needs only the newest interrupted recording and its two clocks.
+    /// Recovery seeds the index once; each persisted capture transition updates it.
+    pub fn interrupted_capture(&self) -> Option<CaptureSnapshot> {
+        self.interrupted.lock().unwrap_or_else(|e| e.into_inner())
+            .last_key_value().map(|(_, capture)| capture.clone())
+    }
+
+    fn index_capture(&self, detail: &MeetingDetail) {
+        let key = (detail.meeting.date, detail.meeting.id);
+        let mut index = self.interrupted.lock().unwrap_or_else(|e| e.into_inner());
+        if !detail.deleted && detail.capture.state == CaptureState::Interrupted {
+            index.insert(key, CaptureSnapshot {
+                meeting_id: Some(detail.meeting.id),
+                state: CaptureState::Interrupted,
+                elapsed_ms: detail.capture.elapsed_ms,
+                saved_ms: detail.capture.saved_ms,
+                ..Default::default()
+            });
+        } else if detail.deleted {
+            // Tombstones do not retain the recording date.
+            index.retain(|(_, id), _| *id != detail.meeting.id);
+        } else {
+            index.remove(&key);
+        }
+    }
+
     fn project(&self, detail: &MeetingDetail) -> AppResult<()> {
         self.context.update(|s| {
             s.next_id = s.next_id.max(detail.meeting.id.saturating_add(1));
@@ -235,6 +263,7 @@ impl MeetingService {
                 })?);
             }
             let detail = latest.as_ref().unwrap_or(detail);
+            self.index_capture(detail);
             if detail.deleted {
                 s.meetings.retain(|m| m.id != detail.meeting.id);
             } else if let Some(m) = s.meetings.iter_mut().find(|m| m.id == detail.meeting.id) {
@@ -410,11 +439,12 @@ impl MeetingService {
                 }
             }
             Err(e) => {
-                self.repository.update(id, &mut |d| {
+                let interrupted = self.repository.update(id, &mut |d| {
                     d.capture.state = CaptureState::Interrupted;
                     d.capture.error = Some(e.message.clone());
                     Ok(())
                 })?;
+                self.index_capture(&interrupted);
                 return Err(e);
             }
         }
@@ -465,6 +495,7 @@ impl MeetingService {
         // the transcription and summary jobs this pass interrupted, as they were.
         let mut interrupted_jobs: Vec<(u64, MeetingJob)> = Vec::new();
         for listed in self.repository.list()? {
+            self.index_capture(&listed);
             let job_lease = match self.repository.claim_job(listed.meeting.id) {
                 Ok(lease) => lease,
                 // Another desktop/MCP runtime is still working. Do not mark its

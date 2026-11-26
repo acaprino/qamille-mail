@@ -182,6 +182,56 @@ fn moved_store() -> Store {
 }
 
 #[test]
+fn removing_a_mailbox_from_a_locked_vault_preserves_the_account_and_skips_post_commit_cleanup() {
+    let context = context(moved_store(), LockedVault::new(true));
+    let service = AccountService::new(context.clone(), Arc::new(Google::default()))
+        .with_grant_cleanup(|id, detach| {
+            assert_eq!(id, 900);
+            detach()?;
+            panic!("contact writes must survive a failed removal")
+        });
+    let error = service.remove_account(900).unwrap_err();
+    assert_eq!(error.code, vault_codes::LOCKED);
+    assert!(context.read().unwrap().account(900).is_some());
+}
+
+#[test]
+fn failed_mail_commit_leaves_all_three_credentials_for_retry() {
+    struct RejectFirstCommit {
+        inner: Arc<dyn StoreRepository>,
+        reject: std::sync::atomic::AtomicBool,
+    }
+    impl StoreRepository for RejectFirstCommit {
+        fn read(&self) -> AppResult<Store> { self.inner.read() }
+        fn transaction(&self, operation: &mut dyn FnMut(&mut Store) -> AppResult<()>) -> AppResult<()> {
+            self.inner.transaction(&mut |store| {
+                operation(store)?;
+                if self.reject.swap(false, std::sync::atomic::Ordering::SeqCst) {
+                    return Err(AppError::storage("injected mail commit failure"));
+                }
+                Ok(())
+            })
+        }
+    }
+    let vault = LockedVault::new(false);
+    let keys = ["gmail:moved@example.test", "contacts:900", "calendar:900"];
+    for key in keys { vault.set(key, "value-before-detach").unwrap(); }
+    let mut context = context(moved_store(), vault.clone());
+    let writable = Arc::get_mut(&mut context).unwrap();
+    writable.repository = Arc::new(RejectFirstCommit {
+        inner: writable.repository.clone(), reject: std::sync::atomic::AtomicBool::new(true),
+    });
+    let service = AccountService::new(context.clone(), Arc::new(Google::default()));
+    assert!(service.remove_account(900).is_err());
+    assert!(context.read().unwrap().account(900).is_some());
+    assert!(context.read().unwrap().settings.pending_mailbox_cleanup.is_empty());
+    for key in keys { assert_eq!(vault.get(key).unwrap(), "value-before-detach"); }
+    service.remove_account(900).unwrap();
+    for key in keys { assert!(vault.get(key).unwrap().is_empty()); }
+    assert!(context.read().unwrap().settings.pending_mailbox_cleanup.is_empty());
+}
+
+#[test]
 fn vault_key_locked_here_still_opens_the_workspace() {
     let store = moved_store();
     let accounts = store.accounts.len();

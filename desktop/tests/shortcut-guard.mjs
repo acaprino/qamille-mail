@@ -209,6 +209,10 @@ test('App keyboard(): arrows only from the page, the list or the reader; AltGr i
 
     // Esc empties a search field that has text, leaves an empty one alone, and an IME Escape is not one.
     await search.fill('maria');
+    await page.locator('#search-filters-popover').waitFor();
+    await page.keyboard.press('Escape');
+    await page.locator('#search-filters-popover').waitFor({ state: 'hidden' });
+    assert.equal(await search.inputValue(), 'maria', 'closing the suggestions preserves the query');
     await page.keyboard.press('Escape');
     assert.equal(await search.inputValue(), '', 'Esc empties the search field');
     assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), 'Search mail', 'and keeps the focus in it');

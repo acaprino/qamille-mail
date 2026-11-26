@@ -113,6 +113,14 @@ impl ScopedRepository {
     }
 }
 impl StoreRepository for ScopedRepository {
+    fn includes_local_contacts(&self) -> bool {
+        self.profile.account_ids.is_none() && self.base.includes_local_contacts()
+    }
+    fn append_activity(&self, entry: &crate::domain::activity::NewActivity, at_ms: i64) -> AppResult<Option<i64>> {
+        // The operation has already committed. Keep its audit even when permissions change
+        // between commit and logging. The scoped wrapper exposes no unfiltered history.
+        self.base.append_activity(entry, at_ms)
+    }
     fn read(&self) -> AppResult<Store> {
         let store = self.base.read()?;
         self.verify(&store)?;
@@ -900,6 +908,27 @@ mod tests {
         store
     }
     #[test]
+    fn assistant_actions_reach_the_workspace_activity_log_through_both_wrappers() {
+        use crate::domain::activity::{ActivityFilter, ActivitySource, NewActivity};
+        let root = std::env::temp_dir().join(format!("qamille-mcp-audit-{}-{}",
+            std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let base = Arc::new(MemoryRepository::new(fixture()));
+        let scope = ScopedRepository {
+            base: crate::infrastructure::workspace_guard::modern(base.clone(), &root).unwrap(),
+            name: None,
+            profile: Profile { account_ids: Some(vec![1]), ..Default::default() },
+        };
+        let entry = NewActivity { source: ActivitySource::Assistant, account_id: Some(1), code: "test".into(), ..Default::default() };
+        assert!(scope.append_activity(&entry, 50).unwrap().is_some());
+        let history = base.activity_page(None, 5, ActivityFilter::All).unwrap();
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].source, ActivitySource::Assistant);
+        assert!(scope.activity_page(None, 5, ActivityFilter::All).unwrap().is_empty());
+        drop(scope);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn scoped_commits_preserve_hidden_accounts_and_undo_actions() {
         let base = Arc::new(MemoryRepository::new(fixture()));
         let scope = ScopedRepository {
@@ -910,6 +939,7 @@ mod tests {
                 ..Default::default()
             },
         };
+        assert!(!scope.includes_local_contacts());
         let visible = scope.read().unwrap();
         assert_eq!(visible.accounts.len(), 1);
         assert_eq!(visible.undo_actions.len(), 1);

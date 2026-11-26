@@ -150,7 +150,7 @@ interface AppState {
   /** Accounts whose Spam or Trash, open now, is being fetched from the server (W3.1). */
   fetchingFolder: number[];
   /** The Professional build's first start (spec A8): shown before the main window. */
-  onboarding: AppEdition | null;
+  startup: { phase: 'checking' | 'ready' } | { phase: 'sign-in'; edition: AppEdition };
   fatal: string;
   // A message opened as shown-only stays so until the view changes (see shownOnly).
   openedShownOnly: Set<number>;
@@ -232,7 +232,7 @@ export default function App() {
     printPreview: null,
     historyUnread: null,
     fetchingFolder: [],
-    onboarding: null,
+    startup: { phase: 'checking' },
     fatal: '',
     openedShownOnly: new Set(),
   }));
@@ -251,6 +251,7 @@ export default function App() {
       syncEventAccounts: new Set<number>(),
       listRequest: 0,
       workspaceRequest: 0,
+      startupRequest: 0,
       readRequest: 0,
       rereadSeq: 0,
       // Messages shown as read before the backend has said so (INV-006): opening one marks it at once.
@@ -671,7 +672,7 @@ export default function App() {
     }
   }
   async function refreshRegional() {
-    if (!s.workspace) return;
+    if (s.startup.phase !== 'ready' || !s.workspace) return;
     const previous = `${regionalLocale()}|${regionalTimeZone()}`;
     try {
       await loadWorkspace();
@@ -681,27 +682,39 @@ export default function App() {
     }
   }
   async function init() {
+    const request = ++v.startupRequest;
+    s.startup = { phase: 'checking' };
     s.fatal = '';
     try {
+      const edition = await call<AppEdition>('app_edition');
+      let signIn = false;
+      if (edition.kind === 'professional') {
+        // A server change may clear the previous session. Read the snapshot after that check.
+        await call('server_startup_check');
+        const status = await call<{ connected: boolean }>('server_status');
+        signIn = status.connected !== true;
+      } else if (edition.kind !== 'self-hosted') {
+        throw new Error(tr('Edizione di Qamille sconosciuta.', 'Unrecognized Qamille edition.'));
+      }
+      if (request !== v.startupRequest) return;
       await loadWorkspace();
-      await checkEdition();
+      if (request !== v.startupRequest) return;
+      if (signIn) {
+        s.startup = { phase: 'sign-in', edition };
+        return;
+      }
+      s.startup = { phase: 'ready' };
       await loadMail();
       void loadPeople();
       await tick();
       const first = s.visibleOrder[0] ?? s.page.items[0]?.id;
       if (first !== undefined) await open(first);
     } catch (e) {
-      s.fatal = errorText(e);
+      if (request === v.startupRequest) {
+        s.startup = { phase: 'checking' };
+        s.fatal = errorText(e);
+      }
     }
-  }
-  // The Professional build drops a session of another server (EX-20) and, without a session,
-  // shows its sign-in screen: the Professional app needs an account (owner, 2026-11-19).
-  async function checkEdition() {
-    const edition = await call<AppEdition>('app_edition').catch(() => null);
-    if (edition?.kind !== 'professional') return;
-    if (await call<boolean>('server_startup_check').catch(() => false)) await loadWorkspace();
-    const status = await call<{ connected: boolean }>('server_status').catch(() => null);
-    if (!status?.connected) s.onboarding = edition;
   }
   // A snapshot of the backend that predates a mark must not show its message unread again.
   function emailShownAsRead<T extends { id: number; read: boolean }>(email: T): T {
@@ -1427,7 +1440,7 @@ export default function App() {
       void zoomWindow(zoom);
       return;
     }
-    if (s.printPreview || shortcutCoveredByLayer(e.target)) return;
+    if (s.startup.phase !== 'ready' || s.printPreview || shortcutCoveredByLayer(e.target)) return;
     const inComposer = e.target instanceof HTMLElement && e.target.closest('.composer-panel,.composer-dock');
     const editing = shortcutIgnored(e.target);
     // AltGr is Ctrl+Alt on Windows: a typed character, never a chord (Ctrl+AltGr+K, Ctrl+AltGr+Z).
@@ -1520,10 +1533,12 @@ export default function App() {
   // Sorting/grouping in MailList supplies the actual visible row order.
   const mailView = isMailView();
   const orderKey = s.visibleOrder.join(',');
+  const workspaceReady = s.startup.phase === 'ready';
   useEffect(() => {
+    if (!workspaceReady) return;
     prefetch();
     return () => clearTimeout(v.prefetchTimer);
-  }, [orderKey, mailView]);
+  }, [orderKey, mailView, workspaceReady]);
 
   // Errors stay separate alerts (ADR-0007 decision 7): one per distinct error text, again after a
   // sync without errors cleared it. Progress and completion get no toast; the indicator has them.
@@ -1550,7 +1565,6 @@ export default function App() {
 
   useEffect(() => {
     void init();
-    void refreshActivity();
     const onKeyDown = (event: KeyboardEvent) => latest.current.keyboard(event);
     const onFocus = () => void latest.current.refreshRegional();
     window.addEventListener('keydown', onKeyDown);
@@ -1602,24 +1616,6 @@ export default function App() {
       ),
     );
     unsubscribers.push(installWindowShell());
-    // A click on a Windows notification (lib/notification-open.ts): Rust brought the window back.
-    unsubscribers.push(
-      installNotificationOpen({
-        // The Inbox of the message's account, so the list shows it; a message gone meanwhile (deleted,
-        // moved) leaves the Inbox open without an error.
-        openMail: (id, accountId) =>
-          navigate('Inbox', { id: accountId }, () =>
-            void call<{ folder?: string }[]>('read_rows', { ids: [id] })
-              .then((rows) => {
-                if (rows.some((row) => (row.folder ?? 'Inbox') === 'Inbox')) void open(id);
-              })
-              .catch(() => {}),
-          ),
-        openDrafts: () => navigate('Drafts'),
-        openAccounts: () => (navigate('Settings'), void tick().then(() => settingsPanel.current?.showSection('Accounts'))),
-        openServer: () => (navigate('Settings'), void tick().then(() => settingsPanel.current?.showSection('Compute'))),
-      }),
-    );
     void installWindowCloseHandler(notify)
       .then((unsubscribe) => (disposed ? unsubscribe() : unsubscribers.push(unsubscribe)))
       .catch((error) => notify(errorText(error), true));
@@ -1639,6 +1635,38 @@ export default function App() {
             s.view !== 'Settings' || !s.settingsDirty || (await settingsPanel.current?.save()) !== false,
         },
       ),
+    );
+    return () => {
+      disposed = true;
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('focus', onFocus);
+      colorScheme.removeEventListener('change', systemThemeChanged);
+      unsubscribers.forEach((fn) => fn());
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!workspaceReady) return;
+    let disposed = false;
+    const unsubscribers: (() => void)[] = [];
+    void refreshActivity();
+    // A click on a Windows notification (lib/notification-open.ts): Rust brought the window back.
+    unsubscribers.push(
+      installNotificationOpen({
+        // The Inbox of the message's account, so the list shows it; a message gone meanwhile (deleted,
+        // moved) leaves the Inbox open without an error.
+        openMail: (id, accountId) =>
+          navigate('Inbox', { id: accountId }, () =>
+            void call<{ folder?: string }[]>('read_rows', { ids: [id] })
+              .then((rows) => {
+                if (rows.some((row) => (row.folder ?? 'Inbox') === 'Inbox')) void open(id);
+              })
+              .catch(() => {}),
+          ),
+        openDrafts: () => navigate('Drafts'),
+        openAccounts: () => (navigate('Settings'), void tick().then(() => settingsPanel.current?.showSection('Accounts'))),
+        openServer: () => (navigate('Settings'), void tick().then(() => settingsPanel.current?.showSection('Compute'))),
+      }),
     );
     // Mail links to the composer: a message's, and in the desktop app those Windows hands to Qamille.
     unsubscribers.push(
@@ -1698,21 +1726,18 @@ export default function App() {
     const calendarFirstSync = desktop ? window.setTimeout(syncCalendars, 3000) : 0;
     return () => {
       disposed = true;
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('focus', onFocus);
       window.clearInterval(calendarSync);
       window.clearTimeout(calendarFirstSync);
       window.removeEventListener('preview-workspace-changed', previewChanged);
       window.removeEventListener('app-event', previewAppEvent);
-      colorScheme.removeEventListener('change', systemThemeChanged);
       unsubscribers.forEach((fn) => fn());
       clearTimeout(v.rowsTimer);
       clearTimeout(v.searchTimer);
       clearTimeout(v.prefetchTimer);
     };
-  }, []);
+  }, [workspaceReady]);
 
-  const workspace = s.workspace;
+  const workspace = workspaceReady ? s.workspace : null;
   const view = s.view;
   const drag = desktop ? '' : undefined;
   const listedId = selectedListId();
@@ -1720,7 +1745,7 @@ export default function App() {
 
   return (
     <>
-      {desktop && (s.fatal || !workspace) && (
+      {desktop && s.startup.phase === 'checking' && (
         <header className="startup-window-bar" data-tauri-drag-region="">
           <span data-tauri-drag-region="">Qamille</span>
           <WindowControls onerror={(message) => notify(message, true)} />
@@ -1735,15 +1760,12 @@ export default function App() {
             {tr('Riprova', 'Try again')}
           </Button>
         </main>
-      ) : workspace && s.onboarding ? (
+      ) : s.startup.phase === 'sign-in' ? (
         <Onboarding
-          edition={s.onboarding}
-          consented={workspace.settings.compute_consented_urls ?? []}
+          edition={s.startup.edition}
+          consented={s.workspace?.settings.compute_consented_urls ?? []}
           onerror={(message) => notify(message, true)}
-          onDone={() => {
-            s.onboarding = null;
-            void loadWorkspace();
-          }}
+          onDone={() => void init()}
         />
       ) : workspace ? (
         <div
@@ -2106,7 +2128,7 @@ export default function App() {
         <UndoStack actions={workspace.undo_actions} undo={undoPending} dismiss={dismissPending} />
       )}
       {workspace && <MeetingRecordingIndicator onopen={() => navigate('Meetings')} notify={notify} />}
-      {s.leaveTarget && (
+      {workspace && s.leaveTarget && (
         <UnsavedDialog
           save={() => void finishLeaving(true)}
           discard={() => void finishLeaving(false)}
@@ -2116,7 +2138,7 @@ export default function App() {
           }}
         />
       )}
-      {s.historyUnread && (
+      {workspace && s.historyUnread && (
         <HistoryUnreadDialog
           accountId={s.historyUnread.accountId}
           account={workspace?.accounts.find((a) => a.id === s.historyUnread?.accountId)?.email ?? ''}
@@ -2129,16 +2151,14 @@ export default function App() {
       )}
       <VaultNotice
         notify={notify}
-        setAside={workspace?.credentials_set_aside}
-        changed={() =>
-          void loadWorkspace().then(async () => {
-            // Credentials opened again may hold the server session the onboarding was asking for.
-            if (s.onboarding && (await call<{ connected: boolean }>('server_status').catch(() => null))?.connected)
-              s.onboarding = null;
-          })
-        }
+        setAside={s.workspace?.credentials_set_aside}
+        changed={() => {
+          // A recovered vault can hold the missing session. An open workspace keeps its current view.
+          if (s.startup.phase === 'ready') void refreshWorkspace();
+          else void init();
+        }}
       />
-      {s.printPreview && (
+      {workspace && s.printPreview && (
         <PrintPreview emails={s.printPreview.emails} title={s.printPreview.title} close={() => (s.printPreview = null)} />
       )}
       <UpdateNotice onerror={(message) => notify(message, true)} />

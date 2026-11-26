@@ -538,7 +538,10 @@ impl SyncService {
             }
             return Ok(merged);
         };
-        Ok(merge_changed(&local.item, remote, now, t.account_mac != local.account_mac, t.credential_mac != local.credential_mac))
+        // Version zero marks a tracked row in a restored history. Neither side is a
+        // common baseline there: compare the known times for both parts once.
+        let rebased = t.version == 0;
+        Ok(merge_changed(&local.item, remote, now, rebased || t.account_mac != local.account_mac, rebased || t.credential_mac != local.credential_mac))
     }
     fn track(&self, version: u64, item: &SyncItem, shared_signature: bool) -> AppResult<Tracked> {
         let (account_mac, credential_mac) = self.macs(item, shared_signature)?;
@@ -564,6 +567,9 @@ impl SyncService {
         let mut state = start.clone();
         let mut report = SyncReport::default();
         let result = self.pass(&endpoint, &mut state, now, &mut report);
+        if matches!(&result, Err(error) if error.code == "sync_session_changed") {
+            return Ok(SyncReport { skipped: true, ..Default::default() });
+        }
         // What was learned is kept even when a later step failed, on top of what the state became
         // meanwhile; a state that cannot be saved is not a success.
         let saved = self.with_state(|current| {
@@ -625,32 +631,52 @@ impl SyncService {
         if !settings.mailbox_sync || settings.mailbox_sync_consent.as_deref() != Some(session.url.as_str()) {
             return Ok(None);
         }
-        let Some(endpoint) = self.accounts.endpoint()? else { return Ok(None) };
-        Ok(Some((endpoint, session.user_id)))
+        let user_id = session.user_id.clone();
+        Ok(Some((self.accounts.endpoint_for_session(session)?, user_id)))
+    }
+
+    fn check_session(&self, endpoint: &RemoteEndpoint) -> AppResult<()> {
+        let session = self.accounts.session()?;
+        let store = self.context.read_shared()?;
+        if session.is_some_and(|s| s.url == endpoint.url && s.device_key == endpoint.device_key)
+            && store.settings.mailbox_sync
+            && store.settings.mailbox_sync_consent.as_deref() == Some(endpoint.url.as_str())
+        {
+            return Ok(());
+        }
+        Err(AppError::new("sync_session_changed", "Mailbox synchronization settings changed"))
     }
 
     fn pass(&self, endpoint: &RemoteEndpoint, state: &mut SyncState, now: i64, report: &mut SyncReport) -> AppResult<()> {
         let full = state.epoch.is_none() || now - state.last_full > FULL_LISTING_SECS || now < state.last_full;
         let mut listing = self.server.list(endpoint, if full { 0 } else { state.since })?;
         let mut full = full;
-        if state.epoch.is_some_and(|epoch| epoch != listing.epoch) {
-            // The server started again from nothing (`sync reset`): nothing was removed, the
-            // mailboxes of this computer go up again.
-            state.items.clear();
-            state.pending_deletes.clear();
-            state.removals.clear();
-            state.since = 0;
+        let last_seen = state.items.values().map(|item| item.version)
+            .chain(state.pending_deletes.iter().map(|delete| delete.version))
+            .fold(state.since, u64::max);
+        if state.epoch.is_some_and(|epoch| epoch != listing.epoch) || listing.version < last_seen {
             if !full {
                 listing = self.server.list(endpoint, 0)?;
                 full = true;
             }
+            // Missing rows can be uploaded again. Keep the baseline of rows that still
+            // exist: a tombstone is a real removal even after restore, and a newer local
+            // edit must survive an older restored item. Old version numbers cannot be compared.
+            let restored: BTreeSet<&str> = listing.items.iter().map(|item| item.id.as_str()).collect();
+            state.items.retain(|id, tracked| {
+                tracked.version = 0;
+                restored.contains(id.as_str())
+            });
+            state.since = 0;
         }
+        self.check_session(endpoint)?;
         let mut applied = false;
         // 1. Download.
         let mut present: BTreeSet<String> = BTreeSet::new();
         for remote in &listing.items {
             present.insert(remote.id.clone());
             report.downloaded += 1;
+            self.check_session(endpoint)?;
             applied |= self.apply_remote(state, remote, now, report)?;
         }
         if full {
@@ -697,10 +723,11 @@ impl SyncService {
             let (id, account_mac, credential_mac) = (local.id.clone(), local.account_mac.clone(), local.credential_mac.clone());
             match self.upload(endpoint, state, local, tracked, now, report, &mut applied) {
                 Ok(()) => {}
-                Err(error) if matches!(error.code, "subscription_required" | "unauthorized" | "not_found" | "unreachable") => return Err(error),
+                Err(error) if matches!(error.code, "subscription_required" | "unauthorized" | "not_found" | "unreachable" | "sync_session_changed") => return Err(error),
                 // This mailbox alone is the problem: it is not sent again until it changes.
-                Err(error) if matches!(error.code, "invalid_request" | "payload_too_large" | "sync_limit") => {
+                Err(error) if matches!(error.code, "invalid_request" | "payload_too_large" | "sync_limit" | "unsupported_schema") => {
                     let reason = match error.code {
+                        "unsupported_schema" => "This mailbox was saved by a newer version of Qamille",
                         "payload_too_large" => "This mailbox is too large for the server",
                         "sync_limit" => "The server does not take more synchronized mailboxes",
                         _ => "The server did not accept this mailbox",
@@ -736,9 +763,13 @@ impl SyncService {
         // A mailbox that was added again here meanwhile is not deleted behind its back.
         pending.retain(|d| state.disabled.contains(&d.item_id) || !store.accounts.iter().any(|a| self::item_id(a.resolved_provider_id(), &a.email) == d.item_id));
         for delete in pending {
+            self.check_session(endpoint)?;
             let sent = match self.server.delete(endpoint, &delete.item_id, Some(delete.version)) {
                 // Changed elsewhere since: the person removed it here on purpose, so it goes.
-                Err(error) if error.code == "sync_conflict" => self.server.delete(endpoint, &delete.item_id, None),
+                Err(error) if error.code == "sync_conflict" => {
+                    self.check_session(endpoint)?;
+                    self.server.delete(endpoint, &delete.item_id, None)
+                }
                 other => other,
             };
             match sent {
@@ -770,6 +801,7 @@ impl SyncService {
     ) -> AppResult<()> {
         let mut base = tracked.as_ref().map_or(0, |t| t.version);
         for _ in 0..MAX_ATTEMPTS {
+            self.check_session(endpoint)?;
             match self.server.put(endpoint, &local.id, base, &local.item)? {
                 PutOutcome::Written { version } => {
                     state.items.insert(local.id.clone(), self.track(version, &local.item, local.shared_signature)?);
@@ -777,9 +809,15 @@ impl SyncService {
                     return Ok(());
                 }
                 PutOutcome::Conflict(None) => base = 0,
+                PutOutcome::Conflict(Some(current)) if !current.deleted && current.item.is_none() => {
+                    return Err(AppError::new("unsupported_schema", "This mailbox was saved by a newer version of Qamille"));
+                }
                 PutOutcome::Conflict(Some(current)) => match current.item.filter(|_| !current.deleted) {
                     Some(remote) => {
                         // The copy of another mailbox under this id is not merged into this one.
+                        if remote.schema > sync::SCHEMA {
+                            return Err(AppError::new("unsupported_schema", "This mailbox was saved by a newer version of Qamille"));
+                        }
                         if remote.validate().is_err() || remote.id() != local.id {
                             return Err(AppError::new("server_error", "The server refused the mailbox item"));
                         }
@@ -878,45 +916,26 @@ impl SyncService {
     /// Writes `item` into this computer: the credential in the vault first, then the mailbox, its
     /// signature and, for a personal Google client, the client's id and secret if missing.
     fn apply_item(&self, item: &SyncItem, existing: Option<u32>, now: i64) -> AppResult<bool> {
-        let store = self.context.read_shared()?;
         let provider = item.account.provider_id.as_str();
-        let next_id = store.accounts.iter().map(|a| a.id).max().unwrap_or(0) + 1;
-        let id = existing.unwrap_or(next_id);
+        let (id, was_present) = match existing {
+            Some(id) => (id, true),
+            None => self.context.update(|store| {
+                if let Some(account) = store.accounts.iter().find(|a| a.resolved_provider_id() == provider && a.email.eq_ignore_ascii_case(&item.account.email)) {
+                    return Ok((account.id, true));
+                }
+                let id = store.allocate_mailbox_id().ok_or_else(|| AppError::storage("Mailbox identifiers exhausted"))?;
+                Ok((id, false))
+            })?,
+        };
         let key = if provider == "gmail" { account_key(&item.account.email) } else { provider_account_key(provider, id) };
-        let mut changed = false;
-        if self.context.secrets.get(&key)? != item.credential.value {
-            self.context.secrets.set(&key, &item.credential.value)?;
-            if provider == "gmail" || !item.account.oauth_client_id.is_empty() {
-                forget_access_hook(&item.account.email);
-            }
-            changed = true;
-        }
-        let adopt_client = item
-            .credential
-            .client_secret
-            .as_deref()
-            .filter(|secret| !secret.trim().is_empty())
-            .filter(|_| !item.account.oauth_client_id.is_empty() && !self.clients.is_app_client(&item.account.oauth_client_id))
-            .filter(|_| store.settings.google_client_id.trim().is_empty());
-        if let Some(secret) = adopt_client {
-            self.context.secrets.set(GOOGLE_SECRET, secret)?;
-        }
-        let client_id = item.account.oauth_client_id.clone();
-        let adopt = adopt_client.is_some();
-        let result = self.context.update(|store| {
+        self.context.update(|store| {
             let mut touched = false;
-            if adopt {
-                store.settings.google_client_id = client_id.clone();
-                touched = true;
-            }
-            let position = match existing {
-                Some(id) => store.accounts.iter().position(|a| a.id == id),
-                None => store.accounts.iter().position(|a| a.resolved_provider_id() == provider && a.email.eq_ignore_ascii_case(&item.account.email)),
-            };
+            let position = store.accounts.iter().position(|a| a.resolved_provider_id() == provider && a.email.eq_ignore_ascii_case(&item.account.email));
             let index = match position {
-                Some(index) => index,
+                Some(index) if store.accounts[index].id == id => index,
+                Some(_) => return Err(AppError::storage("The mailbox identity changed during synchronization; it will be retried")),
                 None => {
-                    if store.accounts.iter().map(|a| a.id).max().unwrap_or(0) + 1 != id {
+                    if was_present || store.account(id).is_some() {
                         return Err(AppError::storage("The mailbox list changed while it was being synchronized; it will be retried"));
                     }
                     store.accounts.push(Account {
@@ -932,6 +951,22 @@ impl SyncService {
                     store.accounts.len() - 1
                 }
             };
+            // Under the mailbox writer lock, a retirement cannot mistake this credential for its own.
+            if self.context.secrets.get(&key)? != item.credential.value {
+                self.context.secrets.set(&key, &item.credential.value)?;
+                if provider == "gmail" || !item.account.oauth_client_id.is_empty() {
+                    forget_access_hook(&item.account.email);
+                }
+                touched = true;
+            }
+            if let Some(secret) = item.credential.client_secret.as_deref().filter(|secret| !secret.trim().is_empty())
+                .filter(|_| store.settings.google_client_id.trim().is_empty())
+                .filter(|_| !item.account.oauth_client_id.is_empty() && !self.clients.is_app_client(&item.account.oauth_client_id))
+            {
+                self.context.secrets.set(GOOGLE_SECRET, secret)?;
+                store.settings.google_client_id = item.account.oauth_client_id.clone();
+                touched = true;
+            }
             let a = &mut store.accounts[index];
             let a_before = (a.name.clone(), a.color, a.imap_host.clone(), a.imap_port, a.smtp_host.clone(), a.smtp_port, a.username.clone(), a.oauth_client_id.clone(), a.archive_folder.clone(), a.trash_folder.clone());
             a.name = item.account.name.clone();
@@ -969,8 +1004,7 @@ impl SyncService {
                 _ => {}
             }
             Ok(touched)
-        })?;
-        Ok(changed | result)
+        })
     }
 
     // ---- revocation (S5) ---------------------------------------------------------------------
@@ -1118,7 +1152,7 @@ static FORGET_ACCESS: Mutex<Option<Box<dyn Fn(&str) + Send>>> = Mutex::new(None)
 pub fn set_forget_access(hook: Box<dyn Fn(&str) + Send>) {
     *lock(&FORGET_ACCESS) = Some(hook);
 }
-fn forget_access_hook(email: &str) {
+pub(super) fn forget_access_hook(email: &str) {
     if let Some(hook) = lock(&FORGET_ACCESS).as_ref() {
         hook(email);
     }

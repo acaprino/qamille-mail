@@ -28,6 +28,7 @@ permissions = [
   "allow-meeting-read",
   "allow-meeting-start",
   "allow-meeting-capture-status",
+  "allow-meeting-interrupted-capture",
   "allow-meeting-pause",
   "allow-meeting-resume",
   "allow-meeting-stop",

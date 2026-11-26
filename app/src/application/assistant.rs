@@ -5,6 +5,7 @@ use super::{
 use crate::domain::rules;
 use serde::Serialize;
 use std::sync::Arc;
+use unicode_normalization::UnicodeNormalization;
 
 #[derive(Serialize)]
 pub struct Answer {
@@ -12,6 +13,83 @@ pub struct Answer {
     pub sources: Vec<SearchHit>,
     pub meeting_sources: Vec<crate::domain::meeting::MeetingHit>,
 }
+
+/// Normalize punctuation, case and equivalent Unicode spellings before matching a title.
+pub(crate) fn normalized_words(text: &str) -> Vec<String> {
+    let normalized: String = text.nfkc().flat_map(char::to_lowercase).collect();
+    normalized.split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+
+pub(crate) fn title_in_question(question: &[String], title: &str) -> bool {
+    let title = normalized_words(title);
+    !title.is_empty() && question.windows(title.len()).any(|phrase| phrase == title.as_slice())
+}
+
+/// Only an agenda request may include calendar data. For a named event, use that event;
+/// for an overview, include the next few titles and dates. Notes require a named event.
+pub(crate) fn calendar_context(events: &[crate::model::Event], question: &str, now: i64) -> String {
+    let words = normalized_words(question);
+    let question = question.to_lowercase();
+    let calendar_named = words.iter().any(|word| matches!(word.as_str(), "agenda" | "calendar" | "calendario"
+        | "appuntamento" | "appuntamenti" | "appointment" | "appointments"
+        | "event" | "events" | "evento" | "eventi" | "schedule"));
+    if !calendar_named { return String::new(); }
+    // An event mentioned by title in an email request is still mail context. Only a
+    // request explicitly combining both sources may bring that event into the prompt.
+    if words.iter().any(|word| is_mail_word(word))
+        && !["email and calendar", "emails and calendar", "mail and calendar", "calendar and mail",
+            "calendar and email", "posta e calendario", "email e calendario", "calendario e posta",
+            "calendario e mail", "calendario e email"].iter().any(|sources| question.contains(*sources))
+    {
+        return String::new();
+    }
+    let mut upcoming: Vec<_> = events.iter().filter(|event| event.end >= now).collect();
+    let named = |event: &crate::model::Event| title_in_question(&words, &event.title);
+    let has_named_event = upcoming.iter().any(|e| named(e));
+    // Merely mentioning the calendar in a mail search is not a request to open it.
+    let overview = matches!(question.trim(), "agenda" | "calendar" | "calendario")
+        || ["show my calendar", "show me my calendar", "what's on my calendar", "what is on my calendar",
+            "what's my schedule", "what is my schedule", "list my appointments", "list my events",
+            "mostra la mia agenda", "mostrami la mia agenda", "mostra il mio calendario",
+            "mostrami il mio calendario", "cosa ho in agenda", "quali appuntamenti ho",
+            "quali eventi ho", "elenca gli appuntamenti"].iter().any(|prefix| question.trim_start().starts_with(*prefix));
+    if !has_named_event && !overview { return String::new(); }
+    let wants_notes = words.iter().any(|word| matches!(word.as_str(), "notes" | "note" | "appunti"));
+    upcoming.retain(|event| if has_named_event { named(event) } else {
+        event.start < now.saturating_add(14 * 86_400)
+    });
+    upcoming.sort_by_key(|event| (event.start, event.id));
+    let mut context = String::new();
+    for event in upcoming.into_iter().take(8) {
+        let title: String = event.title.chars().take(180).collect();
+        context.push_str(&format!("Event {title} on {}\n", rules::fmt_full(event.start)));
+        if has_named_event && wants_notes {
+            context.extend(event.notes.chars().take(500));
+            context.push('\n');
+        }
+    }
+    context
+}
+
+fn is_mail_word(word: &str) -> bool {
+    matches!(word, "mail" | "email" | "emails" | "inbox" | "posta")
+}
+
+/// A question specifically about mail should not retrieve meeting notes alongside it.
+pub(crate) fn include_meeting_sources(question: &str) -> bool {
+    let question = question.to_lowercase();
+    let mut mail = false;
+    let mut meetings = false;
+    for word in question.split(|c: char| !c.is_alphanumeric()) {
+        mail |= is_mail_word(word);
+        meetings |= matches!(word, "meeting" | "meetings" | "riunione" | "riunioni" | "transcript" | "trascrizione" | "verbale");
+    }
+    !mail || meetings
+}
+
 #[derive(Clone)]
 pub struct AssistantService {
     context: Arc<ServiceContext>,
@@ -79,20 +157,9 @@ impl AssistantService {
                 ));
             }
         }
-        for e in store
-            .events
-            .iter()
-            .filter(|e| e.end >= self.context.clock.now())
-        {
-            context.push_str(&format!(
-                "Event {} on {}: {}\n",
-                e.title,
-                rules::fmt_full(e.start),
-                e.notes
-            ));
-        }
+        context.push_str(&calendar_context(&store.events, question, self.context.clock.now()));
         let mut meeting_sources = vec![];
-        if let Some(meetings) = &self.meetings {
+        if let Some(meetings) = &self.meetings && include_meeting_sources(question) {
             let stop_words = ["the", "and", "what", "about", "meeting", "meetings", "quale", "quali", "della", "delle", "degli", "abbiamo", "sono", "cosa", "come", "per", "con", "che", "una", "del", "nel"];
             let mut seen = std::collections::HashSet::new();
             for term in question.split(|c: char| !c.is_alphanumeric()).map(str::to_lowercase)
@@ -205,5 +272,45 @@ impl AssistantService {
     }
     pub fn install_status(&self) -> super::ports::ModelInstallStatus {
         self.search.install_status()
+    }
+}
+
+#[cfg(test)]
+mod calendar_privacy_tests {
+    use super::*;
+    use crate::model::Event;
+
+    #[test]
+    fn calendar_notes_require_consecutive_whole_title_words() {
+        let events = [
+            Event { title: "AI".into(), notes: "reserved".into(), start: 50, end: 51, ..Default::default() },
+            Event { title: "Caffè—Budget".into(), notes: "forecast".into(), start: 52, end: 53, ..Default::default() },
+        ];
+        assert!(calendar_context(&events, "Quali note del calendario non hai mai letto?", 42).is_empty());
+        assert!(calendar_context(&events, "Note del calendario per caffè e budget?", 42).is_empty());
+        let short = calendar_context(&events, "Note del calendario per «AI»?", 42);
+        assert!(short.contains("reserved") && !short.contains("forecast"));
+        let compound = calendar_context(&events, "Note del calendario per CAFFE\u{300} / BUDGET?", 42);
+        assert!(compound.contains("forecast") && !compound.contains("reserved"));
+        assert!(!title_in_question(&normalized_words("calendar notes"), "—"));
+    }
+
+    #[test]
+    fn mail_question_omits_agenda_and_calendar_overview_omits_private_notes() {
+        let events = [
+            Event { title: "Clinic".into(), notes: "sensitive".into(), start: 50, end: 51, ..Default::default() },
+            Event { title: "Budget review".into(), notes: "forecast".into(), start: 52, end: 53, ..Default::default() },
+        ];
+        assert!(calendar_context(&events, "Find the invoice email", 42).is_empty());
+        assert!(calendar_context(&events, "Find the email about the calendar", 42).is_empty());
+        assert!(calendar_context(&events, "Find the email about calendar notes for Budget review", 42).is_empty());
+        assert!(!include_meeting_sources("Find the email about the invoice"));
+        assert!(include_meeting_sources("Find email and meeting notes about the invoice"));
+        let agenda = calendar_context(&events, "Mostrami la mia agenda", 42);
+        assert!(agenda.contains("Clinic") && agenda.contains("Budget review"));
+        assert!(!agenda.contains("sensitive") && !agenda.contains("forecast"));
+        let named = calendar_context(&events, "Calendar notes for Budget review?", 42);
+        assert!(named.contains("forecast"));
+        assert!(!named.contains("Clinic") && !named.contains("sensitive"));
     }
 }

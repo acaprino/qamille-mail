@@ -66,6 +66,8 @@ jobs:
       - name: App tests
         # Every test file runs even after one fails: a failure must not hide the ones after it.
         run: cargo test --manifest-path app/Cargo.toml --no-default-features --features test-support --jobs 2 --locked --no-fail-fast
+      - name: Compile the legacy native UI
+        run: cargo check --manifest-path app/Cargo.toml --locked --features native-ui --jobs 2
 
   desktop:
     runs-on: windows-latest
@@ -92,9 +94,8 @@ jobs:
       # Qamille relies only on Sigrid: no file outside PENDING imports what Sigrid already carries.
       - run: node --test tests/only-sigrid.mjs
       - run: npm run test:ui
-      # Browser tests of the preview that guard the editions (Edge is on the Windows runner); the sign-in screens
-      # they pass through are kept as an artifact, to be looked at.
-      - run: npm run test:browser -- onboarding-professional
+      # Check the critical user paths on every PR. The opt-in workflow runs the remaining suites.
+      - run: npm run test:browser -- onboarding-professional contacts calendar-flow mailbox-sync-ui modal-actions-edge shortcut-guard meetings admin-disable sigrid-words
         env:
           QAMILLE_SHOTS_DIR: ${{ runner.temp }}/screens
       - uses: actions/upload-artifact@v4
@@ -104,3 +105,96 @@ jobs:
           path: ${{ runner.temp }}/screens
           if-no-files-found: ignore
           retention-days: 7
+
+  native:
+    name: Native Windows shell
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: desktop
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/app/target
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri -> ../../app/target
+          cache-on-failure: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm run test:native-feel
+      - name: Test native shell rules
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked --jobs 2 --release --features custom-protocol
+      - name: Build native executable with embedded UI
+        run: |
+          cargo build --manifest-path src-tauri/Cargo.toml --locked --jobs 2 --release --features custom-protocol
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-Item -LiteralPath "$env:CARGO_TARGET_DIR/release/qamille-desktop.exe" -ErrorAction Stop | Select-Object Name, Length
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-packaged-app
+          path: |
+            ${{ github.workspace }}/app/target/release/qamille-desktop.exe
+            ${{ github.workspace }}/app/target/release/*.dll
+          if-no-files-found: error
+          retention-days: 3
+
+  native-startup:
+    name: Open packaged app on Windows
+    needs: native
+    # WebView2 automation on Server 2025: actions/runner-images#14738.
+    runs-on: windows-2022
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-packaged-app
+          path: ${{ runner.temp }}/qamille-smoke
+      - name: Check Windows session and provision WebView2 Evergreen
+        shell: pwsh
+        run: |
+          $session = (Get-Process -Id $PID).SessionId
+          Write-Host "Image $env:ImageOS $env:ImageVersion; session $session; interactive: $([Environment]::UserInteractive)"
+          function Get-WebView2Version {
+            $client = 'Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+            foreach ($key in "HKLM:\SOFTWARE\WOW6432Node\$client", "HKCU:\Software\$client") {
+              $value = Get-ItemPropertyValue -LiteralPath $key -Name pv -ErrorAction SilentlyContinue
+              [version]$version = $null
+              if ([version]::TryParse([string]$value, [ref]$version) -and $version -gt [version]'0.0.0.0') { return $version }
+            }
+          }
+          $runtime = Get-WebView2Version
+          if (-not $runtime) {
+            $installer = Join-Path $env:RUNNER_TEMP 'MicrosoftEdgeWebview2Setup.exe'
+            Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $installer
+            $signature = Get-AuthenticodeSignature -LiteralPath $installer
+            if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation(?:,|$)') {
+              throw 'The Evergreen bootstrapper does not have a valid Microsoft signature.'
+            }
+            $setup = Start-Process -FilePath $installer -ArgumentList '/silent','/install' -Wait -PassThru -WindowStyle Hidden
+            $runtime = Get-WebView2Version
+            if (-not $runtime) { throw "WebView2 Evergreen is unavailable after setup (exit $($setup.ExitCode))." }
+          }
+          Write-Host "Installed WebView2 Evergreen version: $runtime"
+      - name: Open the packaged application with a synthetic workspace
+        env:
+          QAMILLE_STARTUP_EXE: ${{ runner.temp }}/qamille-smoke/qamille-desktop.exe
+        run: npm run test:startup:native

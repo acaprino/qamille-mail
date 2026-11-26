@@ -14,7 +14,6 @@ import {
   requestMeetingOpen,
   stateLabel,
   type CaptureSnapshot,
-  type MeetingPage,
 } from '../../lib/meetings';
 import { cn } from '../../lib/utils';
 import './MeetingRecordingIndicator.css';
@@ -65,15 +64,7 @@ export default function MeetingRecordingIndicator({ onopen, notify }: MeetingRec
         publishCapture(value);
         if (value.state === 'idle') {
           if (previousLiveState !== 'idle' || Date.now() - recoveryCheckedAt >= 5000) {
-            const page = await meetingCall<MeetingPage>('meeting_list_page', {
-              offset: 0,
-              limit: 1,
-              fromDate: null,
-              toDate: null,
-              state: 'interrupted',
-            });
-            const interrupted = page.items[0];
-            recoveryCapture = interrupted ? { ...interrupted.capture, meeting_id: interrupted.meeting.id } : null;
+            recoveryCapture = await meetingCall<CaptureSnapshot | null>('meeting_interrupted_capture');
             recoveryCheckedAt = Date.now();
           }
           if (alive) show(recoveryCapture || value);

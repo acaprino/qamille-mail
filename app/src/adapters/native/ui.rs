@@ -199,7 +199,13 @@ pub struct App {
 impl App {
     pub fn new(cc: &eframe::CreationContext<'_>, screenshot: Option<PathBuf>) -> App {
         // Screenshots always show sample mail, so real mail never ends up in a picture.
-        let store = if screenshot.is_some() { crate::model::sample_store() } else { Store::load_or_default() };
+        let store = if screenshot.is_some() {
+            crate::model::sample_store()
+        } else {
+            let mut store = Store::load_or_default();
+            crate::infrastructure::mailbox_access::retry_legacy(&mut store);
+            store
+        };
         let (tx, rx) = channel();
         let mut app = App {
             selected: None,
@@ -609,22 +615,27 @@ impl App {
         let store = self.store.clone();
         let index = self.index.clone();
         let compute = self.compute.clone();
+        // Screenshot mode contains synthetic meetings only.
+        let search_meeting_dir = self.screenshot.is_none().then(|| Store::data_dir().join("meetings"));
         self.spawn(move || {
             const SOURCES: usize = 8; // estimated
             let (hits, _) = rag::hybrid_search(&store, &index, &q, SOURCES, &*compute);
             let mut context = rag::context_from_hits(&store, &hits);
-            let now = Local::now();
-            let upcoming: Vec<String> = store
-                .events
-                .iter()
-                .filter(|e| e.end >= now.timestamp() && e.start < now.timestamp() + 14 * 86_400)
-                .map(|e| format!("Event: {} on {} ({})", e.title, crate::infrastructure::timezone::format_timestamp(&store.settings, e.start), e.location))
-                .collect();
-            if !upcoming.is_empty() {
-                context.push_str(&format!("Calendar:\n{}\n", upcoming.join("\n")));
-            }
-            for m in &store.meetings {
-                context.push_str(&format!("Meeting {} on {}: {}\n", m.title, crate::infrastructure::timezone::format_timestamp(&store.settings, m.date), m.summary));
+            context.push_str(&crate::application::assistant::calendar_context(
+                &store.events, &q, Local::now().timestamp(),
+            ));
+            if let Some(dir) = search_meeting_dir && crate::application::assistant::include_meeting_sources(&q) {
+                let question = crate::application::assistant::normalized_words(&q);
+                if let Ok(details) = crate::infrastructure::meeting_repository::merged_details(dir, &store.meetings) {
+                    for detail in details.iter().filter(|detail| {
+                        detail.included_in_search
+                            && crate::application::assistant::title_in_question(&question, &detail.meeting.title)
+                    }).take(SOURCES) {
+                        let meeting = &detail.meeting;
+                        let summary: String = meeting.summary.chars().take(1200).collect();
+                        context.push_str(&format!("Meeting {} on {}: {summary}\n", meeting.title, crate::infrastructure::timezone::format_timestamp(&store.settings, meeting.date)));
+                    }
+                }
             }
             let answer = ai::ask_assistant(&store.settings, &q, &context);
             Msg::Answer { question: q, answer, sources: hits.iter().map(|h| h.email_id).collect() }
@@ -726,9 +737,9 @@ impl App {
         let mut d = self.new_draft();
         d.account_id = e.account_id;
         d.reply_to = Some(email_id);
-        d.to = e.from_addr.clone();
+        d.to = e.reply_recipients().join(", ");
         if all {
-            let others: Vec<String> = e.to.iter().chain(e.cc.iter()).filter(|x| x.to_lowercase() != own && **x != e.from_addr).cloned().collect();
+            let others: Vec<String> = e.to.iter().chain(e.cc.iter()).filter(|x| x.to_lowercase() != own && !e.reply_recipients().iter().any(|to| to.eq_ignore_ascii_case(x))).cloned().collect();
             d.cc = others.join(", ");
         }
         d.subject = if e.subject.to_lowercase().starts_with("re:") { e.subject.clone() } else { format!("Re: {}", e.subject) };
@@ -2509,13 +2520,12 @@ impl App {
             });
         }
         if let Some(id) = remove {
-            if let Some(a) = accounts.iter().find(|a| a.id == id).filter(|a| a.kind == AccountKind::Gmail) {
-                let _ = secret::set(&secret::account_key(&a.email), "");
-                crate::infrastructure::oauth::forget_access_token(&a.email);
+            if self.screenshot.is_some() {
+                self.store.detach_mailbox(id, now_ts());
+            } else if let Err(error) = crate::infrastructure::mailbox_access::retire_legacy(&mut self.store, id) {
+                self.status = format!("Could not remove the mailbox: {error}");
+                return;
             }
-            self.store.accounts.retain(|a| a.id != id);
-            self.store.emails.retain(|e| e.account_id != id);
-            self.store.drafts.retain(|d| d.account_id != id);
             self.selected = None;
             self.dirty = true;
             self.start_indexing();
@@ -2615,7 +2625,7 @@ impl App {
             return;
         }
         let existing = self.store.accounts.iter().find(|a| a.email.eq_ignore_ascii_case(f.email.trim()));
-        let id = existing.map(|a| a.id).unwrap_or_else(|| self.store.accounts.iter().map(|a| a.id).max().unwrap_or(0) + 1);
+        let id = existing.map_or(0, |a| a.id);
         let color = existing.map(|a| a.color).unwrap_or(ACCOUNT_COLORS[id as usize % ACCOUNT_COLORS.len()]);
         let acc = mail::gmail_account(id, &f.name, &f.email, &f.password, color);
         self.checking_login = true;
@@ -2640,7 +2650,7 @@ impl App {
                 Err(e) => return Msg::LoginChecked { account: Account::default(), is_new: true, result: Err(e) },
             };
             let existing = known.iter().find(|k| k.1.eq_ignore_ascii_case(&email));
-            let id = existing.map(|k| k.0).unwrap_or_else(|| known.iter().map(|k| k.0).max().unwrap_or(0) + 1);
+            let id = existing.map_or(0, |k| k.0);
             let color = existing.map(|k| k.2).unwrap_or(ACCOUNT_COLORS[id as usize % ACCOUNT_COLORS.len()]);
             let account = mail::oauth_account(id, &email, &client_id, &tokens.refresh, color);
             let result = mail::check_login(&account);
@@ -2648,19 +2658,31 @@ impl App {
         });
     }
 
-    fn finish_add_account(&mut self, acc: Account) {
-        if let Err(e) = secret::set(&secret::account_key(&acc.email), &acc.password) {
-            self.login_result = Some(Err(format!("Sign-in works, but the password couldn't be stored safely, so the account wasn't added: {e}")));
-            return;
-        }
+    fn finish_add_account(&mut self, mut acc: Account) {
+        let mut connected = self.store.clone();
         // The first real account replaces the sample mail.
-        let sample: Vec<u32> = self.store.accounts.iter().filter(|a| a.kind == AccountKind::Sample).map(|a| a.id).collect();
-        self.store.emails.retain(|e| !sample.contains(&e.account_id));
-        self.store.drafts.retain(|d| !sample.contains(&d.account_id));
-        self.store.accounts.retain(|a| a.kind != AccountKind::Sample);
+        let sample: Vec<u32> = connected.accounts.iter().filter(|a| a.kind == AccountKind::Sample).map(|a| a.id).collect();
+        for id in sample { connected.detach_mailbox(id, now_ts()); }
+        acc.id = match connected.accounts.iter().find(|a| a.resolved_provider_id() == "gmail" && a.email.eq_ignore_ascii_case(&acc.email)) {
+            Some(existing) => existing.id,
+            None => match connected.allocate_mailbox_id() {
+                Some(id) => { acc.color = ACCOUNT_COLORS[id as usize % ACCOUNT_COLORS.len()]; id }
+                None => {
+                    self.login_result = Some(Err("Mailbox identifiers exhausted".into()));
+                    return;
+                }
+            },
+        };
         // Adding a known address again just renews its password.
-        self.store.accounts.retain(|a| a.id != acc.id);
-        self.store.accounts.push(acc.clone());
+        connected.accounts.retain(|a| a.id != acc.id);
+        connected.accounts.push(acc.clone());
+        if self.screenshot.is_none() {
+            if let Err(error) = connected.save_signed_in(&acc) {
+                self.login_result = Some(Err(format!("Sign-in works, but the account couldn't be saved: {error}")));
+                return;
+            }
+        }
+        self.store = connected;
         self.new_account = NewAccount::default();
         self.selected = None;
         self.dirty = true;

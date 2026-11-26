@@ -926,22 +926,26 @@ pub fn search_disk(store: &Store, query: &str, limit: usize, compute: &dyn Compu
 /// (D8: the compute server is unreachable, the device was unlinked, another model): the
 /// results are then the lexical ones (BM25 and the word filter), never an error.
 pub fn search_disk_reported(store: &Store, query: &str, limit: usize, compute: &dyn ComputeGateway) -> Result<(Vec<Hit>, Option<crate::application::AppError>), String> {
+    search_disk_at(&Store::data_dir(), store, query, limit, compute)
+}
+
+fn search_disk_at(root: &Path, store: &Store, query: &str, limit: usize, compute: &dyn ComputeGateway) -> Result<(Vec<Hit>, Option<crate::application::AppError>), String> {
     let mut prepared = store.clone();
     super::search_support::resolve_region(&mut prepared);
     let store = &prepared;
     let parsed = crate::domain::search::ParsedQuery::parse(store, query, crate::model::now_ts())?;
     let words = parsed.semantic_words();
-    let root = Store::data_dir();
     let mut readers=HashMap::new();
     let mut lexical=Vec::new();
     for account in &store.accounts {
-        if let Some(reader)=super::lexical_index::Reader::open(&root,account.id).map_err(|e|e.message)? {
+        if let Some(reader)=super::lexical_index::Reader::open(root,account.id).map_err(|e|e.message)? {
             lexical.extend(reader.rank(store,&parsed,limit).map_err(|e|e.message)?);
             readers.insert(account.id,reader);
         }
     }
     lexical.sort_by(|a,b|a.1.total_cmp(&b.1).then(b.0.cmp(&a.0)));
-    let mut allowed = HashSet::new();
+    let ranked_ids: HashSet<_> = lexical.iter().map(|(id, _)| *id).collect();
+    let mut allowed = HashMap::new();
     let mut fallback = Vec::new();
     let terms = parsed.words();
     for email in &store.emails {
@@ -949,12 +953,12 @@ pub fn search_disk_reported(store: &Store, query: &str, limit: usize, compute: &
         let indexed=match reader {Some(reader)=>reader.current(email).map_err(|e|e.message)?,None=>false};
         if indexed {
             let reader=reader.unwrap();
-            if reader.matches(email,&parsed,true).map_err(|e|e.message)? {allowed.insert(email.id);}
-            if reader.matches(email,&parsed,false).map_err(|e|e.message)? && !lexical.iter().any(|hit|hit.0==email.id) {fallback.push((email.id,0,email.date));}
+            if reader.matches(email,&parsed,true).map_err(|e|e.message)? {allowed.insert(email.id, email);}
+            if reader.matches(email,&parsed,false).map_err(|e|e.message)? && !ranked_ids.contains(&email.id) {fallback.push((email.id,0,email.date));}
         } else {
             let candidate=super::search_support::prepare_email(email,&parsed);
             if parsed.matches(&candidate,store) {fallback.push((email.id,crate::rules::score(&candidate,&terms),email.date));}
-            if parsed.semantic_matches(&candidate,store) {allowed.insert(email.id);}
+            if parsed.semantic_matches(&candidate,store) {allowed.insert(email.id, email);}
         }
     }
     fallback.sort_by_key(|&(id,score,date)|std::cmp::Reverse((score,date,id)));
@@ -962,30 +966,72 @@ pub fn search_disk_reported(store: &Store, query: &str, limit: usize, compute: &
     keyword.extend(fallback.into_iter().map(|(id,_,_)|id));
     if words.trim().is_empty() {return Ok((fuse(&[],&keyword,limit),None));}
     // D4: a query vector of another model than the index's finds nothing that means anything.
-    let embedded=super::rag_segments::checked_identity(compute,&root).and_then(|_|compute.embed_query(&words));
+    let embedded=super::rag_segments::checked_identity(compute,root).and_then(|_|compute.embed_query(&words));
     let qv=match embedded {Ok(vector)=>vector,Err(error)=>return Ok((fuse(&[],&keyword,limit),Some(error)))};
-    let segments = super::rag_segments::files(&root).map_err(|e| e.to_string())?;
-    let segmented: HashSet<u64> = segments.iter().map(|(_, id, _)| *id).collect();
-    let mut best: Vec<Hit> = Vec::new();
-    let mut accept = |passage: Passage| {
-        let Some(email) = store.email(passage.email_id) else { return };
-        if email.search_index.version >= 2 && email.search_index.content_hash != email.remote_content_hash { return; }
-        if email.storage_evicted || (passage.account_id != 0 && email.account_id != passage.account_id) || !allowed.contains(&email.id) { return; }
-        let score: f32 = passage.vector.iter().zip(&qv).map(|(a, b)| a * b).sum();
-        if let Some(index) = best.iter().position(|hit| hit.email_id == email.id) {
-            if best[index].score >= score { return; }
-            best.remove(index);
-        }
-        best.push(Hit { email_id: email.id, attachment_id: passage.attachment_id, score, passage: String::new(), reference: passage.reference });
-        best.sort_by(|a, b| b.score.total_cmp(&a.score).then(b.email_id.cmp(&a.email_id)));
-        best.truncate(limit);
-    };
-    visit_records(&root.join("rag_index.bin"), &mut |passage| { if !segmented.contains(&passage.email_id) { accept(passage); } }).map_err(|e| e.to_string())?;
-    for (_, _, path) in segments { visit_records(&path, &mut accept).map_err(|e| e.to_string())?; }
-    if let Some(top) = best.first().map(|hit| hit.score) { best.retain(|hit| hit.score >= top - SCORE_WINDOW); }
+    let (best, incomplete) = ranked_passages(root, &allowed, &qv, limit).unwrap_or_else(|_| (Vec::new(), true));
     let mut hits = fuse(&best, &keyword, limit);
     hydrate_hits(store, &mut hits);
-    Ok((hits, None))
+    let warning = incomplete.then(|| crate::application::AppError::new(
+        crate::application::compute::INDEX_UNREADABLE, crate::application::compute::REINDEX_NOTICE,
+    ));
+    Ok((hits, warning))
+}
+
+/// Look up each passage in the already-filtered messages once. Only publish a segment's
+/// best passage after the whole file passes validation; other segments remain usable.
+fn ranked_passages(root: &Path, allowed: &HashMap<u64, &Email>, query: &[f32], limit: usize) -> std::io::Result<(Vec<Hit>, bool)> {
+    let accounts: HashSet<_> = allowed.values().map(|email| email.account_id).collect();
+    let segments = super::rag_segments::files_for_accounts(root, |account| accounts.contains(&account))?;
+    let segments: Vec<_> = segments.into_iter().filter(|(account, id, _)| {
+        allowed.get(id).is_some_and(|email| email.account_id == *account)
+    }).collect();
+    let segmented: HashSet<_> = segments.iter().map(|(_, id, _)| *id).collect();
+    let score = |passage: Passage| -> Option<Hit> {
+        let email = allowed.get(&passage.email_id)?;
+        if email.search_index.version >= 2 && email.search_index.content_hash != email.remote_content_hash { return None; }
+        if email.storage_evicted || (passage.account_id != 0 && email.account_id != passage.account_id) { return None; }
+        let similarity = passage.vector.iter().zip(query).map(|(a, b)| a * b).sum();
+        Some(Hit { email_id: email.id, attachment_id: passage.attachment_id, score: similarity,
+            passage: String::new(), reference: passage.reference })
+    };
+    let mut best = Vec::new();
+    let legacy = visit_records(&root.join("rag_index.bin"), &mut |passage| {
+        if !segmented.contains(&passage.email_id) && let Some(hit) = score(passage) {
+            retain_ranked_hit(&mut best, hit, limit);
+        }
+    });
+    let mut incomplete = legacy.is_err();
+    if incomplete { best.clear(); }
+    for (account, id, path) in segments {
+        let mut top: Option<Hit> = None;
+        let read = visit_records(&path, &mut |passage| {
+            if passage.email_id == id && (passage.account_id == 0 || passage.account_id == account)
+                && let Some(hit) = score(passage)
+                && top.as_ref().is_none_or(|previous| hit.score > previous.score)
+            {
+                top = Some(hit);
+            }
+        });
+        if read.is_err() {
+            incomplete = true;
+        } else if let Some(hit) = top {
+            retain_ranked_hit(&mut best, hit, limit);
+        }
+    }
+    if let Some(top) = best.first().map(|hit| hit.score) {
+        best.retain(|hit| hit.score >= top - SCORE_WINDOW);
+    }
+    Ok((best, incomplete))
+}
+
+fn retain_ranked_hit(best: &mut Vec<Hit>, hit: Hit, limit: usize) {
+    if let Some(index) = best.iter().position(|previous| previous.email_id == hit.email_id) {
+        if best[index].score >= hit.score { return; }
+        best.remove(index);
+    }
+    best.push(hit);
+    best.sort_by(|a, b| b.score.total_cmp(&a.score).then(b.email_id.cmp(&a.email_id)));
+    best.truncate(limit);
 }
 
 /// A vector is not a quotation. Fill excerpts only after source bytes match their saved hash.
@@ -1160,6 +1206,38 @@ mod tests {
     fn remove_fixture(root: &Path) {
         let _ = std::fs::remove_file(root.join("rag_index.bin"));
         let _ = std::fs::remove_dir(root);
+    }
+
+    #[test]
+    fn corrupt_vector_segment_preserves_lexical_matches_and_respects_scope() {
+        let root = temporary_root();
+        let segments = root.join("search-index/1");
+        std::fs::create_dir_all(&segments).unwrap();
+        let mut store = Store::default();
+        store.accounts.push(crate::model::Account { id: 1, ..Default::default() });
+        store.emails.push(Email { id: 7, account_id: 1, subject: "budget".into(),
+            folder: "Inbox".into(), ..Default::default() });
+        let compute = crate::infrastructure::fake_compute::FakeCompute::default();
+        std::fs::write(segments.join("8.bin"), b"broken").unwrap();
+        let (hits, notice) = search_disk_at(&root, &store, "budget", 4, &compute).unwrap();
+        assert!(notice.is_none(), "a segment outside the result scope must be skipped");
+        assert_eq!(hits[0].email_id, 7);
+        std::fs::write(segments.join("7.bin"), b"broken").unwrap();
+        let (hits, notice) = search_disk_at(&root, &store, "budget", 4, &compute).unwrap();
+        assert_eq!(notice.unwrap().code, crate::application::compute::INDEX_UNREADABLE);
+        assert_eq!(hits[0].email_id, 7);
+        assert_eq!(hits[0].score, 0.0);
+        // A different, valid segment remains searchable even while this one needs rebuilding.
+        store.emails.push(Email { id: 9, account_id: 1, subject: "Other".into(),
+            folder: "Inbox".into(), ..Default::default() });
+        let vector = compute.embed_query("budget").unwrap();
+        let healthy = Index { passages: vec![Passage { account_id: 1, email_id: 9, attachment_id: 0,
+            fingerprint: 0, reference: None, text: String::new(), vector }] };
+        healthy.save_path(&segments.join("9.bin")).unwrap();
+        let (hits, notice) = search_disk_at(&root, &store, "budget", 4, &compute).unwrap();
+        assert!(notice.is_some());
+        assert!(hits.iter().any(|hit| hit.email_id == 9 && hit.score > 0.0));
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

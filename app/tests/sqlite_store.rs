@@ -126,6 +126,7 @@ fn full_store(data: &Path) -> Store {
                 send_at: 1_800_000_012,
                 requested_send_at: Some(1_800_000_013),
                 error: Some("delivery error".into()),
+                receipt_message_id: Some("<sent@example.com>".into()),
                 owner_pid: Some(4_321),
                 requires_mcp_send: true,
                 source_profile: Some("profile-a".into()),
@@ -145,6 +146,7 @@ fn full_store(data: &Path) -> Store {
                 send_at: 3,
                 requested_send_at: None,
                 error: None,
+                receipt_message_id: None,
                 owner_pid: None,
                 requires_mcp_send: false,
                 source_profile: None,
@@ -327,6 +329,7 @@ fn full_store(data: &Path) -> Store {
                 ],
                 from_name: "From Name".into(),
                 from_addr: "from@example.com".into(),
+                reply_to_addresses: vec!["ticket@example.com".into()],
                 to: vec!["to-1@example.com".into(), "to-2@example.com".into()],
                 cc: vec!["cc-1@example.com".into()],
                 subject: "Subject line".into(),
@@ -413,6 +416,8 @@ fn full_store(data: &Path) -> Store {
             Meeting { id: 602, ..Default::default() },
         ],
         settings: Settings {
+            mailbox_id_high_water: Some(4),
+            pending_mailbox_cleanup: [(3, "gmail:removed@example.test".into())].into(),
             time_zone: "Europe/Rome".into(),
             locale: "it-IT".into(),
             undo_seconds: 9,
@@ -893,7 +898,7 @@ fn opening_applies_wal_pragmas_and_records_the_schema_version() {
     let version: String = raw
         .query_row("SELECT value FROM meta WHERE name = 'schema_version'", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(version, "5");
+    assert_eq!(version, "6");
     let tables: BTreeSet<String> = raw
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
         .unwrap()
@@ -1946,7 +1951,7 @@ fn a_v1_database_gains_the_undo_retry_columns() {
         .unwrap()
         .query_row("SELECT value FROM meta WHERE name = 'schema_version'", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(version, "5", "the migration records the new version");
+    assert_eq!(version, "6", "the migration records the new version");
 
     // Reopening a migrated database is a no-op and the data survives.
     drop(repo);
@@ -1989,7 +1994,7 @@ fn a_v1_database_that_already_has_the_columns_only_records_the_new_version() {
         .unwrap()
         .query_row("SELECT value FROM meta WHERE name = 'schema_version'", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(version, "5");
+    assert_eq!(version, "6");
 }
 
 #[test]
@@ -2048,7 +2053,7 @@ fn a_v3_database_gains_in_reply_to_for_received_mail_only() {
         .unwrap()
         .query_row("SELECT value FROM meta WHERE name = 'schema_version'", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(version, "5");
+    assert_eq!(version, "6");
 }
 
 #[test]

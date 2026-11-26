@@ -8,7 +8,7 @@ import Button from '../../ui/Button';
 import Field from '../../ui/Field';
 import Icon from '../../ui/Icon';
 import Menu from '../../ui/Menu';
-import Modal from '../../ui/Modal';
+import Modal, { ModalFooter } from '../../ui/Modal';
 import { errorText } from '../../lib/api';
 import { tr } from '../../lib/i18n';
 import { deleteMeeting, MeetingError, meetingCall, type MeetingDetail } from '../../lib/meetings';
@@ -142,14 +142,14 @@ export default function MeetingMenu({ detail, title, notify, onchange, ondeleted
               <span>{tr('Nome', 'Name')}</span>
               <Input value={name} onChange={(event) => setName(event.target.value)} maxLength={300} autoComplete="off" />
             </Field>
-            <div className="modal-actions">
+            <ModalFooter>
               <Button type="button" variant="secondary" onClick={() => void close()}>
                 {tr('Annulla', 'Cancel')}
               </Button>
               <Button type="submit" variant="primary" disabled={empty} aria-busy={ariaBusy}>
                 {tr('Salva', 'Save')}
               </Button>
-            </div>
+            </ModalFooter>
           </form>
         </Modal>
       ) : dialog === 'delete' ? (
@@ -167,14 +167,14 @@ export default function MeetingMenu({ detail, title, notify, onchange, ondeleted
               `Delete “${title}”? The recording and the text are removed. This cannot be undone.`,
             )}
           </p>
-          <div className="modal-actions">
+          <ModalFooter>
             <Button variant="secondary" onClick={() => void close()}>
               {tr('Annulla', 'Cancel')}
             </Button>
             <Button variant="primary" className="danger" aria-busy={ariaBusy} onClick={() => void remove()}>
               {tr('Elimina', 'Delete')}
             </Button>
-          </div>
+          </ModalFooter>
         </Modal>
       ) : null}
     </>

@@ -468,6 +468,7 @@ fn what_costs_waits_for_a_second_click() {
     assert_eq!(helper.matches("return true;").count(), 1, "{helper}");
     for (guard, action) in [
         ("secondClick(reset, ", "'/reset-password')"),
+        ("secondClick(toggle, disconnects)", "'/users/' + encodeURIComponent(user.id) + '/' + action)"),
         ("secondClick(remove, 'Cancella «'", "api('DELETE', '/users/' + encodeURIComponent(user.id))"),
         ("secondClick(revoke, ", "'/devices/' + encodeURIComponent(device.id))"),
         ("secondClick(remove, 'Rimuove il modello «'", "api('DELETE', '/models/' + encodeURIComponent(model.id))"),

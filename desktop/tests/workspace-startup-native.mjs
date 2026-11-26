@@ -18,10 +18,10 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 if (process.platform === 'win32') {
   const { stdout } = await promisify(execFile)('powershell.exe', [
     '-NoProfile', '-NonInteractive', '-Command',
-    "@(Get-CimInstance Win32_Process | Where-Object { $_.Name -match '^(Qamille|qamille-desktop)(\\.exe)?$' -and $_.CommandLine -notmatch '(?:^|\\s)--(?:mcp|worker|embedding-worker)(?:\\s|$)' } | Select-Object -ExpandProperty ProcessId) | ConvertTo-Json -Compress",
+    "ConvertTo-Json -Compress -InputObject @(Get-CimInstance Win32_Process | Where-Object { $_.Name -match '^(Qamille|qamille-desktop)(\\.exe)?$' -and $_.CommandLine -notmatch '(?:^|\\s)--(?:mcp|worker|embedding-worker)(?:\\s|$)' } | Select-Object -ExpandProperty ProcessId)",
   ], { windowsHide: true });
-  const running = stdout.trim() ? JSON.parse(stdout) : [];
-  assert.equal([running].flat().length, 0, 'Close existing Qamille app windows before this isolated native test.');
+  const running = JSON.parse(stdout);
+  assert.deepEqual(running, [], 'Close existing Qamille app windows before this isolated native test.');
 }
 await fs.access(executable);
 await fs.mkdir(artifacts, { recursive: true });
@@ -65,14 +65,20 @@ async function launch(name, data, demo = false, options = {}) {
   let ready = false;
   for (let attempt = 0; attempt < 120; attempt++) {
     if (session.spawnError) throw session.spawnError;
-    assert.equal(child.exitCode, null, `${name} exited before its own window opened: ${session.output}`);
+    if (child.exitCode !== null) break;
     try {
       ready = (await fetch(`http://127.0.0.1:${port}/json/version`, { signal: AbortSignal.timeout(1000) })).ok;
       if (ready) break;
     } catch { /* WebView is starting. */ }
     await delay(250);
   }
-  assert.ok(ready, `${name} did not expose its test window: ${session.output}`);
+  if (!ready) {
+    // Release builds have no console. Setup errors are reported here before the native dialog opens.
+    const logPath = path.join(data, 'native.log');
+    const nativeLog = await fs.readFile(logPath, 'utf8').catch(error => `(${error.code || error.message})`);
+    const status = child.exitCode === null ? 'is still running' : `exited with code ${child.exitCode}`;
+    assert.fail(`${name} ${status} without opening the test window on port ${port}.\n${logPath}:\n${nativeLog.slice(-8000)}\n${session.output}`);
+  }
   session.browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
   const context = session.browser.contexts()[0];
   session.page = context.pages()[0] || await context.waitForEvent('page');
@@ -89,6 +95,7 @@ async function launch(name, data, demo = false, options = {}) {
     }).observe(document, { childList: true, subtree: true });
   });
   await page.waitForFunction(() => !!window.__TAURI_INTERNALS__);
+  assert.equal(new URL(page.url()).origin, 'http://tauri.localhost', `${name}: the UI must be served by the packaged executable`);
   await page.evaluate(() => localStorage.setItem('qamille:ui-language', 'en'));
   await page.reload();
   await page.locator('.compose-main').waitFor();
@@ -122,7 +129,7 @@ async function assertEmpty(session) {
 
 async function assertAccountsAccessible(session) {
   const { page } = session;
-  await page.getByTitle('Settings', { exact: true }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Your name', exact: true })).toHaveValue('You');
   await page.getByRole('navigation', { name: 'Settings sections' }).getByRole('button', { name: 'Accounts', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Your email accounts', exact: true })).toBeVisible();

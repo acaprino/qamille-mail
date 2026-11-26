@@ -894,3 +894,109 @@ fn a_revoked_mailbox_is_not_uploaded_without_a_credential() {
     a.sync.sync_now().unwrap();
     assert!(server.0.lock().unwrap().rows.is_empty());
 }
+
+#[test]
+fn switching_session_while_listing_stops_the_pass_before_upload() {
+    use qamille::application::server_account::SERVER_SESSION;
+    use qamille::domain::server_account::ServerSession;
+
+    let (server, a, _) = pair();
+    a.add_gmail("local@gmail.com", "local-token", CLIENT);
+    let vault = Arc::clone(&a.vault);
+    server.0.lock().unwrap().before_list = Some(Box::new(move || {
+        let mut session: ServerSession = serde_json::from_str(&vault.get(SERVER_SESSION).unwrap()).unwrap();
+        session.url = "https://other.example".into();
+        session.user_id = "other".into();
+        session.device_key = "other-device".into();
+        vault.set(SERVER_SESSION, &serde_json::to_string(&session).unwrap()).unwrap();
+    }));
+    assert!(a.sync.sync_now().unwrap().skipped);
+    assert!(server.0.lock().unwrap().bodies.is_empty());
+    assert_eq!(a.token("local@gmail.com"), "local-token");
+}
+
+#[test]
+fn a_restored_older_version_reconciles_even_if_the_epoch_was_not_rotated() {
+    let (server, a, _) = pair();
+    let kept = item_id("gmail", "kept@gmail.com");
+    let missing = item_id("gmail", "missing@gmail.com");
+    a.add_gmail("kept@gmail.com", "first", CLIENT);
+    a.add_gmail("missing@gmail.com", "second", CLIENT);
+    a.sync.sync_now().unwrap();
+    a.sync.sync_now().unwrap();
+    assert_eq!(a.state.0.lock().unwrap().since, 2);
+    {
+        let mut data = server.0.lock().unwrap();
+        data.counter = 1;
+        data.rows.remove(&missing);
+        let row = data.rows.get_mut(&kept).unwrap();
+        row.version = 1;
+        row.item.as_mut().unwrap().account.name = "Restored".into();
+    }
+    a.sync.sync_now().unwrap();
+    assert_eq!(a.account("kept@gmail.com").unwrap().name, "Restored");
+    assert!(server.item(&missing).is_some());
+    assert!(a.sync.status().unwrap().removals.is_empty());
+    let mut updated = server.item(&kept).unwrap().1;
+    updated.account.name = "After recovery".into();
+    server.write(updated);
+    a.sync.sync_now().unwrap();
+    assert_eq!(a.account("kept@gmail.com").unwrap().name, "After recovery");
+}
+
+#[test]
+fn a_live_unreadable_mailbox_survives_conflicts_on_old_and_new_devices() {
+    let (server, a, b) = pair();
+    let address = "future@gmail.com";
+    let id = item_id("gmail", address);
+    a.add_gmail(address, "t1", CLIENT);
+    a.sync.sync_now().unwrap();
+    b.add_gmail(address, "local", CLIENT);
+    a.context.update(|s| { s.accounts[0].name = "Renamed".into(); Ok(()) }).unwrap();
+    {
+        let mut data = server.0.lock().unwrap();
+        data.counter = 2;
+        data.rows.insert(id.clone(), Row { version: 2, deleted: false, item: None });
+    }
+    for app in [&a, &b] {
+        assert_eq!(app.sync.sync_now().unwrap().uploaded, 0);
+        let status = app.sync.status().unwrap();
+        assert!(status.removals.is_empty());
+        assert!(status.mailboxes[0].problem.is_some());
+    }
+    let data = server.0.lock().unwrap();
+    let row = data.rows.get(&id).unwrap();
+    assert_eq!(row.version, 2);
+    assert!(!row.deleted);
+    assert!(row.item.is_none());
+}
+
+#[test]
+fn restore_keeps_a_known_tombstone_and_newer_local_edits() {
+    let (server, a, _) = pair();
+    a.add_gmail("removed@gmail.com", "removed-token", CLIENT);
+    a.add_gmail("kept@gmail.com", "old-token", CLIENT);
+    a.sync.sync_now().unwrap();
+    let kept = item_id("gmail", "kept@gmail.com");
+    let mut old = server.item(&kept).unwrap().1;
+    let removed = item_id("gmail", "removed@gmail.com");
+    a.advance(120);
+    a.context.update(|s| {
+        let account = s.accounts.iter_mut().find(|a| a.email == "kept@gmail.com").unwrap();
+        account.name = "Local edit".into();
+        Ok(())
+    }).unwrap();
+    a.vault.set("gmail:kept@gmail.com", "renewed-token").unwrap();
+    a.sync.sync_now().unwrap();
+    old.account.name = "Old backup".into();
+    server.write(old);
+    server.remove(&removed);
+    server.0.lock().unwrap().epoch += 1;
+    a.sync.sync_now().unwrap();
+    let status = a.sync.status().unwrap();
+    assert!(status.removals.iter().any(|notice| notice.item_id == removed));
+    assert!(server.0.lock().unwrap().rows.get(&removed).unwrap().deleted);
+    let restored = server.item(&kept).unwrap().1;
+    assert_eq!(restored.account.name, "Local edit");
+    assert_eq!(restored.credential.value, "renewed-token");
+}

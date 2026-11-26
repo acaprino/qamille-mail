@@ -28,9 +28,12 @@ pub async fn vault_remove_transfer_passphrase() -> AppResult<VaultStatus> {
 /// never fails them), and none of them reached a provider.
 #[tauri::command]
 pub async fn vault_unlock(state: State<'_, DesktopState>, passphrase: String) -> AppResult<VaultStatus> {
-    let (scheduler, undo) = (state.scheduler.clone(), state.undo.clone());
+    let (scheduler, undo, accounts) = (state.scheduler.clone(), state.undo.clone(), state.accounts.clone());
     blocking(move || {
         let status = secret::unlock_with_transfer_passphrase(passphrase).map_err(vault_error)?;
+        if let Err(error) = accounts.retry_mailbox_cleanup() {
+            crate::native_feel::report(&format!("could not resume mailbox cleanup: {}", error.message));
+        }
         scheduler.credentials_opened();
         if let Err(error) = undo.credentials_opened() {
             // The vault is open either way: the queue's own backoff still retries what it holds.

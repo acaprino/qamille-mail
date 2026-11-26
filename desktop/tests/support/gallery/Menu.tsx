@@ -6,7 +6,7 @@ import { useState } from 'react';
 import Button from '../../../src/ui/Button';
 import Icon from '../../../src/ui/Icon';
 import Menu from '../../../src/ui/Menu';
-import Modal from '../../../src/ui/Modal';
+import Modal, { ModalFooter } from '../../../src/ui/Modal';
 import Popover from '../../../src/ui/Popover';
 
 export default function MenuSection() {
@@ -89,11 +89,11 @@ export default function MenuSection() {
       {dialog && (
         <Modal size="sm" aria-label="Details" onClose={() => setDialog(false)}>
           <h2>Details</h2>
-          <div className="modal-actions">
+          <ModalFooter>
             <Button variant="primary" type="button" onClick={() => setDialog(false)}>
               Done
             </Button>
-          </div>
+          </ModalFooter>
         </Modal>
       )}
     </section>

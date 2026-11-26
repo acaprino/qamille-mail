@@ -70,7 +70,7 @@ impl DraftService {
                     email.body
                 );
                 if !forward {
-                    draft.to = email.from_addr.clone();
+                    draft.to = email.reply_recipients().join(", ");
                     draft.reply_to = Some(email.id);
                     draft.signature_id = store.signature_for_reply(&email);
                 }
@@ -181,6 +181,9 @@ impl DraftService {
     }
     pub fn send(&self, id: u64) -> AppResult<()> {
         let operation = super::mcp_outbox::enqueue(self.context.clone(), id, None, None, None, false, None)?;
+        if operation.status == crate::domain::outbox::DeliveryStatus::Failed {
+            super::mcp_outbox::retry_failed(&self.context, operation.id)?;
+        }
         let delivery = super::mcp_outbox::execute(self.context.clone(), operation.id)?;
         use crate::domain::outbox::DeliveryStatus;
         match delivery.status {
@@ -203,23 +206,24 @@ impl DraftService {
         let _guard = self
             .operation
             .lock()
-            .map_err(|_| AppError::storage("Draft operation lock failed"))?;
-        let store = self.context.read_shared()?;
+            .map_err(|_| AppError::delivery_not_started("Draft operation lock failed"))?;
+        let before_send = |error: AppError| AppError::delivery_not_started(error.message);
+        let store = self.context.read_shared().map_err(before_send)?;
         let id = draft.id;
         let draft = draft.clone();
-        let to = self.validate(&draft)?;
-        let account = self.context.account(&store, draft.account_id)?;
+        let to = self.validate(&draft).map_err(before_send)?;
+        let account = self.context.account(&store, draft.account_id).map_err(before_send)?;
         let rendered = richtext::Rendered { plain:plain.to_string(), html };
-        let message_id = super::mcp_outbox::message_id(&draft, self.context.attachments.as_ref())?;
+        let message_id = super::mcp_outbox::message_id(&draft, self.context.attachments.as_ref()).map_err(before_send)?;
         // Snapshot references are immutable and must be readable before sending.
         // Keep their original filenames and bytes available to local Sent/export.
         let mut attachments = Vec::new();
         let mut digests = Vec::new();
         for path in &draft.attachments {
             let name = std::path::Path::new(path).file_name().and_then(|n| n.to_str())
-                .ok_or_else(|| AppError::validation("Attachment filename is invalid"))?.to_string();
+                .ok_or_else(|| AppError::delivery_not_started("Attachment filename is invalid"))?.to_string();
             let mut attachment = crate::model::Attachment { name: name.clone(), mime: "application/octet-stream".into(), path: Some(path.clone()), ..Default::default() };
-            let bytes = self.context.attachments.read_bytes(&attachment)?;
+            let bytes = self.context.attachments.read_bytes(&attachment).map_err(before_send)?;
             attachment.size = bytes.len() as u64;
             use sha2::{Digest, Sha256};
             digests.push((name, format!("{:x}", Sha256::digest(&bytes))));

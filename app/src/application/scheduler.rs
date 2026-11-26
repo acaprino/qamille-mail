@@ -1,6 +1,6 @@
 use super::{AppResult, ServiceContext, drafts::DraftService, events::AppEvent};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     sync::{Arc, Condvar, Mutex, MutexGuard},
     time::Duration,
 };
@@ -32,8 +32,6 @@ pub fn note_schedule_change() {
 #[derive(Clone)]
 pub struct SchedulerService {
     context: Arc<ServiceContext>,
-    drafts: DraftService,
-    failed: Arc<Mutex<HashSet<u64>>>,
     /// Scheduled sends the vault refused (`vault_*`: credentials of another
     /// Windows user or computer, a key Windows cannot open right now), by draft,
     /// with the instant the vault is asked again. Their `send_at` stays as it
@@ -41,11 +39,9 @@ pub struct SchedulerService {
     held: Arc<Mutex<HashMap<u64, i64>>>,
 }
 impl SchedulerService {
-    pub fn new(context: Arc<ServiceContext>, drafts: DraftService) -> Self {
+    pub fn new(context: Arc<ServiceContext>, _drafts: DraftService) -> Self {
         Self {
             context,
-            drafts,
-            failed: Arc::new(Mutex::new(HashSet::new())),
             held: Arc::new(Mutex::new(HashMap::new())),
         }
     }
@@ -201,83 +197,51 @@ impl SchedulerService {
                 })
             })
         {
-            if self
-                .failed
-                .lock()
-                .map(|f| f.contains(&draft.id))
-                .unwrap_or(true)
-            {
-                continue;
-            }
             if self.held().get(&draft.id).is_some_and(|&recheck| recheck > now_ms) {
                 continue;
             }
-            // The credentials before the claim: while the vault cannot open them
-            // the send is held, still armed, with no event and no notice.
-            if self.drafts.validate_send(draft.id).is_err_and(|error| error.is_vault()) {
-                self.held().insert(draft.id, now_ms + VAULT_RECHECK_MS);
-                continue;
-            }
-            self.held().remove(&draft.id);
-            // Persist the claim before contacting SMTP. A crash or an ambiguous
-            // network failure must not trigger another automatic send on restart.
-            let claimed = self.context.update_with_events(|store| {
-                let Some(current) = store.drafts.iter_mut().find(|d| d.id == draft.id) else {
-                    return Ok((false, Vec::new()));
-                };
-                if !current.send_at.is_some_and(|t| t <= now) {
-                    return Ok((false, Vec::new()));
-                };
-                current.send_at = None;
-                current.updated = now.max(current.updated + 1);
-                Ok((
-                    true,
-                    vec![AppEvent::DraftsChanged {
-                        ids: vec![draft.id],
-                    }],
-                ))
-            })?;
-            if !claimed {
-                continue;
-            }
-            if let Err(e) = self.drafts.send(draft.id) {
-                // The vault shut between the check and the send. It refused before
-                // any provider contact (`validate_send` heads the delivery's enqueue):
-                // the claim is undone and the send held, as above. A claim that
-                // cannot be undone falls through to the failure: never a silent disarm.
-                if e.is_vault() && self.rearm(draft.id, draft.send_at).is_ok() {
+            let delivery = match super::mcp_outbox::enqueue_due(self.context.clone(), draft) {
+                Ok(delivery) => delivery,
+                Err(error) if error.is_vault() => {
                     self.held().insert(draft.id, now_ms + VAULT_RECHECK_MS);
                     continue;
                 }
-                if let Ok(mut failed) = self.failed.lock() {
-                    failed.insert(draft.id);
+                Err(error) if matches!(error.code, "revision_conflict" | "not_found") => continue,
+                Err(error) => {
+                    // Validation can fail before an operation exists. Retire only this revision.
+                    let cleared = self.context.update_with_events(|store| {
+                        let Some(current) = store.drafts.iter_mut().find(|d| d.id == draft.id
+                            && d.updated == draft.updated && d.send_at == draft.send_at) else {
+                            return Ok((false, Vec::new()));
+                        };
+                        current.send_at = None;
+                        current.updated = now.max(current.updated + 1);
+                        Ok((true, vec![AppEvent::DraftsChanged { ids: vec![draft.id] }]))
+                    })?;
+                    if cleared {
+                        self.report_failure(draft, &error.message, &mut notices);
+                    }
+                    continue;
                 }
-                notices.push(format!(
-                    "Scheduled message ‘{}’: {}",
-                    draft.subject, e.message
-                ));
-                // Also outside the window (a Windows notification, desktop `notifications.rs`):
-                // once, since the draft is now in `failed` and its claim cleared `send_at`.
-                self.context.events.emit(AppEvent::ScheduledSendFailed {
-                    draft_id: draft.id,
-                    subject: draft.subject.clone(),
-                });
+            };
+            self.held().remove(&draft.id);
+            if let Err(e) = super::mcp_outbox::execute(self.context.clone(), delivery.id) {
+                if e.is_vault() {
+                    self.held().insert(draft.id, now_ms + VAULT_RECHECK_MS);
+                    continue;
+                }
+                self.report_failure(draft, &e.message, &mut notices);
             }
         }
         Ok(notices)
     }
-    /// Puts back the schedule a claim cleared, unless the draft was scheduled
-    /// again or removed meanwhile. The drafts list follows (`DraftsChanged`,
-    /// the same event as the claim's): the send is armed again, not failed.
-    fn rearm(&self, id: u64, send_at: Option<i64>) -> AppResult<()> {
-        self.context.update_with_events(|store| {
-            let Some(current) = store.drafts.iter_mut().find(|d| d.id == id && d.send_at.is_none()) else {
-                return Ok(((), Vec::new()));
-            };
-            current.send_at = send_at;
-            current.updated = self.context.clock.now().max(current.updated + 1);
-            Ok(((), vec![AppEvent::DraftsChanged { ids: vec![id] }]))
-        })
+
+    fn report_failure(&self, draft: &crate::model::Draft, message: &str, notices: &mut Vec<String>) {
+        notices.push(format!("Scheduled message ‘{}’: {}", draft.subject, message));
+        self.context.events.emit(AppEvent::ScheduledSendFailed {
+            draft_id: draft.id,
+            subject: draft.subject.clone(),
+        });
     }
     /// One pass: wakes first (committed even if the send half fails), then
     /// deliveries and scheduled sends.

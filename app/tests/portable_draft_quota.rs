@@ -270,6 +270,7 @@ fn outbox_snapshot_already_accounted_does_not_add_a_second_draft_payload() {
                 send_at: 0,
                 requested_send_at: None,
                 error: None,
+                receipt_message_id: None,
                 owner_pid: None,
                 requires_mcp_send: false,
                 source_profile: None,

@@ -434,6 +434,25 @@ impl JsonStoreRepository {
                     .is_none_or(|limit| usage.get(&account.id).is_some_and(|used| *used <= limit))
         })
     }
+    pub(super) fn compact_delivery_receipts(&self, store: &mut Store) -> AppResult<bool> {
+        use crate::domain::outbox::{self, DeliveryStatus};
+        let Some(root) = self.path.parent() else { return Ok(false) };
+        let mut changed = false;
+        for operation in &mut store.outbox {
+            if matches!(operation.status, DeliveryStatus::Sent | DeliveryStatus::Cancelled)
+                && operation.receipt_message_id.is_none()
+            {
+                let mut portable = operation.draft.clone();
+                for path in &mut portable.attachments {
+                    *path = super::portable_files::persistent_path(path, root)?;
+                }
+                operation.compact(outbox::message_id(&portable));
+                changed = true;
+            }
+        }
+        Ok(changed)
+    }
+
     pub(super) fn reconcile_locked(&self, store: &mut Store) -> AppResult<()> {
         if let Some(root) = self.path.parent() {
             let index_result = match super::rag::reconcile_index(root, store) {
@@ -476,7 +495,8 @@ impl JsonStoreRepository {
             // unreferenced, managed attachments under the same fresh store lock.
             let attachments_result = super::mail_cache::cleanup(&root.join("attachments"), store);
             let drafts_result = super::portable_files::cleanup_draft_attachments(root, store);
-            let failures: Vec<_> = [index_result, attachments_result, drafts_result]
+            let outbox_result = super::mail_cache::cleanup_outbox(&root.join("outbox-files"), store);
+            let failures: Vec<_> = [index_result, attachments_result, drafts_result, outbox_result]
                 .into_iter().filter_map(Result::err).map(|error| error.message).collect();
             if !failures.is_empty() {
                 return Err(AppError::storage(failures.join(" ")));
@@ -586,7 +606,7 @@ impl StoreRepository for JsonStoreRepository {
         let before_pending = store.storage_maintenance_pending;
         let before_rebuild = store.storage_index_rebuild_required;
         let had_removals = !store.cache_removals.is_empty();
-        let mut recovered = false;
+        let mut recovered = self.compact_delivery_receipts(&mut store)?;
         let mut intent_loaded = false;
         let result = (|| {
             let pending = self.read_cleanup_intent(&store)?;

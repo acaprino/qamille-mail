@@ -1,31 +1,35 @@
-// The hairline above a Modal's last row of actions (ui/parts.css, audit F17) follows the
-// dialog's scroll: it tells that more content waits below. It is not motion, so it stays when the
-// system asks for reduced motion, which turns every other animation off (styles.css).
-// Run: node tests/modal-actions-edge.mjs (Vite preview on 127.0.0.1:1420). Synthetic sample data only.
+// The dialog footer is provided by Sigrid. On a short screen its actions must remain
+// reachable and visible when navigating the overflowing form with the keyboard.
 import { chromium, expect } from '@playwright/test';
-import assert from 'node:assert/strict';
 
 const base = process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:1420';
-const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
+const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
   for (const reducedMotion of ['no-preference', 'reduce']) {
-    const page = await browser.newPage({ locale: 'en-US', viewport: { width: 1280, height: 860 }, reducedMotion });
+    const page = await browser.newPage({ locale: 'en-US', viewport: { width: 1280, height: 720 }, reducedMotion });
     await page.goto(base);
-    await page.locator('.mail-row').first().waitFor();
     await page.getByRole('list', { name: 'Workspace' }).getByRole('button', { name: 'Contacts' }).click();
-    await page.getByRole('button', { name: 'New contact' }).click();
+    const open = page.getByRole('button', { name: 'New contact', exact: true }).first();
+    await open.click();
     const dialog = page.getByRole('dialog', { name: 'New contact' });
     await expect(dialog).toBeVisible();
-    const edge = await dialog.evaluate((el) => {
-      const row = el.querySelector(':is(.modal-actions, .contact-actions, .google-dialog-actions, .google-setup-actions, .button-row):last-child');
-      const style = row ? getComputedStyle(row) : null;
-      return { name: style?.animationName, timeline: style?.animationTimeline };
-    });
-    assert.equal(edge.name, 'modal-actions-edge', `${reducedMotion}: the actions row keeps its scroll hairline (${JSON.stringify(edge)})`);
-    assert.match(edge.timeline ?? '', /scroll/, `${reducedMotion}: driven by the dialog's scroll`);
+    await page.setViewportSize({ width: 680, height: 380 });
+    await expect.poll(() => dialog.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
+    const save = dialog.getByRole('button', { name: 'Save', exact: true });
+    for (let n = 0; n < 60; n++) {
+      await page.keyboard.press('Tab');
+      if (await save.evaluate(el => el === document.activeElement)) break;
+    }
+    await expect(save).toBeFocused();
+    await expect(save).toBeInViewport({ ratio: 0.95 });
+    await page.keyboard.press('Shift+Tab');
+    const cancel = dialog.getByRole('button', { name: 'Cancel', exact: true });
+    await expect(cancel).toBeFocused();
+    await expect(cancel).toBeInViewport({ ratio: 0.95 });
+    await page.keyboard.press('Enter');
+    await expect(dialog).toHaveCount(0);
     await page.close();
   }
-  console.log('PASS the hairline above the actions follows the scroll, also with reduced motion');
 } finally {
   await browser.close();
 }

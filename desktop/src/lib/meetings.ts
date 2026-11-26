@@ -955,6 +955,12 @@ async function previewMeeting(command: string, args: Record<string, unknown>): P
       if (args.enabled === false) unreadableDemoMeetings.delete(Number(args.id));
       else unreadableDemoMeetings.add(Number(args.id));
       return;
+    case 'meeting_interrupted_capture': {
+      const interrupted = demoMeetings.filter((meeting) => !meeting.deleted && meeting.capture.state === 'interrupted')
+        .sort((a, b) => b.meeting.date - a.meeting.date || b.meeting.id - a.meeting.id)[0];
+      return interrupted ? { ...emptyCapture(), state: 'interrupted', meeting_id: interrupted.meeting.id,
+        elapsed_ms: interrupted.capture.elapsed_ms, saved_ms: interrupted.capture.saved_ms } : null;
+    }
     case 'meeting_capture_status':
       return clone(demoCapture);
     case 'meeting_preview_restart':

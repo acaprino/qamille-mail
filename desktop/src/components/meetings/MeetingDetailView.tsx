@@ -6,7 +6,7 @@
 import { useRef, useState } from 'react';
 import Button from '../../ui/Button';
 import Icon from '../../ui/Icon';
-import Modal from '../../ui/Modal';
+import Modal, { ModalFooter } from '../../ui/Modal';
 import Tabs from '../../ui/Tabs';
 import { errorText } from '../../lib/api';
 import { tr } from '../../lib/i18n';
@@ -258,14 +258,14 @@ export default function MeetingDetailView({
               'The audio of this meeting will be deleted and it can no longer be transcribed again.',
             )}
           </p>
-          <div className="modal-actions">
+          <ModalFooter>
             <Button variant="secondary" onClick={() => setDiscarding(false)}>
               {tr('Annulla', 'Cancel')}
             </Button>
             <Button variant="primary" aria-busy={ariaBusy} onClick={() => void discard()}>
               {tr('Elimina audio', 'Delete audio')}
             </Button>
-          </div>
+          </ModalFooter>
         </Modal>
       )}
     </>

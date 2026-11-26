@@ -253,7 +253,7 @@ async function pageCalls(mark) {
     (call) =>
       !call.test &&
       call.command !== 'meeting_capture_status' &&
-      !(call.command === 'meeting_list_page' && call.args?.state === 'interrupted'),
+      call.command !== 'meeting_interrupted_capture',
   );
 }
 const countOf = (calls, command) => calls.filter((call) => call.command === command).length;

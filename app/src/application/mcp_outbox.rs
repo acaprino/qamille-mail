@@ -41,8 +41,12 @@ fn public(
     operation: &Delivery,
     attachments: &dyn super::ports::AttachmentGateway,
 ) -> AppResult<Value> {
+    let id = match &operation.receipt_message_id {
+        Some(id) => id.clone(),
+        None => message_id(&operation.draft, attachments)?,
+    };
     Ok(
-        json!({"id":operation.id.to_string(),"operation_id":operation.id.to_string(),"message_id":message_id(&operation.draft, attachments)?,"draft_id":operation.draft.id.to_string(),"account_id":operation.draft.account_id.to_string(),"status":operation.status,"created_at":operation.created_at,"updated_at":operation.updated_at,"send_at":operation.send_at,"error":operation.error,"can_cancel":matches!(operation.status,Status::Queued|Status::Scheduled|Status::NeedsReview),"retryable":operation.status==Status::Failed}),
+        json!({"id":operation.id.to_string(),"operation_id":operation.id.to_string(),"message_id":id,"draft_id":operation.draft.id.to_string(),"account_id":operation.draft.account_id.to_string(),"status":operation.status,"created_at":operation.created_at,"updated_at":operation.updated_at,"send_at":operation.send_at,"error":operation.error,"can_cancel":matches!(operation.status,Status::Queued|Status::Scheduled|Status::NeedsReview),"retryable":operation.status==Status::Failed}),
     )
 }
 
@@ -54,6 +58,21 @@ pub fn enqueue(
     when: Option<i64>,
     requires_mcp_send: bool,
     source_profile: Option<&str>,
+) -> AppResult<Delivery> {
+    enqueue_inner(context, id, revision, key, when, requires_mcp_send, source_profile, false)
+}
+
+/// A scheduled draft from an older desktop writes its durable delivery in the same
+/// transaction that consumes its due date. Restart can always find one or the other.
+pub fn enqueue_due(context: Arc<ServiceContext>, draft: &Draft) -> AppResult<Delivery> {
+    let key = format!("scheduled-draft:{}:{}", draft.id, draft.updated);
+    enqueue_inner(context, draft.id, Some(draft.updated), Some(&key), None, false, None, true)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn enqueue_inner(
+    context: Arc<ServiceContext>, id: u64, revision: Option<i64>, key: Option<&str>,
+    when: Option<i64>, requires_mcp_send: bool, source_profile: Option<&str>, consume_due: bool,
 ) -> AppResult<Delivery> {
     let now = context.clock.now();
     // Resolve an existing request before looking up a draft removed by a successful send.
@@ -86,7 +105,7 @@ pub fn enqueue(
     if when.is_some_and(|w| w < now || w > now + crate::rules::MAX_DAYS_SEND_LATER * 86_400) {
         return Err(AppError::validation("Choose a future time within 180 days"));
     }
-    let queued = context.update(|store| {
+    let queued = context.update_with_events(|store| {
         let mut draft = store
             .drafts
             .iter()
@@ -105,6 +124,9 @@ pub fn enqueue(
                 "The draft changed; read it again before sending",
             ));
         }
+        if consume_due && !draft.send_at.is_some_and(|at| at <= now) {
+            return Err(AppError::new("revision_conflict", "The draft schedule changed"));
+        }
         let key = key
             .map(str::to_owned)
             .unwrap_or_else(|| format!("draft:{id}:{}", draft.updated));
@@ -122,7 +144,7 @@ pub fn enqueue(
                     "The key was already used with different content",
                 ));
             }
-            return Ok(previous.clone());
+            return Ok((previous.clone(), Vec::new()));
         }
         if store.outbox.iter().any(|o| {
             o.draft.id == id
@@ -141,12 +163,23 @@ pub fn enqueue(
                 "This draft already has an active or uncertain delivery. Check the outbox.",
             ));
         }
+        // Cleanup and enqueue share the store's write lock. If a previously unreferenced
+        // snapshot was removed after preparation, no inaccessible attachment is committed.
+        context.attachments.total_size(&snapshot_paths)?;
+        let mut events = Vec::new();
+        if consume_due {
+            let current = store.drafts.iter_mut().find(|current| current.id == id)
+                .ok_or_else(|| AppError::missing("Draft"))?;
+            current.send_at = None;
+            events.push(super::events::AppEvent::DraftsChanged { ids: vec![id] });
+        }
         draft.attachments = snapshot_paths;
         let rendered = crate::domain::richtext::render_draft(store, &draft);
         let operation = Delivery {
             id: store.new_id(),
             key,
             request_hash: hash,
+            receipt_message_id: None,
             draft,
             plain: rendered.plain,
             html: rendered.html,
@@ -167,7 +200,7 @@ pub fn enqueue(
             source_profile: source_profile.map(str::to_owned),
         };
         store.outbox.push(operation.clone());
-        Ok(operation)
+        Ok((operation, events))
     })?;
     // A queued or scheduled delivery is a new deadline for the scheduler
     // thread, which no longer polls (INV-005): note it after the commit.
@@ -177,12 +210,26 @@ pub fn enqueue(
 
 pub fn execute(context: Arc<ServiceContext>, operation_id: u64) -> AppResult<Delivery> {
     let now = context.clock.now();
-    let existing = context
-        .read()?
-        .outbox
-        .into_iter()
-        .find(|o| o.id == operation_id)
+    let initial = context.read()?;
+    let existing = initial.outbox.iter().find(|o| o.id == operation_id).cloned()
         .ok_or_else(|| AppError::missing("Operation"))?;
+    let has_source = |store: &crate::model::Store| {
+        store.account(existing.draft.account_id).is_some() && store.drafts.iter().any(|draft|
+            draft.id == existing.draft.id && draft.account_id == existing.draft.account_id)
+    };
+    if matches!(existing.status, Status::Queued | Status::Scheduled) && !has_source(&initial) {
+        return context.update(|store| {
+            let orphan = !has_source(store);
+            let operation = store.outbox.iter_mut().find(|o| o.id == operation_id)
+                .ok_or_else(|| AppError::missing("Operation"))?;
+            if orphan && matches!(operation.status, Status::Queued | Status::Scheduled) {
+                operation.status = Status::NeedsReview;
+                operation.error = Some("The original mailbox or draft is gone. Review the delivery before sending.".into());
+                operation.updated_at = now;
+            }
+            Ok(operation.clone())
+        });
+    }
     visible(&context, &existing)?;
     if !matches!(existing.status, Status::Queued | Status::Scheduled) {
         return Ok(existing);
@@ -217,6 +264,22 @@ pub fn execute(context: Arc<ServiceContext>, operation_id: u64) -> AppResult<Del
                 .map(|_| ())
         });
     if let Err(error) = preflight {
+        if error.is_vault() && existing.key == format!("scheduled-draft:{}:{}", existing.draft.id, existing.draft.updated)
+            && existing.draft.send_at.is_some() && !existing.requires_mcp_send {
+            context.update_with_events(|store| {
+                let Some(index) = store.outbox.iter().position(|o| o.id == operation_id && o.status == Status::Queued) else {
+                    return Ok(((), Vec::new()));
+                };
+                let Some(draft) = store.drafts.iter_mut().find(|d| d.id == existing.draft.id
+                    && d.updated == existing.draft.updated && d.send_at.is_none()) else {
+                    return Ok(((), Vec::new()));
+                };
+                draft.send_at = existing.draft.send_at;
+                store.outbox.remove(index);
+                Ok(((), vec![super::events::AppEvent::DraftsChanged { ids: vec![existing.draft.id] }]))
+            })?;
+            return Err(error);
+        }
         context.update(|store| {
             if let Some(o) = store.outbox.iter_mut().find(|o| o.id == operation_id) {
                 if matches!(o.status, Status::Queued | Status::Scheduled) {
@@ -229,7 +292,9 @@ pub fn execute(context: Arc<ServiceContext>, operation_id: u64) -> AppResult<Del
         })?;
         return Err(error);
     }
+    let receipt_id = message_id(&existing.draft, context.attachments.as_ref())?;
     let claimed = context.update(|store| {
+        let original_present = has_source(store);
         let access = store.settings.mcp_access;
         let o = store
             .outbox
@@ -237,6 +302,12 @@ pub fn execute(context: Arc<ServiceContext>, operation_id: u64) -> AppResult<Del
             .find(|o| o.id == operation_id)
             .ok_or_else(|| AppError::missing("Operation"))?;
         if !matches!(o.status, Status::Queued | Status::Scheduled) || o.send_at > now {
+            return Ok(None);
+        }
+        if !original_present {
+            o.status = Status::NeedsReview;
+            o.error = Some("The original mailbox or draft is gone. Review the delivery before sending.".into());
+            o.updated_at = now;
             return Ok(None);
         }
         if o.requires_mcp_send && access != Access::Send {
@@ -266,6 +337,7 @@ pub fn execute(context: Arc<ServiceContext>, operation_id: u64) -> AppResult<Del
         );
         let (status, error) = match &result {
             Ok(()) => (Status::Sent, None),
+            Err(e) if e.code == "delivery_not_started" => (Status::Failed, Some(e.message.clone())),
             Err(e) if e.code == "sent_not_saved" => (Status::SentNotSaved, Some(e.message.clone())),
             Err(e) => (
                 Status::Unknown,
@@ -277,7 +349,13 @@ pub fn execute(context: Arc<ServiceContext>, operation_id: u64) -> AppResult<Del
         };
         context.update(|store| {
             let o=store.outbox.iter_mut().find(|o| o.id==operation_id).ok_or_else(||AppError::missing("Operation"))?;
-            o.status=status;o.error=error;o.updated_at=context.clock.now();Ok(())
+            o.status = status;
+            o.error = error;
+            o.updated_at = context.clock.now();
+            if o.status == Status::Sent {
+                o.compact(receipt_id);
+            }
+            Ok(())
         }).map_err(|e| AppError::new("delivery_record_failed",format!("Delivery was attempted but its result could not be saved. Do not resend. {}",e.message)))?;
         // Preserve existing application callers' error semantics while the durable record
         // separately communicates whether a remote effect is uncertain.
@@ -289,6 +367,21 @@ pub fn execute(context: Arc<ServiceContext>, operation_id: u64) -> AppResult<Del
         .into_iter()
         .find(|o| o.id == operation_id)
         .ok_or_else(|| AppError::missing("Operation"))
+}
+
+pub(crate) fn retry_failed(context: &ServiceContext, id: u64) -> AppResult<Delivery> {
+    context.update(|store| {
+        let operation = store.outbox.iter_mut().find(|operation| operation.id == id)
+            .ok_or_else(|| AppError::missing("Operation"))?;
+        if operation.status != Status::Failed {
+            return Err(AppError::new("review_required", "Only a delivery that did not start may be retried."));
+        }
+        operation.status = Status::Queued;
+        operation.send_at = context.clock.now();
+        operation.updated_at = operation.send_at;
+        operation.error = None;
+        Ok(operation.clone())
+    })
 }
 
 pub fn tick(context: Arc<ServiceContext>) -> AppResult<()> {
@@ -621,7 +714,9 @@ pub fn call(context: Arc<ServiceContext>, name: &str, args: &Value) -> AppResult
                         "Delivery has already started or finished",
                     ));
                 }
+                let message_id = message_id(&o.draft, context.attachments.as_ref())?;
                 o.status = Status::Cancelled;
+                o.compact(message_id);
                 o.updated_at = context.clock.now();
                 Ok(o.clone())
             })?;
@@ -636,7 +731,7 @@ pub fn call(context: Arc<ServiceContext>, name: &str, args: &Value) -> AppResult
                 .find(|o| o.id == id)
                 .ok_or_else(|| AppError::missing("Operation"))?;
             visible(&context, &existing)?;
-            let o=context.update(|store|{let o=store.outbox.iter_mut().find(|o|o.id==id).ok_or_else(||AppError::missing("Operation"))?;if o.status!=Status::Failed{return Err(AppError::new("review_required","Only deliveries that failed before contacting the provider may be retried. Uncertain sends require reconciliation."));}o.status=Status::Queued;o.send_at=context.clock.now();o.updated_at=context.clock.now();o.error=None;Ok(o.clone())})?;
+            let o = retry_failed(&context, id)?;
             // The retry is due immediately: the deadline moved (INV-005).
             super::scheduler::note_schedule_change();
             public(&o, context.attachments.as_ref())

@@ -152,6 +152,7 @@ fn moved_workspace_keeps_mail_draft_outbox_and_legacy_audio_paths_readable() {
         send_at: 0,
         requested_send_at: None,
         error: None,
+        receipt_message_id: None,
         owner_pid: None,
         requires_mcp_send: false,
         source_profile: None,

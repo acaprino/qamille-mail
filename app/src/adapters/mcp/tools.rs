@@ -712,7 +712,7 @@ pub fn call(context: Arc<ServiceContext>, name: &str, a: &Value) -> AppResult<Va
       "save_signature"=>save_signature(context.clone(),a),
       "delete_signature"=>{let id=number(a,"id")?;context.update(|store|{let v=store.signatures.iter().find(|v|v.id==id).ok_or_else(||AppError::missing("Signature"))?;if v.modified.max(0) as u64!=revision(a)?{return Err(AppError::new("revision_conflict","Signature changed"));}store.remove_signature(id);Ok(())})?;Ok(output(json!({"id":id,"deleted":true})))}
       "list_emails"|"search_emails"=>search_mail(context.clone(), &mail, name, a),
-      "semantic_search"=>{let store=context.read()?;let gateway=crate::infrastructure::gateways::LocalSearch::new(context.compute.clone());let (hits,unavailable)=gateway.search_reported(&store,required(a,"query")?,100)?;let mut result=Vec::new();for hit in hits{let current=mail.read(hit.email_id)?;result.push(json!({"email_id":current.id,"account_id":current.account_id,"subject":current.subject,"score":hit.score,"passage":if current.remote_only{current.snippet(1800)}else{hit.passage},"source_verified":true}));}let mut out=page(result,a,name)?;out["meta"]["coverage"]=json!("indexed_content_only");if let Some(error)=unavailable{out["meta"]["semantic"]=json!("unavailable");out["meta"]["notice"]=json!(crate::application::compute::mcp_semantic_notice(error.code));}Ok(out)}
+      "semantic_search" => semantic_mail(&context, &mail, a),
       "read_email"=>read_email(&mail, a),
       "read_thread"=>{let id=number(a,"id")?;check_email_account(&mail.read(id)?,a)?;let members=if arg(a,"scope")==Some("local"){mail.conversation(id)?}else{mail.thread(id)?};page(members.into_iter().map(|e|json!({"id":e.id,"account_id":e.account_id,"date":e.date,"subject":e.subject,"from":e.from_addr,"snippet":e.snippet(500),"body_available":!e.remote_only})).collect(),a,name)}
       "list_attachments"|"read_attachment"|"download_attachment"=>{let id=number(a,"email_id")?;let email=mail.read(id)?;check_email_account(&email,a)?;if name=="list_attachments"{return page(email.attachments.into_iter().map(|v|serde_json::to_value(v).unwrap_or(Value::Null)).collect(),a,name);}let aid=number(a,"attachment_id")?;let attachment=email.attachments.iter().find(|v|v.id==aid).ok_or_else(||AppError::missing("Attachment"))?;if name=="read_attachment"{return Ok(output(text_page(&mail.attachment_text(id,aid)?,a)?));}let bytes=context.attachments.read_bytes(attachment)?;Ok(output(files::write_scoped(&attachment.name,"application/octet-stream",&bytes,&[email.account_id])?))}
@@ -742,6 +742,37 @@ fn check_email_account(e: &crate::model::Email, a: &Value) -> AppResult<()> {
         Ok(())
     }
 }
+fn semantic_workspace(mut store: Store, requested: Option<u32>) -> AppResult<Store> {
+    if let Some(id) = requested {
+        if store.account(id).is_none() {
+            return Err(AppError::missing("Account"));
+        }
+        store.accounts.retain(|account| account.id == id);
+        store.emails.retain(|email| email.account_id == id);
+    }
+    Ok(store)
+}
+
+fn semantic_mail(context: &ServiceContext, mail: &MailService, args: &Value) -> AppResult<Value> {
+    let store = semantic_workspace(context.read()?, account(args)?)?;
+    let gateway = crate::infrastructure::gateways::LocalSearch::new(context.compute.clone());
+    let (hits, unavailable) = gateway.search_reported(&store, required(args, "query")?, 100)?;
+    let mut rows = Vec::with_capacity(hits.len());
+    for hit in hits {
+        let current = mail.read(hit.email_id)?;
+        let passage = if hit.passage.is_empty() { current.snippet(1800) } else { hit.passage };
+        rows.push(json!({"email_id":current.id,"account_id":current.account_id,"subject":current.subject,
+            "score":hit.score,"source_verified":!passage.is_empty(),"passage":passage}));
+    }
+    let mut result = page(rows, args, "semantic_search")?;
+    result["meta"]["coverage"] = json!("indexed_content_only");
+    if let Some(error) = unavailable {
+        result["meta"]["semantic"] = json!(if error.code == crate::application::compute::INDEX_UNREADABLE { "partial" } else { "unavailable" });
+        result["meta"]["notice"] = json!(crate::application::compute::mcp_semantic_notice(error.code));
+    }
+    Ok(result)
+}
+
 fn search_mail(
     context: Arc<ServiceContext>,
     mail: &MailService,
@@ -1281,7 +1312,7 @@ fn create_draft(context: Arc<ServiceContext>, a: &Value) -> AppResult<Draft> {
             );
             if mode != "forward" {
                 d.reply_to = Some(e.id);
-                d.to = e.from_addr.clone();
+                d.to = e.reply_recipients().join(", ");
                 d.signature_id = store.signature_for_reply(e);
                 if mode == "reply_all" {
                     let own: HashSet<_> = store
@@ -1289,8 +1320,7 @@ fn create_draft(context: Arc<ServiceContext>, a: &Value) -> AppResult<Draft> {
                         .iter()
                         .map(|a| a.email.to_lowercase())
                         .collect();
-                    let mut seen = HashSet::new();
-                    seen.insert(e.from_addr.to_lowercase());
+                    let mut seen: HashSet<_> = e.reply_recipients().iter().map(|address| address.to_lowercase()).collect();
                     d.cc =
                         e.to.iter()
                             .chain(&e.cc)
@@ -2029,6 +2059,18 @@ mod tests {
             attachments: Arc::new(AttachmentsTest),
         })
     }
+    #[test]
+    fn semantic_ranking_only_sees_messages_from_the_selected_authorized_account() {
+        let mut store = context().read().unwrap();
+        store.accounts.push(crate::model::Account { id: 2, ..Default::default() });
+        store.emails.push(crate::model::Email { id: 9, account_id: 2, ..Default::default() });
+        assert!(semantic_workspace(store.clone(), Some(99)).is_err());
+        let selected = semantic_workspace(store, Some(2)).unwrap();
+        assert_eq!(selected.accounts.len(), 1);
+        assert_eq!(selected.emails.len(), 1);
+        assert_eq!(selected.emails[0].id, 9);
+    }
+
     #[test]
     fn pagination_exposes_every_result_and_rejects_changed_scope() {
         let v: Vec<_> = (0..201).map(|id| json!({"id":id})).collect();

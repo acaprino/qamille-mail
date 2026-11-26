@@ -66,11 +66,4 @@
     color: var(--color-destructive);
     margin-top: 12px;
   }
-  & .google-setup-actions {
-    display: flex;
-    justify-content: flex-end;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 24px;
-  }
 }

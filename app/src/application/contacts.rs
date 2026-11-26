@@ -189,7 +189,8 @@ pub(crate) fn new_source_key(state: &mut ContactsState) -> (u64, String) {
 /// Removes a card: Google cards already sent become a tombstone until the server confirms.
 pub(crate) fn drop_source(state: &mut ContactsState, key: &str) {
     let Some(position) = state.sources.iter().position(|s| s.key == key) else { return };
-    let remote = state.sources[position].book.kind() == BookKind::Google && state.sources[position].remote_id.is_some();
+    let card = &state.sources[position];
+    let remote = card.book.kind() == BookKind::Google && (card.remote_id.is_some() || card.create_request.is_some());
     state.queue.retain(|q| q.key != key);
     if remote {
         state.sources[position].deleted = true;

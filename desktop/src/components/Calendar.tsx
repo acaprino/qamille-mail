@@ -666,12 +666,17 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
             : (await calendarEvents(source, from, to, false)).map((event) => ({ ...event, calendar: source })),
         ),
       );
-      const result = parts.flatMap((part) => (part.status === 'fulfilled' ? part.value : []));
-      const failed = parts.find((part) => part.status === 'rejected');
-      if (!cached && failed && failed.status === 'rejected') throw failed.reason;
       if (!loads.accept(ticket)) return;
-      s.events = result;
-      if (!cached && sources.length === 1 && sources[0].provider_id !== 'local') s.syncedAt = Date.now() / 1000;
+      const errors: string[] = [];
+      s.events = parts.flatMap((part, index) => {
+        if (part.status === 'fulfilled') return part.value;
+        const source = sources[index];
+        errors.push(`${source.name} — ${errorText(part.reason)}`);
+        return previous.filter((event) => event.calendar && calendarKey(event.calendar) === calendarKey(source)
+          && dateKey(event.start) < to && dateKey(Math.max(event.start, event.end - 1)) >= from);
+      });
+      if (!cached && errors.length) say(errors.join('\n'), true);
+      if (!cached && !errors.length && sources.length === 1 && sources[0].provider_id !== 'local') s.syncedAt = Date.now() / 1000;
     } catch (e) {
       if (!cached) say(errorText(e), true);
     }
@@ -788,7 +793,7 @@ export default function Calendar({ notify, openSettings }: CalendarProps) {
             meeting_link: edited.link || null,
             conference: '',
             rsvp: event?.rsvp || 'None',
-            notes: event?.notes || '',
+            notes: edited.description,
             color: [65, 106, 219],
           },
         });

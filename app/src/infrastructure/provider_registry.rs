@@ -80,7 +80,7 @@ impl MailGateway for ProviderRegistry {
     }
     fn authorize_mcp_delivery(&self, profile: Option<&str>, account_id: u32) -> AppResult<()> {
         // This is an application grant, not an authentication method of one provider.
-        let store = super::repository::JsonStoreRepository::new(Store::path()).read()?;
+        let store = super::mcp_config::active_workspace(&Store::data_dir())?;
         let account = store
             .account(account_id)
             .ok_or_else(|| AppError::missing("Account"))?;

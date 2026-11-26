@@ -161,7 +161,9 @@ impl GmailGateway {
 impl MailGateway for GmailGateway {
     fn send_remote_draft(&self,account:&Account,sender_name:&str,message:OutgoingMessage,id:&str,revision:&str)->AppResult<()>{super::gmail_drafts::send_snapshot(account,sender_name,message,id,revision)}
     fn authorize_mcp_delivery(&self,profile:Option<&str>,account_id:u32)->AppResult<()> {
-        let maximum=super::repository::JsonStoreRepository::new(Store::path()).read()?.settings.mcp_access;
+        let current = super::mcp_config::active_workspace(&Store::data_dir())?;
+        if current.account(account_id).is_none() { return Err(AppError::missing("Account")); }
+        let maximum = current.settings.mcp_access;
         if maximum!=crate::model::Access::Send{return Err(AppError::new("permission_denied","MCP send permission was revoked"));}
         if let Some(name)=profile {let grant=super::mcp_config::profile(name,maximum)?;if grant.access!=crate::model::Access::Send||grant.account_ids.as_ref().is_some_and(|ids|!ids.contains(&account_id)){return Err(AppError::new("permission_denied","MCP profile no longer allows sending from this account"));}}
         Ok(())
@@ -250,7 +252,7 @@ impl MailGateway for GmailGateway {
         if a.resolved_provider_id() == "sample" {
             return Ok(());
         }
-        mail::send(
+        mail::deliver(
             a,
             name,
             &mail::Outgoing {
@@ -265,7 +267,6 @@ impl MailGateway for GmailGateway {
                 attachments: message.attachments,
             },
         )
-        .map_err(AppError::external)
     }
     fn check_login(&self, a: &Account) -> AppResult<()> {
         mail::check_login(a).map_err(AppError::external)
@@ -339,9 +340,20 @@ impl SearchGateway for LocalSearch {
     /// Words only when the query vector cannot be had, with the notice of D8 once per outage.
     fn search(&self, store: &Store, query: &str, limit: usize) -> AppResult<Vec<SearchHit>> {
         let (hits, unavailable) = self.search_reported(store, query, limit)?;
+        use crate::application::compute::{INDEX_UNREADABLE, REINDEX_NOTICE, SEMANTIC_UNAVAILABLE_MESSAGE};
         match unavailable {
-            Some(_) => self.notices.once(SEMANTIC_NOTICE, crate::application::compute::SEMANTIC_UNAVAILABLE_MESSAGE),
-            None => self.notices.forget(SEMANTIC_NOTICE),
+            Some(error) if error.code == INDEX_UNREADABLE => {
+                self.notices.forget(SEMANTIC_NOTICE);
+                self.notices.once(INDEX_UNREADABLE, REINDEX_NOTICE);
+            }
+            Some(_) => {
+                self.notices.forget(INDEX_UNREADABLE);
+                self.notices.once(SEMANTIC_NOTICE, SEMANTIC_UNAVAILABLE_MESSAGE);
+            }
+            None => {
+                self.notices.forget(SEMANTIC_NOTICE);
+                self.notices.forget(INDEX_UNREADABLE);
+            }
         }
         Ok(hits)
     }

@@ -3,7 +3,7 @@
 // plus a side panel and a tipped button so the layer order can be read with all four in use.
 import { useState } from 'react';
 import Button from '../../../src/ui/Button';
-import Modal from '../../../src/ui/Modal';
+import Modal, { ModalFooter } from '../../../src/ui/Modal';
 import Popover from '../../../src/ui/Popover';
 import SidePanel from '../../../src/ui/SidePanel';
 
@@ -59,11 +59,11 @@ export default function PopoverSection() {
       {dialog && (
         <Modal size="sm" aria-label="Confirm" onClose={() => setDialog(false)}>
           <h2>Confirm</h2>
-          <div className="modal-actions">
+          <ModalFooter>
             <Button variant="primary" type="button" onClick={() => setDialog(false)}>
               Done
             </Button>
-          </div>
+          </ModalFooter>
         </Modal>
       )}
     </section>

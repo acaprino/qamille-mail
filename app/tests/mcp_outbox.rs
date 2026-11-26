@@ -48,6 +48,7 @@ struct Mail {
     cloud_sent: AtomicU64,
     cloud_ids: Mutex<Vec<String>>,
     fail: AtomicBool,
+    cannot_submit: AtomicBool,
     messages: Mutex<Vec<OutgoingMessage>>,
 }
 impl MailGateway for Mail {
@@ -81,6 +82,9 @@ impl MailGateway for Mail {
         Ok(())
     }
     fn send(&self, _: &Account, _: &str, message: OutgoingMessage) -> AppResult<()> {
+        if self.cannot_submit.load(Ordering::SeqCst) {
+            return Err(AppError::delivery_not_started("Token refresh failed before submission"));
+        }
         self.sent.fetch_add(1, Ordering::SeqCst);
         self.messages.lock().unwrap().push(message);
         std::thread::sleep(std::time::Duration::from_millis(20));
@@ -179,7 +183,11 @@ fn concurrent_claim_and_key_replay_only_send_once() {
     .unwrap();
     assert_eq!(replay.id, id);
     assert_eq!(replay.status, DeliveryStatus::Sent);
+    let stored = context.read().unwrap();
+    assert!(stored.outbox[0].draft.body.is_empty());
+    assert!(stored.outbox[0].plain.is_empty());
     let sent = mail.messages.lock().unwrap();
+    assert_eq!(stored.outbox[0].receipt_message_id, sent[0].message_id);
     assert_eq!(sent[0].bcc, vec!["private@example.test"]);
     assert!(
         sent[0]
@@ -189,6 +197,61 @@ fn concurrent_claim_and_key_replay_only_send_once() {
             .starts_with("<qamille-")
     );
 }
+#[test]
+fn pre_submission_error_allows_an_explicit_retry_of_the_same_revision() {
+    let (context, mail) = setup();
+    let drafts = DraftService::new(context.clone());
+    mail.cannot_submit.store(true, Ordering::SeqCst);
+    assert_eq!(drafts.send(10).unwrap_err().code, "delivery_not_started");
+    let failed = context.read().unwrap();
+    assert_eq!(failed.outbox[0].status, DeliveryStatus::Failed);
+    assert_eq!(failed.drafts.len(), 1);
+    assert_eq!(mail.sent.load(Ordering::SeqCst), 0);
+    mail.cannot_submit.store(false, Ordering::SeqCst);
+    drafts.send(10).unwrap();
+    let store = context.read().unwrap();
+    assert_eq!(store.outbox.len(), 1);
+    assert_eq!(store.outbox[0].status, DeliveryStatus::Sent);
+    assert_eq!(mail.sent.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn a_replacement_mailbox_cannot_submit_an_orphan_delivery() {
+    let (context, mail) = setup();
+    let queued = mcp_outbox::enqueue(context.clone(), 10, None, None, None, false, None).unwrap();
+    context.update(|store| {
+        store.accounts[0].email = "replacement@example.test".into();
+        store.drafts.clear();
+        Ok(())
+    }).unwrap();
+    let stopped = mcp_outbox::execute(context, queued.id).unwrap();
+    assert_eq!(stopped.status, DeliveryStatus::NeedsReview);
+    assert_eq!(mail.sent.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn a_legacy_handoff_survives_a_restart_before_the_first_provider_call() {
+    let (context, mail) = setup();
+    let draft = context.update(|store| {
+        store.drafts[0].send_at = Some(Time.now() - 20);
+        Ok(store.drafts[0].clone())
+    }).unwrap();
+    let queued = mcp_outbox::enqueue_due(context.clone(), &draft).unwrap();
+    let saved = context.read().unwrap();
+    assert!(saved.drafts[0].send_at.is_none());
+    assert_eq!(saved.outbox[0].id, queued.id);
+    assert_eq!(mail.sent.load(Ordering::SeqCst), 0);
+    let restarted = Arc::new(ServiceContext {
+        repository: Arc::new(MemoryRepository::new(saved)),
+        compute: context.compute.clone(), events: context.events.clone(), mail: mail.clone(),
+        secrets: context.secrets.clone(), clock: context.clock.clone(), attachments: context.attachments.clone(),
+    });
+    mcp_outbox::tick(restarted.clone()).unwrap();
+    mcp_outbox::tick(restarted.clone()).unwrap();
+    assert!(restarted.read().unwrap().drafts.is_empty());
+    assert_eq!(mail.sent.load(Ordering::SeqCst), 1);
+}
+
 #[test]
 fn ambiguous_delivery_stays_uncertain_after_worker_restart() {
     let (context, mail) = setup();

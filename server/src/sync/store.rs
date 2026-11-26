@@ -413,6 +413,17 @@ pub fn rekey(conn: &mut Connection, old: &SyncKey, new: &SyncKey) -> Result<usiz
     Ok(done)
 }
 
+/// Assign a fresh history to every restored user, including accounts without any items in
+/// the backup. Clients from the former history must reconcile even if versions coincide.
+pub fn after_restore(conn: &mut Connection) -> Result<usize, StoreError> {
+    Ok(conn.execute(
+        "INSERT INTO sync_state (user_id, version, epoch)
+         SELECT id, 0, 1 + (random() & 4503599627370495) FROM users WHERE true
+         ON CONFLICT(user_id) DO UPDATE SET epoch = excluded.epoch",
+        [],
+    )?)
+}
+
 /// Cancella tutti gli elementi e i segnaposto di tutti gli utenti e incrementa l'epoca di chi
 /// ne aveva: i computer lo vedono e ricaricano le loro caselle invece di crederle rimosse. Il
 /// contatore delle versioni non si azzera mai. Restituisce le righe cancellate.

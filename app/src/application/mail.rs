@@ -1941,6 +1941,10 @@ impl MailService {
                                     let seen = before.get(&old.id);
                                     let moved_since = seen.is_some_and(|b| b.folder != old.folder || b.uid != old.uid);
                                     let mut changed = false;
+                                    if !email.reply_to_addresses.is_empty() && old.reply_to_addresses != email.reply_to_addresses {
+                                        old.reply_to_addresses.clone_from(&email.reply_to_addresses);
+                                        changed = true;
+                                    }
                                     if seen.is_none_or(|b| b.read == old.read) {
                                         changed |= old.read != email.read;
                                         old.read = email.read;

@@ -28,7 +28,7 @@ on:
         options: [patch, minor, major]
         default: patch
       publish:
-        description: Publish the release (otherwise build only)
+        description: Retry publication of the merged develop PR on main (otherwise build only)
         type: boolean
         default: false
 
@@ -48,31 +48,56 @@ jobs:
     outputs:
       runner: ${{ steps.plan.outputs.runner }}
       step: ${{ steps.plan.outputs.step }}
+      publish: ${{ steps.plan.outputs.publish }}
+      build: ${{ steps.plan.outputs.build }}
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
       - id: plan
+        env:
+          REQUESTED_PUBLISH: ${{ inputs.publish || false }}
+          REQUESTED_STEP: ${{ inputs.step || 'patch' }}
         shell: pwsh
         run: |
           $config = Get-Content .github/release.json -Raw | ConvertFrom-Json
           $runner = if ($config.runner) { $config.runner } else { 'windows-latest' }
-          $step = '${{ inputs.step }}'
-          if ('${{ github.event_name }}' -eq 'push') {
-            $labels = @(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" --jq '.[0].labels[].name')
-            $step = if ($labels -contains 'release:major') { 'major' } elseif ($labels -contains 'release:minor') { 'minor' } else { 'patch' }
+          $step = $env:REQUESTED_STEP
+          $publish = $false
+          $push = $env:GITHUB_EVENT_NAME -eq 'push'
+          if ($env:GITHUB_REF -eq 'refs/heads/main' -and ($push -or $env:REQUESTED_PUBLISH -eq 'true')) {
+            $json = gh api "repos/$env:GITHUB_REPOSITORY/commits/$env:GITHUB_SHA/pulls"
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot verify the merged release pull request' }
+            $associated = ConvertFrom-Json -InputObject ($json -join "`n")
+            $pr = @($associated | Where-Object {
+              $_.merged_at -and $_.merge_commit_sha -eq $env:GITHUB_SHA -and
+              $_.base.ref -eq 'main' -and $_.head.ref -eq 'develop' -and
+              $_.head.repo.full_name -eq $env:GITHUB_REPOSITORY
+            } | Select-Object -First 1)
+            if ($pr.Count -gt 0) {
+              $details = gh api "repos/$env:GITHUB_REPOSITORY/pulls/$($pr[0].number)" | ConvertFrom-Json
+              if ($LASTEXITCODE -ne 0) { throw 'Cannot verify the release owner' }
+              $publish = $details.user.login -eq $env:GITHUB_REPOSITORY_OWNER -and $details.merged_by.login -eq $env:GITHUB_REPOSITORY_OWNER
+              if ($push) {
+                $labels = @($details.labels.name)
+                $step = if ($labels -contains 'release:major') { 'major' } elseif ($labels -contains 'release:minor') { 'minor' } else { 'patch' }
+              }
+            }
           }
+          "publish=$($publish.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "build=$(((!$push) -or $publish).ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "runner=$runner" >> $env:GITHUB_OUTPUT
           "step=$step" >> $env:GITHUB_OUTPUT
           Write-Host "Runner $runner, version step $step"
 
   release:
     needs: plan
+    if: needs.plan.outputs.build == 'true'
     runs-on: ${{ needs.plan.outputs.runner }}
     timeout-minutes: 360
     env:
       GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
-      PUBLISH: ${{ github.event_name == 'push' || inputs.publish }}
+      PUBLISH: ${{ needs.plan.outputs.publish }}
     defaults:
       run:
         shell: pwsh
@@ -152,6 +177,20 @@ jobs:
           $assets = @(Get-Content "$env:RUNNER_TEMP/assets.txt")
           gh release create $tag --repo '${{ github.repository }}' --verify-tag --title "${{ steps.version.outputs.app }} ${{ steps.version.outputs.version }}" --generate-notes @assets
           if ($LASTEXITCODE) { exit 1 }
+
+      - name: Record the published tag for the server image
+        if: env.PUBLISH == 'true'
+        run: |
+          $commit = git rev-parse HEAD
+          if ($LASTEXITCODE) { throw 'Cannot identify the published commit' }
+          @{ tag = '${{ steps.version.outputs.tag }}'; commit = $commit } |
+            ConvertTo-Json -Compress | Set-Content -Encoding utf8 "$env:RUNNER_TEMP/publication.json"
+      - uses: actions/upload-artifact@v4
+        if: env.PUBLISH == 'true'
+        with:
+          name: published-release-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/publication.json
+          if-no-files-found: error
 
       - name: develop follows main
         if: env.PUBLISH == 'true'

@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import Button from '../ui/Button';
-import Modal from '../ui/Modal';
+import Modal, { ModalFooter } from '../ui/Modal';
 import { tr } from '../lib/i18n';
 
 export type UnsavedDialogProps = { save: () => void; discard: () => void; stay: () => void };
@@ -23,9 +23,8 @@ export default function UnsavedDialog({ save, discard, stay }: UnsavedDialogProp
           'Your settings have changes that are not saved yet.',
         )}
       </p>
-      <div className="modal-actions">
-        {/* Throwing the changes away stands apart, at the left, from the two that keep them. */}
-        <Button variant="secondary" className="modal-action-apart" onClick={discard}>
+      <ModalFooter>
+        <Button variant="secondary" onClick={discard}>
           {tr('Annulla modifiche', 'Discard')}
         </Button>
         <Button ref={keep} variant="secondary" onClick={stay}>
@@ -34,7 +33,7 @@ export default function UnsavedDialog({ save, discard, stay }: UnsavedDialogProp
         <Button variant="primary" onClick={save}>
           {tr('Salva', 'Save')}
         </Button>
-      </div>
+      </ModalFooter>
     </Modal>
   );
 }

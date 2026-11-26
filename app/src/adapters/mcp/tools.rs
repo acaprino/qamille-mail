@@ -767,7 +767,7 @@ fn semantic_mail(context: &ServiceContext, mail: &MailService, args: &Value) -> 
     let mut result = page(rows, args, "semantic_search")?;
     result["meta"]["coverage"] = json!("indexed_content_only");
     if let Some(error) = unavailable {
-        result["meta"]["semantic"] = json!("unavailable");
+        result["meta"]["semantic"] = json!(if error.code == crate::application::compute::INDEX_UNREADABLE { "partial" } else { "unavailable" });
         result["meta"]["notice"] = json!(crate::application::compute::mcp_semantic_notice(error.code));
     }
     Ok(result)

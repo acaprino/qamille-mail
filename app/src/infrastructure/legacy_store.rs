@@ -89,23 +89,34 @@ impl Store {
     }
     pub fn save(&self) -> std::io::Result<()> {
         use crate::application::ports::StoreRepository;
+        let mut replace = |current: &mut Store| -> crate::application::AppResult<()> {
+            // Another process can detach a mailbox while this whole-store editor is open.
+            // Never restore a retired number or replace its owner's address from a stale copy.
+            let watermark = current.settings.mailbox_id_high_water;
+            for mailbox in &self.accounts {
+                let conflict = match current.account(mailbox.id) {
+                    Some(other) => !other.email.eq_ignore_ascii_case(&mailbox.email)
+                        || other.resolved_provider_id() != mailbox.resolved_provider_id(),
+                    None => watermark.is_some_and(|last| mailbox.id <= last),
+                };
+                if conflict {
+                    return Err(crate::application::AppError::new("identity_changed", "Mailboxes changed in another process; reload before saving"));
+                }
+            }
+            *current = self.clone();
+            current.settings.mailbox_id_high_water = current.settings.mailbox_id_high_water.max(watermark);
+            Ok(())
+        };
         let data_dir = Self::data_dir();
         if super::store_migration::sqlite_active(&data_dir) {
             let repository = super::sqlite_store::SqliteStoreRepository::open(
                 super::store_migration::sqlite_path(&data_dir),
             )
             .map_err(std::io::Error::other)?;
-            let store = self.clone();
-            return repository
-                .transaction(&mut |current| {
-                    // The closure may run again on a BUSY retry: it clones.
-                    *current = store.clone();
-                    Ok(())
-                })
-                .map_err(std::io::Error::other);
+            return repository.transaction(&mut replace).map_err(std::io::Error::other);
         }
         super::repository::JsonStoreRepository::new(Self::path())
-            .transaction(&mut |current| { *current = self.clone(); Ok(()) })
+            .transaction(&mut replace)
             .map_err(std::io::Error::other)
     }
     pub fn mtime() -> Option<std::time::SystemTime> {

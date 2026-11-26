@@ -38,6 +38,9 @@ struct Modern {
     _guard: File,
 }
 impl StoreRepository for Modern {
+    fn includes_local_contacts(&self) -> bool {
+        self.base.includes_local_contacts()
+    }
     fn activity_log(&self) -> Option<&dyn crate::application::ports::ActivityStore> {
         self.base.activity_log()
     }

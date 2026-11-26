@@ -29,6 +29,9 @@ pub const EMBEDDING_QUANTIZATION: &str = "q4f16";
 pub const UNLINKED_MESSAGE: &str = "This device is no longer connected to the server";
 /// Search returned word matches only (D8). Translated in `backend-text.ts`.
 pub const SEMANTIC_UNAVAILABLE_MESSAGE: &str = "Search by meaning is not available: showing word matches only";
+/// A local index file could not be read; other segments and keyword results remain usable.
+pub const INDEX_UNREADABLE: &str = "semantic_index_unreadable";
+pub const REINDEX_NOTICE: &str = "Part of the search index could not be read. Reindex to restore all semantic results.";
 /// The words of A11 for an assistant (MCP results are not translated by the interface).
 pub const MCP_NOT_CONNECTED_MESSAGE: &str = "ricerca per significato non disponibile: Qamille non è collegato al server, accedi dall'app";
 /// The MCP form of [`SEMANTIC_UNAVAILABLE_MESSAGE`] for every other cause.
@@ -100,6 +103,7 @@ pub fn is_transient(code: &str) -> bool {
 pub fn mcp_semantic_notice(code: &str) -> &'static str {
     match code {
         codes::UNAUTHORIZED | codes::NOT_CONNECTED | "compute_unauthorized" => MCP_NOT_CONNECTED_MESSAGE,
+        INDEX_UNREADABLE => "Una parte dell'indice non è leggibile. Reindicizza per ripristinare tutti i risultati semantici.",
         _ => MCP_SEMANTIC_UNAVAILABLE_MESSAGE,
     }
 }

@@ -299,3 +299,38 @@ fn the_label_of_the_provider_travels_as_the_server_wrote_it_and_cannot_break_the
     assert!(ai::complete(&settings(), "sys", "hi").is_err());
     assert_eq!(fake.chats().len(), 1);
 }
+
+#[test]
+fn mail_question_sends_only_its_mail_context_to_the_configured_provider() {
+    use qamille::application::{ServiceContext, assistant::AssistantService, ports::{NullSink, SearchGateway, SearchHit}};
+    use qamille::infrastructure::gateways::{ConfiguredAssistant, GmailGateway, LocalAttachments, SystemClock};
+    struct MailHit;
+    impl SearchGateway for MailHit {
+        fn search(&self, _: &Store, _: &str, _: usize) -> AppResult<Vec<SearchHit>> {
+            Ok(vec![SearchHit { email_id: 7, passage: "The invoice was paid".into(), score: 1.0 }])
+        }
+        fn index(&self, _: &Store) -> AppResult<String> { unreachable!() }
+        fn installed(&self) -> bool { true }
+    }
+
+    let _guard = serial();
+    let fake = gateway(|_| answer("ok"));
+    let mut store = Store::default();
+    store.settings = settings();
+    store.emails.push(Email { id: 7, subject: "Invoice".into(), ..Default::default() });
+    let tomorrow = chrono::Utc::now().timestamp() + 86_400;
+    store.events.push(qamille::model::Event { title: "private calendar entry".into(),
+        notes: "private calendar note".into(), start: tomorrow, end: tomorrow + 1800, ..Default::default() });
+    let context = Arc::new(ServiceContext {
+        compute: Arc::new(qamille::infrastructure::fake_compute::FakeCompute::default()),
+        repository: Arc::new(MemoryRepository::new(store)),
+        events: Arc::new(NullSink), mail: Arc::new(GmailGateway::new(std::path::PathBuf::new())),
+        secrets: Arc::new(Vault::default()), clock: Arc::new(SystemClock), attachments: Arc::new(LocalAttachments),
+    });
+    let assistant = AssistantService::new(context, Arc::new(ConfiguredAssistant), Arc::new(MailHit));
+    assistant.ask("What does the invoice email say?").unwrap();
+    let chats = fake.chats();
+    assert_eq!(chats.len(), 1);
+    assert!(chats[0].body.contains("The invoice was paid"));
+    assert!(!chats[0].body.contains("private calendar"));
+}

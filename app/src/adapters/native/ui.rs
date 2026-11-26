@@ -609,6 +609,8 @@ impl App {
         let store = self.store.clone();
         let index = self.index.clone();
         let compute = self.compute.clone();
+        // Screenshot mode contains synthetic meetings only.
+        let search_meeting_dir = self.screenshot.is_none().then(|| Store::data_dir().join("meetings"));
         self.spawn(move || {
             const SOURCES: usize = 8; // estimated
             let (hits, _) = rag::hybrid_search(&store, &index, &q, SOURCES, &*compute);
@@ -616,13 +618,18 @@ impl App {
             context.push_str(&crate::application::assistant::calendar_context(
                 &store.events, &q, Local::now().timestamp(),
             ));
-            let question = q.to_lowercase();
-            for m in store.meetings.iter().filter(|meeting| {
-                let title = meeting.title.trim().to_lowercase();
-                !title.is_empty() && question.contains(&title)
-            }).take(SOURCES) {
-                let summary: String = m.summary.chars().take(1200).collect();
-                context.push_str(&format!("Meeting {} on {}: {summary}\n", m.title, crate::infrastructure::timezone::format_timestamp(&store.settings, m.date)));
+            if let Some(dir) = search_meeting_dir && crate::application::assistant::include_meeting_sources(&q) {
+                let question = q.to_lowercase();
+                if let Ok(details) = crate::infrastructure::meeting_repository::merged_details(dir, &store.meetings) {
+                    for detail in details.iter().filter(|detail| {
+                        let title = detail.meeting.title.trim().to_lowercase();
+                        detail.included_in_search && !title.is_empty() && question.contains(&title)
+                    }).take(SOURCES) {
+                        let meeting = &detail.meeting;
+                        let summary: String = meeting.summary.chars().take(1200).collect();
+                        context.push_str(&format!("Meeting {} on {}: {summary}\n", meeting.title, crate::infrastructure::timezone::format_timestamp(&store.settings, meeting.date)));
+                    }
+                }
             }
             let answer = ai::ask_assistant(&store.settings, &q, &context);
             Msg::Answer { question: q, answer, sources: hits.iter().map(|h| h.email_id).collect() }

@@ -968,55 +968,70 @@ fn search_disk_at(root: &Path, store: &Store, query: &str, limit: usize, compute
     // D4: a query vector of another model than the index's finds nothing that means anything.
     let embedded=super::rag_segments::checked_identity(compute,root).and_then(|_|compute.embed_query(&words));
     let qv=match embedded {Ok(vector)=>vector,Err(error)=>return Ok((fuse(&[],&keyword,limit),Some(error)))};
-    let best = match ranked_passages(root, &allowed, &qv, limit) {
-        Ok(best) => best,
-        Err(error) => {
-            let notice = crate::application::AppError::storage(format!("The semantic index could not be read: {error}"));
-            return Ok((fuse(&[], &keyword, limit), Some(notice)));
-        }
-    };
+    let (best, incomplete) = ranked_passages(root, &allowed, &qv, limit).unwrap_or_else(|_| (Vec::new(), true));
     let mut hits = fuse(&best, &keyword, limit);
     hydrate_hits(store, &mut hits);
-    Ok((hits, None))
+    let warning = incomplete.then(|| crate::application::AppError::new(
+        crate::application::compute::INDEX_UNREADABLE, crate::application::compute::REINDEX_NOTICE,
+    ));
+    Ok((hits, warning))
 }
 
-/// Look up each passage in the already-filtered messages once. Segments are private to
-/// one account and message; skip an excluded segment before opening or decoding it.
-fn ranked_passages(root: &Path, allowed: &HashMap<u64, &Email>, query: &[f32], limit: usize) -> std::io::Result<Vec<Hit>> {
+/// Look up each passage in the already-filtered messages once. Only publish a segment's
+/// best passage after the whole file passes validation; other segments remain usable.
+fn ranked_passages(root: &Path, allowed: &HashMap<u64, &Email>, query: &[f32], limit: usize) -> std::io::Result<(Vec<Hit>, bool)> {
     let accounts: HashSet<_> = allowed.values().map(|email| email.account_id).collect();
     let segments = super::rag_segments::files_for_accounts(root, |account| accounts.contains(&account))?;
     let segments: Vec<_> = segments.into_iter().filter(|(account, id, _)| {
         allowed.get(id).is_some_and(|email| email.account_id == *account)
     }).collect();
     let segmented: HashSet<_> = segments.iter().map(|(_, id, _)| *id).collect();
-    let mut best: Vec<Hit> = Vec::new();
-    let mut accept = |passage: Passage| {
-        let Some(email) = allowed.get(&passage.email_id) else { return };
-        if email.search_index.version >= 2 && email.search_index.content_hash != email.remote_content_hash { return; }
-        if email.storage_evicted || (passage.account_id != 0 && email.account_id != passage.account_id) { return; }
-        let score: f32 = passage.vector.iter().zip(query).map(|(a, b)| a * b).sum();
-        if let Some(index) = best.iter().position(|hit| hit.email_id == email.id) {
-            if best[index].score >= score { return; }
-            best.remove(index);
-        }
-        best.push(Hit { email_id: email.id, attachment_id: passage.attachment_id, score, passage: String::new(), reference: passage.reference });
-        best.sort_by(|a, b| b.score.total_cmp(&a.score).then(b.email_id.cmp(&a.email_id)));
-        best.truncate(limit);
+    let score = |passage: Passage| -> Option<Hit> {
+        let email = allowed.get(&passage.email_id)?;
+        if email.search_index.version >= 2 && email.search_index.content_hash != email.remote_content_hash { return None; }
+        if email.storage_evicted || (passage.account_id != 0 && email.account_id != passage.account_id) { return None; }
+        let similarity = passage.vector.iter().zip(query).map(|(a, b)| a * b).sum();
+        Some(Hit { email_id: email.id, attachment_id: passage.attachment_id, score: similarity,
+            passage: String::new(), reference: passage.reference })
     };
-    visit_records(&root.join("rag_index.bin"), &mut |passage| {
-        if !segmented.contains(&passage.email_id) { accept(passage); }
-    })?;
+    let mut best = Vec::new();
+    let legacy = visit_records(&root.join("rag_index.bin"), &mut |passage| {
+        if !segmented.contains(&passage.email_id) && let Some(hit) = score(passage) {
+            retain_ranked_hit(&mut best, hit, limit);
+        }
+    });
+    let mut incomplete = legacy.is_err();
+    if incomplete { best.clear(); }
     for (account, id, path) in segments {
-        visit_records(&path, &mut |passage| {
-            if passage.email_id == id && (passage.account_id == 0 || passage.account_id == account) {
-                accept(passage);
+        let mut top: Option<Hit> = None;
+        let read = visit_records(&path, &mut |passage| {
+            if passage.email_id == id && (passage.account_id == 0 || passage.account_id == account)
+                && let Some(hit) = score(passage)
+                && top.as_ref().is_none_or(|previous| hit.score > previous.score)
+            {
+                top = Some(hit);
             }
-        })?;
+        });
+        if read.is_err() {
+            incomplete = true;
+        } else if let Some(hit) = top {
+            retain_ranked_hit(&mut best, hit, limit);
+        }
     }
     if let Some(top) = best.first().map(|hit| hit.score) {
         best.retain(|hit| hit.score >= top - SCORE_WINDOW);
     }
-    Ok(best)
+    Ok((best, incomplete))
+}
+
+fn retain_ranked_hit(best: &mut Vec<Hit>, hit: Hit, limit: usize) {
+    if let Some(index) = best.iter().position(|previous| previous.email_id == hit.email_id) {
+        if best[index].score >= hit.score { return; }
+        best.remove(index);
+    }
+    best.push(hit);
+    best.sort_by(|a, b| b.score.total_cmp(&a.score).then(b.email_id.cmp(&a.email_id)));
+    best.truncate(limit);
 }
 
 /// A vector is not a quotation. Fill excerpts only after source bytes match their saved hash.
@@ -1209,9 +1224,19 @@ mod tests {
         assert_eq!(hits[0].email_id, 7);
         std::fs::write(segments.join("7.bin"), b"broken").unwrap();
         let (hits, notice) = search_disk_at(&root, &store, "budget", 4, &compute).unwrap();
-        assert!(notice.is_some());
+        assert_eq!(notice.unwrap().code, crate::application::compute::INDEX_UNREADABLE);
         assert_eq!(hits[0].email_id, 7);
         assert_eq!(hits[0].score, 0.0);
+        // A different, valid segment remains searchable even while this one needs rebuilding.
+        store.emails.push(Email { id: 9, account_id: 1, subject: "Other".into(),
+            folder: "Inbox".into(), ..Default::default() });
+        let vector = compute.embed_query("budget").unwrap();
+        let healthy = Index { passages: vec![Passage { account_id: 1, email_id: 9, attachment_id: 0,
+            fingerprint: 0, reference: None, text: String::new(), vector }] };
+        healthy.save_path(&segments.join("9.bin")).unwrap();
+        let (hits, notice) = search_disk_at(&root, &store, "budget", 4, &compute).unwrap();
+        assert!(notice.is_some());
+        assert!(hits.iter().any(|hit| hit.email_id == 9 && hit.score > 0.0));
         std::fs::remove_dir_all(root).unwrap();
     }
 

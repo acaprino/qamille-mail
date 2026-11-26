@@ -1,7 +1,7 @@
 name: Docker image
 
 # Publishes ghcr.io/acaprino/qamille-server (linux/amd64): `develop` and `sha-<short>` at every change of
-# server/ or compute/ on develop, `<version>` and `latest` after every successful Release. A tag made by the
+# server/ or compute/ on develop, `<version>` for every published release, and `latest` for the latest release. A tag made by the
 # Release workflow with GITHUB_TOKEN starts no workflow, a workflow_run does. The package stays private until
 # the owner makes it public in the package settings.
 
@@ -26,25 +26,54 @@ permissions:
   packages: write
 
 concurrency:
-  group: docker-image
+  group: docker-image-${{ github.event.workflow_run.id || github.ref }}
   cancel-in-progress: false
 
 jobs:
+  publication:
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      tag: ${{ steps.verify.outputs.tag }}
+      commit: ${{ steps.verify.outputs.commit }}
+    steps:
+      - name: Identify the release published by this run
+        id: verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          marker="published-release-$RUN_ATTEMPT"
+          count=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts?name=$marker" --jq '[.artifacts[] | select(.expired == false)] | length')
+          if [[ "$count" == 0 ]]; then exit 0; fi
+          [[ "$count" == 1 ]]
+          dir=$(mktemp -d)
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name "$marker" --dir "$dir"
+          tag=$(jq -er .tag "$dir/publication.json")
+          commit=$(jq -er .commit "$dir/publication.json")
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ && "$commit" =~ ^[0-9a-f]{40}$ ]]
+          release=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag")
+          jq -e --arg tag "$tag" '.tag_name == $tag and .draft == false and .published_at != null' <<<"$release" >/dev/null
+          resolved=$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag")
+          jq -e --arg sha "$commit" --arg parent "$RUN_SHA" '.sha == $sha and .parents[0].sha == $parent' <<<"$resolved" >/dev/null
+          printf 'tag=%s\ncommit=%s\n' "$tag" "$commit" >> "$GITHUB_OUTPUT"
+
   image:
-    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    needs: publication
+    if: ${{ !cancelled() && (github.event_name != 'workflow_run' || (needs.publication.result == 'success' && needs.publication.outputs.tag != '')) }}
     runs-on: ubuntu-latest
     env:
       IMAGE: ghcr.io/acaprino/qamille-server
     steps:
-      - name: Find the release tag
-        if: github.event_name == 'workflow_run'
-        id: release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: echo "tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName)" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ github.event_name == 'workflow_run' && steps.release.outputs.tag || (github.event.inputs.ref || github.ref) }}
+          ref: ${{ needs.publication.outputs.commit || github.event.inputs.ref || github.ref }}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
@@ -59,9 +88,13 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Tags
         id: tags
+        env:
+          RELEASE_TAG: ${{ needs.publication.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.value }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_run" ]; then
-            printf 'list=%s\n' "$IMAGE:${{ steps.version.outputs.value }},$IMAGE:latest" >> "$GITHUB_OUTPUT"
+            [[ "$RELEASE_TAG" == "v$VERSION" ]] || exit 1
+            printf 'list=%s\n' "$IMAGE:$VERSION" >> "$GITHUB_OUTPUT"
           else
             printf 'list=%s\n' "$IMAGE:develop,$IMAGE:sha-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
           fi
@@ -85,12 +118,54 @@ jobs:
         if: github.event_name == 'workflow_run'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.release.outputs.tag }}
+          TAG: ${{ needs.publication.outputs.tag }}
           VERSION: ${{ steps.version.outputs.value }}
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q .body > notes.md
-          if ! grep -q "$IMAGE:$VERSION" notes.md; then
-            printf '\n\n## Server image\n\n```\ndocker pull %s:%s\n```\n\nDigest: `%s`\n' "$IMAGE" "$VERSION" "$DIGEST" >> notes.md
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q .body > original-notes.md
+          cp original-notes.md notes.md
+          python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+          path = Path("notes.md")
+          notes = path.read_text()
+          image = f"{os.environ['IMAGE']}:{os.environ['VERSION']}"
+          heading = f"## Server image\n\n```\ndocker pull {image}\n```\n\nDigest: "
+          block = heading + f"`{os.environ['DIGEST']}`"
+          pattern = re.escape(heading) + r"`sha256:[a-f0-9]{64}`"
+          updated, count = re.subn(pattern, lambda _: block, notes, count=1)
+          path.write_text(updated if count else notes.rstrip() + "\n\n" + block + "\n")
+          PY
+          if ! cmp -s original-notes.md notes.md; then
             gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file notes.md
           fi
+
+  promote:
+    needs: [publication, image]
+    if: ${{ !cancelled() && needs.publication.outputs.tag != '' && needs.image.result == 'success' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: qamille-stable-image-latest
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      IMAGE: ghcr.io/acaprino/qamille-server
+    steps:
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Point latest at the current published release
+        env:
+          BUILT_TAG: ${{ needs.publication.outputs.tag }}
+        run: |
+          set -euo pipefail
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name')
+          [[ "$latest" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          # A rerun of an old release must never demote latest. If the current release
+          # is still building, its own completed image will perform the promotion.
+          ref="$IMAGE:${latest#v}"
+          if [[ "$latest" != "$BUILT_TAG" ]] && ! docker buildx imagetools inspect "$ref" >/dev/null; then exit 0; fi
+          docker buildx imagetools create --tag "$IMAGE:latest" "$ref"

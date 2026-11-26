@@ -119,10 +119,9 @@ pub fn save_with_autostart(config: &Config) -> AppResult<()> {
     save(config)
 }
 
-pub(super) fn revoke_mailbox(id: u32) -> AppResult<()> {
-    let root = Store::data_dir();
-    let _lock = config_lock(&root)?;
-    let mut config = load_at(&root)?;
+pub(super) fn revoke_mailbox(root: &std::path::Path, id: u32) -> AppResult<()> {
+    let _lock = config_lock(root)?;
+    let mut config = load_at(root)?;
     let mut changed = false;
     for profile in config.profiles.values_mut() {
         if let Some(ids) = &mut profile.account_ids {
@@ -131,7 +130,7 @@ pub(super) fn revoke_mailbox(id: u32) -> AppResult<()> {
             changed |= count != ids.len();
         }
     }
-    if changed { publish(&config, &root)?; }
+    if changed { publish(&config, root)?; }
     Ok(())
 }
 

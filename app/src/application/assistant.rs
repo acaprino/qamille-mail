@@ -52,6 +52,18 @@ pub(crate) fn calendar_context(events: &[crate::model::Event], question: &str, n
     context
 }
 
+/// A question specifically about mail should not retrieve meeting notes alongside it.
+pub(crate) fn include_meeting_sources(question: &str) -> bool {
+    let question = question.to_lowercase();
+    let mut mail = false;
+    let mut meetings = false;
+    for word in question.split(|c: char| !c.is_alphanumeric()) {
+        mail |= matches!(word, "mail" | "email" | "emails" | "inbox" | "posta");
+        meetings |= matches!(word, "meeting" | "meetings" | "riunione" | "riunioni" | "transcript" | "trascrizione" | "verbale");
+    }
+    !mail || meetings
+}
+
 #[derive(Clone)]
 pub struct AssistantService {
     context: Arc<ServiceContext>,
@@ -121,7 +133,7 @@ impl AssistantService {
         }
         context.push_str(&calendar_context(&store.events, question, self.context.clock.now()));
         let mut meeting_sources = vec![];
-        if let Some(meetings) = &self.meetings {
+        if let Some(meetings) = &self.meetings && include_meeting_sources(question) {
             let stop_words = ["the", "and", "what", "about", "meeting", "meetings", "quale", "quali", "della", "delle", "degli", "abbiamo", "sono", "cosa", "come", "per", "con", "che", "una", "del", "nel"];
             let mut seen = std::collections::HashSet::new();
             for term in question.split(|c: char| !c.is_alphanumeric()).map(str::to_lowercase)
@@ -250,6 +262,8 @@ mod calendar_privacy_tests {
         ];
         assert!(calendar_context(&events, "Find the invoice email", 42).is_empty());
         assert!(calendar_context(&events, "Find the email about the calendar", 42).is_empty());
+        assert!(!include_meeting_sources("Find the email about the invoice"));
+        assert!(include_meeting_sources("Find email and meeting notes about the invoice"));
         let agenda = calendar_context(&events, "Mostrami la mia agenda", 42);
         assert!(agenda.contains("Clinic") && agenda.contains("Budget review"));
         assert!(!agenda.contains("sensitive") && !agenda.contains("forecast"));

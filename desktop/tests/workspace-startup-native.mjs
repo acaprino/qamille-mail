@@ -18,10 +18,10 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 if (process.platform === 'win32') {
   const { stdout } = await promisify(execFile)('powershell.exe', [
     '-NoProfile', '-NonInteractive', '-Command',
-    "@(Get-CimInstance Win32_Process | Where-Object { $_.Name -match '^(Qamille|qamille-desktop)(\\.exe)?$' -and $_.CommandLine -notmatch '(?:^|\\s)--(?:mcp|worker|embedding-worker)(?:\\s|$)' } | Select-Object -ExpandProperty ProcessId) | ConvertTo-Json -Compress",
+    "ConvertTo-Json -Compress -InputObject @(Get-CimInstance Win32_Process | Where-Object { $_.Name -match '^(Qamille|qamille-desktop)(\\.exe)?$' -and $_.CommandLine -notmatch '(?:^|\\s)--(?:mcp|worker|embedding-worker)(?:\\s|$)' } | Select-Object -ExpandProperty ProcessId)",
   ], { windowsHide: true });
-  const running = stdout.trim() ? JSON.parse(stdout) : [];
-  assert.equal([running].flat().length, 0, 'Close existing Qamille app windows before this isolated native test.');
+  const running = JSON.parse(stdout);
+  assert.deepEqual(running, [], 'Close existing Qamille app windows before this isolated native test.');
 }
 await fs.access(executable);
 await fs.mkdir(artifacts, { recursive: true });
@@ -89,6 +89,7 @@ async function launch(name, data, demo = false, options = {}) {
     }).observe(document, { childList: true, subtree: true });
   });
   await page.waitForFunction(() => !!window.__TAURI_INTERNALS__);
+  assert.equal(new URL(page.url()).origin, 'http://tauri.localhost', `${name}: the UI must be served by the packaged executable`);
   await page.evaluate(() => localStorage.setItem('qamille:ui-language', 'en'));
   await page.reload();
   await page.locator('.compose-main').waitFor();
@@ -122,7 +123,7 @@ async function assertEmpty(session) {
 
 async function assertAccountsAccessible(session) {
   const { page } = session;
-  await page.getByTitle('Settings', { exact: true }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Your name', exact: true })).toHaveValue('You');
   await page.getByRole('navigation', { name: 'Settings sections' }).getByRole('button', { name: 'Accounts', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Your email accounts', exact: true })).toBeVisible();

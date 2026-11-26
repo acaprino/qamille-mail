@@ -68,7 +68,8 @@ jobs:
           if ($env:GITHUB_REF -eq 'refs/heads/main' -and ($push -or $env:REQUESTED_PUBLISH -eq 'true')) {
             $json = gh api "repos/$env:GITHUB_REPOSITORY/commits/$env:GITHUB_SHA/pulls"
             if ($LASTEXITCODE -ne 0) { throw 'Cannot verify the merged release pull request' }
-            $pr = @($json | ConvertFrom-Json | Where-Object {
+            $associated = ConvertFrom-Json -InputObject ($json -join "`n")
+            $pr = @($associated | Where-Object {
               $_.merged_at -and $_.merge_commit_sha -eq $env:GITHUB_SHA -and
               $_.base.ref -eq 'main' -and $_.head.ref -eq 'develop' -and
               $_.head.repo.full_name -eq $env:GITHUB_REPOSITORY
@@ -176,6 +177,20 @@ jobs:
           $assets = @(Get-Content "$env:RUNNER_TEMP/assets.txt")
           gh release create $tag --repo '${{ github.repository }}' --verify-tag --title "${{ steps.version.outputs.app }} ${{ steps.version.outputs.version }}" --generate-notes @assets
           if ($LASTEXITCODE) { exit 1 }
+
+      - name: Record the published tag for the server image
+        if: env.PUBLISH == 'true'
+        run: |
+          $commit = git rev-parse HEAD
+          if ($LASTEXITCODE) { throw 'Cannot identify the published commit' }
+          @{ tag = '${{ steps.version.outputs.tag }}'; commit = $commit } |
+            ConvertTo-Json -Compress | Set-Content -Encoding utf8 "$env:RUNNER_TEMP/publication.json"
+      - uses: actions/upload-artifact@v4
+        if: env.PUBLISH == 'true'
+        with:
+          name: published-release-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/publication.json
+          if-no-files-found: error
 
       - name: develop follows main
         if: env.PUBLISH == 'true'

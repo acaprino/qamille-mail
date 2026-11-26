@@ -502,6 +502,7 @@ const EXACT = new Map<string, string>([
   ['The compute server is not responding; the request will be retried.', 'Il server di calcolo non risponde; la richiesta verrà ripetuta.'],
   ['The compute server is busy; the request will be retried shortly.', 'Il server di calcolo è occupato; la richiesta verrà ripetuta tra poco.'],
   ['The compute server refused the credentials of this request.', 'Il server di calcolo ha rifiutato le credenziali di questa richiesta.'],
+  ['Part of the search index could not be read. Reindex to restore all semantic results.', "Una parte dell'indice di ricerca non è leggibile. Reindicizza per ripristinare tutti i risultati semantici."],
   ['Search by meaning is not available: showing word matches only', 'Ricerca per significato non disponibile: risultati solo per parola.'],
   ['The server uses a different model from the index: reindex to search by meaning again', "Il server usa un modello diverso dall'indice: reindicizza per tornare a cercare per significato."],
   ['Not connected to the Qamille server', 'Non collegato al server Qamille.'],

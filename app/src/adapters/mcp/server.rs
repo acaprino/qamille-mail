@@ -113,6 +113,9 @@ impl ScopedRepository {
     }
 }
 impl StoreRepository for ScopedRepository {
+    fn includes_local_contacts(&self) -> bool {
+        self.profile.account_ids.is_none() && self.base.includes_local_contacts()
+    }
     fn append_activity(&self, entry: &crate::domain::activity::NewActivity, at_ms: i64) -> AppResult<Option<i64>> {
         // The operation has already committed. Keep its audit even when permissions change
         // between commit and logging. The scoped wrapper exposes no unfiltered history.
@@ -936,6 +939,7 @@ mod tests {
                 ..Default::default()
             },
         };
+        assert!(!scope.includes_local_contacts());
         let visible = scope.read().unwrap();
         assert_eq!(visible.accounts.len(), 1);
         assert_eq!(visible.undo_actions.len(), 1);

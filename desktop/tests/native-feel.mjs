@@ -1236,7 +1236,7 @@ check('28. the first maximized show is cloaked by DWM only through a guard that 
 // The Sigrid plan, Task 2: check 29.
 check('29. Sigrid draws no web cursor of its own: the pointer stays the arrow (rule 3)', () => {
   // Sigrid's sources may name `cursor-not-allowed` and `cursor-progress` only where they do today (asked of Sigrid as R16),
-  // and Qamille's base keeps the arrow on them. `cursor-pointer` and every other cursor never appear.
+  // and Qamille's base keeps the arrow on them. Resize and drag feedback are checked at their specific controls.
   // The paths are those of Sigrid 6, whose sources are laid out by level (primitives, components, layout, assemblies).
   const KNOWN = new Set([
     'assemblies/prompt-input.tsx',
@@ -1252,9 +1252,15 @@ check('29. Sigrid draws no web cursor of its own: the pointer stays the arrow (r
   const home = path.join(desktop, 'vendor', 'sigrid', 'src');
   const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => (entry.isDirectory() ? walk(path.join(dir, entry.name)) : [path.join(dir, entry.name)]));
   for (const file of walk(home).filter((name) => /\.tsx?$/.test(name))) {
-    const cursors = [...fs.readFileSync(file, 'utf8').matchAll(/cursor-([a-z-]+)/g)].map((match) => match[1]);
-    if (!cursors.length) continue;
     const name = path.relative(home, file).replaceAll('\\', '/');
+    let source = fs.readFileSync(file, 'utf8');
+    if (name === 'assemblies/workspace.tsx') {
+      // A movable pane boundary uses the system's resize arrows. All other controls keep rule 3.
+      const sash = /<div\b(?=[^<]*\brole=["']separator["'])(?=[^<]*\bdata-slot=["']workspace-sash["'])[^<]*/g;
+      source = source.replace(sash, (element) => element.replace(/\bcursor-(?:col|row)-resize\b/g, ''));
+    }
+    const cursors = [...source.matchAll(/cursor-([a-z-]+)/g)].map((match) => match[1]);
+    if (!cursors.length) continue;
     // The deck of cards one drags (Sigrid 6) shows the grabbing hand while a card is held: Qamille does not use it.
     const dragged = name === 'assemblies/swipe-deck.tsx';
     for (const cursor of cursors) assert.ok(['not-allowed', 'progress', 'default'].includes(cursor) || (dragged && cursor.startsWith('grab')), `${name} uses cursor-${cursor}: ask Sigrid to drop it`);

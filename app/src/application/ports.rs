@@ -8,6 +8,8 @@ use crate::domain::model::{Account, Attachment, Category, Email, Settings, Store
 /// operation once and commit only on Ok. Network work must stay outside it.
 pub trait StoreRepository: Send + Sync {
     fn read(&self) -> AppResult<Store>;
+    /// Only a workspace-wide grant includes its shared (unowned) address book.
+    fn includes_local_contacts(&self) -> bool { true }
     /// The committed store, shared and read-only. Adapters that can keep it
     /// between writes (SQLite: until `PRAGMA data_version` moves) avoid a full
     /// read per call; the default reads.

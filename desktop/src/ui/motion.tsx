@@ -3,7 +3,10 @@
 // starts on load, nothing repeats, nothing is a spring. This file puts those pieces in the shape the app's lists use:
 //   `Presence`    what stays in the page for the length of its exit (Sigrid's `Presence`, around the items of a list);
 //   `Item`        an element of such a list, as a div, li, section or button: it enters, moves to make room and leaves;
-//   `useIsPresent` false while an item is on its way out, so it can let go of focus and take no click.
+//   `useIsPresent` false while an item is on its way out, so it can let go of focus and take no click;
+//   `useAppear`, `useLand`  what comes into the page, or changes under the reader's hand (a message, a window), settles in;
+//   `usePopup`    a card that opens from a control comes in from the side of it;
+//   `Turn`        the arrow of a group that opens turns a quarter.
 // With animations off (the system asks for less motion, or Sigrid's chunk has not arrived) every piece is the plain DOM:
 // no animation, and the same markup. Qamille keeps no animation of its own and imports no animation library.
 import {
@@ -22,6 +25,7 @@ import {
   type RefObject,
 } from 'react';
 import { preloadMotion, useMotion } from '@acaprino/sigrid';
+import { cn } from './cn';
 
 /**
  * Loads Sigrid's chunk with Motion before the first render, so the lists do not change from plain elements to moving ones (and
@@ -55,19 +59,61 @@ export function useAppear(): (element: HTMLElement | null) => void {
 
 /**
  * The same entrance on an element that stays: each time `key` changes (never on the first render, never while loading) and
- * `when` holds, it settles into place again: the view that has just changed, a panel that has just opened.
+ * `when` holds, it settles into place again: the view that has just changed, a panel that has just opened. A key that
+ * changes again within `REPEAT_MS` (an arrow key held down on a list) does not start it over: it would never reach rest.
  */
+const REPEAT_MS = 160;
 export function useLand(ref: RefObject<HTMLElement | null>, key: unknown, when = true): void {
   const motion = useMotion();
   const first = useRef(true);
+  const last = useRef(0);
   useLayoutEffect(() => {
     if (first.current) {
       first.current = false;
       return;
     }
-    if (motion && when && loaded() && ref.current) motion.landCard(ref.current);
+    const now = performance.now();
+    if (motion && when && loaded() && ref.current && now - last.current > REPEAT_MS) {
+      last.current = now;
+      motion.landCard(ref.current);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
+}
+
+/**
+ * The `ref` of a card that opens from a control (the panel under the search field): it fades in coming a few pixels from the
+ * side of its `anchor` (Sigrid's `enterPopup`), once per element and not while the app is loading.
+ */
+export function usePopup(anchor?: () => Element | null): (element: HTMLElement | null) => void {
+  const motion = useMotion();
+  const seen = useRef<HTMLElement | null>(null);
+  const from = useRef(anchor);
+  from.current = anchor;
+  return useCallback(
+    (element: HTMLElement | null) => {
+      if (!element || element === seen.current) return;
+      seen.current = element;
+      if (motion && loaded()) motion.enterPopup(element, from.current?.());
+    },
+    [motion],
+  );
+}
+
+/**
+ * The arrow of a group that opens, drawn pointing right: it turns a quarter, down, as the group opens (Sigrid's `Turn`).
+ * Without animations it is the same arrow, already turned.
+ */
+export function Turn({ open, children }: { open: boolean; children: ReactNode }) {
+  const motion = useMotion();
+  if (!motion) {
+    return (
+      <span aria-hidden="true" className={cn('inline-flex', open && 'rotate-90')}>
+        {children}
+      </span>
+    );
+  }
+  return <motion.Turn open={open}>{children}</motion.Turn>;
 }
 
 /** True while Sigrid's motion is on: the app animates, the system allows motion and the chunk with Motion is loaded. */

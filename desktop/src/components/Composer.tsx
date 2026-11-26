@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type DragEvent } from 'react';
-import { useLand } from '../ui/motion';
+import { useEffect, useLayoutEffect, useRef, useState, type DragEvent } from 'react';
+import { useAppear, useLand } from '../ui/motion';
 import Button from '../ui/Button';
 import Tooltip from '../ui/Tooltip';
 import Icon from '../ui/Icon';
@@ -384,8 +384,10 @@ export default function Composer(props: ComposerProps) {
     await queue('discard', null, false);
   }
 
-  // Minimized, the panel is hidden at once; opened again it settles into place.
+  // A new window settles into place as it opens; minimized, the panel is hidden at once, and opened again it settles again.
   const hidden = !active;
+  const appear = useAppear();
+  useLayoutEffect(() => appear(panel.current), [appear]);
   useLand(panel, active, active);
   const fileName = (path: string) => path.split(/[\\/]/).pop();
 

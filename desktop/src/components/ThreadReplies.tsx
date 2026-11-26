@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Icon from '../ui/Icon';
+import { Turn } from '../ui/motion';
 import { fullDate, shortDate } from '../lib/api';
 import { conversationOf, repliesLeft, repliesOf, threadState } from '../lib/groups';
 import { fixedBackendText, tr } from '../lib/i18n';
@@ -121,8 +122,10 @@ export default function ThreadReplies({ row, index, self, selectedId, tabId, ope
                 title={foldTip(item)}
                 onClick={() => toggleFold(reply.id)}
               >
-                <Icon name="down" size={14} />
-                {item.folded && <span className="fold-count">{item.hidden}</span>}
+                <Turn open={!item.folded}>
+                  <Icon name="chevron" size={14} />
+                </Turn>
+                {item.folded &&<span className="fold-count">{item.hidden}</span>}
               </button>
             )}
           </div>

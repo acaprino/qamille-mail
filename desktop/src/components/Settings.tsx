@@ -1,5 +1,6 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import Button from '../ui/Button';
+import { useLand } from '../ui/motion';
 import Checkbox from '../ui/Checkbox';
 import Field from '../ui/Field';
 import Icon from '../ui/Icon';
@@ -304,6 +305,9 @@ export default function Settings({
   useImperativeHandle(ref, () => ({ showSection, discard, save }));
 
   const section = form.section;
+  // Another section settles into place; the menu beside it stays still.
+  const content = useRef<HTMLDivElement>(null);
+  useLand(content, section);
   const hasGmail = workspace.accounts.some((account) => account.kind === 'Gmail');
   return (
     <>
@@ -352,7 +356,7 @@ export default function Settings({
               </button>
             ))}
           </nav>
-          <div className="settings-content">
+          <div className="settings-content" ref={content}>
             {section === 'General' ? (
               <>
                 <h2>{tr('Uno spazio tutto tuo', 'A workspace of your own')}</h2>

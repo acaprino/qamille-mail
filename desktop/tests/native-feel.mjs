@@ -1254,10 +1254,10 @@ check('29. Sigrid draws no web cursor of its own: the pointer stays the arrow (r
   for (const file of walk(home).filter((name) => /\.tsx?$/.test(name))) {
     const name = path.relative(home, file).replaceAll('\\', '/');
     let source = fs.readFileSync(file, 'utf8');
-    if (name === 'assemblies/workspace.tsx') {
-      // A movable pane boundary uses the system's resize arrows. All other controls keep rule 3.
-      const sash = /<div\b(?=[^<]*\brole=["']separator["'])(?=[^<]*\bdata-slot=["']workspace-sash["'])[^<]*/g;
-      source = source.replace(sash, (element) => element.replace(/\bcursor-(?:col|row)-resize\b/g, ''));
+    if (name === 'assemblies/workspace.tsx' || name === 'layout/split-pane.tsx') {
+      // Both movable pane dividers use the system's resize arrows.
+      const divider = /<div\b(?=[^<]*\brole=["']separator["'])(?=[^<]*\bdata-slot=["'](?:workspace-sash|split-pane-divider)["'])[^<]*/g;
+      source = source.replace(divider, (element) => element.replace(/\bcursor-(?:col|row)-resize\b/g, ''));
     }
     const cursors = [...source.matchAll(/cursor-([a-z-]+)/g)].map((match) => match[1]);
     if (!cursors.length) continue;

@@ -970,3 +970,33 @@ fn a_live_unreadable_mailbox_survives_conflicts_on_old_and_new_devices() {
     assert!(!row.deleted);
     assert!(row.item.is_none());
 }
+
+#[test]
+fn restore_keeps_a_known_tombstone_and_newer_local_edits() {
+    let (server, a, _) = pair();
+    a.add_gmail("removed@gmail.com", "removed-token", CLIENT);
+    a.add_gmail("kept@gmail.com", "old-token", CLIENT);
+    a.sync.sync_now().unwrap();
+    let kept = item_id("gmail", "kept@gmail.com");
+    let mut old = server.item(&kept).unwrap().1;
+    let removed = item_id("gmail", "removed@gmail.com");
+    a.advance(120);
+    a.context.update(|s| {
+        let account = s.accounts.iter_mut().find(|a| a.email == "kept@gmail.com").unwrap();
+        account.name = "Local edit".into();
+        Ok(())
+    }).unwrap();
+    a.vault.set("gmail:kept@gmail.com", "renewed-token").unwrap();
+    a.sync.sync_now().unwrap();
+    old.account.name = "Old backup".into();
+    server.write(old);
+    server.remove(&removed);
+    server.0.lock().unwrap().epoch += 1;
+    a.sync.sync_now().unwrap();
+    let status = a.sync.status().unwrap();
+    assert!(status.removals.iter().any(|notice| notice.item_id == removed));
+    assert!(server.0.lock().unwrap().rows.get(&removed).unwrap().deleted);
+    let restored = server.item(&kept).unwrap().1;
+    assert_eq!(restored.account.name, "Local edit");
+    assert_eq!(restored.credential.value, "renewed-token");
+}

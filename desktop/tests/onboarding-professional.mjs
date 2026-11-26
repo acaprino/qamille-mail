@@ -28,6 +28,14 @@ async function start(server) {
   page.setDefaultTimeout(15000);
   await page.addInitScript((value) => (window.__previewServer = value), server);
   await page.goto(process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:1420');
+  // The first page on a fresh Vite instance also loads the desktop preview backend.
+  // Start the interface assertions only once the app has asked which edition it is.
+  try {
+    await page.waitForFunction(() => window.__previewCalls?.includes('app_edition'), null, { timeout: 30_000 });
+  } catch (error) {
+    const body = await page.locator('body').innerText();
+    throw new Error(`The preview did not reach the edition check. Page errors: ${errors.join(' | ')}. Screen: ${body.slice(0, 600)}`, { cause: error });
+  }
   return { page, context };
 }
 const noAccountButton = (page) => page.getByRole('button', { name: 'Continue without an account', exact: true }).count();

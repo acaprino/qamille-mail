@@ -21,6 +21,15 @@ pub(crate) fn calendar_context(events: &[crate::model::Event], question: &str, n
         | "appuntamento" | "appuntamenti" | "appointment" | "appointments"
         | "event" | "events" | "evento" | "eventi" | "schedule"));
     if !calendar_named { return String::new(); }
+    // An event mentioned by title in an email request is still mail context. Only a
+    // request explicitly combining both sources may bring that event into the prompt.
+    if words.iter().any(|word| is_mail_word(word))
+        && !["email and calendar", "emails and calendar", "mail and calendar", "calendar and mail",
+            "calendar and email", "posta e calendario", "email e calendario", "calendario e posta",
+            "calendario e mail", "calendario e email"].iter().any(|sources| question.contains(*sources))
+    {
+        return String::new();
+    }
     let mut upcoming: Vec<_> = events.iter().filter(|event| event.end >= now).collect();
     let named = |event: &crate::model::Event| {
         let title = event.title.trim().to_lowercase();
@@ -52,13 +61,17 @@ pub(crate) fn calendar_context(events: &[crate::model::Event], question: &str, n
     context
 }
 
+fn is_mail_word(word: &str) -> bool {
+    matches!(word, "mail" | "email" | "emails" | "inbox" | "posta")
+}
+
 /// A question specifically about mail should not retrieve meeting notes alongside it.
 pub(crate) fn include_meeting_sources(question: &str) -> bool {
     let question = question.to_lowercase();
     let mut mail = false;
     let mut meetings = false;
     for word in question.split(|c: char| !c.is_alphanumeric()) {
-        mail |= matches!(word, "mail" | "email" | "emails" | "inbox" | "posta");
+        mail |= is_mail_word(word);
         meetings |= matches!(word, "meeting" | "meetings" | "riunione" | "riunioni" | "transcript" | "trascrizione" | "verbale");
     }
     !mail || meetings
@@ -262,6 +275,7 @@ mod calendar_privacy_tests {
         ];
         assert!(calendar_context(&events, "Find the invoice email", 42).is_empty());
         assert!(calendar_context(&events, "Find the email about the calendar", 42).is_empty());
+        assert!(calendar_context(&events, "Find the email about calendar notes for Budget review", 42).is_empty());
         assert!(!include_meeting_sources("Find the email about the invoice"));
         assert!(include_meeting_sources("Find email and meeting notes about the invoice"));
         let agenda = calendar_context(&events, "Mostrami la mia agenda", 42);

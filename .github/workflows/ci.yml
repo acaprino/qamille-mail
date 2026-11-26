@@ -66,6 +66,8 @@ jobs:
       - name: App tests
         # Every test file runs even after one fails: a failure must not hide the ones after it.
         run: cargo test --manifest-path app/Cargo.toml --no-default-features --features test-support --jobs 2 --locked --no-fail-fast
+      - name: Compile the legacy native UI
+        run: cargo check --manifest-path app/Cargo.toml --locked --features native-ui --jobs 2
 
   desktop:
     runs-on: windows-latest

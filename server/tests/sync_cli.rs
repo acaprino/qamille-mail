@@ -154,13 +154,24 @@ fn a_key_of_the_wrong_format_stops_the_commands_without_echoing_it() {
 
 #[tokio::test]
 async fn a_restored_backup_gets_a_new_history_without_losing_items_or_versions() {
-    let ts = seeded(2).await;
+    let ts = TestServer::new(sync_config());
+    let mario = user_with_device(&ts, "mario", "una password lunga").await;
+    let anna = user_with_device(&ts, "anna", "una password lunga").await;
+    let active = SyncClient::new(&ts.public, &mario.device_key);
+    let empty = SyncClient::new(&ts.public, &anna.device_key);
+    for n in 1..=2 {
+        assert_eq!(active.put(&item_id(n), 0, account_item("MARKER")).await.status, 200);
+    }
+    assert_eq!(active.delete(&item_id(2), Some(2)).await.status, 200);
+    let before = active.list(0).await.body;
     let result = run(ts.dir.path(), &["sync", "after-restore"], &[]);
     assert_eq!(result.status.code(), Some(0), "{}", err(&result));
-    let (version, epoch): (i64, i64) = ts.accounts().db().blocking(|conn| {
-        Ok(conn.query_row("SELECT version, epoch FROM sync_state", [], |r| Ok((r.get(0)?, r.get(1)?)))?)
-    }).await.unwrap();
-    assert_eq!(version, 2);
-    assert!(epoch > 0);
-    assert_eq!(probe(&ts, TEST_SYNC_KEY).await, Probe::Opens);
+    let after = active.list(0).await.body;
+    assert_ne!(after["epoch"], before["epoch"]);
+    assert_eq!(after["version"], before["version"]);
+    assert_eq!(after["items"], before["items"], "includes the original tombstone and readable live item");
+    let unused = empty.list(0).await.body;
+    assert!(unused["epoch"].as_u64().unwrap() > 0);
+    assert_eq!(unused["version"].as_u64(), Some(0));
+    assert!(unused["items"].as_array().unwrap().is_empty());
 }

@@ -538,7 +538,10 @@ impl SyncService {
             }
             return Ok(merged);
         };
-        Ok(merge_changed(&local.item, remote, now, t.account_mac != local.account_mac, t.credential_mac != local.credential_mac))
+        // Version zero marks a tracked row in a restored history. Neither side is a
+        // common baseline there: compare the known times for both parts once.
+        let rebased = t.version == 0;
+        Ok(merge_changed(&local.item, remote, now, rebased || t.account_mac != local.account_mac, rebased || t.credential_mac != local.credential_mac))
     }
     fn track(&self, version: u64, item: &SyncItem, shared_signature: bool) -> AppResult<Tracked> {
         let (account_mac, credential_mac) = self.macs(item, shared_signature)?;
@@ -656,10 +659,14 @@ impl SyncService {
                 listing = self.server.list(endpoint, 0)?;
                 full = true;
             }
-            // A restore or reset starts a fresh history. Missing rows can be uploaded again.
-            // Keep explicit local removals so a restored remote copy cannot revive them.
-            state.items.clear();
-            state.removals.clear();
+            // Missing rows can be uploaded again. Keep the baseline of rows that still
+            // exist: a tombstone is a real removal even after restore, and a newer local
+            // edit must survive an older restored item. Old version numbers cannot be compared.
+            let restored: BTreeSet<&str> = listing.items.iter().map(|item| item.id.as_str()).collect();
+            state.items.retain(|id, tracked| {
+                tracked.version = 0;
+                restored.contains(id.as_str())
+            });
             state.since = 0;
         }
         self.check_session(endpoint)?;

@@ -1,8 +1,8 @@
 use super::{
     AppError, AppResult, ServiceContext,
-    ports::{GOOGLE_SECRET, GoogleIdentity, account_key},
+    ports::{GOOGLE_SECRET, GoogleIdentity, SecretStore, account_key},
 };
-use crate::domain::model::{Account, AccountKind, SignatureBinding};
+use crate::domain::model::{Account, AccountKind, SignatureBinding, Store};
 use std::sync::Arc;
 
 /// What a removed mailbox was: enough for the synchronization to delete its item.
@@ -45,25 +45,56 @@ impl AccountService {
         let store = self.context.read_shared()?;
         let account = store.account(id).cloned().ok_or_else(|| AppError::missing("Account"))?;
         let removed = RemovedAccount { provider_id: account.resolved_provider_id().to_string(), email: account.email.clone() };
-        (self.retire_mailbox)(id, &mut || {
+        let primary = retirement_key(&account);
+        let mut committed = false;
+        let result = (self.retire_mailbox)(id, &mut || {
             self.context.update(|store| {
                 let current = store.account(id).ok_or_else(|| AppError::missing("Account"))?;
                 if !current.email.eq_ignore_ascii_case(&account.email) || current.resolved_provider_id() != account.resolved_provider_id() {
                     return Err(AppError::new("identity_changed", "Mailbox changed; refresh before removing it"));
                 }
-                if account.resolved_provider_id() != "sample" {
-                    let primary = super::sync::credential_key(&account);
-                    // A locked vault otherwise accepts a removal as a no-op.
-                    self.context.secrets.get(&primary)?;
-                    for key in [format!("calendar:{id}"), format!("contacts:{id}"), primary] {
-                        self.context.secrets.remove(&key)?;
-                    }
-                }
+                // Validate the vault without changing it. Only a committed removal may delete keys.
+                if !primary.is_empty() { self.context.secrets.get(&primary)?; }
                 store.detach_mailbox(id, self.context.clock.now());
+                store.settings.pending_mailbox_cleanup.insert(id, primary.clone());
                 Ok(())
-            })
-        })?;
+            })?;
+            committed = true;
+            self.clear_credentials(id)
+        });
+        if committed {
+            self.settle_cleanup(id, result);
+        } else {
+            result?;
+            return Err(AppError::storage("Mailbox retirement did not commit"));
+        }
         Ok(removed)
+    }
+
+    fn clear_credentials(&self, id: u32) -> AppResult<()> {
+        // Connecting a mailbox sets its credential under this same repository writer lock.
+        self.context.repository.transaction(&mut |store| {
+            clear_retired_credentials(store, id, self.context.secrets.as_ref())
+        })
+    }
+
+    fn settle_cleanup(&self, id: u32, result: AppResult<()>) {
+        let result = result.and_then(|()| self.context.update(|store| {
+            store.settings.pending_mailbox_cleanup.remove(&id);
+            Ok(())
+        }));
+        if let Err(error) = result {
+            eprintln!("Mailbox {id} cleanup will resume after restart: {error}");
+        }
+    }
+
+    pub fn retry_mailbox_cleanup(&self) -> AppResult<()> {
+        let pending: Vec<_> = self.context.read_shared()?.settings.pending_mailbox_cleanup.keys().copied().collect();
+        for id in pending {
+            let result = (self.retire_mailbox)(id, &mut || self.clear_credentials(id));
+            self.settle_cleanup(id, result);
+        }
+        Ok(())
     }
     /// Stops a Google sign-in that is still waiting for the browser.
     pub fn cancel_google(&self) {
@@ -122,4 +153,24 @@ impl AccountService {
             Ok(())
         })
     }
+}
+
+pub(crate) fn retirement_key(account: &Account) -> String {
+    if account.resolved_provider_id() == "sample" { String::new() } else { super::sync::credential_key(account) }
+}
+
+pub(crate) fn clear_retired_credentials(store: &Store, id: u32, secrets: &dyn SecretStore) -> AppResult<()> {
+    let Some(primary) = store.settings.pending_mailbox_cleanup.get(&id) else { return Ok(()); };
+    if store.account(id).is_some() { return Err(AppError::storage("Pending cleanup belongs to an active mailbox")); }
+    if primary.is_empty() { return Ok(()); }
+    // The real vault accepts remove as a no-op while locked. Leave the journal for a retry.
+    secrets.get(primary)?;
+    for key in [format!("calendar:{id}"), format!("contacts:{id}")] {
+        secrets.remove(&key)?;
+    }
+    if !store.accounts.iter().any(|account| super::sync::credential_key(account) == *primary) {
+        secrets.remove(primary)?;
+        if let Some(email) = primary.strip_prefix("gmail:") { super::sync::forget_access_hook(email); }
+    }
+    Ok(())
 }

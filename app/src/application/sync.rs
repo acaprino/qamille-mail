@@ -1161,7 +1161,7 @@ static FORGET_ACCESS: Mutex<Option<Box<dyn Fn(&str) + Send>>> = Mutex::new(None)
 pub fn set_forget_access(hook: Box<dyn Fn(&str) + Send>) {
     *lock(&FORGET_ACCESS) = Some(hook);
 }
-fn forget_access_hook(email: &str) {
+pub(super) fn forget_access_hook(email: &str) {
     if let Some(hook) = lock(&FORGET_ACCESS).as_ref() {
         hook(email);
     }

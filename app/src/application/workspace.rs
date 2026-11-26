@@ -165,6 +165,7 @@ impl WorkspaceService {
             settings.mailbox_sync = store.settings.mailbox_sync;
             settings.mailbox_sync_consent = store.settings.mailbox_sync_consent.clone();
             settings.mailbox_id_high_water = store.settings.mailbox_id_high_water;
+            settings.pending_mailbox_cleanup = store.settings.pending_mailbox_cleanup.clone();
             store.settings = settings;
             Ok(())
         })?;

@@ -552,6 +552,9 @@ pub struct Settings {
     /// Allocated once per workspace, including reservations for interrupted syncs.
     #[serde(default)]
     pub mailbox_id_high_water: Option<u32>,
+    /// Vault keys awaiting cleanup after a committed removal. An empty key is a sample mailbox.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub pending_mailbox_cleanup: std::collections::BTreeMap<u32, String>,
 }
 
 /// Where indexing, semantic search and transcription compute (spec A1, D7, INV-41): on a
@@ -616,6 +619,7 @@ impl Default for Settings {
             mailbox_sync: false,
             mailbox_sync_consent: None,
             mailbox_id_high_water: Some(0),
+            pending_mailbox_cleanup: Default::default(),
         }
     }
 }
@@ -662,7 +666,8 @@ impl Store {
     }
 
     pub fn allocate_mailbox_id(&mut self) -> Option<u32> {
-        let id = self.mailbox_id_floor().checked_add(1)?;
+        // The worker pool reserves u32::MAX for the shared drafts worker.
+        let id = self.mailbox_id_floor().checked_add(1).filter(|id| *id != u32::MAX)?;
         self.settings.mailbox_id_high_water = Some(id);
         Some(id)
     }

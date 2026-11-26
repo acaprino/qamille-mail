@@ -126,7 +126,7 @@ fn full_store(data: &Path) -> Store {
                 send_at: 1_800_000_012,
                 requested_send_at: Some(1_800_000_013),
                 error: Some("delivery error".into()),
-                receipt_message_id: None,
+                receipt_message_id: Some("<sent@example.com>".into()),
                 owner_pid: Some(4_321),
                 requires_mcp_send: true,
                 source_profile: Some("profile-a".into()),
@@ -417,6 +417,7 @@ fn full_store(data: &Path) -> Store {
         ],
         settings: Settings {
             mailbox_id_high_water: Some(4),
+            pending_mailbox_cleanup: [(3, "gmail:removed@example.test".into())].into(),
             time_zone: "Europe/Rome".into(),
             locale: "it-IT".into(),
             undo_seconds: 9,

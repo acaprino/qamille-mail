@@ -199,7 +199,13 @@ pub struct App {
 impl App {
     pub fn new(cc: &eframe::CreationContext<'_>, screenshot: Option<PathBuf>) -> App {
         // Screenshots always show sample mail, so real mail never ends up in a picture.
-        let store = if screenshot.is_some() { crate::model::sample_store() } else { Store::load_or_default() };
+        let store = if screenshot.is_some() {
+            crate::model::sample_store()
+        } else {
+            let mut store = Store::load_or_default();
+            crate::infrastructure::mailbox_access::retry_legacy(&mut store);
+            store
+        };
         let (tx, rx) = channel();
         let mut app = App {
             selected: None,
@@ -2514,7 +2520,9 @@ impl App {
             });
         }
         if let Some(id) = remove {
-            if let Err(error) = crate::infrastructure::mailbox_access::retire_legacy(&mut self.store, id) {
+            if self.screenshot.is_some() {
+                self.store.detach_mailbox(id, now_ts());
+            } else if let Err(error) = crate::infrastructure::mailbox_access::retire_legacy(&mut self.store, id) {
                 self.status = format!("Could not remove the mailbox: {error}");
                 return;
             }

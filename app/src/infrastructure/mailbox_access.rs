@@ -9,35 +9,55 @@ pub fn revoke(id: u32, detach: &mut dyn FnMut() -> AppResult<()>) -> AppResult<(
 fn revoke_in(root: &std::path::Path, id: u32, detach: &mut dyn FnMut() -> AppResult<()>) -> AppResult<()> {
     let contacts = super::contact_repository::FileContactStore::new(root.to_path_buf());
     let _flush = contacts.lock_flush()?;
+    detach()?;
     super::mcp_config::revoke_mailbox(root, id)?;
     contacts.revoke_mailbox_grants(id)?;
-    detach()?;
-    if let Err(error) = contacts.discard_detached_writes(id) {
-        // The committed mailbox can no longer send or regain this identifier. Keep reporting
-        // its removal so the caller also publishes the deletion to the person's other devices.
-        eprintln!("Could not clear the detached mailbox's queued contact writes: {error}");
-    }
-    Ok(())
+    contacts.discard_detached_writes(id)
 }
 
-/// The legacy editor must persist its updated snapshot before discarding contact writes.
+fn clear_legacy_credentials(id: u32) -> AppResult<()> {
+    Store::with_persisted_store(&mut |store| {
+        crate::application::accounts::clear_retired_credentials(store, id, &super::gateways::KeyringSecrets)
+    })
+}
+
+fn settle_legacy(store: &mut Store, id: u32, result: AppResult<()>) {
+    let result = result.and_then(|()| Store::with_persisted_store(&mut |current| {
+        current.settings.pending_mailbox_cleanup.remove(&id);
+        Ok(())
+    }));
+    match result {
+        Ok(()) => { store.settings.pending_mailbox_cleanup.remove(&id); }
+        Err(error) => eprintln!("Mailbox {id} cleanup will resume after restart: {error}"),
+    }
+}
+
+pub fn retry_legacy(store: &mut Store) {
+    let ids: Vec<_> = store.settings.pending_mailbox_cleanup.keys().copied().collect();
+    for id in ids {
+        let result = revoke(id, &mut || clear_legacy_credentials(id));
+        settle_legacy(store, id, result);
+    }
+}
+
 pub fn retire_legacy(store: &mut Store, id: u32) -> Result<(), String> {
     let account = store.account(id).cloned().ok_or_else(|| "Mailbox no longer exists".to_string())?;
-    revoke(id, &mut || {
-        if account.resolved_provider_id() != "sample" {
-            let primary = crate::application::sync::credential_key(&account);
-            super::secret::get_result(&primary).map_err(AppError::storage)?;
-            for key in [format!("calendar:{id}"), format!("contacts:{id}"), primary] {
-                super::secret::remove(&key).map_err(AppError::storage)?;
-            }
-            super::oauth::forget_access(&account.email);
-        }
+    let primary = crate::application::accounts::retirement_key(&account);
+    let mut committed = false;
+    let result = revoke(id, &mut || {
+        if !primary.is_empty() { super::secret::get_result(&primary).map_err(AppError::storage)?; }
         let mut detached = store.clone();
         detached.detach_mailbox(id, crate::model::now_ts());
-        detached.save()?;
+        detached.save_snapshot(Some(&account))?;
+        detached.settings.pending_mailbox_cleanup.insert(id, primary.clone());
         *store = detached;
-        Ok(())
-    }).map_err(|error| error.message)
+        committed = true;
+        if let Some(email) = primary.strip_prefix("gmail:") { super::oauth::forget_access(email); }
+        clear_legacy_credentials(id)
+    });
+    if !committed { return result.map_err(|error| error.message); }
+    settle_legacy(store, id, result);
+    Ok(())
 }
 
 #[cfg(test)]
@@ -67,6 +87,9 @@ mod tests {
         assert!(failed.is_err());
         let state = contacts.read().unwrap();
         assert_eq!(state.queue.len(), 2, "a refused vault operation or mail repository commit preserves pending writes");
+        assert_eq!(state.settings.write_granted, ["google:12", "google:13"]);
+        let config: Config = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(config.profiles["assistant"].account_ids.as_deref(), Some(&[12,13][..]));
         revoke_in(&root, 12, &mut || {
             assert_eq!(contacts.read()?.queue.len(), 2, "contact cleanup must follow the detach commit");
             Ok(())

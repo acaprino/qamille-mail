@@ -275,6 +275,9 @@ impl DesktopState {
         let _ready_on_drop = ReadyOnDrop(&self.recovered);
         // Dropped first: when the gated paths wake up, the meetings are no longer recovering.
         let _recovering_off = RecoveringOff(&self.meetings);
+        if let Err(error) = self.accounts.retry_mailbox_cleanup() {
+            eprintln!("Could not read pending mailbox cleanup: {error}");
+        }
         self.undo
             .recover_interrupted()
             .and_then(|()| self.meetings.recover_interrupted())

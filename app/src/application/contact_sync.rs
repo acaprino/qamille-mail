@@ -453,7 +453,7 @@ impl ContactService {
                         Ok(created) => created,
                         Err(error) => {
                             // A refusal on the first attempt cannot have created a contact at Google.
-                            if !retry && matches!(error.code, "consent_required" | "contacts_permission_denied" | "rate_limited") {
+                            if !retry && matches!(error.code, "unsupported_capability" | "consent_required" | "contacts_permission_denied" | "rate_limited") {
                                 self.update_state(|state| {
                                     if let Some(current) = state.sources.iter_mut().find(|c| c.key == key) {
                                         current.create_request = None;

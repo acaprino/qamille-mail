@@ -192,7 +192,8 @@ fn undo_removes_cards_the_merge_created() {
     fx.service.merge_undo(outcome.journal_id).unwrap();
     let st = state(&fx);
     assert_eq!(st.sources.len(), 2);
-    assert!(!st.queue.iter().any(|q| q.op == WriteOp::Create));
+    assert!(!st.queue.iter().any(|q| matches!(q.op, WriteOp::Create | WriteOp::Delete)),
+        "an unavailable Google gateway cannot have accepted the extra card");
 }
 
 #[test]

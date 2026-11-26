@@ -88,6 +88,28 @@ fn recreate(state: &mut ContactsState, at: usize) {
     state.queue.push(QueuedWrite { key, op: WriteOp::Create });
 }
 
+/// Accept only the operation that was actually sent. A concurrent deletion replaces
+/// its queued update with a tombstone even when all contact fields are unchanged.
+fn acknowledge_update(state: &mut ContactsState, sent: &SourceContact, fields: &ContactFields, remote: &RemoteContact) {
+    if !state.queue.iter().any(|q| q.key == sent.key && q.op == WriteOp::Update) {
+        return;
+    }
+    let Some(card) = state.sources.iter_mut().find(|c| c.key == sent.key && !c.deleted) else { return };
+    let unchanged = card.fields == sent.fields;
+    card.etag = Some(remote.etag.clone());
+    card.base = Some(remote.fields.clone());
+    if !remote.unmanaged.is_null() {
+        card.unmanaged = remote.unmanaged.clone();
+    }
+    if unchanged {
+        card.fields = fields.clone();
+        card.sync = SyncState::Synced;
+        state.queue.retain(|q| q.key != sent.key || q.op != WriteOp::Update);
+    } else {
+        card.sync = SyncState::Pending;
+    }
+}
+
 impl ContactService {
     fn fetch_all(&self, account: &crate::domain::model::Account, other: bool, token: Option<&str>) -> AppResult<(Vec<RemoteContact>, Option<String>)> {
         let (mut items, mut next_token, mut page) = (Vec::new(), None, None::<String>);
@@ -344,6 +366,9 @@ impl ContactService {
                 continue;
             }
             let state = self.store.read()?;
+            if !state.queue.contains(&entry) {
+                continue;
+            }
             let Some(card) = state.sources.iter().find(|s| s.key == entry.key).cloned() else {
                 self.update_state(|s| {
                     s.queue.retain(|q| q.key != entry.key);
@@ -367,6 +392,9 @@ impl ContactService {
                     let consent = e.code == "consent_required";
                     note(&card.book.0, false, Some(message.clone()));
                     self.update_state(|s| {
+                        if !s.queue.contains(&entry) {
+                            return Ok(());
+                        }
                         if consent {
                             // Permission is missing or was revoked: forget the grant so the next edit asks again,
                             // and keep the card waiting in the queue instead of marking it broken.
@@ -428,22 +456,7 @@ impl ContactService {
                     match self.gateway.update(account, &remote_id, &etag, &fields, &card.unmanaged) {
                         Ok(remote) => {
                             self.update_state(|s| {
-                                let Some(at) = s.sources.iter().position(|c| c.key == key) else { return Ok(()) };
-                                let unchanged = s.sources[at].fields == card.fields;
-                                let c = &mut s.sources[at];
-                                c.etag = Some(remote.etag.clone());
-                                c.base = Some(remote.fields.clone());
-                                if !remote.unmanaged.is_null() {
-                                    c.unmanaged = remote.unmanaged.clone();
-                                }
-                                if unchanged {
-                                    c.fields = fields.clone();
-                                    c.sync = SyncState::Synced;
-                                    s.queue.retain(|q| q.key != key);
-                                } else {
-                                    // Edited while the request was in flight: keep the newer text and send it next.
-                                    c.sync = SyncState::Pending;
-                                }
+                                acknowledge_update(s, card, &fields, &remote);
                                 Ok(())
                             })?;
                             return Ok(Step::Done);
@@ -458,16 +471,17 @@ impl ContactService {
                                     base = Some(remote.fields.clone());
                                 }
                                 Merge3::Conflict(_) => {
-                                    self.update_state(|s| {
-                                        if let Some(c) = s.sources.iter_mut().find(|c| c.key == key) {
+                                    let conflicted = self.update_state(|s| {
+                                        if let Some(c) = s.sources.iter_mut().find(|c| c.key == key && !c.deleted) {
                                             c.sync = SyncState::Conflict;
                                             c.theirs = Some(remote.fields.clone());
                                             c.etag = Some(remote.etag.clone());
                                             c.unmanaged = remote.unmanaged.clone();
+                                            return Ok(true);
                                         }
-                                        Ok(())
+                                        Ok(false)
                                     })?;
-                                    return Ok(Step::Conflict);
+                                    return Ok(if conflicted { Step::Conflict } else { Step::Done });
                                 }
                             }
                         }
@@ -570,6 +584,26 @@ fn contacts_activity(report: &SyncReport) -> Option<(NewActivity, bool)> {
 mod activity_tests {
     use super::*;
     use crate::domain::activity::{ActivityKind, code};
+
+    #[test]
+    fn a_late_success_for_an_update_preserves_a_queued_deletion() {
+        let sent = SourceContact {
+            key: "c1".into(), book: BookId::google(1), remote_id: Some("people/1".into()),
+            sync: SyncState::Pending, ..Default::default()
+        };
+        let mut state = ContactsState::default();
+        state.sources.push(sent.clone());
+        queue_write(&mut state, &sent.key, WriteOp::Update);
+        drop_source(&mut state, &sent.key);
+        let remote = RemoteContact {
+            remote_id: "people/1".into(), etag: "next".into(), fields: sent.fields.clone(),
+            unmanaged: serde_json::Value::Null, deleted: false,
+        };
+        acknowledge_update(&mut state, &sent, &sent.fields, &remote);
+        assert!(state.sources[0].deleted);
+        assert_eq!(state.sources[0].sync, SyncState::Pending);
+        assert_eq!(state.queue, vec![QueuedWrite { key: sent.key, op: WriteOp::Delete }]);
+    }
 
     fn book(added: usize, updated: usize, removed: usize) -> BookSync {
         BookSync { book: "google:1".into(), added, updated, removed, ..Default::default() }

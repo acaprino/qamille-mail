@@ -221,7 +221,7 @@ impl DesktopState {
             accounts: application::accounts::AccountService::new(
                 context.clone(),
                 Arc::new(GoogleOAuth),
-            ),
+            ).with_grant_cleanup(qamille::infrastructure::mailbox_access::revoke),
             storage: application::storage::AccountStorageService::new(context.clone()),
             maintenance: Arc::new(application::maintenance::MaintenanceService::new(
                 context.clone(),

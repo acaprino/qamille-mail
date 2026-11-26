@@ -13,6 +13,20 @@ impl FileContactStore {
     pub fn new(root: PathBuf) -> Self {
         Self { root }
     }
+    pub(super) fn revoke_mailbox(&self, id: u32) -> AppResult<()> {
+        if !self.data_path().try_exists()? { return Ok(()); }
+        let _flush = self.lock_flush()?;
+        self.transaction(&mut |state| {
+            let keys: std::collections::HashSet<_> = state.sources.iter()
+                .filter(|card| card.book.account_id() == Some(id)).map(|card| card.key.clone()).collect();
+            state.queue.retain(|write| !keys.contains(&write.key));
+            let belongs = |book: &str| crate::domain::contacts::BookId(book.to_string()).account_id() == Some(id);
+            state.settings.write_granted.retain(|book| !belongs(book));
+            state.sync_tokens.retain(|book, _| !belongs(book));
+            Ok(())
+        })
+    }
+
     fn data_path(&self) -> PathBuf {
         self.root.join("contacts.json")
     }

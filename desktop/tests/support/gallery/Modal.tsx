@@ -1,7 +1,7 @@
 // Modal section of the gallery: three openers, one per size. `onClose` counts and closes.
 import { useState } from 'react';
 import Button from '../../../src/ui/Button';
-import Modal from '../../../src/ui/Modal';
+import Modal, { ModalFooter } from '../../../src/ui/Modal';
 
 type Size = 'sm' | 'md' | 'lg';
 
@@ -39,14 +39,14 @@ export default function ModalSection() {
         >
           <h2 id="sample-title">Sample dialog</h2>
           <p>Decide before going on.</p>
-          <div className="modal-actions">
+          <ModalFooter>
             <Button variant="secondary" type="button" onClick={() => setOpen(false)}>
               Keep
             </Button>
             <Button variant="primary" type="button" onClick={() => setOpen(false)}>
               Confirm
             </Button>
-          </div>
+          </ModalFooter>
         </Modal>
       )}
     </section>

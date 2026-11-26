@@ -564,6 +564,9 @@ impl SyncService {
         let mut state = start.clone();
         let mut report = SyncReport::default();
         let result = self.pass(&endpoint, &mut state, now, &mut report);
+        if matches!(&result, Err(error) if error.code == "sync_session_changed") {
+            return Ok(SyncReport { skipped: true, ..Default::default() });
+        }
         // What was learned is kept even when a later step failed, on top of what the state became
         // meanwhile; a state that cannot be saved is not a success.
         let saved = self.with_state(|current| {
@@ -625,32 +628,48 @@ impl SyncService {
         if !settings.mailbox_sync || settings.mailbox_sync_consent.as_deref() != Some(session.url.as_str()) {
             return Ok(None);
         }
-        let Some(endpoint) = self.accounts.endpoint()? else { return Ok(None) };
-        Ok(Some((endpoint, session.user_id)))
+        let user_id = session.user_id.clone();
+        Ok(Some((self.accounts.endpoint_for_session(session)?, user_id)))
+    }
+
+    fn check_session(&self, endpoint: &RemoteEndpoint) -> AppResult<()> {
+        let session = self.accounts.session()?;
+        let store = self.context.read_shared()?;
+        if session.is_some_and(|s| s.url == endpoint.url && s.device_key == endpoint.device_key)
+            && store.settings.mailbox_sync
+            && store.settings.mailbox_sync_consent.as_deref() == Some(endpoint.url.as_str())
+        {
+            return Ok(());
+        }
+        Err(AppError::new("sync_session_changed", "Mailbox synchronization settings changed"))
     }
 
     fn pass(&self, endpoint: &RemoteEndpoint, state: &mut SyncState, now: i64, report: &mut SyncReport) -> AppResult<()> {
         let full = state.epoch.is_none() || now - state.last_full > FULL_LISTING_SECS || now < state.last_full;
         let mut listing = self.server.list(endpoint, if full { 0 } else { state.since })?;
         let mut full = full;
-        if state.epoch.is_some_and(|epoch| epoch != listing.epoch) {
-            // The server started again from nothing (`sync reset`): nothing was removed, the
-            // mailboxes of this computer go up again.
-            state.items.clear();
-            state.pending_deletes.clear();
-            state.removals.clear();
-            state.since = 0;
+        let last_seen = state.items.values().map(|item| item.version)
+            .chain(state.pending_deletes.iter().map(|delete| delete.version))
+            .fold(state.since, u64::max);
+        if state.epoch.is_some_and(|epoch| epoch != listing.epoch) || listing.version < last_seen {
             if !full {
                 listing = self.server.list(endpoint, 0)?;
                 full = true;
             }
+            // A restore or reset starts a fresh history. Missing rows can be uploaded again.
+            // Keep explicit local removals so a restored remote copy cannot revive them.
+            state.items.clear();
+            state.removals.clear();
+            state.since = 0;
         }
+        self.check_session(endpoint)?;
         let mut applied = false;
         // 1. Download.
         let mut present: BTreeSet<String> = BTreeSet::new();
         for remote in &listing.items {
             present.insert(remote.id.clone());
             report.downloaded += 1;
+            self.check_session(endpoint)?;
             applied |= self.apply_remote(state, remote, now, report)?;
         }
         if full {
@@ -697,10 +716,11 @@ impl SyncService {
             let (id, account_mac, credential_mac) = (local.id.clone(), local.account_mac.clone(), local.credential_mac.clone());
             match self.upload(endpoint, state, local, tracked, now, report, &mut applied) {
                 Ok(()) => {}
-                Err(error) if matches!(error.code, "subscription_required" | "unauthorized" | "not_found" | "unreachable") => return Err(error),
+                Err(error) if matches!(error.code, "subscription_required" | "unauthorized" | "not_found" | "unreachable" | "sync_session_changed") => return Err(error),
                 // This mailbox alone is the problem: it is not sent again until it changes.
-                Err(error) if matches!(error.code, "invalid_request" | "payload_too_large" | "sync_limit") => {
+                Err(error) if matches!(error.code, "invalid_request" | "payload_too_large" | "sync_limit" | "unsupported_schema") => {
                     let reason = match error.code {
+                        "unsupported_schema" => "This mailbox was saved by a newer version of Qamille",
                         "payload_too_large" => "This mailbox is too large for the server",
                         "sync_limit" => "The server does not take more synchronized mailboxes",
                         _ => "The server did not accept this mailbox",
@@ -736,9 +756,13 @@ impl SyncService {
         // A mailbox that was added again here meanwhile is not deleted behind its back.
         pending.retain(|d| state.disabled.contains(&d.item_id) || !store.accounts.iter().any(|a| self::item_id(a.resolved_provider_id(), &a.email) == d.item_id));
         for delete in pending {
+            self.check_session(endpoint)?;
             let sent = match self.server.delete(endpoint, &delete.item_id, Some(delete.version)) {
                 // Changed elsewhere since: the person removed it here on purpose, so it goes.
-                Err(error) if error.code == "sync_conflict" => self.server.delete(endpoint, &delete.item_id, None),
+                Err(error) if error.code == "sync_conflict" => {
+                    self.check_session(endpoint)?;
+                    self.server.delete(endpoint, &delete.item_id, None)
+                }
                 other => other,
             };
             match sent {
@@ -770,6 +794,7 @@ impl SyncService {
     ) -> AppResult<()> {
         let mut base = tracked.as_ref().map_or(0, |t| t.version);
         for _ in 0..MAX_ATTEMPTS {
+            self.check_session(endpoint)?;
             match self.server.put(endpoint, &local.id, base, &local.item)? {
                 PutOutcome::Written { version } => {
                     state.items.insert(local.id.clone(), self.track(version, &local.item, local.shared_signature)?);
@@ -777,9 +802,15 @@ impl SyncService {
                     return Ok(());
                 }
                 PutOutcome::Conflict(None) => base = 0,
+                PutOutcome::Conflict(Some(current)) if !current.deleted && current.item.is_none() => {
+                    return Err(AppError::new("unsupported_schema", "This mailbox was saved by a newer version of Qamille"));
+                }
                 PutOutcome::Conflict(Some(current)) => match current.item.filter(|_| !current.deleted) {
                     Some(remote) => {
                         // The copy of another mailbox under this id is not merged into this one.
+                        if remote.schema > sync::SCHEMA {
+                            return Err(AppError::new("unsupported_schema", "This mailbox was saved by a newer version of Qamille"));
+                        }
                         if remote.validate().is_err() || remote.id() != local.id {
                             return Err(AppError::new("server_error", "The server refused the mailbox item"));
                         }
@@ -880,8 +911,15 @@ impl SyncService {
     fn apply_item(&self, item: &SyncItem, existing: Option<u32>, now: i64) -> AppResult<bool> {
         let store = self.context.read_shared()?;
         let provider = item.account.provider_id.as_str();
-        let next_id = store.accounts.iter().map(|a| a.id).max().unwrap_or(0) + 1;
-        let id = existing.unwrap_or(next_id);
+        let id = match existing {
+            Some(id) => id,
+            None => self.context.update(|store| {
+                if let Some(account) = store.accounts.iter().find(|a| a.resolved_provider_id() == provider && a.email.eq_ignore_ascii_case(&item.account.email)) {
+                    return Ok(account.id);
+                }
+                store.allocate_mailbox_id().ok_or_else(|| AppError::storage("Mailbox identifiers exhausted"))
+            })?,
+        };
         let key = if provider == "gmail" { account_key(&item.account.email) } else { provider_account_key(provider, id) };
         let mut changed = false;
         if self.context.secrets.get(&key)? != item.credential.value {
@@ -909,14 +947,12 @@ impl SyncService {
                 store.settings.google_client_id = client_id.clone();
                 touched = true;
             }
-            let position = match existing {
-                Some(id) => store.accounts.iter().position(|a| a.id == id),
-                None => store.accounts.iter().position(|a| a.resolved_provider_id() == provider && a.email.eq_ignore_ascii_case(&item.account.email)),
-            };
+            let position = store.accounts.iter().position(|a| a.resolved_provider_id() == provider && a.email.eq_ignore_ascii_case(&item.account.email));
             let index = match position {
-                Some(index) => index,
+                Some(index) if store.accounts[index].id == id => index,
+                Some(_) => return Err(AppError::storage("The mailbox identity changed during synchronization; it will be retried")),
                 None => {
-                    if store.accounts.iter().map(|a| a.id).max().unwrap_or(0) + 1 != id {
+                    if existing.is_some() || store.account(id).is_some() {
                         return Err(AppError::storage("The mailbox list changed while it was being synchronized; it will be retried"));
                     }
                     store.accounts.push(Account {

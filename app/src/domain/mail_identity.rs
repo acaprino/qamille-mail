@@ -208,6 +208,9 @@ mod tests {
 /// (indexing, server search): identity, location, missing labels and dates.
 /// Local state (folder, read, star, labels, tasks, reminders) stays as it is.
 pub fn merge_remote(existing: &mut Email, incoming: &Email) {
+    if !incoming.reply_to_addresses.is_empty() {
+        existing.reply_to_addresses.clone_from(&incoming.reply_to_addresses);
+    }
     if incoming.remote_global_id.is_some() {
         existing.remote_global_id = incoming.remote_global_id;
     }

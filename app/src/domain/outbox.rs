@@ -30,6 +30,8 @@ pub struct Delivery {
     pub id: u64,
     pub key: String,
     pub request_hash: String,
+    #[serde(default)]
+    pub receipt_message_id: Option<String>,
     pub draft: Draft,
     #[serde(default)]
     pub plain: String,
@@ -51,6 +53,24 @@ pub struct Delivery {
     pub requires_mcp_send: bool,
     #[serde(default)]
     pub source_profile: Option<String>,
+}
+
+impl Delivery {
+    /// Keep the identity needed for idempotent replay, while releasing completed message payloads.
+    pub fn compact(&mut self, message_id: String) {
+        self.receipt_message_id = Some(message_id);
+        self.draft = Draft {
+            id: self.draft.id,
+            account_id: self.draft.account_id,
+            updated: self.draft.updated,
+            request_id: std::mem::take(&mut self.draft.request_id),
+            ..Default::default()
+        };
+        self.plain.clear();
+        self.html = None;
+        self.sender_name.clear();
+        self.attachment_bytes = 0;
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]

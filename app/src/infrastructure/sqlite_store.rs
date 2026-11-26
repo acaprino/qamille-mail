@@ -69,7 +69,7 @@ const SCHEMA: &str = include_str!("sqlite_schema.sql");
 ///     purely by the idempotent schema script; version 2 databases gain the
 ///     table on the next open and record 3.
 /// 5 — `accounts.history` (W3.1), added in place with an empty JSON object.
-const SCHEMA_VERSION: u32 = 5;
+const SCHEMA_VERSION: u32 = 6;
 /// Idle connections kept for reuse; more are opened on demand and dropped on return.
 const POOL_LIMIT: usize = 8;
 /// How long a write waits for a writer in *another process* (the MCP server).
@@ -328,6 +328,12 @@ fn apply_schema(connection: &mut Connection) -> AppResult<()> {
 /// script itself creates `change_feed` inside the same transaction that
 /// records the new version.
 fn migrate(connection: &Connection) -> AppResult<()> {
+    if !has_column(connection, "outbox", "receipt_message_id")? {
+        connection.execute("ALTER TABLE outbox ADD COLUMN receipt_message_id TEXT", []).map_err(db)?;
+    }
+    if !has_column(connection, "emails", "reply_to_addresses")? {
+        connection.execute("ALTER TABLE emails ADD COLUMN reply_to_addresses TEXT NOT NULL DEFAULT '[]'", []).map_err(db)?;
+    }
     // 4 → 5: the history backfill cursor (W3.1); `{}` reads as not started.
     if !has_column(connection, "accounts", "history")? {
         connection
@@ -1190,7 +1196,7 @@ impl StoreRepository for SqliteStoreRepository {
         let before_pending = store.storage_maintenance_pending;
         let before_rebuild = store.storage_index_rebuild_required;
         let had_removals = !store.cache_removals.is_empty();
-        let mut recovered = false;
+        let mut recovered = self.files.compact_delivery_receipts(&mut store)?;
         let mut intent_loaded = false;
         let result = (|| {
             let pending = self.files.read_cleanup_intent(&store)?;
@@ -1332,7 +1338,7 @@ static EMAILS: Table = Table::new(
         "date_missing", "read", "starred", "pinned", "done", "muted", "set_aside", "replied",
         "priority_thread", "category", "snoozed_until", "reminder_at", "due", "assigned_to",
         "classified", "returned_at", "bulk", "auto_submitted", "calendar", "search_index",
-        "in_reply_to",
+        "in_reply_to", "reply_to_addresses",
     ],
 );
 static DRAFTS: Table = Table::new(
@@ -1349,7 +1355,7 @@ static OUTBOX: Table = Table::new(
     &[
         "id", "delivery_key", "request_hash", "draft", "plain", "html", "sender_name",
         "attachment_bytes", "status", "created_at", "updated_at", "send_at",
-        "requested_send_at", "error", "owner_pid", "requires_mcp_send", "source_profile",
+        "requested_send_at", "error", "owner_pid", "requires_mcp_send", "source_profile", "receipt_message_id",
     ],
 );
 static UNDO_ACTIONS: Table = Table::new(
@@ -1515,7 +1521,7 @@ fn email_row(email: &Email) -> AppResult<Vec<Value>> {
         body_html: _, remote_only, storage_evicted, date, date_missing, received_at: _, read, starred, pinned,
         done, muted, set_aside, replied, priority_thread, category, labels: _, snoozed_until,
         reminder_at, due, assigned_to, attachments: _, classified, returned_at, bulk,
-        auto_submitted, calendar, in_reply_to,
+        auto_submitted, calendar, in_reply_to, reply_to_addresses,
     } = email;
     Ok(vec![
         big(*id),
@@ -1561,6 +1567,7 @@ fn email_row(email: &Email) -> AppResult<Vec<Value>> {
         int(*calendar),
         json(search_index)?,
         text(in_reply_to),
+        json(reply_to_addresses)?,
     ])
 }
 fn email_from(c: &mut Cur) -> rusqlite::Result<Email> {
@@ -1614,6 +1621,7 @@ fn email_from(c: &mut Cur) -> rusqlite::Result<Email> {
         calendar: c.get()?,
         search_index: c.json()?,
         in_reply_to: c.get()?,
+        reply_to_addresses: c.json()?,
     })
 }
 
@@ -1680,7 +1688,7 @@ fn delivery_row(delivery: &Delivery) -> AppResult<Vec<Value>> {
     let Delivery {
         id, key, request_hash, draft, plain, html, sender_name, attachment_bytes, status,
         created_at, updated_at, send_at, requested_send_at, error, owner_pid,
-        requires_mcp_send, source_profile,
+        requires_mcp_send, source_profile, receipt_message_id,
     } = delivery;
     Ok(vec![
         big(*id),
@@ -1700,6 +1708,7 @@ fn delivery_row(delivery: &Delivery) -> AppResult<Vec<Value>> {
         opt_int(*owner_pid),
         int(*requires_mcp_send),
         opt_text(source_profile),
+        opt_text(receipt_message_id),
     ])
 }
 fn delivery_from(c: &mut Cur) -> rusqlite::Result<Delivery> {
@@ -1721,6 +1730,7 @@ fn delivery_from(c: &mut Cur) -> rusqlite::Result<Delivery> {
         owner_pid: c.get()?,
         requires_mcp_send: c.get()?,
         source_profile: c.get()?,
+        receipt_message_id: c.get()?,
     })
 }
 

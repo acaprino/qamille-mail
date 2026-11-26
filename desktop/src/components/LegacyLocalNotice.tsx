@@ -4,7 +4,7 @@
 // and goes away for good with «Ho capito».
 import { useEffect, useRef, useState } from 'react';
 import Button from '../ui/Button';
-import Modal from '../ui/Modal';
+import Modal, { ModalFooter } from '../ui/Modal';
 import { call, errorText } from '../lib/api';
 import { tr } from '../lib/i18n';
 import { SERVER_GUIDE_URL } from '../lib/types';
@@ -79,7 +79,7 @@ export default function LegacyLocalNotice({ onerror }: { onerror: (message: stri
               `The models downloaded by the local mode are deleted (${gigabytes(status.models_bytes)}). Mail and the index stay.`,
             )}
           </p>
-          <div className="button-row">
+          <ModalFooter>
             <Button
               variant="primary"
               disabled={busy}
@@ -95,7 +95,7 @@ export default function LegacyLocalNotice({ onerror }: { onerror: (message: stri
             <Button ref={keepModels} variant="text" onClick={() => setConfirming(false)}>
               {tr('Annulla', 'Cancel')}
             </Button>
-          </div>
+          </ModalFooter>
         </Modal>
       )}
     </>

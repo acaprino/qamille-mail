@@ -99,7 +99,8 @@ CREATE TABLE IF NOT EXISTS emails (
     auto_submitted       INTEGER NOT NULL,
     calendar             INTEGER NOT NULL,
     search_index         TEXT NOT NULL,
-    in_reply_to          TEXT NOT NULL DEFAULT ''
+    in_reply_to          TEXT NOT NULL DEFAULT '',
+    reply_to_addresses   TEXT NOT NULL DEFAULT '[]'
 );
 CREATE INDEX IF NOT EXISTS emails_by_folder ON emails (account_id, folder, date);
 CREATE INDEX IF NOT EXISTS emails_by_thread ON emails (account_id, thread_id);
@@ -177,7 +178,8 @@ CREATE TABLE IF NOT EXISTS outbox (
     error             TEXT,
     owner_pid         INTEGER,
     requires_mcp_send INTEGER NOT NULL,
-    source_profile    TEXT
+    source_profile    TEXT,
+    receipt_message_id TEXT
 );
 CREATE INDEX IF NOT EXISTS outbox_by_status ON outbox (status, send_at);
 

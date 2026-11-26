@@ -38,6 +38,12 @@ struct Modern {
     _guard: File,
 }
 impl StoreRepository for Modern {
+    fn activity_log(&self) -> Option<&dyn crate::application::ports::ActivityStore> {
+        self.base.activity_log()
+    }
+    fn append_activity(&self, entry: &crate::domain::activity::NewActivity, at_ms: i64) -> AppResult<Option<i64>> {
+        self.base.append_activity(entry, at_ms)
+    }
     fn read(&self) -> AppResult<Store> {
         self.base.read()
     }

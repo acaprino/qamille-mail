@@ -36,7 +36,7 @@
 
 | | What you get |
 | :--- | :--- |
-| 📬 **One inbox. Every account.** | Gmail accounts together. Threads, snooze, tasks, autosaved drafts, attachment previews, scheduled sends, mail export and offline storage controls. |
+| 📬 **One inbox. Every account.** | Gmail accounts together. Threads, snooze, tasks, autosaved drafts, attachment previews, mail export and offline storage controls. |
 | 🎙️ **Record it. Keep the context.** | Capture microphone and system audio during **Meet, Zoom or Teams**. Import audio, transcribe with **Whisper on your Qamille server**, even on your own PC with Docker, or with your own provider key, generate summaries and source-linked action items, and export your notes. No meeting bot. |
 | 🔔 **Never miss the next call.** | Floating reminders for local events and your primary Google calendar. **Join** or **Join and record**, with one click. |
 | 🔎 **Find meaning, not just words.** | **EmbeddingGemma 2 + BM25** search email and supported attachments, including static images. Background indexing with pause, resume and visible coverage. |
@@ -87,7 +87,7 @@ The optional server with user accounts and password sign-in lives in `server/` (
 
 [Meetings](docs/meetings-implementazione.md) · [Search and indexing](docs/indicizzazione-completa.md) · [AI agents and MCP](docs/assistenti-installazione.md) · [Portable storage](docs/portable.md)
 
-**In active development for Windows and Gmail.** Some real-device and provider checks remain open; see the [verification reports](docs/verification/) and limitations in the guides. Scheduled sends and background work need a running Qamille process and an awake computer. Detailed guides are currently mostly in Italian.
+**In active development for Windows and Gmail.** Some real-device and provider checks remain open; see the [verification reports](docs/verification/) and limitations in the guides. The desktop composer sends immediately. Deliveries scheduled through MCP, older scheduled drafts and background work require Qamille to be running on an awake computer. Detailed guides are currently mostly in Italian.
 
 ## Contributing
 

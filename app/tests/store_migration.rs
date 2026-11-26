@@ -266,7 +266,7 @@ fn a_v2_database_gains_the_feed_table_and_records_the_current_version() {
             |row| row.get(0),
         )
         .unwrap();
-    assert_eq!(version, "5", "the recorded version moves to the current one");
+    assert_eq!(version, "6", "the recorded version moves to the current one");
     // The data survived and the feed works on the upgraded database.
     assert!(again.read().unwrap().emails.iter().any(|e| e.id == email_id));
     let head = again.change_feed_head().unwrap();

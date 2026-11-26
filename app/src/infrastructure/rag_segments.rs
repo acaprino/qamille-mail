@@ -8,6 +8,10 @@ fn path(root: &Path, account: u32, email: u64) -> PathBuf {
     root.join("search-index").join(account.to_string()).join(format!("{email}.bin"))
 }
 pub fn files(root: &Path) -> std::io::Result<Vec<(u32, u64, PathBuf)>> {
+    files_for_accounts(root, |_| true)
+}
+
+pub(super) fn files_for_accounts(root: &Path, include: impl Fn(u32) -> bool) -> std::io::Result<Vec<(u32, u64, PathBuf)>> {
     let mut paths = Vec::new();
     let folders = match std::fs::read_dir(root.join("search-index")) {
         Ok(folders) => folders,
@@ -18,6 +22,7 @@ pub fn files(root: &Path) -> std::io::Result<Vec<(u32, u64, PathBuf)>> {
         let folder = folder?;
         if !folder.file_type()?.is_dir() { continue; }
         let Ok(account) = folder.file_name().to_string_lossy().parse::<u32>() else { continue };
+        if !include(account) { continue; }
         for file in std::fs::read_dir(folder.path())? {
             let file = file?;
             if !file.file_type()?.is_file() { continue; }

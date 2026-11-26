@@ -349,8 +349,12 @@ impl ServerAccountService {
     /// The endpoint of the session: the only way a device key leaves the vault.
     pub fn endpoint(&self) -> AppResult<Option<RemoteEndpoint>> {
         let Some(session) = self.session()? else { return Ok(None) };
+        self.endpoint_for_session(session).map(Some)
+    }
+    /// Bind both the destination and its credential to the caller's single vault snapshot.
+    pub(super) fn endpoint_for_session(&self, session: ServerSession) -> AppResult<RemoteEndpoint> {
         let ca_pem = self.ca_pem(&session.url)?;
-        Ok(Some(RemoteEndpoint { url: session.url, device_key: session.device_key, ca_pem, timeout: REQUEST_TIMEOUT }))
+        Ok(RemoteEndpoint { url: session.url, device_key: session.device_key, ca_pem, timeout: REQUEST_TIMEOUT })
     }
     fn require_endpoint(&self) -> AppResult<RemoteEndpoint> {
         self.endpoint()?.ok_or_else(|| AppError::new("not_connected", "This computer is not connected to a Qamille server"))
@@ -409,6 +413,42 @@ impl ServerAccountService {
             Ok(())
         })
     }
+    /// Commit the disclosures that were on screen together. A changed declaration is
+    /// returned for display and requires another confirmation before anything is saved.
+    pub fn confirm_connection(&self, url: &str, shown: &ServerInfo) -> AppResult<Option<ServerInfo>> {
+        let address = self.address(url)?;
+        let current = self.account.info(&address)?;
+        if current.api != SERVER_API {
+            return Err(AppError::new("incompatible", "This server uses an incompatible API"));
+        }
+        let provider = |info: &ServerInfo| info.llm.as_ref().map(|llm| (llm.label.clone(), llm.external));
+        let sync = current.sync.is_some_and(|s| s.available);
+        if shown.api != current.api || provider(shown) != provider(&current) || shown.sync.is_some_and(|s| s.available) != sync {
+            return Ok(Some(current));
+        }
+        let consent = current.llm.as_ref().map(|llm| {
+            if llm.label.trim().is_empty() || llm.label.chars().any(char::is_control) {
+                return Err(AppError::new("invalid_provider", "The server declared an assistant provider this app cannot use"));
+            }
+            Ok(LlmConsent { url: address.url.clone(), label: llm.label.clone(), external: llm.external })
+        }).transpose()?;
+        self.context.update(|store| {
+            let settings = &mut store.settings;
+            if !settings.compute_consented_urls.contains(&address.url) {
+                settings.compute_consented_urls.push(address.url.clone());
+            }
+            if consent.is_some() || settings.llm_consent.as_ref().is_some_and(|c| c.url == address.url) {
+                settings.llm_consent = consent.clone();
+            }
+            if sync || settings.mailbox_sync_consent.as_deref() == Some(address.url.as_str()) {
+                settings.mailbox_sync = sync;
+                settings.mailbox_sync_consent = sync.then(|| address.url.clone());
+            }
+            Ok(())
+        })?;
+        Ok(None)
+    }
+
     /// The person agreed to the provider the server declares now for the assistant (INV-34).
     /// What is saved comes from `GET /v1/info`, never from the interface. A server without an
     /// assistant saves nothing.

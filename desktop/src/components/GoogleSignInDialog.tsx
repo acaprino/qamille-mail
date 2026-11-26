@@ -1,6 +1,6 @@
 import Button from '../ui/Button';
 import Icon from '../ui/Icon';
-import Modal from '../ui/Modal';
+import Modal, { ModalFooter } from '../ui/Modal';
 import { tr } from '../lib/i18n';
 import './GoogleSignInDialog.css';
 
@@ -60,7 +60,7 @@ export default function GoogleSignInDialog({
           </p>
         </>
       )}
-      <div className="google-dialog-actions">
+      <ModalFooter>
         {pending && !error && (
           <Button variant="secondary" onClick={cancel}>
             {tr('Annulla accesso', 'Cancel sign-in')}
@@ -74,7 +74,7 @@ export default function GoogleSignInDialog({
             {tr('Riprova', 'Try again')}
           </Button>
         )}
-      </div>
+      </ModalFooter>
     </Modal>
   );
 }

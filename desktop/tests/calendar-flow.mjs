@@ -50,7 +50,10 @@ await page.addInitScript(() => {
         consented = true;
         return { status: 'authorized' };
       }
-      if (action === 'list_events') return { items: events };
+      if (action === 'list_events') {
+        if (args.args.calendar_id === window.failedCalendar) throw { message: 'Calendar offline' };
+        return { items: events };
+      }
       if (action === 'sync_calendar') return { status: 'complete' };
       if (action === 'delete_event') {
         const at = events.findIndex((event) => event.id === args.args.id);
@@ -88,6 +91,17 @@ try {
   await expect(rail.getByRole('checkbox', { name: /Holidays/ })).toContainText('Read-only');
   await expect(rail.getByRole('checkbox', { name: 'All calendars' })).toBeChecked();
   console.log('PASS connecting an account lists its calendars, all shown together');
+
+  await page.evaluate(() => {
+    window.failedCalendar = 'holidays';
+    window.fakeEvents[0].summary = 'Updated standup';
+  });
+  await page.getByRole('button', { name: 'Sync visible calendars' }).click();
+  await expect.poll(() => page.evaluate(() => window.notices.some((n) => n.error && n.message.includes('Holidays') && n.message.includes('Calendar offline')))).toBe(true);
+  await expect(page.locator('.calendar-event', { hasText: 'Updated standup' }).first()).toBeVisible();
+  await page.evaluate(() => { window.failedCalendar = null; window.fakeEvents[0].summary = 'Standup'; });
+  await page.getByRole('button', { name: 'Sync visible calendars' }).click();
+  await expect(page.locator('.calendar-event', { hasText: 'Updated standup' })).toHaveCount(0);
 
   // Dragging across empty slots opens the editor with that exact range.
   const column = page.locator('.calendar-day').nth(1);
@@ -273,6 +287,23 @@ try {
     await page.waitForTimeout(400);
     await shot('3-edit-dark');
   }
+  const preview = await browser.newPage({ locale: 'en-US', viewport: { width: 1280, height: 840 } });
+  await preview.goto(base);
+  await preview.getByRole('list', { name: 'Workspace' }).getByRole('button', { name: 'Calendar', exact: true }).click();
+  await preview.getByRole('button', { name: 'New event', exact: true }).click();
+  const newPreviewEvent = preview.getByRole('dialog', { name: 'New event' });
+  await newPreviewEvent.getByLabel('Title').fill('Preview notes fixture');
+  await newPreviewEvent.getByLabel('Notes', { exact: true }).fill('First note');
+  await newPreviewEvent.getByRole('button', { name: 'Save', exact: true }).click();
+  const previewRow = preview.locator('.calendar-event').filter({ hasText: 'Preview notes fixture' }).first();
+  await previewRow.click();
+  const existingPreviewEvent = preview.getByRole('dialog', { name: 'Edit event' });
+  await expect(existingPreviewEvent.getByLabel('Notes', { exact: true })).toHaveValue('First note');
+  await existingPreviewEvent.getByLabel('Notes', { exact: true }).fill('Revised note');
+  await existingPreviewEvent.getByRole('button', { name: 'Save', exact: true }).click();
+  await previewRow.click();
+  await expect(existingPreviewEvent.getByLabel('Notes', { exact: true })).toHaveValue('Revised note');
+  await preview.close();
   assert.deepEqual(errors, []);
 } finally {
   await browser.close();

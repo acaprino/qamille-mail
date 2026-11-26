@@ -32,6 +32,14 @@ async function signIn(page, form) {
   await expect(page.getByText('User:')).toBeVisible();
 }
 
+async function checkRemovalScope(section) {
+  await section.getByRole('button', { name: 'Remove the mailbox' }).first().click();
+  await expect(section).toContainText('configuration is also removed from the Qamille server');
+  await expect(section).toContainText('other computers you can choose to keep it');
+  await expect(section).toContainText('Messages at your mail provider remain available');
+  await section.getByRole('button', { name: 'Cancel', exact: true }).click();
+}
+
 try {
   {
     // A server without sync says nothing about mailboxes.
@@ -56,10 +64,12 @@ try {
     await expect(general).toBeChecked();
     await general.uncheck({ force: true });
     await expect(section.getByRole('status')).toContainText(/Off: your mailboxes stay on this computer only/);
+    await checkRemovalScope(section);
     await general.click({ force: true });
     await expect(general).toBeChecked();
     await expect(section.getByText('alex@studio-example.com')).toBeVisible();
-    console.log('PASS consent line, status, removal notice and the switches');
+    await checkRemovalScope(section);
+    console.log('PASS consent line, status, removal scope and the switches');
     // Disabling another device offers to revoke the access.
     await page.locator('.settings-nav').getByRole('button', { name: 'Compute', exact: true }).click();
     await page.getByRole('listitem').filter({ hasText: 'Portatile di casa' }).getByRole('button', { name: 'Disable' }).click();

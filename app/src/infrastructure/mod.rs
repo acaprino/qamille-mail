@@ -45,6 +45,7 @@ pub mod mail_index_source;
 pub mod rag_segments;
 pub mod lexical_index;
 pub mod mcp_config;
+pub mod mailbox_access;
 pub mod assistant_install;
 pub mod assistant_packages;
 pub mod google_calendar;

@@ -42,6 +42,7 @@ Uso:
   qamille-server sync keygen
   qamille-server [--config <file>] sync rekey
   qamille-server [--config <file>] sync reset --yes
+  qamille-server [--config <file>] sync after-restore
   qamille-server --help | --version
 
 `user create` e `user reset-password` stampano sullo standard output solo la
@@ -83,6 +84,7 @@ pub enum ModelCommand {
 enum SyncCommand {
     Keygen,
     Rekey,
+    AfterRestore,
     Reset { yes: bool },
 }
 
@@ -626,6 +628,7 @@ async fn user_command(accounts: &Accounts, command: UserCommand) -> Result<(), S
 
 fn parse_sync(words: &[&str]) -> Result<SyncCommand, Usage> {
     match words {
+        ["after-restore"] => Ok(SyncCommand::AfterRestore),
         ["keygen"] => Ok(SyncCommand::Keygen),
         ["keygen", ..] => Err(usage("uso: sync keygen")),
         ["rekey"] => Ok(SyncCommand::Rekey),
@@ -634,7 +637,7 @@ fn parse_sync(words: &[&str]) -> Result<SyncCommand, Usage> {
         ["reset"] => Ok(SyncCommand::Reset { yes: false }),
         ["reset", ..] => Err(usage("uso: sync reset --yes (cancella tutte le caselle salvate sul server)")),
         [other, ..] => Err(usage(format!("comando sync sconosciuto: {other}"))),
-        [] => Err(usage("manca il comando sync (keygen, rekey, reset)")),
+        [] => Err(usage("manca il comando sync (keygen, rekey, reset, after-restore)")),
     }
 }
 
@@ -687,6 +690,10 @@ fn run_sync_command(cli: &Cli, config_path: Option<PathBuf>, command: SyncComman
                 .map_err(|e| format!("{e}")),
             _ => Err("servono QAMILLE_SYNC_KEY (la nuova) e QAMILLE_SYNC_KEY_OLD (la vecchia)".to_owned()),
         },
+        SyncCommand::AfterRestore => runtime
+            .block_on(db.blocking(|conn| crate::sync::store::after_restore(conn).map_err(ServerError::from)))
+            .map(|n| format!("Nuova epoca di sincronizzazione per {n} utenti"))
+            .map_err(|e| format!("{e}")),
         SyncCommand::Reset { .. } => runtime
             .block_on(db.blocking(|conn| crate::sync::store::reset(conn).map_err(ServerError::from)))
             .map(|n| format!("{n} righe cancellate"))

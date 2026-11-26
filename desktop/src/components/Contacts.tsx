@@ -11,7 +11,7 @@ import Icon from '../ui/Icon';
 import { ItemList, ItemRow } from '../ui/ItemList';
 import { Column } from '../ui/Layout';
 import Menu from '../ui/Menu';
-import Modal from '../ui/Modal';
+import Modal, { ModalFooter } from '../ui/Modal';
 import Note from '../ui/Note';
 import Panel from '../ui/Panel';
 import SearchField from '../ui/SearchField';
@@ -36,6 +36,8 @@ import ContactForm from './contacts/ContactForm';
 import DuplicatesPanel from './contacts/DuplicatesPanel';
 import MergeDialog from './contacts/MergeDialog';
 
+const CONTACT_PAGE_SIZE = 500;
+
 export type ContactsProps = { notify: (message: string, error?: boolean) => void };
 
 type FormState = {
@@ -55,6 +57,8 @@ export default function Contacts({ notify }: ContactsProps) {
     books: [] as BookView[],
     items: [] as ContactView[],
     total: 0,
+    nextOffset: null as number | null,
+    loadingMore: false,
     text: '',
     // 'all' is the "All address books" choice; the Select cannot hold an empty value as a choice.
     bookFilter: 'all',
@@ -77,6 +81,7 @@ export default function Contacts({ notify }: ContactsProps) {
   }));
   const fileInput = useRef<HTMLInputElement>(null);
   const sequence = useRef(0);
+  const requested = useRef({ query: '', limit: CONTACT_PAGE_SIZE });
   const notifyRef = useRef(notify);
   notifyRef.current = notify;
   const say = (message: string, error?: boolean) => notifyRef.current(message, error);
@@ -84,33 +89,49 @@ export default function Contacts({ notify }: ContactsProps) {
   const selected = s.items.find((c) => c.id === s.selectedId) ?? null;
   const writableOrigins = (c: ContactView) => c.origins.filter((o) => o.writable);
 
-  async function load() {
+  async function load(more = false) {
+    const { text, bookFilter, showHidden } = s;
+    const query = JSON.stringify([text, bookFilter, showHidden]);
+    if (more && (s.loadingMore || s.nextOffset === null || requested.current.query !== query)) return;
     const mine = ++sequence.current;
+    const offset = more ? (s.nextOffset ?? 0) : 0;
+    if (query !== requested.current.query) requested.current = { query, limit: CONTACT_PAGE_SIZE };
+    if (more) requested.current.limit = offset + CONTACT_PAGE_SIZE;
+    s.loadingMore = more;
+    const limit = more ? CONTACT_PAGE_SIZE : requested.current.limit;
     try {
       const [nextBooks, page, groups, settings] = await Promise.all([
         call<BookView[]>('contacts_books'),
         call<ContactPage>('contacts_list', {
           query: {
-            text: s.text,
-            book: s.bookFilter === 'all' ? null : s.bookFilter,
-            include_hidden: s.showHidden,
-            offset: 0,
-            limit: 500,
+            text,
+            book: bookFilter === 'all' ? null : bookFilter,
+            include_hidden: showHidden,
+            offset,
+            limit,
           },
         }),
         call<DuplicateView[]>('contacts_duplicates', { includePossible: false }),
         call<ContactSettings>('contacts_settings'),
       ]);
-      if (mine !== sequence.current) return;
+      if (mine !== sequence.current || text !== s.text || bookFilter !== s.bookFilter || showHidden !== s.showHidden) return;
+      s.nextOffset = page.next_offset;
       s.books = nextBooks;
-      s.items = page.items;
+      if (more) {
+        const existing = new Set(s.items.map((contact) => contact.id));
+        s.items = [...s.items, ...page.items.filter((contact) => !existing.has(contact.id))];
+      } else {
+        s.items = page.items;
+      }
       s.total = page.total;
       s.duplicates = groups;
       s.lastBook = settings.last_book ?? '';
-      if (s.selectedId && !page.items.some((c) => c.id === s.selectedId)) s.selectedId = null;
+      if (s.selectedId && !s.items.some((c) => c.id === s.selectedId)) s.selectedId = null;
       s.loaded = true;
     } catch (e) {
-      say(errorText(e), true);
+      if (mine === sequence.current) say(errorText(e), true);
+    } finally {
+      if (mine === sequence.current) s.loadingMore = false;
     }
   }
 
@@ -511,6 +532,11 @@ export default function Contacts({ notify }: ContactsProps) {
                   ))}
                 </ItemList>
               )}
+              {s.nextOffset !== null && (
+                <Button variant="text" disabled={s.loadingMore} onClick={() => void load(true)}>
+                  {tr('Carica altri contatti', 'Load more contacts')}
+                </Button>
+              )}
               {s.loaded && !s.items.length && (
                 <Empty
                   title={tr('Nessun contatto', 'No contacts')}
@@ -717,7 +743,7 @@ export default function Contacts({ notify }: ContactsProps) {
               'Cards seen in mail cannot be deleted; you can hide them.',
             )}
           </p>
-          <div className="contact-actions">
+          <ModalFooter>
             <Button variant="secondary" onClick={() => (s.deleting = null)}>
               {tr('Annulla', 'Cancel')}
             </Button>
@@ -729,7 +755,7 @@ export default function Contacts({ notify }: ContactsProps) {
             >
               {tr('Elimina', 'Delete')}
             </Button>
-          </div>
+          </ModalFooter>
         </Modal>
       )}
     </section>

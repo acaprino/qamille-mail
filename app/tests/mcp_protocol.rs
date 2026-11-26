@@ -5,14 +5,17 @@ use std::{
     path::PathBuf,
     process::{Command, Stdio},
 };
+// Parallel tests in one process can observe the same Windows clock tick.
+static NEXT_FIXTURE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 struct Fixture(PathBuf);
 impl Fixture {
     fn new(access: qamille::model::Access) -> Self {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../checks")
             .join(format!(
-                "qamille-protocol-{}-{}",
+                "qamille-protocol-{}-{}-{}",
                 std::process::id(),
+                NEXT_FIXTURE.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
                 std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap()

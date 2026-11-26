@@ -159,7 +159,7 @@ fn main() {
             window_shell::window_appearance, window_shell::window_zoom,
             background::autostart_status, background::autostart_set, background::close_to_tray_get, background::close_to_tray_set,
             background::restore_main_window, undo_send_now, undo_quit_anyway,
-            meeting_devices, meeting_list, meeting_list_page, meeting_read, meeting_start, meeting_capture_status,
+            meeting_devices, meeting_list, meeting_list_page, meeting_read, meeting_start, meeting_capture_status, meeting_interrupted_capture,
             meeting_pause, meeting_resume, meeting_stop, meeting_recover, meeting_save_notes,
             meeting_add_note, meeting_update, meeting_delete, meeting_import, meeting_transcribe,
             meeting_summarize, meeting_cancel_job, meeting_retry_job, meeting_correct_segment,

@@ -31,6 +31,9 @@ struct CalendarState {
     local_extra: BTreeMap<String, Value>,
     #[serde(default)]
     remote: BTreeMap<String, RemoteProjection>,
+    /// One page has durable provider identities; its main-store write can be replayed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pending_projection: Option<ProjectionBatch>,
     #[serde(default)]
     sync_tokens: BTreeMap<String, String>,
     #[serde(default)]
@@ -40,6 +43,13 @@ struct CalendarState {
     #[serde(default)]
     view_seen: BTreeMap<String, Vec<String>>,
 }
+#[derive(Serialize, Deserialize)]
+struct ProjectionBatch {
+    events: Vec<Event>,
+    /// Keep deleted identities in `remote` until their local rows are gone.
+    removals: Vec<String>,
+}
+
 #[derive(Serialize, Deserialize)]
 struct RemoteProjection {
     local_id: u64,
@@ -71,8 +81,15 @@ struct StateFile {
 }
 impl StateFile {
     fn open() -> AppResult<Self> {
-        let root = Store::data_dir();
-        std::fs::create_dir_all(&root)?;
+        Self::open_in(&Store::data_dir())
+    }
+    fn open_ready(context: &ServiceContext) -> AppResult<Self> {
+        let mut file = Self::open()?;
+        finish_projection(&mut file, context)?;
+        Ok(file)
+    }
+    fn open_in(root: &std::path::Path) -> AppResult<Self> {
+        std::fs::create_dir_all(root)?;
         let guard = OpenOptions::new()
             .read(true)
             .write(true)
@@ -798,7 +815,7 @@ fn list_events(context: &ServiceContext, args: &Value, all: bool) -> AppResult<V
     let limit = args["limit"].as_u64().unwrap_or(20).clamp(1, 100) as usize;
     let query = str_arg(args, "query").unwrap_or("");
     if cal == "local" {
-        let state = StateFile::open()?;
+        let state = StateFile::open_ready(context)?;
         let store = context.read()?;
         let projected = projected_ids(&state.state);
         let mut all_items: Vec<_> = store
@@ -841,7 +858,7 @@ fn list_events(context: &ServiceContext, args: &Value, all: bool) -> AppResult<V
     }
     if args["cached"].as_bool() == Some(true) {
         let account = account_id(args)?;
-        let state = StateFile::open()?;
+        let state = StateFile::open_ready(context)?;
         let items: Vec<_> = state
             .state
             .remote
@@ -896,14 +913,15 @@ fn list_events(context: &ServiceContext, args: &Value, all: bool) -> AppResult<V
             None,
             None,
         )?;
+        let page_start = items.len();
         for e in result["items"].as_array().into_iter().flatten() {
             let mut e = e.clone();
             e["revision"] = e["etag"].clone();
             e["calendar_id"] = json!(cal);
             e["provider_id"] = json!("google");
-            project(context, account_id(args)?, cal, &e)?;
             items.push(e);
         }
+        project_page(context, account_id(args)?, cal, &items[page_start..], &[])?;
         let next = result["nextPageToken"].as_str();
         let mut state = StateFile::open()?;
         let seen = state.state.view_seen.entry(view_key.clone()).or_default();
@@ -937,8 +955,8 @@ fn list_events(context: &ServiceContext, args: &Value, all: bool) -> AppResult<V
         }
         state.save()?;
         drop(state);
-        for id in stale {
-            remove_projection(context, account_id(args)?, cal, &id)?;
+        if !stale.is_empty() {
+            project_page(context, account_id(args)?, cal, &[], &stale)?;
         }
         if !all || next.is_none() {
             return Ok(
@@ -1696,83 +1714,135 @@ fn save_series_operation(id: &str, operation: &SeriesOperation) -> AppResult<()>
     state.save()
 }
 
-fn project(context: &ServiceContext, account: u32, cal: &str, remote: &Value) -> AppResult<()> {
-    let id = remote["id"]
-        .as_str()
-        .ok_or_else(|| AppError::external("Google event has no ID"))?;
-    if remote["status"].as_str() == Some("cancelled") {
-        return remove_projection(context, account, cal, id);
-    }
-    let z = zone(context)?;
-    let start = dates::google_timestamp(&remote["start"], &z)?;
-    let end = dates::google_timestamp(&remote["end"], &z)?;
-    let mut state = StateFile::open()?;
-    let k = key(account, cal, id);
-    let existing = state.state.remote.get(&k).map(|p| p.local_id);
-    let local_id = context.update(|store| {
-        let local_id = existing.unwrap_or_else(|| store.new_id());
-        let mut event = Event {
-            id: local_id,
-            title: remote["summary"].as_str().unwrap_or("(untitled)").into(),
-            start,
-            end,
-            location: remote["location"].as_str().unwrap_or_default().into(),
-            notes: remote["description"].as_str().unwrap_or_default().into(),
-            meeting_link: remote["hangoutLink"].as_str().map(String::from),
-            conference: if remote["conferenceData"].is_object() {
-                "googleMeet".into()
-            } else {
-                String::new()
-            },
-            ..Default::default()
-        };
-        event.attendees = remote["attendees"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter_map(|v| v["email"].as_str().map(String::from))
-            .collect();
-        event.rsvp = remote["attendees"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .find(|a| a["self"].as_bool() == Some(true))
-            .and_then(|a| a["responseStatus"].as_str())
-            .map(|s| match s {
-                "accepted" => Rsvp::Accepted,
-                "declined" => Rsvp::Declined,
-                "tentative" => Rsvp::Maybe,
-                _ => Rsvp::None,
-            })
-            .unwrap_or_default();
-        if let Some(at) = store.events.iter().position(|e| e.id == local_id) {
-            store.events[at] = event;
+fn projected_event(remote: &Value, zone: &str) -> AppResult<Event> {
+    let mut event = Event {
+        id: 0,
+        title: remote["summary"].as_str().unwrap_or("(untitled)").into(),
+        start: dates::google_timestamp(&remote["start"], zone)?,
+        end: dates::google_timestamp(&remote["end"], zone)?,
+        location: remote["location"].as_str().unwrap_or_default().into(),
+        notes: remote["description"].as_str().unwrap_or_default().into(),
+        meeting_link: remote["hangoutLink"].as_str().map(String::from),
+        conference: if remote["conferenceData"].is_object() {
+            "googleMeet".into()
         } else {
-            store.events.push(event);
-        }
-        Ok(local_id)
-    })?;
-    state.state.remote.insert(
-        k,
-        RemoteProjection {
-            local_id,
-            account_id: account,
-            calendar_id: cal.into(),
-            event: remote.clone(),
+            String::new()
         },
-    );
-    state.save()
+        ..Default::default()
+    };
+    event.attendees = remote["attendees"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|v| v["email"].as_str().map(String::from))
+        .collect();
+    event.rsvp = remote["attendees"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find(|a| a["self"].as_bool() == Some(true))
+        .and_then(|a| a["responseStatus"].as_str())
+        .map(|s| match s {
+            "accepted" => Rsvp::Accepted,
+            "declined" => Rsvp::Declined,
+            "tentative" => Rsvp::Maybe,
+            _ => Rsvp::None,
+        })
+        .unwrap_or_default();
+    Ok(event)
 }
-fn remove_projection(context: &ServiceContext, account: u32, cal: &str, id: &str) -> AppResult<()> {
-    let mut state = StateFile::open()?;
-    if let Some(p) = state.state.remote.remove(&key(account, cal, id)) {
-        context.update(|s| {
-            s.events.retain(|e| e.id != p.local_id);
-            Ok(())
-        })?;
-        state.save()?;
+
+/// Reserve new identifiers in the aggregate before publishing their provider mapping. A failure
+/// before staging can leave unused IDs, never a visible event without its identity.
+fn stage_projection(
+    file: &mut StateFile, context: &ServiceContext, account: u32, cal: &str,
+    events: &[Value], removals: &[String],
+) -> AppResult<()> {
+    let zone = zone(context)?;
+    let mut changes = BTreeMap::new();
+    for remote in events {
+        let id = remote["id"].as_str().ok_or_else(|| AppError::external("Google event has no ID"))?;
+        let change = if remote["status"].as_str() == Some("cancelled") {
+            None
+        } else {
+            Some((remote, projected_event(remote, &zone)?))
+        };
+        changes.insert(key(account, cal, id), change);
     }
-    Ok(())
+    for id in removals {
+        changes.insert(key(account, cal, id), None);
+    }
+    let needed = changes.iter()
+        .filter(|(key, value)| value.is_some() && !file.state.remote.contains_key(*key)).count();
+    let mut reserved = if needed == 0 {
+        Vec::new()
+    } else {
+        context.update_emails(&[], |store| {
+            Ok((0..needed).map(|_| store.new_id()).collect::<Vec<_>>())
+        })?
+    }.into_iter();
+    let mut batch = ProjectionBatch { events: Vec::new(), removals: Vec::new() };
+    for (key, change) in changes {
+        match change {
+            Some((remote, mut event)) => {
+                let local_id = match file.state.remote.get(&key) {
+                    Some(old) => old.local_id,
+                    None => reserved.next().ok_or_else(|| AppError::storage("Calendar ID reservation missing"))?,
+                };
+                event.id = local_id;
+                batch.events.push(event);
+                file.state.remote.insert(key, RemoteProjection {
+                    local_id, account_id: account, calendar_id: cal.to_owned(), event: remote.clone(),
+                });
+            }
+            None if file.state.remote.contains_key(&key) => batch.removals.push(key),
+            None => {}
+        }
+    }
+    if batch.events.is_empty() && batch.removals.is_empty() {
+        return Ok(());
+    }
+    file.state.pending_projection = Some(batch);
+    file.save()
+}
+
+fn finish_projection(file: &mut StateFile, context: &ServiceContext) -> AppResult<()> {
+    let Some(batch) = file.state.pending_projection.take() else { return Ok(()) };
+    let removed: HashSet<u64> = batch.removals.iter()
+        .filter_map(|key| file.state.remote.get(key).map(|p| p.local_id)).collect();
+    let mut changed: BTreeMap<u64, Event> = batch.events.into_iter().map(|e| (e.id, e)).collect();
+    context.update_emails(&[], |store| {
+        store.events.retain_mut(|event| {
+            if removed.contains(&event.id) {
+                return false;
+            }
+            if let Some(updated) = changed.remove(&event.id) {
+                *event = updated;
+            }
+            true
+        });
+        store.events.extend(changed.into_values());
+        Ok(())
+    })?;
+    for key in batch.removals {
+        file.state.remote.remove(&key);
+    }
+    file.save()
+}
+
+fn project_page(context: &ServiceContext, account: u32, cal: &str, events: &[Value], removed: &[String]) -> AppResult<()> {
+    let mut file = StateFile::open_ready(context)?;
+    if events.is_empty() && removed.is_empty() { return Ok(()); }
+    stage_projection(&mut file, context, account, cal, events, removed)?;
+    finish_projection(&mut file, context)
+}
+
+fn project(context: &ServiceContext, account: u32, cal: &str, remote: &Value) -> AppResult<()> {
+    project_page(context, account, cal, std::slice::from_ref(remote), &[])
+}
+
+fn remove_projection(context: &ServiceContext, account: u32, cal: &str, id: &str) -> AppResult<()> {
+    project_page(context, account, cal, &[], &[id.to_owned()])
 }
 /// One provider sync at a time in this process: a full scan removes projections
 /// it did not see, so a concurrent sync of the same calendar must not run.
@@ -1787,7 +1857,7 @@ fn sync_calendar(context: &ServiceContext, args: &Value) -> AppResult<Value> {
     let account = account_id(args)?;
     let api = gateway(context, account)?;
     let token_key = key(account, cal, "");
-    let token = StateFile::open()?
+    let token = StateFile::open_ready(context)?
         .state
         .sync_tokens
         .get(&token_key)
@@ -1805,7 +1875,7 @@ fn sync_calendar(context: &ServiceContext, args: &Value) -> AppResult<Value> {
         params.push(("syncToken", token));
     }
     let mut count = 0;
-    let mut seen = Vec::new();
+    let mut seen = HashSet::new();
     let next_token;
     loop {
         let result = match api.request(
@@ -1822,11 +1892,12 @@ fn sync_calendar(context: &ServiceContext, args: &Value) -> AppResult<Value> {
             }
             other => other?,
         };
-        for event in result["items"].as_array().into_iter().flatten() {
-            project(context, account, cal, event)?;
-            count += 1;
+        let page = result["items"].as_array().map(Vec::as_slice).unwrap_or(&[]);
+        project_page(context, account, cal, page, &[])?;
+        count += page.len();
+        for event in page {
             if let Some(id) = event["id"].as_str() {
-                seen.push(id.to_string());
+                seen.insert(id.to_owned());
             }
         }
         if count > 100000 {
@@ -1852,14 +1923,14 @@ fn sync_calendar(context: &ServiceContext, args: &Value) -> AppResult<Value> {
             .filter(|p| {
                 p.account_id == account
                     && p.calendar_id == cal
-                    && !seen.iter().any(|id| p.event["id"].as_str() == Some(id))
+                    && p.event["id"].as_str().is_some_and(|id| !seen.contains(id))
             })
             .filter_map(|p| p.event["id"].as_str().map(String::from))
             // An event written while the scan ran is newer than the scan, not stale.
             .filter(|id| known_before.contains(id))
             .collect();
-        for id in stale {
-            remove_projection(context, account, cal, &id)?;
+        if !stale.is_empty() {
+            project_page(context, account, cal, &[], &stale)?;
         }
     }
     if let Some(token) = next_token {
@@ -2231,6 +2302,48 @@ mod tests {
             attachments: Arc::new(LocalAttachments),
         }
     }
+    #[test]
+    fn a_staged_page_recovers_across_both_commit_boundaries() {
+        let context = calendar_context();
+        let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let root = std::env::temp_dir().join(format!("qamille-calendar-page-{}-{nonce}", std::process::id()));
+        let remote = |id: &str| json!({"id":id, "summary":id,
+            "start":{"dateTime":"2026-11-03T09:00:00Z"}, "end":{"dateTime":"2026-11-03T10:00:00Z"}});
+        let a = remote("a");
+        let b = remote("b");
+        let mut file = StateFile::open_in(&root).unwrap();
+        stage_projection(&mut file, &context, 1, "primary", &[a.clone(), b], &[]).unwrap();
+        let first = file.state.remote[&key(1, "primary", "a")].local_id;
+        let other = file.state.remote[&key(1, "primary", "b")].local_id;
+        assert_ne!(first, other);
+        assert!(context.read().unwrap().events.is_empty());
+        drop(file);
+
+        let mut file = StateFile::open_in(&root).unwrap();
+        // The main commit can succeed and the process can die before acknowledging the page.
+        let staged = std::fs::read(&file.path).unwrap();
+        finish_projection(&mut file, &context).unwrap();
+        std::fs::write(&file.path, &staged).unwrap();
+        drop(file);
+        let mut file = StateFile::open_in(&root).unwrap();
+        finish_projection(&mut file, &context).unwrap();
+        let store = context.read().unwrap();
+        assert_eq!(store.events.len(), 2);
+        assert!(store.events.iter().any(|e| e.id == first && e.title == "a"));
+
+        stage_projection(&mut file, &context, 1, "primary", &[a], &["b".to_string()]).unwrap();
+        assert_eq!(file.state.remote[&key(1, "primary", "a")].local_id, first);
+        assert!(projected_ids(&file.state).contains(&other));
+        drop(file);
+        let mut file = StateFile::open_in(&root).unwrap();
+        finish_projection(&mut file, &context).unwrap();
+        assert!(!projected_ids(&file.state).contains(&other));
+        assert_eq!(context.read().unwrap().events.len(), 1);
+        assert!(file.state.pending_projection.is_none());
+        drop(file);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     #[test]
     fn following_replacement_validates_all_fields_before_series_truncation() {
         let context = calendar_context();

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-meeting-interrupted-capture"
+description = "Enables the meeting_interrupted_capture command without any pre-configured scope."
+commands.allow = ["meeting_interrupted_capture"]
+
+[[permission]]
+identifier = "deny-meeting-interrupted-capture"
+description = "Denies the meeting_interrupted_capture command without any pre-configured scope."
+commands.deny = ["meeting_interrupted_capture"]

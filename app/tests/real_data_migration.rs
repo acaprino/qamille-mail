@@ -243,13 +243,13 @@ fn a_real_schema_3_mailbox_migrates_to_4_and_lists_conversations() {
     println!("open + migrate: {} ms", started.elapsed().as_millis());
 
     let after = plain(&path);
-    assert_eq!(version(&after), "5", "the version is recorded as 5");
+    assert_eq!(version(&after), "6", "the version is recorded as 6");
     let count_after = count(&after, "SELECT count(*) FROM emails");
     assert_eq!(count_after, count_before, "no message lost or added");
     assert_eq!(count(&after, "SELECT count(*) FROM attachments"), attachments_before, "no attachment lost");
     assert_eq!(count(&after, "SELECT count(*) FROM accounts"), accounts_before, "no account lost");
     // Nothing but the new column changed: every other column of every row is byte for byte what it was.
-    let others_after = fingerprints(&after, &["in_reply_to"]);
+    let others_after = fingerprints(&after, &["in_reply_to", "reply_to_addresses"]);
     assert_eq!(others_after.len(), others_before.len());
     let changed = others_before.iter().filter(|(id, print)| others_after.get(id) != Some(print)).count();
     assert_eq!(changed, 0, "{changed} messages changed in a column the migration must not touch");

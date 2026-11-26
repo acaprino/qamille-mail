@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import Button from '../ui/Button';
 import Checkbox from '../ui/Checkbox';
 import Field from '../ui/Field';
-import Modal from '../ui/Modal';
+import Modal, { ModalFooter } from '../ui/Modal';
 import Select from '../ui/Select';
 import { call, errorText } from '../lib/api';
 import { backendText, tr } from '../lib/i18n';
@@ -479,7 +479,7 @@ export default function ComputeSettings() {
               {error}
             </p>
           )}
-          <div className="button-row">
+          <ModalFooter>
             {passwordless && (
               <Button
                 variant="primary"
@@ -520,7 +520,7 @@ export default function ComputeSettings() {
             <Button ref={keepAccount} variant="secondary" onClick={() => (setDeleting(false), setDeletePassword(''))}>
               {tr('Annulla', 'Cancel')}
             </Button>
-          </div>
+          </ModalFooter>
         </Modal>
       )}
       {error && !deleting && (

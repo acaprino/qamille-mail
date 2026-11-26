@@ -19,6 +19,10 @@ pub async fn meeting_start(request: StartMeeting, state: State<'_, DesktopState>
     let s = state.meetings.clone(); blocking(move || s.start(request)).await
 }
 #[tauri::command]
+pub fn meeting_interrupted_capture(state: State<'_, DesktopState>) -> Option<CaptureSnapshot> {
+    state.meetings.interrupted_capture()
+}
+#[tauri::command]
 pub async fn meeting_capture_status(state: State<'_, DesktopState>) -> AppResult<CaptureSnapshot> { let s = state.meetings.clone(); blocking(move || { let mut snapshot = s.capture_status()?; snapshot.chunks.clear(); snapshot.gaps.clear(); snapshot.unverified_chunks.clear(); Ok(snapshot) }).await }
 #[tauri::command]
 pub async fn meeting_pause(state: State<'_, DesktopState>) -> AppResult<CaptureSnapshot> { let s = state.meetings.clone(); blocking(move || s.pause()).await }

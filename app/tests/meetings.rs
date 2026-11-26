@@ -3771,3 +3771,15 @@ fn restart_does_not_requeue_a_summary_while_ai_is_not_ready() {
     let d = service.read(id).unwrap();
     assert_eq!((kinds(&d), states(&d)), (vec!["summarize"], vec!["interrupted"]));
 }
+
+#[test]
+fn idle_indicator_uses_the_recovery_index_and_drops_deleted_recordings() {
+    let f = Fixture::new();
+    let id = f.start().meeting.id;
+    // An application restart has no live recorder. Recovery finds the old manifest.
+    *f.audio.snapshot.lock().unwrap() = CaptureSnapshot::default();
+    f.service.recover_interrupted().unwrap();
+    assert_eq!(f.service.interrupted_capture().unwrap().meeting_id, Some(id));
+    f.service.delete(id).unwrap();
+    assert!(f.service.interrupted_capture().is_none());
+}

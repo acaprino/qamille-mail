@@ -16,10 +16,15 @@ pub struct RemovedAccount {
 pub struct AccountService {
     context: Arc<ServiceContext>,
     identity: Arc<dyn GoogleIdentity>,
+    revoke_local_grants: fn(u32) -> AppResult<()>,
 }
 impl AccountService {
     pub fn new(context: Arc<ServiceContext>, identity: Arc<dyn GoogleIdentity>) -> Self {
-        Self { context, identity }
+        Self { context, identity, revoke_local_grants: |_| Ok(()) }
+    }
+    pub fn with_grant_cleanup(mut self, cleanup: fn(u32) -> AppResult<()>) -> Self {
+        self.revoke_local_grants = cleanup;
+        self
     }
     /// `login_hint` is the address the person expects to use; empty lets Google ask.
     pub fn connect_google(&self, login_hint: &str) -> AppResult<()> {
@@ -37,15 +42,23 @@ impl AccountService {
         let store = self.context.read_shared()?;
         let account = store.account(id).cloned().ok_or_else(|| AppError::missing("Account"))?;
         let removed = RemovedAccount { provider_id: account.resolved_provider_id().to_string(), email: account.email.clone() };
+        (self.revoke_local_grants)(id)?;
         self.context.update(|store| {
-            store.accounts.retain(|a| a.id != id);
-            store.emails.retain(|e| e.account_id != id);
-            store.drafts.retain(|d| d.account_id != id);
+            let current = store.account(id).ok_or_else(|| AppError::missing("Account"))?;
+            if !current.email.eq_ignore_ascii_case(&account.email) || current.resolved_provider_id() != account.resolved_provider_id() {
+                return Err(AppError::new("identity_changed", "Mailbox changed; refresh before removing it"));
+            }
+            if account.resolved_provider_id() != "sample" {
+                let primary = super::sync::credential_key(&account);
+                // A locked vault otherwise accepts a removal as a no-op.
+                self.context.secrets.get(&primary)?;
+                for key in [format!("calendar:{id}"), format!("contacts:{id}"), primary] {
+                    self.context.secrets.remove(&key)?;
+                }
+            }
+            store.detach_mailbox(id, self.context.clock.now());
             Ok(())
         })?;
-        if account.resolved_provider_id() != "sample" {
-            self.context.secrets.remove(&super::sync::credential_key(&account))?;
-        }
         Ok(removed)
     }
     /// Stops a Google sign-in that is still waiting for the browser.
@@ -87,9 +100,9 @@ impl AccountService {
             ..Default::default()
         };
         self.context.mail.check_login(&account)?;
-        self.context.secrets.set(&account_key(&email), password)?;
         account.password.clear();
         self.context.update(|store| {
+            self.context.secrets.set(&account_key(&email), password)?;
             if let Some(old) = store.accounts.iter_mut().find(|a| {
                 a.email.eq_ignore_ascii_case(&email) && a.resolved_provider_id() == "gmail"
             }) {
@@ -99,7 +112,7 @@ impl AccountService {
                     old.name = account.name;
                 }
             } else {
-                account.id = store.accounts.iter().map(|a| a.id).max().unwrap_or(0) + 1;
+                account.id = store.allocate_mailbox_id().ok_or_else(|| AppError::storage("Mailbox identifiers exhausted"))?;
                 store.accounts.push(account);
             }
             Ok(())

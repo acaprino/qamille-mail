@@ -3,7 +3,6 @@
 use crate::{
     application::{
         AppError, AppResult, ServiceContext,
-        ports::StoreRepository,
         contact_ports::{ContactGateway, RemoteContact, RemotePage},
         contacts::{ContactQuery, ContactService, ContactView},
     },
@@ -12,7 +11,7 @@ use crate::{
         model::{Account, Store},
     },
     infrastructure::{
-        contact_repository::FileContactStore, google_people::GooglePeopleGateway, repository::JsonStoreRepository,
+        contact_repository::FileContactStore, google_people::GooglePeopleGateway, mcp_config,
     },
 };
 use serde_json::{Value, json};
@@ -45,14 +44,15 @@ impl ContactGateway for McpGateway {
 }
 
 fn service(context: &Arc<ServiceContext>) -> AppResult<ContactService> {
-    // A profile limited to some accounts sees fewer accounts than the stored workspace has.
-    let all_accounts = JsonStoreRepository::new(Store::path()).read()?.accounts.len();
+    let workspace = mcp_config::active_workspace(&Store::data_dir())?;
+    let visible = context.read()?;
+    let include_local = workspace.accounts.iter().all(|account| visible.account(account.id).is_some());
     let service = ContactService::new(
         context.clone(),
         Arc::new(FileContactStore::new(Store::data_dir())),
         Arc::new(McpGateway(GooglePeopleGateway::new(context.secrets.clone()))),
     );
-    Ok(if context.read()?.accounts.len() < all_accounts { service.without_local() } else { service })
+    Ok(if include_local { service } else { service.without_local() })
 }
 
 pub fn handles(name: &str) -> bool {

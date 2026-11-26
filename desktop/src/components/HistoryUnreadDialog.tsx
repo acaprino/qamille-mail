@@ -2,7 +2,7 @@
 // mark the ones older than 30 days read, here and on Gmail, or leave the Inbox as it is.
 import { useRef, useState } from 'react';
 import Button from '../ui/Button';
-import Modal from '../ui/Modal';
+import Modal, { ModalFooter } from '../ui/Modal';
 import { call, errorText } from '../lib/api';
 import { tr } from '../lib/i18n';
 
@@ -44,14 +44,14 @@ export default function HistoryUnreadDialog({ accountId, account, count, onClose
           `Bringing in the older mail of ${account} added ${count} unread messages to the Inbox.`,
         )}
       </p>
-      <div className="button-row">
+      <ModalFooter>
         <Button variant="primary" disabled={busy} onClick={() => void markRead()}>
           {tr('Segna come letti quelli più vecchi di 30 giorni', 'Mark as read those older than 30 days')}
         </Button>
         <Button ref={leave} variant="secondary" disabled={busy} onClick={() => onClose()}>
           {tr('Lascia così', 'Leave as is')}
         </Button>
-      </div>
+      </ModalFooter>
     </Modal>
   );
 }

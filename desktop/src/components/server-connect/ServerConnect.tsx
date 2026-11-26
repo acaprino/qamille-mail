@@ -88,7 +88,6 @@ export default function ServerConnect({ preset = null, consented, defaultDeviceN
   // «Create account» and «Forgot password?» replace the sign-in step while open.
   const [side, setSide] = useState<'signup' | 'reset' | null>(signUp && preset ? 'signup' : null);
   useEffect(() => onCreatingChange?.(side === 'signup'), [side]);
-  const [presetInfo, setPresetInfo] = useState<ServerInfo | null>(null);
   // «Continue with Google» (spec «Vendita Professional», V3): the browser signs in on the server.
   const [browserWaiting, setBrowserWaiting] = useState(false);
   // The server asks the Terms to be accepted before a Google sign-in may create an account (wave 9).
@@ -101,12 +100,14 @@ export default function ServerConnect({ preset = null, consented, defaultDeviceN
   const fixedUrl = preset ?? reconnect;
   useEffect(() => {
     if (!fixedUrl) return;
+    let active = true;
     void call<Probe>('server_probe', { url: fixedUrl })
-      .then((result) => live.current && result.kind === 'found' && setPresetInfo(result.info))
-      .catch(() => {});
+      .then((result) => active && setForm((current) => probed(current, fixedUrl, result)))
+      .catch(() => active && setForm((current) => probed(current, fixedUrl, { kind: 'unreachable' })));
+    return () => { active = false; };
   }, [fixedUrl]);
-  const info: ServerInfo | null =
-    presetInfo ?? (form.probe?.result?.kind === 'found' ? form.probe.result.info : null);
+  const probeResult = form.probe?.url === form.url ? form.probe.result : null;
+  const info = probeResult?.kind === 'found' ? probeResult.info : null;
   // One probe of the server of the Docker guide on this PC, when the step opens empty (wave 2).
   const [localProbe, setLocalProbe] = useState<Probe | null>(null);
   useEffect(() => {
@@ -117,13 +118,14 @@ export default function ServerConnect({ preset = null, consented, defaultDeviceN
   }, [fixedUrl]);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const live = useRef(true);
-  useEffect(() => () => {
-    live.current = false;
-    clearTimeout(timer.current);
-    // A CA written here and not used for a sign-in is forgotten when the form closes.
-    void call('compute_forget_pending_ca').catch(() => {});
-    // A browser sign-in still waiting stops with the form.
-    void call('server_cancel_browser_sign_in').catch(() => {});
+  useEffect(() => {
+    live.current = true;
+    return () => {
+      live.current = false;
+      clearTimeout(timer.current);
+      void call('compute_forget_pending_ca').catch(() => {});
+      void call('server_cancel_browser_sign_in').catch(() => {});
+    };
   }, []);
 
   function probe(url: string) {
@@ -334,13 +336,21 @@ export default function ServerConnect({ preset = null, consented, defaultDeviceN
           </p>
           {assistantConsent && <p>{tr(assistantConsent.it, assistantConsent.en)}</p>}
           {mailboxConsent && <p>{tr(mailboxConsent.it, mailboxConsent.en)}</p>}
+          {!info && <p role="status">{probeText(probeResult)}</p>}
+          {!info && probeResult && <Button variant="text" onClick={() => probe(form.url)}>{tr('Riprova', 'Retry')}</Button>}
           <div className="button-row step-actions">
             <Button
               variant="primary"
-              disabled={busy}
+              disabled={busy || !info}
               onClick={() =>
                 void run(async () => {
-                  await call('server_record_consent', { url: form.url });
+                  if (!info) return;
+                  const changed = await call<ServerInfo | null>('server_record_consent', { url: form.url, shown: info });
+                  if (changed) {
+                    setForm((current) => probed(current, form.url, { kind: 'found', info: changed }));
+                    setError(tr('Le impostazioni del server sono cambiate. Verifica le informazioni aggiornate.', 'The server settings changed. Review the updated information.'));
+                    return;
+                  }
                   setForm(consentGiven(form));
                 })
               }

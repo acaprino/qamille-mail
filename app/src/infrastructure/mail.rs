@@ -512,6 +512,7 @@ pub(super) fn parse_message_inner(raw: &[u8], id: u64, account_id: u32, attach_d
         in_reply_to: in_reply_to.unwrap_or_default(),
         from_name,
         from_addr,
+        reply_to_addresses: addr_list(msg.reply_to()),
         to: addr_list(msg.to()),
         cc: addr_list(msg.cc()),
         subject: msg.subject().unwrap_or("(no subject)").to_string(),
@@ -948,6 +949,15 @@ mod search_transport_tests {
         assert_eq!(email.date, 0);
     }
     #[test]
+    fn replies_use_the_ordered_reply_to_mailboxes_when_present() {
+        let raw = b"From: robot@test.example\r\nReply-To: desk@test.example, Ticket <agent@test.example>\r\n\r\nRequest";
+        let email = super::parse_message_inner(raw, 1, 1, None).unwrap();
+        assert_eq!(email.reply_recipients(), &["desk@test.example", "agent@test.example"]);
+        let plain = super::parse_message_inner(b"From: robot@test.example\r\n\r\nText", 2, 1, None).unwrap();
+        assert_eq!(plain.reply_recipients(), &["robot@test.example"]);
+    }
+
+    #[test]
     fn parse_keeps_the_in_reply_to_header() {
         let reply = parse_message_inner(
             b"From: a@x\r\nMessage-ID: <child@x>\r\nIn-Reply-To: <parent@x>\r\nSubject: Re: s\r\n\r\nBody",
@@ -1038,10 +1048,17 @@ fn attachment_part(name: String, bytes: Vec<u8>) -> SinglePart {
 }
 
 pub fn send(a: &Account, from_name: &str, out: &Outgoing) -> Result<(), String> {
-    let msg = build_message(a, from_name, out)?;
+    deliver(a, from_name, out).map_err(|e| e.to_string())
+}
+
+/// Failures before SMTP submission are safe to correct and retry.
+pub fn deliver(a: &Account, from_name: &str, out: &Outgoing) -> crate::application::AppResult<()> {
+    use crate::application::AppError;
+    let msg = build_message(a, from_name, out).map_err(AppError::delivery_not_started)?;
+    let transport = smtp_transport(a).map_err(AppError::delivery_not_started)?;
     // lettre connects, authenticates and delivers inside `send`, so a success is
     // the SMTP proof of connectivity that wakes this account's confirmations.
-    smtp_transport(a)?.send(&msg).map_err(|e| e.to_string())?;
+    transport.send(&msg).map_err(|e| AppError::external(e.to_string()))?;
     crate::application::connectivity::note_success(a.id);
     Ok(())
 }

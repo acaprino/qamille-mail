@@ -848,3 +848,24 @@ fn an_account_never_shows_its_refresh_token_or_app_password_in_debug() {
     assert!(!shown.contains("SECRET"), "{shown}");
     assert!(shown.contains("anna@example.com") && shown.contains("<hidden>"));
 }
+
+#[test]
+fn connection_consent_saves_only_the_disclosures_that_were_shown() {
+    let (service, server, _, context) = setup(professional());
+    let Probe::Found { info: mut shown } = service.probe(SERVER).unwrap() else { panic!("missing server") };
+    shown.sync = Some(qamille::domain::server_account::SyncInfo { available: true });
+    let changed = service.confirm_connection(SERVER, &shown).unwrap().expect("mailbox disclosure changed");
+    assert!(context.read().unwrap().settings.compute_consented_urls.is_empty());
+
+    *server.llm.lock().unwrap() = Some(llm("External provider", true));
+    let latest = service.confirm_connection(SERVER, &changed).unwrap().expect("assistant disclosure changed");
+    let settings = context.read().unwrap().settings;
+    assert!(settings.llm_consent.is_none() && !settings.mailbox_sync);
+    assert!(settings.compute_consented_urls.is_empty());
+
+    assert!(service.confirm_connection(SERVER, &latest).unwrap().is_none());
+    let settings = context.read().unwrap().settings;
+    assert_eq!(settings.compute_consented_urls, vec![SERVER.to_string()]);
+    assert_eq!(settings.llm_consent.unwrap().label, "External provider");
+    assert!(!settings.mailbox_sync);
+}

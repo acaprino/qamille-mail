@@ -101,6 +101,8 @@ pub struct Email {
     pub remote_locations: Vec<RemoteLocation>,
     pub from_name: String,
     pub from_addr: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reply_to_addresses: Vec<String>,
     pub to: Vec<String>,
     pub cc: Vec<String>,
     pub subject: String,
@@ -168,6 +170,9 @@ pub struct RemoteLocation {
 }
 
 impl Email {
+    pub fn reply_recipients(&self) -> &[String] {
+        if self.reply_to_addresses.is_empty() { std::slice::from_ref(&self.from_addr) } else { &self.reply_to_addresses }
+    }
     /// A provider copy that replaces a local one keeps the parent the local copy recorded
     /// when the provider did not supply its own (ADR-0010: a sent reply's echo).
     pub fn keep_parent_of(&mut self, previous: &Email) {
@@ -544,6 +549,9 @@ pub struct Settings {
     /// The server address the person agreed to store the mailboxes' credentials on (INV-35).
     #[serde(default)]
     pub mailbox_sync_consent: Option<String>,
+    /// Allocated once per workspace, including reservations for interrupted syncs.
+    #[serde(default)]
+    pub mailbox_id_high_water: Option<u32>,
 }
 
 /// Where indexing, semantic search and transcription compute (spec A1, D7, INV-41): on a
@@ -607,6 +615,7 @@ impl Default for Settings {
             legacy_local_notice_dismissed: false,
             mailbox_sync: false,
             mailbox_sync_consent: None,
+            mailbox_id_high_water: Some(0),
         }
     }
 }
@@ -642,6 +651,45 @@ pub struct Store {
 }
 
 impl Store {
+    fn mailbox_id_floor(&self) -> u32 {
+        // Old versions issued small sequential IDs and never retained a counter. Leave their
+        // entire lower namespace alone, including historical grants outside the mail store.
+        let floor = self.settings.mailbox_id_high_water.unwrap_or(i32::MAX as u32);
+        self.accounts.iter().map(|a| a.id)
+            .chain(self.outbox.iter().map(|delivery| delivery.draft.account_id))
+            .chain(self.drafts.iter().map(|draft| draft.account_id))
+            .fold(floor, u32::max)
+    }
+
+    pub fn allocate_mailbox_id(&mut self) -> Option<u32> {
+        let id = self.mailbox_id_floor().checked_add(1)?;
+        self.settings.mailbox_id_high_water = Some(id);
+        Some(id)
+    }
+
+    pub fn detach_mailbox(&mut self, id: u32, now: i64) {
+        use super::{outbox::DeliveryStatus, undo::UndoOperation};
+        // Record the number before dropping its last reference. In-flight deliveries retain
+        // their uncertain status for reconciliation; pending ones can no longer be sent.
+        self.settings.mailbox_id_high_water = Some(self.mailbox_id_floor().max(id));
+        for delivery in self.outbox.iter_mut().filter(|d| d.draft.account_id == id) {
+            if matches!(delivery.status, DeliveryStatus::Queued | DeliveryStatus::Scheduled | DeliveryStatus::Failed) {
+                delivery.status = DeliveryStatus::Cancelled;
+                delivery.updated_at = now;
+                delivery.error = Some("Mailbox removed".into());
+            }
+        }
+        let email_ids: std::collections::HashSet<_> = self.emails.iter().filter(|e| e.account_id == id).map(|e| e.id).collect();
+        let draft_ids: std::collections::HashSet<_> = self.drafts.iter().filter(|d| d.account_id == id).map(|d| d.id).collect();
+        self.undo_actions.retain(|action| match &action.operation {
+            UndoOperation::Mail { email_id, .. } => !email_ids.contains(email_id),
+            other => !other.draft_id().is_some_and(|draft| draft_ids.contains(&draft)),
+        });
+        self.accounts.retain(|a| a.id != id);
+        self.emails.retain(|e| e.account_id != id);
+        self.drafts.retain(|d| d.account_id != id);
+    }
+
     /// An older single signature becomes the first entry of the manager.
     pub(crate) fn adopt_old_signature(&mut self) {
         if self.settings.signature.trim().is_empty() || !self.signatures.is_empty() {

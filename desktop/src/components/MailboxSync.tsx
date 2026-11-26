@@ -139,7 +139,10 @@ export default function MailboxSync({ accounts, changed, notify }: MailboxSyncPr
               {box?.problem && <p className="muted">{backendText(box.problem)}</p>}
               {removing === account.id ? (
                 <div className="button-row">
-                  <span>{tr('Rimuovere la casella e la posta scaricata da questo computer?', 'Remove the mailbox and its downloaded mail from this computer?')}</span>
+                  <span>{tr(
+                    'Rimuovere la casella e la posta scaricata da questo computer? Se la casella è sincronizzata, la configurazione viene rimossa anche dal server Qamille. Sugli altri computer potrai scegliere se tenerla. I messaggi presso il fornitore restano disponibili.',
+                    'Remove the mailbox and its downloaded mail from this computer? If this mailbox is synchronized, its configuration is also removed from the Qamille server. On your other computers you can choose to keep it. Messages at your mail provider remain available.',
+                  )}</span>
                   <Button
                     variant="secondary"
                     disabled={busy}

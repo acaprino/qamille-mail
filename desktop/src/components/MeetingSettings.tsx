@@ -5,7 +5,7 @@
 import { useEffect, useRef } from 'react';
 import Button from '../ui/Button';
 import Field from '../ui/Field';
-import Modal from '../ui/Modal';
+import Modal, { ModalFooter } from '../ui/Modal';
 import Select from '../ui/Select';
 import Switch from '../ui/Switch';
 import { errorText } from '../lib/api';
@@ -337,7 +337,7 @@ export default function MeetingSettings({ settings, onSettingsChange, notify }: 
               `This frees ${megabytes(preview.bytes)}. Transcripts stay. This cannot be undone.`,
             )}
           </p>
-          <div className="modal-actions">
+          <ModalFooter>
             <Button
               variant="secondary"
               aria-disabled={s.cleaning ? 'true' : undefined}
@@ -356,7 +356,7 @@ export default function MeetingSettings({ settings, onSettingsChange, notify }: 
             >
               {tr('Elimina', 'Delete')}
             </Button>
-          </div>
+          </ModalFooter>
         </Modal>
       )}
     </>

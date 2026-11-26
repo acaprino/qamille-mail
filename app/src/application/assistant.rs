@@ -12,6 +12,46 @@ pub struct Answer {
     pub sources: Vec<SearchHit>,
     pub meeting_sources: Vec<crate::domain::meeting::MeetingHit>,
 }
+/// Only an agenda request may include calendar data. For a named event, use that event;
+/// for an overview, include the next few titles and dates. Notes require a named event.
+pub(crate) fn calendar_context(events: &[crate::model::Event], question: &str, now: i64) -> String {
+    let question = question.to_lowercase();
+    let words: Vec<_> = question.split(|c: char| !c.is_alphanumeric()).collect();
+    let calendar_named = words.iter().any(|word| matches!(*word, "agenda" | "calendar" | "calendario"
+        | "appuntamento" | "appuntamenti" | "appointment" | "appointments"
+        | "event" | "events" | "evento" | "eventi" | "schedule"));
+    if !calendar_named { return String::new(); }
+    let mut upcoming: Vec<_> = events.iter().filter(|event| event.end >= now).collect();
+    let named = |event: &crate::model::Event| {
+        let title = event.title.trim().to_lowercase();
+        !title.is_empty() && question.contains(&title)
+    };
+    let has_named_event = upcoming.iter().any(|e| named(e));
+    // Merely mentioning the calendar in a mail search is not a request to open it.
+    let overview = matches!(question.trim(), "agenda" | "calendar" | "calendario")
+        || ["show my calendar", "show me my calendar", "what's on my calendar", "what is on my calendar",
+            "what's my schedule", "what is my schedule", "list my appointments", "list my events",
+            "mostra la mia agenda", "mostrami la mia agenda", "mostra il mio calendario",
+            "mostrami il mio calendario", "cosa ho in agenda", "quali appuntamenti ho",
+            "quali eventi ho", "elenca gli appuntamenti"].iter().any(|prefix| question.trim_start().starts_with(*prefix));
+    if !has_named_event && !overview { return String::new(); }
+    let wants_notes = words.iter().any(|word| matches!(*word, "notes" | "note" | "appunti"));
+    upcoming.retain(|event| if has_named_event { named(event) } else {
+        event.start < now.saturating_add(14 * 86_400)
+    });
+    upcoming.sort_by_key(|event| (event.start, event.id));
+    let mut context = String::new();
+    for event in upcoming.into_iter().take(8) {
+        let title: String = event.title.chars().take(180).collect();
+        context.push_str(&format!("Event {title} on {}\n", rules::fmt_full(event.start)));
+        if has_named_event && wants_notes {
+            context.extend(event.notes.chars().take(500));
+            context.push('\n');
+        }
+    }
+    context
+}
+
 #[derive(Clone)]
 pub struct AssistantService {
     context: Arc<ServiceContext>,
@@ -79,18 +119,7 @@ impl AssistantService {
                 ));
             }
         }
-        for e in store
-            .events
-            .iter()
-            .filter(|e| e.end >= self.context.clock.now())
-        {
-            context.push_str(&format!(
-                "Event {} on {}: {}\n",
-                e.title,
-                rules::fmt_full(e.start),
-                e.notes
-            ));
-        }
+        context.push_str(&calendar_context(&store.events, question, self.context.clock.now()));
         let mut meeting_sources = vec![];
         if let Some(meetings) = &self.meetings {
             let stop_words = ["the", "and", "what", "about", "meeting", "meetings", "quale", "quali", "della", "delle", "degli", "abbiamo", "sono", "cosa", "come", "per", "con", "che", "una", "del", "nel"];
@@ -205,5 +234,27 @@ impl AssistantService {
     }
     pub fn install_status(&self) -> super::ports::ModelInstallStatus {
         self.search.install_status()
+    }
+}
+
+#[cfg(test)]
+mod calendar_privacy_tests {
+    use super::*;
+    use crate::model::Event;
+
+    #[test]
+    fn mail_question_omits_agenda_and_calendar_overview_omits_private_notes() {
+        let events = [
+            Event { title: "Clinic".into(), notes: "sensitive".into(), start: 50, end: 51, ..Default::default() },
+            Event { title: "Budget review".into(), notes: "forecast".into(), start: 52, end: 53, ..Default::default() },
+        ];
+        assert!(calendar_context(&events, "Find the invoice email", 42).is_empty());
+        assert!(calendar_context(&events, "Find the email about the calendar", 42).is_empty());
+        let agenda = calendar_context(&events, "Mostrami la mia agenda", 42);
+        assert!(agenda.contains("Clinic") && agenda.contains("Budget review"));
+        assert!(!agenda.contains("sensitive") && !agenda.contains("forecast"));
+        let named = calendar_context(&events, "Calendar notes for Budget review?", 42);
+        assert!(named.contains("forecast"));
+        assert!(!named.contains("Clinic") && !named.contains("sensitive"));
     }
 }

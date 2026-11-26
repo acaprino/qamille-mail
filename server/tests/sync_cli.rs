@@ -151,3 +151,16 @@ fn a_key_of_the_wrong_format_stops_the_commands_without_echoing_it() {
     assert!(err(&o).contains("QAMILLE_SYNC_KEY"), "{}", err(&o));
     assert!(!err(&o).contains(bad), "{}", err(&o));
 }
+
+#[tokio::test]
+async fn a_restored_backup_gets_a_new_history_without_losing_items_or_versions() {
+    let ts = seeded(2).await;
+    let result = run(ts.dir.path(), &["sync", "after-restore"], &[]);
+    assert_eq!(result.status.code(), Some(0), "{}", err(&result));
+    let (version, epoch): (i64, i64) = ts.accounts().db().blocking(|conn| {
+        Ok(conn.query_row("SELECT version, epoch FROM sync_state", [], |r| Ok((r.get(0)?, r.get(1)?)))?)
+    }).await.unwrap();
+    assert_eq!(version, 2);
+    assert!(epoch > 0);
+    assert_eq!(probe(&ts, TEST_SYNC_KEY).await, Probe::Opens);
+}

@@ -220,7 +220,7 @@ pub fn call(store: &mut Store, name: &str, a: &Value) -> Result<(String, bool), 
             if let Some(r) = a["reply_to"].as_u64() {
                 let e = store.email(r).ok_or("reply_to email not found")?;
                 d.reply_to = Some(r);
-                d.to = e.from_addr.clone();
+                d.to = e.reply_recipients().join(", ");
                 d.subject = if e.subject.to_lowercase().starts_with("re:") { e.subject.clone() } else { format!("Re: {}", e.subject) };
                 d.account_id = e.account_id;
                 d.signature_id = store.signature_for_reply(&e.clone());
@@ -318,7 +318,7 @@ pub fn call(store: &mut Store, name: &str, a: &Value) -> Result<(String, bool), 
                 signature_id,
                 id: did,
                 account_id: e.account_id,
-                to: e.from_addr.clone(),
+                to: e.reply_recipients().join(", "),
                 subject: format!("Re: {}", e.subject.trim_start_matches("Re: ")),
                 body: body.clone(),
                 reply_to: Some(id),

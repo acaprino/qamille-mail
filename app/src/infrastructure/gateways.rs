@@ -250,7 +250,7 @@ impl MailGateway for GmailGateway {
         if a.resolved_provider_id() == "sample" {
             return Ok(());
         }
-        mail::send(
+        mail::deliver(
             a,
             name,
             &mail::Outgoing {
@@ -265,7 +265,6 @@ impl MailGateway for GmailGateway {
                 attachments: message.attachments,
             },
         )
-        .map_err(AppError::external)
     }
     fn check_login(&self, a: &Account) -> AppResult<()> {
         mail::check_login(a).map_err(AppError::external)

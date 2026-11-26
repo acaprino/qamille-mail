@@ -495,7 +495,7 @@ fn run(
         }));
         let where_ = account_label(account_id);
         // The next history batch waits behind any other work (EX-10).
-        if backfill && matches!(result, Ok(Ok(()))) && super::history::pending(&context, account_id).unwrap_or(false) {
+        if matches!(result, Ok(Ok(true))) {
             if !heap.iter().any(|Reverse(q)| matches!(q.job, Job::Backfill)) {
                 heap.push(Reverse(Queued { priority: Priority::History, seq: queued.seq, job: Job::Backfill }));
             }
@@ -511,7 +511,7 @@ fn run(
                     // them through its events; a guarded call, so a panicking
                     // handler cannot take the worker down either.
                     let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        outcome.commit_finished(&pending, &result)
+                        outcome.commit_finished(&pending, &result.map(|_| ()))
                     }));
                 }
             }
@@ -568,14 +568,14 @@ fn run_job(
     drafts: &DraftService,
     context: &Arc<ServiceContext>,
     job: Job,
-) -> AppResult<()> {
+) -> AppResult<bool> {
     match job {
         // The sync writer (`MailService::sync_selected`) is the single emitter
         // of `SyncProgress` (ADR-0007 decision 5; controller seam fix
         // 2026-11-05): the worker adds nothing, so progress is never announced
         // twice per sync. Collected provider errors still surface as the job's
         // failure, which the loop announces once.
-        Job::Backfill => super::history::run_batch(context, account_id).map(|_| ()),
+        Job::Backfill => return super::history::run_batch(context, account_id),
         Job::Sync => mail.sync_account(account_id).and_then(|report| {
             if report.errors.is_empty() {
                 Ok(())
@@ -630,5 +630,6 @@ fn run_job(
             }
             committed
         }
-    }
+    }?;
+    Ok(false)
 }

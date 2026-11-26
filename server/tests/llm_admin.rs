@@ -193,3 +193,22 @@ async fn the_saved_settings_survive_a_restart() {
     assert_eq!(view.body["source"], "admin");
     assert_eq!(view.body["api_key"]["from"], "admin");
 }
+
+#[tokio::test]
+async fn switching_endpoint_never_sends_the_previous_provider_key() {
+    let (original, ts, device_key, _) = setup(llm_for).await;
+    let other = FakeOpenai::start(ok()).await;
+    for previous_key in [None, Some(PANEL_KEY)] {
+        let setup = admin(&ts, "PUT", Some(openai_settings(&original.url, previous_key))).await;
+        assert_eq!(setup.status, 200);
+        let changed = admin(&ts, "PUT", Some(openai_settings(&other.url, None))).await;
+        assert_eq!(changed.status, 200);
+        assert!(changed.body["api_key"].is_null());
+        let info = request(&ts.public, "GET", "/v1/info", None, loopback(), &[]).await;
+        let llm = &info.body["llm"];
+        let consent = format!("{};{}", llm["external"].as_bool().unwrap(), llm["label"].as_str().unwrap());
+        let response = chat(&ts.public, &device_key, Some(&consent), hello()).await;
+        assert_eq!(response.status, 200, "{}", response.text);
+        assert_eq!(last_authorization(&other), "");
+    }
+}

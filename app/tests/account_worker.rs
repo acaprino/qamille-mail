@@ -127,9 +127,12 @@ impl MailGateway for Gateway {
         Ok(())
     }
     /// A 1,000-message All Mail without rows: two batches of 500 UIDs.
-    fn history_batch(&self, _: &Account, request: &HistoryRequest) -> AppResult<HistoryBatch> {
+    fn history_batch(&self, account: &Account, request: &HistoryRequest) -> AppResult<HistoryBatch> {
         let call = self.history_calls.fetch_add(1, Ordering::SeqCst) + 1;
         self.log.lock().unwrap().push(format!("history-start-{call}"));
+        if self.fail_account == Some(account.id) {
+            return Err(AppError::external("All Mail unavailable"));
+        }
         if self.slow_history.load(Ordering::SeqCst) {
             self.barrier.wait();
         }
@@ -692,4 +695,20 @@ fn work_queued_during_a_history_batch_runs_before_the_next_one() {
     let at = |entry: &str| log.iter().position(|line| line == entry).unwrap_or_else(|| panic!("{entry} missing: {log:?}"));
     assert!(at("act-30") < at("history-start-2") && at("sync-end-1-1") < at("history-start-2"), "{log:?}");
     assert_eq!(gateway.history_calls.load(Ordering::SeqCst), 2, "one batch at a time, no duplicate: {log:?}");
+}
+
+#[test]
+fn repeated_history_failure_waits_for_another_sync() {
+    let mut store = Store::default();
+    let mut mailbox = account(1);
+    mailbox.history.last_error = Some("All Mail unavailable".into());
+    store.accounts.push(mailbox);
+    let gateway = Gateway::new(None, Some(1));
+    let context = context(store, gateway.clone(), Arc::new(Recorder::default()));
+    let worker = spawn_worker(1, &context);
+    worker.submit(Priority::History, Job::Backfill).unwrap();
+    assert!(wait_until(|| gateway.logged("history-start-1")));
+    std::thread::sleep(Duration::from_millis(150));
+    worker.stop();
+    assert_eq!(gateway.history_calls.load(Ordering::SeqCst), 1);
 }

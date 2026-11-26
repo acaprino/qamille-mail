@@ -104,3 +104,36 @@ jobs:
           path: ${{ runner.temp }}/screens
           if-no-files-found: ignore
           retention-days: 7
+
+  native:
+    name: Native Windows shell
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: desktop
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/app/target
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri -> ../../app/target
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm run test:native-feel
+      - name: Test native shell rules
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked --jobs 2 --release --features custom-protocol
+      - name: Build native executable with embedded UI
+        run: cargo build --manifest-path src-tauri/Cargo.toml --locked --jobs 2 --release --features custom-protocol
+      - name: Open the packaged application with a synthetic workspace
+        env:
+          QAMILLE_STARTUP_EXE: ${{ github.workspace }}/app/target/release/qamille-desktop.exe
+        run: npm run test:startup:native

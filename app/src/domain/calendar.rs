@@ -197,23 +197,13 @@ pub fn export_ics(events: &[Value], zone: &str) -> CalendarResult<String> {
             escape_ics(uid),
             escape_ics(e["summary"].as_str().unwrap_or(""))
         ));
-        for (name, key) in [("DTSTART", "start"), ("DTEND", "end")] {
-            if let Some(date) = e[key]["date"].as_str() {
-                out.push_str(&format!("{name};VALUE=DATE:{}\r\n", date.replace('-', "")));
-            } else {
-                let ts = google_timestamp(&e[key], zone)?;
-                let time_zone = e[key]["timeZone"].as_str().unwrap_or(zone);
-                let time_zone = time_zone
-                    .parse::<chrono_tz::Tz>()
-                    .map_err(|_| CalendarError::validation("Event time zone is invalid"))?;
-                let stamp = time_zone
-                    .timestamp_opt(ts, 0)
-                    .single()
-                    .unwrap()
-                    .format("%Y%m%dT%H%M%S");
-                out.push_str(&format!("{name};TZID={time_zone}:{stamp}\r\n"));
-            }
+        // Expanded Google instances share their series UID. Their original start, even
+        // when an occurrence moved, identifies which instance this VEVENT represents.
+        if e["recurringEventId"].is_string() {
+            write_ics_time(&mut out, "RECURRENCE-ID", &e["originalStartTime"], zone)?;
         }
+        write_ics_time(&mut out, "DTSTART", &e["start"], zone)?;
+        write_ics_time(&mut out, "DTEND", &e["end"], zone)?;
         for (key, name) in [("description", "DESCRIPTION"), ("location", "LOCATION")] {
             if let Some(value) = e[key].as_str() {
                 out.push_str(&format!("{name}:{}\r\n", escape_ics(value)));
@@ -231,6 +221,22 @@ pub fn export_ics(events: &[Value], zone: &str) -> CalendarResult<String> {
     }
     out.push_str("END:VCALENDAR\r\n");
     Ok(fold_ics(&out))
+}
+
+fn write_ics_time(out: &mut String, name: &str, value: &Value, zone: &str) -> CalendarResult<()> {
+    if let Some(day) = value["date"].as_str() {
+        let date = NaiveDate::parse_from_str(day, "%Y-%m-%d")
+            .map_err(|_| CalendarError::validation("Invalid calendar date"))?;
+        out.push_str(&format!("{name};VALUE=DATE:{}\r\n", date.format("%Y%m%d")));
+    } else {
+        let timestamp = google_timestamp(value, zone)?;
+        let zone = value["timeZone"].as_str().unwrap_or(zone).parse::<chrono_tz::Tz>()
+            .map_err(|_| CalendarError::validation("Event time zone is invalid"))?;
+        let start = zone.timestamp_opt(timestamp, 0).single()
+            .ok_or_else(|| CalendarError::validation("Calendar date is out of range"))?;
+        out.push_str(&format!("{name};TZID={zone}:{}\r\n", start.format("%Y%m%dT%H%M%S")));
+    }
+    Ok(())
 }
 
 fn fold_ics(input: &str) -> String {
@@ -273,6 +279,24 @@ mod tests {
     fn timed_inputs_need_offsets() {
         assert!(google_time("2026-10-25", "Europe/Rome", false).is_err());
     }
+    #[test]
+    fn expanded_occurrences_share_uid_and_keep_their_original_recurrence_id() {
+        let instance = |original: Value, start: Value, end: Value| json!({
+            "iCalUID":"series@example.test", "recurringEventId":"master",
+            "originalStartTime":original, "start":start, "end":end, "summary":"Meeting"
+        });
+        let events = [
+            instance(json!({"dateTime":"2026-11-02T09:00:00+01:00"}), json!({"dateTime":"2026-11-03T11:00:00Z"}), json!({"dateTime":"2026-11-03T12:00:00Z"})),
+            instance(json!({"dateTime":"2026-11-09T09:00:00+01:00"}), json!({"dateTime":"2026-11-09T08:00:00Z"}), json!({"dateTime":"2026-11-09T09:00:00Z"})),
+        ];
+        let exported = export_ics(&events, "Europe/Rome").unwrap();
+        assert_eq!(exported.matches("\r\nUID:series@example.test\r\n").count(), 2);
+        assert!(exported.contains("RECURRENCE-ID;TZID=Europe/Rome:20261102T090000\r\n"));
+        assert!(exported.contains("RECURRENCE-ID;TZID=Europe/Rome:20261109T090000\r\n"));
+        let all_day = instance(json!({"date":"2026-11-02"}), json!({"date":"2026-11-03"}), json!({"date":"2026-11-04"}));
+        assert!(export_ics(&[all_day], "UTC").unwrap().contains("RECURRENCE-ID;VALUE=DATE:20261102\r\n"));
+    }
+
     #[test]
     fn ics_values_cannot_inject_properties() {
         assert_eq!(

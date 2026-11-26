@@ -1225,6 +1225,24 @@ impl fmt::Debug for LlmSettings {
 }
 
 impl LlmSettings {
+    fn uses_endpoint(&self, provider: &str, url: Option<&str>) -> bool {
+        self.provider == "openai-compatible" && provider == self.provider
+            && self.base_url.as_deref().zip(url).is_some_and(|(a, b)| a.trim() == b.trim())
+    }
+
+    fn effective_key(&self, base: &LlmConfig) -> Option<(&'static str, ApiKey)> {
+        if self.provider != "openai-compatible" {
+            return None;
+        }
+        if let Some(key) = self.api_key.as_deref().and_then(ApiKey::new) {
+            return Some(("admin", key));
+        }
+        if self.uses_endpoint(base.provider.as_str(), base.base_url.as_deref()) {
+            return base.api_key.clone().map(|key| ("config", key));
+        }
+        None
+    }
+
     /// Ciò che dice la configurazione, senza la sua chiave (che resta dov'è).
     pub fn from_config(config: &LlmConfig) -> LlmSettings {
         LlmSettings {
@@ -1273,14 +1291,11 @@ impl LlmSettings {
         match config.provider {
             LlmProvider::None => {}
             LlmProvider::OpenAiCompatible => {
-                let same_service = base.provider == LlmProvider::OpenAiCompatible
-                    && trimmed(base.base_url.as_deref()) == trimmed(self.base_url.as_deref());
+                let same_service = self.uses_endpoint(base.provider.as_str(), base.base_url.as_deref());
                 config.base_url = trimmed(self.base_url.as_deref());
                 config.model = trimmed(self.model.as_deref());
                 config.allowed_models = self.allowed_models.iter().filter_map(|m| trimmed(Some(m))).collect();
-                if let Some(key) = self.api_key.as_deref().and_then(ApiKey::new) {
-                    config.api_key = Some(key);
-                }
+                config.api_key = self.effective_key(base).map(|(_, key)| key);
                 if !same_service {
                     // Nome, natura e contesto dichiarati per un altro servizio ingannerebbero il consenso.
                     config.label = None;
@@ -1385,10 +1400,7 @@ impl LlmAdmin {
         let saved = LlmSettings::load(&self.path);
         let source = if saved.is_some() { "admin" } else { "config" };
         let settings = saved.unwrap_or_else(|| LlmSettings::from_config(&self.base));
-        let key = match settings.api_key.as_deref().and_then(ApiKey::new) {
-            Some(key) => Some(("admin", key)),
-            None => self.base.api_key.clone().map(|key| ("config", key)),
-        };
+        let key = settings.effective_key(&self.base);
         let active = self.holder.get().map(|gateway| {
             let info = gateway.info();
             serde_json::json!({"provider": gateway.config().provider.as_str(), "model": info.model, "label": info.label, "external": info.external})
@@ -1412,13 +1424,16 @@ impl LlmAdmin {
     pub fn update(&self, input: LlmSettingsInput) -> Result<serde_json::Value, ConfigError> {
         let _one_at_a_time = self.lock.lock().unwrap_or_else(|p| p.into_inner());
         let previous = LlmSettings::load(&self.path);
-        let api_key = if input.remove_api_key {
+        let provider = input.provider.trim();
+        let api_key = if input.remove_api_key || provider != "openai-compatible" {
             None
         } else {
-            trimmed(input.api_key.as_deref()).or_else(|| previous.and_then(|p| p.api_key))
+            trimmed(input.api_key.as_deref()).or_else(|| {
+                previous.filter(|saved| saved.uses_endpoint(provider, input.base_url.as_deref())).and_then(|saved| saved.api_key)
+            })
         };
         let settings = LlmSettings {
-            provider: input.provider.trim().to_owned(),
+            provider: provider.to_owned(),
             base_url: input.base_url,
             model: input.model,
             allowed_models: input.allowed_models,

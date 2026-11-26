@@ -5,6 +5,7 @@ use super::{
 use crate::domain::rules;
 use serde::Serialize;
 use std::sync::Arc;
+use unicode_normalization::UnicodeNormalization;
 
 #[derive(Serialize)]
 pub struct Answer {
@@ -12,12 +13,27 @@ pub struct Answer {
     pub sources: Vec<SearchHit>,
     pub meeting_sources: Vec<crate::domain::meeting::MeetingHit>,
 }
+
+/// Normalize punctuation, case and equivalent Unicode spellings before matching a title.
+pub(crate) fn normalized_words(text: &str) -> Vec<String> {
+    let normalized: String = text.nfkc().flat_map(char::to_lowercase).collect();
+    normalized.split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+
+pub(crate) fn title_in_question(question: &[String], title: &str) -> bool {
+    let title = normalized_words(title);
+    !title.is_empty() && question.windows(title.len()).any(|phrase| phrase == title.as_slice())
+}
+
 /// Only an agenda request may include calendar data. For a named event, use that event;
 /// for an overview, include the next few titles and dates. Notes require a named event.
 pub(crate) fn calendar_context(events: &[crate::model::Event], question: &str, now: i64) -> String {
+    let words = normalized_words(question);
     let question = question.to_lowercase();
-    let words: Vec<_> = question.split(|c: char| !c.is_alphanumeric()).collect();
-    let calendar_named = words.iter().any(|word| matches!(*word, "agenda" | "calendar" | "calendario"
+    let calendar_named = words.iter().any(|word| matches!(word.as_str(), "agenda" | "calendar" | "calendario"
         | "appuntamento" | "appuntamenti" | "appointment" | "appointments"
         | "event" | "events" | "evento" | "eventi" | "schedule"));
     if !calendar_named { return String::new(); }
@@ -31,10 +47,7 @@ pub(crate) fn calendar_context(events: &[crate::model::Event], question: &str, n
         return String::new();
     }
     let mut upcoming: Vec<_> = events.iter().filter(|event| event.end >= now).collect();
-    let named = |event: &crate::model::Event| {
-        let title = event.title.trim().to_lowercase();
-        !title.is_empty() && question.contains(&title)
-    };
+    let named = |event: &crate::model::Event| title_in_question(&words, &event.title);
     let has_named_event = upcoming.iter().any(|e| named(e));
     // Merely mentioning the calendar in a mail search is not a request to open it.
     let overview = matches!(question.trim(), "agenda" | "calendar" | "calendario")
@@ -44,7 +57,7 @@ pub(crate) fn calendar_context(events: &[crate::model::Event], question: &str, n
             "mostrami il mio calendario", "cosa ho in agenda", "quali appuntamenti ho",
             "quali eventi ho", "elenca gli appuntamenti"].iter().any(|prefix| question.trim_start().starts_with(*prefix));
     if !has_named_event && !overview { return String::new(); }
-    let wants_notes = words.iter().any(|word| matches!(*word, "notes" | "note" | "appunti"));
+    let wants_notes = words.iter().any(|word| matches!(word.as_str(), "notes" | "note" | "appunti"));
     upcoming.retain(|event| if has_named_event { named(event) } else {
         event.start < now.saturating_add(14 * 86_400)
     });
@@ -266,6 +279,21 @@ impl AssistantService {
 mod calendar_privacy_tests {
     use super::*;
     use crate::model::Event;
+
+    #[test]
+    fn calendar_notes_require_consecutive_whole_title_words() {
+        let events = [
+            Event { title: "AI".into(), notes: "reserved".into(), start: 50, end: 51, ..Default::default() },
+            Event { title: "Caffè—Budget".into(), notes: "forecast".into(), start: 52, end: 53, ..Default::default() },
+        ];
+        assert!(calendar_context(&events, "Quali note del calendario non hai mai letto?", 42).is_empty());
+        assert!(calendar_context(&events, "Note del calendario per caffè e budget?", 42).is_empty());
+        let short = calendar_context(&events, "Note del calendario per «AI»?", 42);
+        assert!(short.contains("reserved") && !short.contains("forecast"));
+        let compound = calendar_context(&events, "Note del calendario per CAFFE\u{300} / BUDGET?", 42);
+        assert!(compound.contains("forecast") && !compound.contains("reserved"));
+        assert!(!title_in_question(&normalized_words("calendar notes"), "—"));
+    }
 
     #[test]
     fn mail_question_omits_agenda_and_calendar_overview_omits_private_notes() {

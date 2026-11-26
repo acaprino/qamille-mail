@@ -93,6 +93,9 @@ pub struct SourceContact {
     pub book: BookId,
     #[serde(default)]
     pub remote_id: Option<String>,
+    /// Stored before Google's create request, so a lost response can be matched to this card.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub create_request: Option<String>,
     #[serde(default)]
     pub etag: Option<String>,
     #[serde(default)]

@@ -16,7 +16,9 @@ pub const READ_SCOPE: &str = "https://www.googleapis.com/auth/userinfo.email htt
 pub const WRITE_SCOPE: &str = "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/contacts https://www.googleapis.com/auth/contacts.other.readonly";
 
 const API: &str = "https://people.googleapis.com/v1";
-const PERSON_FIELDS: &str = "names,emailAddresses,phoneNumbers,addresses,organizations,birthdays,biographies,metadata";
+const PERSON_FIELDS: &str = "names,emailAddresses,phoneNumbers,addresses,organizations,birthdays,biographies,metadata,clientData";
+// Sync tokens are bound to the field mask of their original request.
+const CONTACT_TOKEN_PREFIX: &str = "client-data-v1:";
 const WRITE_FIELDS: &str = "names,emailAddresses,phoneNumbers,addresses,organizations,birthdays,biographies";
 const OTHER_FIELDS: &str = "names,emailAddresses,phoneNumbers,metadata";
 const RAW_GROUPS: [&str; 7] = ["names", "emailAddresses", "phoneNumbers", "addresses", "organizations", "birthdays", "biographies"];
@@ -329,18 +331,29 @@ impl GooglePeopleGateway {
 
 impl ContactGateway for GooglePeopleGateway {
     fn list(&self, account: &Account, other: bool, page: Option<&str>, sync_token: Option<&str>) -> AppResult<RemotePage> {
+        let sync_token = match (other, sync_token) {
+            (false, Some(stored)) => Some(stored.strip_prefix(CONTACT_TOKEN_PREFIX)
+                .ok_or_else(|| AppError::new("sync_token_expired", "Contacts field mask changed"))?),
+            _ => sync_token,
+        };
         let (path, params) = list_request(other, page, sync_token);
         let reply = self.request(account, "GET", &path, &params, None)?;
         let key = if other { "otherContacts" } else { "connections" };
         Ok(RemotePage {
             items: reply[key].as_array().map(|items| items.iter().map(person_to_remote).collect()).unwrap_or_default(),
             next_page: reply["nextPageToken"].as_str().filter(|t| !t.is_empty()).map(String::from),
-            next_sync_token: reply["nextSyncToken"].as_str().filter(|t| !t.is_empty()).map(String::from),
+            next_sync_token: reply["nextSyncToken"].as_str().filter(|t| !t.is_empty()).map(|token| {
+                if other { token.to_string() } else { format!("{CONTACT_TOKEN_PREFIX}{token}") }
+            }),
         })
     }
-    fn create(&self, account: &Account, fields: &ContactFields) -> AppResult<RemoteContact> {
-        let reply = self.request(account, "POST", "/people:createContact", &Self::person_query(), Some(&fields_to_person(fields)))?;
-        Ok(person_to_remote(&reply))
+    fn create(&self, account: &Account, fields: &ContactFields, request_id: &str) -> AppResult<RemoteContact> {
+        let mut person = fields_to_person(fields);
+        person["clientData"] = json!([{"key": crate::application::contact_ports::CREATE_REQUEST_KEY, "value": request_id}]);
+        let reply = self.request(account, "POST", "/people:createContact", &Self::person_query(), Some(&person))?;
+        let remote = person_to_remote(&reply);
+        if remote.remote_id.is_empty() { return Err(AppError::external("Google returned a contact without a resource name")); }
+        Ok(remote)
     }
     fn update(&self, account: &Account, remote_id: &str, etag: &str, fields: &ContactFields, unmanaged: &Value) -> AppResult<RemoteContact> {
         let path = format!("/{}:updateContact", resource(remote_id)?);
@@ -614,12 +627,26 @@ Italia", "streetAddress": "Via Roma 1", "city": "Milano", "postalCode": "20100",
         let page = json!({"connections": [full_person()], "nextPageToken": "p2", "nextSyncToken": null}).to_string();
         let (base, seen) = serve(vec![(200, page)]);
         let gateway = GooglePeopleGateway::with_base(Arc::new(NoSecrets), &base, "access-1");
-        let reply = gateway.list(&account(), false, None, Some("T9")).unwrap();
+        assert_eq!(gateway.list(&account(), false, None, Some("T9")).unwrap_err().code, "sync_token_expired");
+        let reply = gateway.list(&account(), false, None, Some("client-data-v1:T9")).unwrap();
         assert_eq!((reply.items.len(), reply.next_page.as_deref(), reply.next_sync_token), (1, Some("p2"), None));
         let head = seen.lock().unwrap()[0].clone();
         assert!(head.starts_with("GET /people/me/connections?"), "{head}");
         assert!(head.contains("syncToken=T9") && head.contains("requestSyncToken=true"), "{head}");
         assert!(head.to_lowercase().contains("authorization: bearer access-1"), "{head}");
+    }
+
+    #[test]
+    fn create_sends_an_identity_that_can_be_read_back_after_a_lost_reply() {
+        let answer = json!({"resourceName": "people/c1", "clientData": [{"key": "qamille.contact.create", "value": "request-7"}]});
+        let (base, seen) = serve(vec![(200, answer.to_string())]);
+        let gateway = GooglePeopleGateway::with_base(Arc::new(NoSecrets), &base, "t");
+        let created = gateway.create(&account(), &ContactFields::default(), "request-7").unwrap();
+        assert_eq!(created.create_request(), Some("request-7"));
+        let request = seen.lock().unwrap()[0].clone();
+        assert!(request.starts_with("POST /people:createContact?") && request.contains("clientData"));
+        let body: Value = serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap()).unwrap();
+        assert_eq!(body["clientData"], answer["clientData"]);
     }
 
     #[test]

@@ -208,10 +208,11 @@ impl ContactGateway for FakeContactGateway {
             next_sync_token: (end >= items.len()).then(|| "T1".to_string()),
         })
     }
-    fn create(&self, account: &Account, fields: &ContactFields) -> AppResult<RemoteContact> {
+    fn create(&self, account: &Account, fields: &ContactFields, request_id: &str) -> AppResult<RemoteContact> {
         self.write(account, || {
             let n = self.next();
-            let created = Self::remote(&format!("people/{n}"), &format!("e{n}"), fields.clone());
+            let mut created = Self::remote(&format!("people/{n}"), &format!("e{n}"), fields.clone());
+            created.unmanaged = serde_json::json!({"clientData": [{"key": qamille::application::contact_ports::CREATE_REQUEST_KEY, "value": request_id}]});
             self.log.lock().unwrap().push(format!("create {}", account.id));
             self.server.lock().unwrap().entry(account.id).or_default().push(created.clone());
             Ok(created)

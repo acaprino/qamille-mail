@@ -416,7 +416,7 @@ fn full_store(data: &Path) -> Store {
             Meeting { id: 602, ..Default::default() },
         ],
         settings: Settings {
-            mailbox_id_high_water: 4,
+            mailbox_id_high_water: Some(4),
             time_zone: "Europe/Rome".into(),
             locale: "it-IT".into(),
             undo_seconds: 9,

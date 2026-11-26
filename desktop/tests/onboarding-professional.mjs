@@ -21,12 +21,32 @@ async function shoot(page, name) {
 
 const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--force-prefers-reduced-motion'] });
 const errors = [];
-async function start(server) {
+async function start(server, { hold, fail } = {}) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'en-US' });
   const page = await context.newPage();
   page.on('pageerror', (error) => errors.push(error.message));
   page.setDefaultTimeout(15000);
-  await page.addInitScript((value) => (window.__previewServer = value), server);
+  await page.addInitScript(({ server, hold, fail }) => {
+    window.__previewServer = server;
+    if (hold && !sessionStorage.getItem('startup-hold-used')) {
+      sessionStorage.setItem('startup-hold-used', 'true');
+      window.__previewCommandBarrier = {
+        [hold]: new Promise((resolve) => { window.releaseStartup = resolve; }),
+      };
+    }
+    if (fail) window.__previewCommandFail = { [fail]: 'Startup IPC interrupted' };
+    // Keep even a shell that React inserted and removed before the next Playwright assertion.
+    window.mailboxWasVisible = false;
+    new MutationObserver((records) => {
+      for (const record of records) {
+        for (const node of record.addedNodes) {
+          if (node instanceof Element && (node.matches('.app-shell') || node.querySelector('.app-shell'))) {
+            window.mailboxWasVisible = true;
+          }
+        }
+      }
+    }).observe(document, { childList: true, subtree: true });
+  }, { server, hold, fail });
   await page.goto(process.env.QAMILLE_PREVIEW_URL || 'http://127.0.0.1:1420');
   // The first page on a fresh Vite instance also loads the desktop preview backend.
   // Start the interface assertions only once the app has asked which edition it is.
@@ -40,11 +60,26 @@ async function start(server) {
 }
 const noAccountButton = (page) => page.getByRole('button', { name: 'Continue without an account', exact: true }).count();
 
+async function expectMailClosed(page) {
+  const observed = await page.evaluate(() => ({
+    shell: window.mailboxWasVisible,
+    mailCalls: window.__previewCalls.filter((name) => ['list_mail', 'read_mail', 'prefetch_mail', 'create_draft'].includes(name)),
+  }));
+  assert.deepEqual(observed, { shell: false, mailCalls: [] });
+}
+
 try {
   {
-    const { page, context } = await start({ edition: 'professional' });
+    const { page, context } = await start({ edition: 'professional' }, { hold: 'server_status' });
+    await page.waitForFunction(() => window.__previewCalls.includes('server_status'));
+    await expect(page.getByRole('heading', { name: 'Opening your workspace' })).toBeVisible();
+    await page.evaluate(() => window.dispatchEvent(new Event('preview-workspace-changed')));
+    await page.keyboard.press('n');
+    await expectMailClosed(page);
+    await page.evaluate(() => window.releaseStartup());
     await expect(page.getByRole('heading', { name: 'Sign in to Qamille' })).toBeVisible();
     await expect(page.getByText('The server is ready.')).toBeVisible();
+    await expectMailClosed(page);
     await shoot(page, 'signin-choice');
     assert.equal(await noAccountButton(page), 0, 'no way past the screen without an account');
     assert.equal(await page.getByLabel('Server address').count(), 0, 'no address field in the Professional build');
@@ -94,6 +129,27 @@ try {
     await page.getByRole('button', { name: /^New message/ }).waitFor();
     assert.equal(await page.getByRole('heading', { name: 'Sign in to Qamille' }).count(), 0);
     console.log('PASS the self-hosted build has no sign-in screen');
+    await context.close();
+  }
+  for (const [edition, fail] of [
+    ['professional', 'app_edition'],
+    ['professional', 'server_startup_check'],
+    ['professional', 'server_status'],
+    ['self-hosted', 'app_edition'],
+    ['self-hosted', 'workspace_snapshot'],
+  ]) {
+    const { page, context } = await start({ edition }, { fail });
+    await expect(page.getByRole('alert').filter({ hasText: 'Startup IPC interrupted' })).toBeVisible();
+    await expectMailClosed(page);
+    await page.evaluate((command) => { delete window.__previewCommandFail[command]; }, fail);
+    await page.getByRole('button', { name: 'Try again' }).click();
+    if (edition === 'professional') {
+      await expect(page.getByRole('heading', { name: 'Sign in to Qamille' })).toBeVisible();
+      await expectMailClosed(page);
+    } else {
+      await expect(page.getByRole('button', { name: /^New message/ })).toBeVisible();
+    }
+    console.log(`PASS ${edition} recovers after ${fail} is interrupted`);
     await context.close();
   }
   assert.deepEqual(errors, []);

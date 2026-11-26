@@ -23,8 +23,8 @@ impl ContactGateway for McpGateway {
     fn list(&self, a: &Account, other: bool, page: Option<&str>, token: Option<&str>) -> AppResult<RemotePage> {
         self.0.list(a, other, page, token)
     }
-    fn create(&self, a: &Account, f: &ContactFields) -> AppResult<RemoteContact> {
-        self.0.create(a, f)
+    fn create(&self, a: &Account, f: &ContactFields, request_id: &str) -> AppResult<RemoteContact> {
+        self.0.create(a, f, request_id)
     }
     fn update(&self, a: &Account, id: &str, etag: &str, f: &ContactFields, u: &Value) -> AppResult<RemoteContact> {
         self.0.update(a, id, etag, f, u)

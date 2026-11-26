@@ -42,6 +42,8 @@ declare global {
      * call (`{ read_mail: [900, 0] }`: the first call is slow, the next ones are not).
      */
     __previewCommandDelay?: Record<string, number | number[]>;
+    /** Test hook: keep a named IPC pending until the browser scenario releases it. */
+    __previewCommandBarrier?: Record<string, Promise<void>>;
     /** Test hook: each named command rejects with this message, after its delay. */
     __previewCommandFail?: Record<string, string>;
     /**
@@ -434,6 +436,8 @@ export async function previewCommand(
 ): Promise<unknown> {
   (window.__previewCalls ??= []).push(command);
   const view = projected();
+  const barrier = window.__previewCommandBarrier?.[command];
+  if (barrier) await barrier;
   const wait = window.__previewCommandDelay?.[command];
   const delay = Array.isArray(wait) ? wait.shift() : wait;
   if (delay) await new Promise((resolve) => setTimeout(resolve, delay));

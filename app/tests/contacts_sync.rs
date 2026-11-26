@@ -483,6 +483,54 @@ fn an_edit_made_while_a_create_is_in_flight_becomes_an_update() {
 }
 
 #[test]
+fn delete_during_creation_survives_a_restart_even_when_the_create_reply_is_lost() {
+    use qamille::{application::contacts::ContactService, infrastructure::contact_repository::FileContactStore};
+
+    let (fx, gateway) = online();
+    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+    let path = std::env::temp_dir().join(format!("qamille-contact-create-delete-{}-{stamp}", std::process::id()));
+    let store = Arc::new(FileContactStore::new(path.clone()));
+    let open = || ContactService::new(fx.context.clone(), Arc::new(FileContactStore::new(path.clone())), gateway.clone());
+    let service = open();
+    let created = service.create("google:1", fields("Bea", &["bea@x.it"])).unwrap();
+
+    // Save the exact durable state at the crash point, before Google returns its resource name.
+    let pending = Arc::new(std::sync::Mutex::new(None));
+    let snapshot = pending.clone();
+    let writer = open();
+    let reader = store.clone();
+    *gateway.on_write.lock().unwrap() = Some(Box::new(move || {
+        writer.delete(&created.id, vec!["google:1".into()]).unwrap();
+        *snapshot.lock().unwrap() = Some(reader.read().unwrap());
+    }));
+    assert!(service.flush_queue().unwrap().iter().all(|o| o.ok));
+    let acknowledged = store.read().unwrap();
+    assert!(acknowledged.sources[0].deleted && acknowledged.sources[0].remote_id.is_some());
+    assert_eq!(acknowledged.queue[0].op, WriteOp::Delete);
+
+    let interrupted = pending.lock().unwrap().take().unwrap();
+    assert!(interrupted.sources[0].deleted && interrupted.sources[0].remote_id.is_none());
+    assert!(interrupted.sources[0].create_request.is_some());
+    store.transaction(&mut |state| { *state = interrupted.clone(); Ok(()) }).unwrap();
+    drop(service);
+    let reopened = open();
+    // An empty read while the create is still propagating must keep the deletion retryable.
+    let provider_copy = gateway.server.lock().unwrap().remove(&1).unwrap();
+    assert!(reopened.flush_queue().unwrap().iter().all(|o| !o.ok));
+    assert_eq!(store.read().unwrap().queue[0].op, WriteOp::Delete);
+    gateway.put(1, provider_copy);
+    assert_eq!(reopened.sync_book("google:1").unwrap().added, 0);
+    assert_eq!(store.read().unwrap().sources.len(), 1);
+    assert!(reopened.flush_queue().unwrap().iter().all(|o| o.ok));
+    assert!(gateway.server.lock().unwrap()[&1].is_empty());
+    assert_eq!(gateway.calls("create 1"), 1);
+    assert_eq!(gateway.calls("delete 1"), 1);
+    assert!(store.read().unwrap().queue.is_empty());
+    assert!(store.read().unwrap().sources.is_empty());
+    std::fs::remove_dir_all(path).unwrap();
+}
+
+#[test]
 fn a_conflict_elsewhere_does_not_spoil_the_result_of_a_merge() {
     let (fx, gateway, _) = conflicted();
     gateway.server.lock().unwrap().get_mut(&1).unwrap().push(person("people/9", "e1", "Mario Rossi", "mario@x.it"));

@@ -619,11 +619,11 @@ impl App {
                 &store.events, &q, Local::now().timestamp(),
             ));
             if let Some(dir) = search_meeting_dir && crate::application::assistant::include_meeting_sources(&q) {
-                let question = q.to_lowercase();
+                let question = crate::application::assistant::normalized_words(&q);
                 if let Ok(details) = crate::infrastructure::meeting_repository::merged_details(dir, &store.meetings) {
                     for detail in details.iter().filter(|detail| {
-                        let title = detail.meeting.title.trim().to_lowercase();
-                        detail.included_in_search && !title.is_empty() && question.contains(&title)
+                        detail.included_in_search
+                            && crate::application::assistant::title_in_question(&question, &detail.meeting.title)
                     }).take(SOURCES) {
                         let meeting = &detail.meeting;
                         let summary: String = meeting.summary.chars().take(1200).collect();
@@ -2514,13 +2514,10 @@ impl App {
             });
         }
         if let Some(id) = remove {
-            if let Some(a) = accounts.iter().find(|a| a.id == id) {
-                if let Err(error) = crate::infrastructure::mailbox_access::retire_legacy(a) {
-                    self.status = format!("Could not remove the mailbox: {error}");
-                    return;
-                }
+            if let Err(error) = crate::infrastructure::mailbox_access::retire_legacy(&mut self.store, id) {
+                self.status = format!("Could not remove the mailbox: {error}");
+                return;
             }
-            self.store.detach_mailbox(id, now_ts());
             self.selected = None;
             self.dirty = true;
             self.start_indexing();

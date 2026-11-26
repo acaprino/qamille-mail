@@ -12,18 +12,21 @@ pub struct RemovedAccount {
     pub email: String,
 }
 
+/// Holds off contact delivery while the vault and the mail repository detach the mailbox.
+pub type MailboxRetirement = fn(u32, &mut dyn FnMut() -> AppResult<()>) -> AppResult<()>;
+
 #[derive(Clone)]
 pub struct AccountService {
     context: Arc<ServiceContext>,
     identity: Arc<dyn GoogleIdentity>,
-    revoke_local_grants: fn(u32) -> AppResult<()>,
+    retire_mailbox: MailboxRetirement,
 }
 impl AccountService {
     pub fn new(context: Arc<ServiceContext>, identity: Arc<dyn GoogleIdentity>) -> Self {
-        Self { context, identity, revoke_local_grants: |_| Ok(()) }
+        Self { context, identity, retire_mailbox: |_, detach| detach() }
     }
-    pub fn with_grant_cleanup(mut self, cleanup: fn(u32) -> AppResult<()>) -> Self {
-        self.revoke_local_grants = cleanup;
+    pub fn with_grant_cleanup(mut self, cleanup: MailboxRetirement) -> Self {
+        self.retire_mailbox = cleanup;
         self
     }
     /// `login_hint` is the address the person expects to use; empty lets Google ask.
@@ -42,22 +45,23 @@ impl AccountService {
         let store = self.context.read_shared()?;
         let account = store.account(id).cloned().ok_or_else(|| AppError::missing("Account"))?;
         let removed = RemovedAccount { provider_id: account.resolved_provider_id().to_string(), email: account.email.clone() };
-        (self.revoke_local_grants)(id)?;
-        self.context.update(|store| {
-            let current = store.account(id).ok_or_else(|| AppError::missing("Account"))?;
-            if !current.email.eq_ignore_ascii_case(&account.email) || current.resolved_provider_id() != account.resolved_provider_id() {
-                return Err(AppError::new("identity_changed", "Mailbox changed; refresh before removing it"));
-            }
-            if account.resolved_provider_id() != "sample" {
-                let primary = super::sync::credential_key(&account);
-                // A locked vault otherwise accepts a removal as a no-op.
-                self.context.secrets.get(&primary)?;
-                for key in [format!("calendar:{id}"), format!("contacts:{id}"), primary] {
-                    self.context.secrets.remove(&key)?;
+        (self.retire_mailbox)(id, &mut || {
+            self.context.update(|store| {
+                let current = store.account(id).ok_or_else(|| AppError::missing("Account"))?;
+                if !current.email.eq_ignore_ascii_case(&account.email) || current.resolved_provider_id() != account.resolved_provider_id() {
+                    return Err(AppError::new("identity_changed", "Mailbox changed; refresh before removing it"));
                 }
-            }
-            store.detach_mailbox(id, self.context.clock.now());
-            Ok(())
+                if account.resolved_provider_id() != "sample" {
+                    let primary = super::sync::credential_key(&account);
+                    // A locked vault otherwise accepts a removal as a no-op.
+                    self.context.secrets.get(&primary)?;
+                    for key in [format!("calendar:{id}"), format!("contacts:{id}"), primary] {
+                        self.context.secrets.remove(&key)?;
+                    }
+                }
+                store.detach_mailbox(id, self.context.clock.now());
+                Ok(())
+            })
         })?;
         Ok(removed)
     }

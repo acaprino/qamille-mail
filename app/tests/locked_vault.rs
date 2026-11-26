@@ -182,6 +182,20 @@ fn moved_store() -> Store {
 }
 
 #[test]
+fn removing_a_mailbox_from_a_locked_vault_preserves_the_account_and_skips_post_commit_cleanup() {
+    let context = context(moved_store(), LockedVault::new(true));
+    let service = AccountService::new(context.clone(), Arc::new(Google::default()))
+        .with_grant_cleanup(|id, detach| {
+            assert_eq!(id, 900);
+            detach()?;
+            panic!("contact writes must survive a failed removal")
+        });
+    let error = service.remove_account(900).unwrap_err();
+    assert_eq!(error.code, vault_codes::LOCKED);
+    assert!(context.read().unwrap().account(900).is_some());
+}
+
+#[test]
 fn vault_key_locked_here_still_opens_the_workspace() {
     let store = moved_store();
     let accounts = store.accounts.len();

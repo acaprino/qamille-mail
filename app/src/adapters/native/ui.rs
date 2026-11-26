@@ -2659,16 +2659,13 @@ impl App {
     }
 
     fn finish_add_account(&mut self, mut acc: Account) {
-        if let Err(e) = secret::set(&secret::account_key(&acc.email), &acc.password) {
-            self.login_result = Some(Err(format!("Sign-in works, but the password couldn't be stored safely, so the account wasn't added: {e}")));
-            return;
-        }
+        let mut connected = self.store.clone();
         // The first real account replaces the sample mail.
-        let sample: Vec<u32> = self.store.accounts.iter().filter(|a| a.kind == AccountKind::Sample).map(|a| a.id).collect();
-        for id in sample { self.store.detach_mailbox(id, now_ts()); }
-        acc.id = match self.store.accounts.iter().find(|a| a.resolved_provider_id() == "gmail" && a.email.eq_ignore_ascii_case(&acc.email)) {
+        let sample: Vec<u32> = connected.accounts.iter().filter(|a| a.kind == AccountKind::Sample).map(|a| a.id).collect();
+        for id in sample { connected.detach_mailbox(id, now_ts()); }
+        acc.id = match connected.accounts.iter().find(|a| a.resolved_provider_id() == "gmail" && a.email.eq_ignore_ascii_case(&acc.email)) {
             Some(existing) => existing.id,
-            None => match self.store.allocate_mailbox_id() {
+            None => match connected.allocate_mailbox_id() {
                 Some(id) => { acc.color = ACCOUNT_COLORS[id as usize % ACCOUNT_COLORS.len()]; id }
                 None => {
                     self.login_result = Some(Err("Mailbox identifiers exhausted".into()));
@@ -2677,8 +2674,15 @@ impl App {
             },
         };
         // Adding a known address again just renews its password.
-        self.store.accounts.retain(|a| a.id != acc.id);
-        self.store.accounts.push(acc.clone());
+        connected.accounts.retain(|a| a.id != acc.id);
+        connected.accounts.push(acc.clone());
+        if self.screenshot.is_none() {
+            if let Err(error) = connected.save_signed_in(&acc) {
+                self.login_result = Some(Err(format!("Sign-in works, but the account couldn't be saved: {error}")));
+                return;
+            }
+        }
+        self.store = connected;
         self.new_account = NewAccount::default();
         self.selected = None;
         self.dirty = true;

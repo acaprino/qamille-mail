@@ -916,50 +916,26 @@ impl SyncService {
     /// Writes `item` into this computer: the credential in the vault first, then the mailbox, its
     /// signature and, for a personal Google client, the client's id and secret if missing.
     fn apply_item(&self, item: &SyncItem, existing: Option<u32>, now: i64) -> AppResult<bool> {
-        let store = self.context.read_shared()?;
         let provider = item.account.provider_id.as_str();
-        let id = match existing {
-            Some(id) => id,
+        let (id, was_present) = match existing {
+            Some(id) => (id, true),
             None => self.context.update(|store| {
                 if let Some(account) = store.accounts.iter().find(|a| a.resolved_provider_id() == provider && a.email.eq_ignore_ascii_case(&item.account.email)) {
-                    return Ok(account.id);
+                    return Ok((account.id, true));
                 }
-                store.allocate_mailbox_id().ok_or_else(|| AppError::storage("Mailbox identifiers exhausted"))
+                let id = store.allocate_mailbox_id().ok_or_else(|| AppError::storage("Mailbox identifiers exhausted"))?;
+                Ok((id, false))
             })?,
         };
         let key = if provider == "gmail" { account_key(&item.account.email) } else { provider_account_key(provider, id) };
-        let mut changed = false;
-        if self.context.secrets.get(&key)? != item.credential.value {
-            self.context.secrets.set(&key, &item.credential.value)?;
-            if provider == "gmail" || !item.account.oauth_client_id.is_empty() {
-                forget_access_hook(&item.account.email);
-            }
-            changed = true;
-        }
-        let adopt_client = item
-            .credential
-            .client_secret
-            .as_deref()
-            .filter(|secret| !secret.trim().is_empty())
-            .filter(|_| !item.account.oauth_client_id.is_empty() && !self.clients.is_app_client(&item.account.oauth_client_id))
-            .filter(|_| store.settings.google_client_id.trim().is_empty());
-        if let Some(secret) = adopt_client {
-            self.context.secrets.set(GOOGLE_SECRET, secret)?;
-        }
-        let client_id = item.account.oauth_client_id.clone();
-        let adopt = adopt_client.is_some();
-        let result = self.context.update(|store| {
+        self.context.update(|store| {
             let mut touched = false;
-            if adopt {
-                store.settings.google_client_id = client_id.clone();
-                touched = true;
-            }
             let position = store.accounts.iter().position(|a| a.resolved_provider_id() == provider && a.email.eq_ignore_ascii_case(&item.account.email));
             let index = match position {
                 Some(index) if store.accounts[index].id == id => index,
                 Some(_) => return Err(AppError::storage("The mailbox identity changed during synchronization; it will be retried")),
                 None => {
-                    if existing.is_some() || store.account(id).is_some() {
+                    if was_present || store.account(id).is_some() {
                         return Err(AppError::storage("The mailbox list changed while it was being synchronized; it will be retried"));
                     }
                     store.accounts.push(Account {
@@ -975,6 +951,22 @@ impl SyncService {
                     store.accounts.len() - 1
                 }
             };
+            // Under the mailbox writer lock, a retirement cannot mistake this credential for its own.
+            if self.context.secrets.get(&key)? != item.credential.value {
+                self.context.secrets.set(&key, &item.credential.value)?;
+                if provider == "gmail" || !item.account.oauth_client_id.is_empty() {
+                    forget_access_hook(&item.account.email);
+                }
+                touched = true;
+            }
+            if let Some(secret) = item.credential.client_secret.as_deref().filter(|secret| !secret.trim().is_empty())
+                .filter(|_| store.settings.google_client_id.trim().is_empty())
+                .filter(|_| !item.account.oauth_client_id.is_empty() && !self.clients.is_app_client(&item.account.oauth_client_id))
+            {
+                self.context.secrets.set(GOOGLE_SECRET, secret)?;
+                store.settings.google_client_id = item.account.oauth_client_id.clone();
+                touched = true;
+            }
             let a = &mut store.accounts[index];
             let a_before = (a.name.clone(), a.color, a.imap_host.clone(), a.imap_port, a.smtp_host.clone(), a.smtp_port, a.username.clone(), a.oauth_client_id.clone(), a.archive_folder.clone(), a.trash_folder.clone());
             a.name = item.account.name.clone();
@@ -1012,8 +1004,7 @@ impl SyncService {
                 _ => {}
             }
             Ok(touched)
-        })?;
-        Ok(changed | result)
+        })
     }
 
     // ---- revocation (S5) ---------------------------------------------------------------------

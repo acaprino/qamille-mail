@@ -92,6 +92,15 @@ impl Store {
     }
 
     pub(crate) fn save_snapshot(&self, retirement: Option<&crate::model::Account>) -> crate::application::AppResult<()> {
+        self.replace_snapshot(retirement, || Ok(()))
+    }
+
+    pub(crate) fn save_signed_in(&self, account: &crate::model::Account) -> crate::application::AppResult<()> {
+        self.replace_snapshot(None, || super::secret::set(&super::secret::account_key(&account.email), &account.password)
+            .map_err(super::gateways::vault_error))
+    }
+
+    fn replace_snapshot(&self, retirement: Option<&crate::model::Account>, save_credential: impl Fn() -> crate::application::AppResult<()>) -> crate::application::AppResult<()> {
         Self::with_persisted_store(&mut |current| {
             // Another process can detach a mailbox while this whole-store editor is open.
             // Never restore a retired number or replace its owner's address from a stale copy.
@@ -106,12 +115,15 @@ impl Store {
                     return Err(crate::application::AppError::new("identity_changed", "Mailboxes changed in another process; reload before saving"));
                 }
             }
-            let mut cleanup = std::mem::take(&mut current.settings.pending_mailbox_cleanup);
             if let Some(account) = retirement {
                 let original = current.account(account.id).ok_or_else(|| crate::application::AppError::missing("Account"))?;
                 if !original.email.eq_ignore_ascii_case(&account.email) || original.resolved_provider_id() != account.resolved_provider_id() {
                     return Err(crate::application::AppError::new("identity_changed", "Mailbox changed; reload before removing it"));
                 }
+            }
+            save_credential()?;
+            let mut cleanup = std::mem::take(&mut current.settings.pending_mailbox_cleanup);
+            if let Some(account) = retirement {
                 cleanup.insert(account.id, crate::application::accounts::retirement_key(account));
             }
             *current = self.clone();

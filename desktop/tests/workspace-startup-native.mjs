@@ -65,14 +65,20 @@ async function launch(name, data, demo = false, options = {}) {
   let ready = false;
   for (let attempt = 0; attempt < 120; attempt++) {
     if (session.spawnError) throw session.spawnError;
-    assert.equal(child.exitCode, null, `${name} exited before its own window opened: ${session.output}`);
+    if (child.exitCode !== null) break;
     try {
       ready = (await fetch(`http://127.0.0.1:${port}/json/version`, { signal: AbortSignal.timeout(1000) })).ok;
       if (ready) break;
     } catch { /* WebView is starting. */ }
     await delay(250);
   }
-  assert.ok(ready, `${name} did not expose its test window: ${session.output}`);
+  if (!ready) {
+    // Release builds have no console. Setup errors are reported here before the native dialog opens.
+    const logPath = path.join(data, 'native.log');
+    const nativeLog = await fs.readFile(logPath, 'utf8').catch(error => `(${error.code || error.message})`);
+    const status = child.exitCode === null ? 'is still running' : `exited with code ${child.exitCode}`;
+    assert.fail(`${name} ${status} without opening the test window on port ${port}.\n${logPath}:\n${nativeLog.slice(-8000)}\n${session.output}`);
+  }
   session.browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
   const context = session.browser.contexts()[0];
   session.page = context.pages()[0] || await context.waitForEvent('page');
